@@ -1,0 +1,51 @@
+name: Vanmo
+options:
+  bundleIdPrefix: com.vanmo
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    INFOPLIST_FILE: Vanmo/Resources/Info.plist
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+
+targets:
+  Vanmo:
+    type: application
+    platform: iOS
+    sources:
+      - path: Vanmo
+        excludes:
+          - "**/*.xcassets/**/Contents.json"
+    resources:
+      - path: Vanmo/Resources/Assets.xcassets
+      - path: Vanmo/Resources/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app
+        INFOPLIST_FILE: Vanmo/Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+    entitlements:
+      path: Vanmo/Vanmo.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+
+schemes:
+  Vanmo:
+    build:
+      targets:
+        Vanmo: all
+    run:
+      config: Debug
+    archive:
+      config: Release
