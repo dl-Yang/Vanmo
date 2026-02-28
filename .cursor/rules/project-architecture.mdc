@@ -1,0 +1,76 @@
+---
+name: project-architecture
+description: Vanmo 项目整体架构规范。用于创建新模块、讨论架构设计、组织代码结构时触发。
+globs:
+  - "**/*.swift"
+---
+
+# Vanmo 项目架构
+
+## 项目概述
+
+Vanmo 是一个类似 Infuse 的 iOS 视频播放器应用，支持多格式本地/网络视频播放、媒体库管理、字幕、元数据抓取等功能。
+
+## 技术栈
+
+| 项 | 选型 |
+|------|------|
+| 语言 | Swift 5.9+ |
+| 最低系统 | iOS 16.0 |
+| UI 框架 | SwiftUI（主）+ UIKit（播放器层） |
+| 架构模式 | MVVM + Clean Architecture |
+| 异步 | Swift Concurrency (async/await, Actor) |
+| 依赖管理 | Swift Package Manager |
+| 本地存储 | SwiftData / Core Data |
+| 网络 | URLSession + 自定义协议层 |
+| 播放核心 | AVFoundation + FFmpeg (via FFmpegKit) |
+
+## 项目结构
+
+```
+Vanmo/
+├── App/                        # App 入口、AppDelegate、生命周期
+│   ├── VanmoApp.swift
+│   └── AppCoordinator.swift
+├── Core/                       # 核心基础设施
+│   ├── Player/                 # 播放引擎
+│   ├── Network/                # 网络协议 (SMB, FTP, WebDAV, DLNA)
+│   ├── Storage/                # 本地存储、缓存
+│   ├── Subtitle/               # 字幕解析与渲染
+│   └── Metadata/               # 元数据抓取 (TMDb/TheTVDB)
+├── Features/                   # 功能模块（按 Feature 划分）
+│   ├── Library/                # 媒体库
+│   │   ├── Models/
+│   │   ├── ViewModels/
+│   │   └── Views/
+│   ├── Player/                 # 播放器界面
+│   ├── Browser/                # 文件/网络浏览器
+│   ├── Settings/               # 设置
+│   └── Search/                 # 搜索
+├── Shared/                     # 共享组件
+│   ├── Components/             # 可复用 UI 组件
+│   ├── Extensions/             # Swift 扩展
+│   ├── Protocols/              # 公共协议
+│   └── Utilities/              # 工具类
+└── Resources/                  # 资源文件
+    ├── Assets.xcassets
+    ├── Localizable/
+    └── Fonts/
+```
+
+## 架构原则
+
+1. **单一职责**：每个模块只负责一个功能领域
+2. **依赖反转**：Core 层定义协议，Feature 层通过协议依赖 Core
+3. **可测试性**：ViewModel 不直接依赖 UIKit/SwiftUI，便于单元测试
+4. **Actor 隔离**：播放器状态、网络连接状态使用 Actor 保证线程安全
+5. **协议优先**：对外暴露协议，内部实现可替换
+
+## 模块依赖关系
+
+```
+Features → Core → Shared
+Features → Shared
+```
+
+Features 之间不能互相依赖。模块间通信通过 Coordinator 或 NotificationCenter。

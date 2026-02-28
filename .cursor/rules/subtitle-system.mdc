@@ -1,0 +1,48 @@
+---
+name: subtitle-system
+description: 字幕系统功能规范。用于开发字幕解析、渲染、搜索下载、样式设置等功能时触发。
+globs:
+  - "**/Subtitle/**/*.swift"
+---
+
+# 字幕系统模块
+
+## 功能清单（参考 Infuse）
+
+### 字幕支持
+- [ ] 内嵌字幕提取 (MKV/MP4 内封字幕)
+- [ ] 外挂字幕加载 (.srt, .ass/.ssa, .vtt, .sub/.idx)
+- [ ] 同目录自动匹配同名字幕文件
+- [ ] OpenSubtitles 在线搜索与下载
+- [ ] 多字幕轨道切换
+- [ ] 双字幕同时显示
+
+### 字幕样式设置
+- [ ] 字体大小调节
+- [ ] 字体颜色选择
+- [ ] 背景颜色/透明度
+- [ ] 字幕位置调整（上/下）
+- [ ] 字幕时间偏移（±调整同步）
+- [ ] 字幕编码自动检测 (UTF-8, GBK, Big5 等)
+
+## 字幕解析架构
+
+```swift
+protocol SubtitleParser {
+    func parse(data: Data, encoding: String.Encoding?) throws -> [SubtitleCue]
+}
+
+struct SubtitleCue {
+    let index: Int
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+    let text: AttributedString
+}
+```
+
+## 开发规范
+
+1. **编码检测**：优先尝试 UTF-8，失败后用 ICU 检测编码
+2. **ASS 渲染**：ASS/SSA 格式的样式标签需正确解析并渲染
+3. **性能**：字幕查找使用二分搜索，避免逐帧遍历
+4. **内存**：大字幕文件延迟加载，不一次性全部加入内存

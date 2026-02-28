@@ -1,0 +1,55 @@
+---
+name: network-streaming
+description: 网络串流与远程文件访问功能规范。用于开发 SMB、FTP、WebDAV、DLNA、Plex/Emby/Jellyfin 连接等功能时触发。
+globs:
+  - "**/Network/**/*.swift"
+  - "**/Browser/**/*.swift"
+---
+
+# 网络串流模块
+
+## 功能清单（参考 Infuse）
+
+### 网络协议支持
+- [ ] SMB (Samba) — NAS/共享文件夹访问
+- [ ] FTP / SFTP
+- [ ] WebDAV
+- [ ] NFS
+- [ ] DLNA / UPnP — 自动发现局域网设备
+- [ ] HTTP/HTTPS 直链播放
+- [ ] Plex Media Server 集成
+- [ ] Emby / Jellyfin 集成
+
+### 文件浏览器
+- [ ] 网络设备/服务自动发现 (Bonjour/SSDP)
+- [ ] 远程目录浏览，树状结构导航
+- [ ] 文件预览（缩略图、时长、格式信息）
+- [ ] 收藏常用连接 / 最近连接
+- [ ] 支持保存凭据（Keychain）
+
+### 传输管理
+- [ ] 流式播放（边下边播）
+- [ ] 后台下载到本地
+- [ ] 下载队列管理
+- [ ] 断点续传
+
+## 连接抽象
+
+```swift
+protocol RemoteFileService {
+    var type: ConnectionType { get }
+    func connect(config: ConnectionConfig) async throws
+    func disconnect() async
+    func listDirectory(path: String) async throws -> [RemoteFile]
+    func streamURL(for file: RemoteFile) async throws -> URL
+    func download(file: RemoteFile, to localURL: URL, progress: @escaping (Double) -> Void) async throws
+}
+```
+
+## 开发规范
+
+1. **协议抽象**：所有网络协议实现统一的 `RemoteFileService` 协议
+2. **凭据安全**：用户密码存储在 Keychain，不使用 UserDefaults
+3. **连接池**：复用 SMB/FTP 连接，避免频繁建立/断开
+4. **超时处理**：合理设置连接和读取超时，提供用户友好的错误提示
+5. **后台下载**：使用 URLSession background configuration

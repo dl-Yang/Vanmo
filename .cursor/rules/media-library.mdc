@@ -1,0 +1,71 @@
+---
+name: media-library
+description: 媒体库功能开发规范。用于开发媒体扫描、元数据匹配、收藏夹、最近播放、分类浏览等功能时触发。
+globs:
+  - "**/Library/**/*.swift"
+  - "**/Metadata/**/*.swift"
+  - "**/Core/Storage/**/*.swift"
+---
+
+# 媒体库模块
+
+## 功能清单（参考 Infuse）
+
+### 媒体库管理
+- [ ] 自动扫描并识别视频文件（电影 vs 电视剧）
+- [ ] 按 电影 / 电视剧 / 其他 分类展示
+- [ ] 电视剧按 剧集 → 季 → 集 层级组织
+- [ ] 最近添加 / 最近播放 / 未观看 智能列表
+- [ ] 收藏夹功能
+- [ ] 自定义列表/合集
+- [ ] 搜索与筛选（按名称、年份、类型、评分）
+
+### 元数据抓取（参考 Infuse）
+- [ ] 从 TMDb (The Movie Database) 获取电影元数据
+- [ ] 从 TheTVDB 获取电视剧元数据
+- [ ] 自动匹配文件名 → 影片信息
+- [ ] 获取封面海报、背景图、剧照
+- [ ] 获取演员、导演、评分、简介、上映日期
+- [ ] 支持手动修正匹配结果
+- [ ] 元数据缓存与增量更新
+
+### Trakt 集成
+- [ ] 同步观看历史到 Trakt
+- [ ] 同步收藏和评分
+- [ ] Trakt 进度同步
+
+## 数据模型
+
+```swift
+@Model
+class MediaItem {
+    var id: UUID
+    var title: String
+    var originalTitle: String?
+    var year: Int?
+    var overview: String?
+    var posterURL: URL?
+    var backdropURL: URL?
+    var rating: Double?
+    var mediaType: MediaType          // .movie, .tvShow, .other
+    var fileURL: URL
+    var fileSize: Int64
+    var duration: TimeInterval
+    var lastPlayedAt: Date?
+    var lastPlaybackPosition: TimeInterval
+    var isWatched: Bool
+    var isFavorite: Bool
+    var addedAt: Date
+
+    var audioTracks: [AudioTrackInfo]
+    var subtitleTracks: [SubtitleTrackInfo]
+}
+```
+
+## 开发规范
+
+1. **文件名解析**：使用正则匹配常见命名格式 (Movie.2024.1080p, Show.S01E02 等)
+2. **后台扫描**：媒体扫描在后台线程进行，使用 Actor 保证数据一致性
+3. **图片缓存**：海报/背景图使用多级缓存（内存 + 磁盘），控制内存占用
+4. **增量更新**：只扫描新增/删除的文件，避免全量重扫
+5. **TMDb API**：遵守 API 速率限制，使用 API Key 认证
