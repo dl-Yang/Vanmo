@@ -5,6 +5,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            tmdbSection
             playbackSection
             subtitleSection
             librarySection
@@ -13,7 +14,10 @@ struct SettingsView: View {
             aboutSection
         }
         .navigationTitle("设置")
-        .task { await viewModel.calculateCacheSize() }
+        .task {
+            viewModel.loadAPIKey()
+            await viewModel.calculateCacheSize()
+        }
         .alert("清除缓存", isPresented: $viewModel.showClearCacheAlert) {
             Button("取消", role: .cancel) {}
             Button("清除", role: .destructive) {
@@ -33,6 +37,40 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    private var tmdbSection: some View {
+        Section {
+            HStack {
+                SecureField("输入 TMDb API Key", text: $viewModel.tmdbAPIKey)
+                    .textContentType(.password)
+                    .autocapitalization(.none)
+
+                if let isValid = viewModel.isAPIKeyValid {
+                    Image(systemName: isValid ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundStyle(isValid ? .green : .red)
+                }
+            }
+
+            Button {
+                viewModel.saveAPIKey()
+                Task { await viewModel.validateAPIKey() }
+            } label: {
+                HStack {
+                    Text("保存并验证")
+                    Spacer()
+                    if viewModel.isAPIKeyValid == nil && !viewModel.tmdbAPIKey.isEmpty {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            .disabled(viewModel.tmdbAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } header: {
+            Label("TMDb 元数据", systemImage: "film.stack")
+        } footer: {
+            Text("从 themoviedb.org 获取 API Key，用于自动匹配电影和剧集的海报、评分、简介等元数据。")
+        }
+    }
 
     private var playbackSection: some View {
         Section {

@@ -17,9 +17,43 @@ final class SettingsViewModel: ObservableObject {
 
     @AppStorage("appearance.theme") var appearance: AppearanceMode = .dark
 
+    @Published var tmdbAPIKey: String = ""
+    @Published var isAPIKeyValid: Bool? = nil
     @Published var cacheSize: String = "计算中..."
     @Published var showClearCacheAlert = false
     @Published var showResetAlert = false
+
+    func loadAPIKey() {
+        tmdbAPIKey = (try? KeychainManager.shared.loadString(for: "tmdb.apiKey")) ?? ""
+        isAPIKeyValid = tmdbAPIKey.isEmpty ? nil : true
+    }
+
+    func saveAPIKey() {
+        let trimmed = tmdbAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            try TMDbService.shared.setAPIKey(trimmed)
+            isAPIKeyValid = true
+        } catch {
+            isAPIKeyValid = false
+        }
+    }
+
+    func validateAPIKey() async {
+        let key = tmdbAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else {
+            isAPIKeyValid = nil
+            return
+        }
+        do {
+            try TMDbService.shared.setAPIKey(key)
+            let results = try await TMDbService.shared.searchMovie(query: "test")
+            isAPIKeyValid = true
+            _ = results
+        } catch {
+            isAPIKeyValid = false
+        }
+    }
 
     var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"

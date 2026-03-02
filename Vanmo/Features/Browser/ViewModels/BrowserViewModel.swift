@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import os.log
 
 @MainActor
 final class BrowserViewModel: ObservableObject {
@@ -38,10 +39,16 @@ final class BrowserViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
+        VanmoLogger.network.info("[Browser] Connecting to \(connection.name) (\(connection.type.rawValue)://\(connection.host):\(connection.port))")
+
         do {
             let password = try KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+            VanmoLogger.network.debug("[Browser] Password loaded: \(password != nil ? "yes" : "no")")
+
             let config = ConnectionConfig(from: connection, password: password)
             let newService = RemoteServiceFactory.create(for: connection.type)
+            VanmoLogger.network.debug("[Browser] Service created, starting connect...")
+
             try await newService.connect(config: config)
 
             service = newService
@@ -52,8 +59,11 @@ final class BrowserViewModel: ObservableObject {
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
 
+            VanmoLogger.network.info("[Browser] Connected successfully, loading directory: \(self.currentPath)")
             await loadDirectory(currentPath)
         } catch {
+            VanmoLogger.network.error("[Browser] Connection failed: \(error.localizedDescription)")
+            VanmoLogger.network.error("[Browser] Error type: \(String(describing: error))")
             errorMessage = error.localizedDescription
             showError = true
         }

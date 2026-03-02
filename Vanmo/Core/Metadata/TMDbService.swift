@@ -9,8 +9,11 @@ final class TMDbService {
     private let decoder: JSONDecoder
 
     var apiKey: String {
-        // In production, store in Keychain or use environment config
-        UserDefaults.standard.string(forKey: "tmdb.apiKey") ?? ""
+        (try? KeychainManager.shared.loadString(for: "tmdb.apiKey")) ?? ""
+    }
+
+    func setAPIKey(_ key: String) throws {
+        try KeychainManager.shared.save(key, for: "tmdb.apiKey")
     }
 
     private init(session: URLSession = .shared) {

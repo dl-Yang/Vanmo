@@ -43,7 +43,7 @@ struct TrackSelectorView: View {
                             Spacer()
                             if viewModel.config.selectedAudioTrack == track.id {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(.vanmoPrimary)
+                                    .foregroundStyle(Color.vanmoPrimary)
                             }
                         }
                     }
@@ -64,7 +64,7 @@ struct TrackSelectorView: View {
                     Spacer()
                     if viewModel.config.selectedSubtitleTrack == nil {
                         Image(systemName: "checkmark")
-                            .foregroundStyle(.vanmoPrimary)
+                            .foregroundStyle(Color.vanmoPrimary)
                     }
                 }
             }
@@ -85,7 +85,7 @@ struct TrackSelectorView: View {
                         Spacer()
                         if viewModel.config.selectedSubtitleTrack == track.id {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(.vanmoPrimary)
+                                .foregroundStyle(Color.vanmoPrimary)
                         }
                     }
                 }

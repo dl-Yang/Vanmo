@@ -27,7 +27,7 @@ final class FTPService: RemoteFileService {
 
     func connect(config: ConnectionConfig) async throws {
         isConnected = true
-        VanmoLogger.network.info("\(type.displayName) connected to \(config.host)")
+        VanmoLogger.network.info("\(self.type.displayName) connected to \(config.host)")
     }
 
     func disconnect() async {

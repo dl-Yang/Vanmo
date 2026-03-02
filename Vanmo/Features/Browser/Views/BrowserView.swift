@@ -163,7 +163,7 @@ struct ConnectionRow: View {
         HStack(spacing: 12) {
             Image(systemName: connection.type.icon)
                 .font(.title2)
-                .foregroundStyle(.vanmoPrimary)
+                .foregroundStyle(Color.vanmoPrimary)
                 .frame(width: 40)
 
             VStack(alignment: .leading, spacing: 2) {

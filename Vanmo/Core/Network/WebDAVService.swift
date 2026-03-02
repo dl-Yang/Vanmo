@@ -14,11 +14,15 @@ final class WebDAVService: RemoteFileService {
         self.config = config
 
         let url = baseURL(for: config)
+        VanmoLogger.network.info("[WebDAV] Connecting to \(url.absoluteString)")
+
         var request = URLRequest(url: url)
         request.httpMethod = "PROPFIND"
         request.setValue("0", forHTTPHeaderField: "Depth")
+        request.timeoutInterval = 15
 
         if let username = config.username, let password = config.password {
+            VanmoLogger.network.debug("[WebDAV] Using Basic Auth, user: \(username)")
             let credentials = "\(username):\(password)"
             if let data = credentials.data(using: .utf8) {
                 request.setValue(
@@ -26,16 +30,41 @@ final class WebDAVService: RemoteFileService {
                     forHTTPHeaderField: "Authorization"
                 )
             }
+        } else {
+            VanmoLogger.network.debug("[WebDAV] No credentials provided, connecting anonymously")
         }
 
-        let (_, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) || httpResponse.statusCode == 207 else {
+        VanmoLogger.network.debug("[WebDAV] Sending PROPFIND request (Depth: 0)...")
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            VanmoLogger.network.error("[WebDAV] Request failed: \(error.localizedDescription)")
+            VanmoLogger.network.error("[WebDAV] Error details: \(String(describing: error))")
+            throw NetworkError.connectionFailed(error.localizedDescription)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            VanmoLogger.network.error("[WebDAV] Response is not HTTPURLResponse")
+            throw NetworkError.connectionFailed("Invalid response type")
+        }
+
+        VanmoLogger.network.info("[WebDAV] Response status: \(httpResponse.statusCode)")
+        VanmoLogger.network.debug("[WebDAV] Response headers: \(httpResponse.allHeaderFields)")
+
+        if let body = String(data: data, encoding: .utf8) {
+            VanmoLogger.network.debug("[WebDAV] Response body (\(data.count) bytes): \(body.prefix(500))")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) || httpResponse.statusCode == 207 else {
+            VanmoLogger.network.error("[WebDAV] Auth failed, status: \(httpResponse.statusCode)")
             throw NetworkError.authenticationFailed
         }
 
         isConnected = true
-        VanmoLogger.network.info("WebDAV connected to \(config.host)")
+        VanmoLogger.network.info("[WebDAV] Successfully connected to \(config.host)")
     }
 
     func disconnect() async {
@@ -44,16 +73,40 @@ final class WebDAVService: RemoteFileService {
     }
 
     func listDirectory(path: String) async throws -> [RemoteFile] {
-        guard isConnected, let config else { throw NetworkError.notConnected }
+        guard isConnected, let config else {
+            VanmoLogger.network.error("[WebDAV] listDirectory failed: not connected")
+            throw NetworkError.notConnected
+        }
 
         let url = baseURL(for: config).appendingPathComponent(path)
+        VanmoLogger.network.info("[WebDAV] Listing directory: \(url.absoluteString)")
+
         var request = URLRequest(url: url)
         request.httpMethod = "PROPFIND"
         request.setValue("1", forHTTPHeaderField: "Depth")
+        request.timeoutInterval = 15
         addAuth(to: &request)
 
-        let (data, _) = try await session.data(for: request)
-        return parseWebDAVResponse(data, basePath: path)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            VanmoLogger.network.error("[WebDAV] listDirectory request failed: \(error.localizedDescription)")
+            throw NetworkError.connectionFailed(error.localizedDescription)
+        }
+
+        if let httpResponse = response as? HTTPURLResponse {
+            VanmoLogger.network.debug("[WebDAV] listDirectory status: \(httpResponse.statusCode)")
+        }
+
+        if let body = String(data: data, encoding: .utf8) {
+            VanmoLogger.network.debug("[WebDAV] listDirectory response (\(data.count) bytes): \(body.prefix(1000))")
+        }
+
+        let files = parseWebDAVResponse(data, basePath: path)
+        VanmoLogger.network.info("[WebDAV] Found \(files.count) items in \(path)")
+        return files
     }
 
     func streamURL(for file: RemoteFile) async throws -> URL {
