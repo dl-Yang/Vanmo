@@ -1,4 +1,6 @@
 import Foundation
+import FileProvider
+import SWXMLHash
 
 final class WebDAVService: RemoteFileService {
     let type: ConnectionType = .webdav
@@ -15,7 +17,7 @@ final class WebDAVService: RemoteFileService {
 
         let url = baseURL(for: config)
         VanmoLogger.network.info("[WebDAV] Connecting to \(url.absoluteString)")
-
+        
         var request = URLRequest(url: url)
         request.httpMethod = "PROPFIND"
         request.setValue("0", forHTTPHeaderField: "Depth")
@@ -33,7 +35,6 @@ final class WebDAVService: RemoteFileService {
         } else {
             VanmoLogger.network.debug("[WebDAV] No credentials provided, connecting anonymously")
         }
-
         VanmoLogger.network.debug("[WebDAV] Sending PROPFIND request (Depth: 0)...")
 
         let data: Data
@@ -59,7 +60,8 @@ final class WebDAVService: RemoteFileService {
         }
 
         guard (200...299).contains(httpResponse.statusCode) || httpResponse.statusCode == 207 else {
-            VanmoLogger.network.error("[WebDAV] Auth failed, status: \(httpResponse.statusCode)")
+            VanmoLogger.network.error("[WebDAV] Auth failed, status: \(httpResponse.statusCode) \(httpResponse.description)")
+        
             throw NetworkError.authenticationFailed
         }
 
@@ -78,7 +80,8 @@ final class WebDAVService: RemoteFileService {
             throw NetworkError.notConnected
         }
 
-        let url = baseURL(for: config).appendingPathComponent(path)
+        let url = baseURL(for: config)
+//            .appendingPathComponent(path)
         VanmoLogger.network.info("[WebDAV] Listing directory: \(url.absoluteString)")
 
         var request = URLRequest(url: url)
@@ -101,7 +104,7 @@ final class WebDAVService: RemoteFileService {
         }
 
         if let body = String(data: data, encoding: .utf8) {
-            VanmoLogger.network.debug("[WebDAV] listDirectory response (\(data.count) bytes): \(body.prefix(1000))")
+            VanmoLogger.network.debug("[WebDAV] listDirectory response (\(data.count) bytes): \(body)")
         }
 
         let files = parseWebDAVResponse(data, basePath: path)
@@ -145,7 +148,14 @@ final class WebDAVService: RemoteFileService {
 
     private func baseURL(for config: ConnectionConfig) -> URL {
         let scheme = config.port == 443 ? "https" : "http"
-        return URL(string: "\(scheme)://\(config.host):\(config.port)")!
+        var urlString = "\(scheme)://\(config.host):\(config.port)"
+        if let path = config.path, !path.isEmpty {
+            if !path.hasPrefix("/") {
+                urlString += "/"
+            }
+            urlString += path
+        }
+        return URL(string: urlString)!
     }
 
     private func addAuth(to request: inout URLRequest) {
@@ -162,8 +172,105 @@ final class WebDAVService: RemoteFileService {
     }
 
     private func parseWebDAVResponse(_ data: Data, basePath: String) -> [RemoteFile] {
-        // Simplified WebDAV XML response parsing
-        // Full implementation would use XMLParser
-        return []
+        let xml = XMLHash.parse(data)
+        var files: [RemoteFile] = []
+        let dateFormatter = ISO8601DateFormatter()
+        let rfc1123Formatter = DateFormatter()
+        rfc1123Formatter.locale = Locale(identifier: "en_US_POSIX")
+        rfc1123Formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+
+        guard let responses = xml["D:multistatus"]["D:response"].all as? [XMLIndexer] else {
+            VanmoLogger.network.warning("[WebDAV] No D:response elements found, trying without namespace")
+            return parseWebDAVResponseWithoutNamespace(xml, basePath: basePath)
+        }
+
+        for response in responses {
+            guard let href = response["D:href"].element?.text else { continue }
+
+            let decodedHref = href.removingPercentEncoding ?? href
+            let name = extractFileName(from: decodedHref)
+
+            guard !name.isEmpty else { continue }
+
+            let normalizedBasePath = basePath.hasSuffix("/") ? basePath : basePath + "/"
+            let normalizedHref = decodedHref.hasSuffix("/") ? decodedHref : decodedHref
+            if normalizedHref == normalizedBasePath || decodedHref == "/" {
+                continue
+            }
+
+            let propstat = response["D:propstat"]
+            let prop = propstat["D:prop"]
+
+            let isDirectory = prop["D:resourcetype"]["D:collection"].element != nil
+            let sizeText = prop["D:getcontentlength"].element?.text
+            let size = Int64(sizeText ?? "0") ?? 0
+            let lastModifiedText = prop["D:getlastmodified"].element?.text
+            let modifiedDate = lastModifiedText.flatMap { rfc1123Formatter.date(from: $0) }
+                ?? lastModifiedText.flatMap { dateFormatter.date(from: $0) }
+
+            let path = decodedHref
+            let fileType: RemoteFileType = isDirectory ? .directory : RemoteFileType.from(filename: name)
+
+            let remoteFile = RemoteFile(
+                name: name,
+                path: path,
+                size: size,
+                isDirectory: isDirectory,
+                modifiedDate: modifiedDate,
+                type: fileType
+            )
+            files.append(remoteFile)
+        }
+
+        return files
+    }
+
+    private func parseWebDAVResponseWithoutNamespace(
+        _ xml: XMLIndexer,
+        basePath: String
+    ) -> [RemoteFile] {
+        var files: [RemoteFile] = []
+        let rfc1123Formatter = DateFormatter()
+        rfc1123Formatter.locale = Locale(identifier: "en_US_POSIX")
+        rfc1123Formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+
+        let responses = xml["multistatus"]["response"].all
+
+        for response in responses {
+            guard let href = response["href"].element?.text else { continue }
+
+            let decodedHref = href.removingPercentEncoding ?? href
+            let name = extractFileName(from: decodedHref)
+            guard !name.isEmpty else { continue }
+
+            let normalizedBasePath = basePath.hasSuffix("/") ? basePath : basePath + "/"
+            if decodedHref == normalizedBasePath || decodedHref == "/" {
+                continue
+            }
+
+            let prop = response["propstat"]["prop"]
+            let isDirectory = prop["resourcetype"]["collection"].element != nil
+            let size = Int64(prop["getcontentlength"].element?.text ?? "0") ?? 0
+            let modifiedDate = prop["getlastmodified"].element?.text.flatMap {
+                rfc1123Formatter.date(from: $0)
+            }
+
+            let fileType: RemoteFileType = isDirectory ? .directory : RemoteFileType.from(filename: name)
+            files.append(RemoteFile(
+                name: name,
+                path: decodedHref,
+                size: size,
+                isDirectory: isDirectory,
+                modifiedDate: modifiedDate,
+                type: fileType
+            ))
+        }
+
+        return files
+    }
+
+    private func extractFileName(from href: String) -> String {
+        let trimmed = href.hasSuffix("/") ? String(href.dropLast()) : href
+        return URL(fileURLWithPath: trimmed).lastPathComponent
     }
 }

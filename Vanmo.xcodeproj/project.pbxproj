@@ -59,6 +59,7 @@
 		F81CDA7A6F126D61EA48E2F3 /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 255BC9880082B37A6C9F5612 /* NetworkError.swift */; };
 		FE0A2201C9F3CDCA472EBE00 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96CE2D7094AEA16D95E3050C /* PlayerViewModel.swift */; };
 		FF84C30ADC33D47677635F7B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDAAA9821B6C7B549EC0C654 /* LibraryViewModel.swift */; };
+		A1B2C3D4E5F60001AABBCCDD /* SWXMLHash in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D4E5F60004AABBCCDD /* SWXMLHash */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -463,12 +464,24 @@
 		};
 /* End PBXGroup section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		A1B2C3D4E5F60002AABBCCDD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F60001AABBCCDD /* SWXMLHash in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXNativeTarget section */
 		0F6607F78A5C0B637140BEB4 /* Vanmo */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C59ABAA2DD1B06AF0BD964DE /* Build configuration list for PBXNativeTarget "Vanmo" */;
 			buildPhases = (
 				4BAF5F8814705D75C384EEA1 /* Sources */,
+				A1B2C3D4E5F60002AABBCCDD /* Frameworks */,
 				7F48313C315822F7CC82A0FC /* Resources */,
 			);
 			buildRules = (
@@ -477,6 +490,7 @@
 			);
 			name = Vanmo;
 			packageProductDependencies = (
+				A1B2C3D4E5F60004AABBCCDD /* SWXMLHash */,
 			);
 			productName = Vanmo;
 			productReference = 2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */;
@@ -508,6 +522,9 @@
 			minimizedProjectReferenceProxies = 1;
 			projectDirPath = "";
 			projectRoot = "";
+			packageReferences = (
+				A1B2C3D4E5F60003AABBCCDD /* XCRemoteSwiftPackageReference "SWXMLHash" */,
+			);
 			targets = (
 				0F6607F78A5C0B637140BEB4 /* Vanmo */,
 			);
@@ -781,5 +798,24 @@
 		};
 /* End XCConfigurationList section */
 	};
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1B2C3D4E5F60003AABBCCDD /* XCRemoteSwiftPackageReference "SWXMLHash" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/drmohundro/SWXMLHash.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1B2C3D4E5F60004AABBCCDD /* SWXMLHash */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D4E5F60003AABBCCDD /* XCRemoteSwiftPackageReference "SWXMLHash" */;
+			productName = SWXMLHash;
+		};
+/* End XCSwiftPackageProductDependency section */
 	rootObject = C09E5913DC4B59FEBFD564D4 /* Project object */;
 }
