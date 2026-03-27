@@ -52,3 +52,22 @@ struct PlayerConfig {
 
     static let availableRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
 }
+
+struct Chapter: Identifiable, Equatable {
+    let id: Int
+    let title: String
+    let startTime: CMTime
+    let endTime: CMTime
+
+    var displayTime: String {
+        let seconds = startTime.seconds
+        guard seconds.isFinite else { return "0:00" }
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        let hours = mins / 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, mins % 60, secs)
+        }
+        return String(format: "%d:%02d", mins, secs)
+    }
+}

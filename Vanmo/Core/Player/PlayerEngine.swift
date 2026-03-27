@@ -25,6 +25,20 @@ protocol PlayerEngine: AnyObject {
     func availableSubtitleTracks() -> [SubtitleTrackInfo]
 }
 
+enum EngineType {
+    case avFoundation
+    case ffmpeg
+}
+
+extension PlayerEngine {
+    var engineType: EngineType {
+        if self is AVPlayerEngine {
+            return .avFoundation
+        }
+        return .ffmpeg
+    }
+}
+
 final class AVPlayerEngine: NSObject, PlayerEngine {
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
@@ -67,10 +81,13 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     // MARK: - Playback Control
 
     func load(url: URL, startPosition: CMTime? = nil) async throws {
+        VanmoLogger.player.info("[AVEngine] load() called, url: \(url.absoluteString)")
         stop()
         stateSubject.send(.loading)
 
-        let asset = AVURLAsset(url: url)
+        let (cleanURL, options) = Self.assetURL(from: url)
+        let asset = AVURLAsset(url: cleanURL, options: options)
+        VanmoLogger.player.info("[AVEngine] AVURLAsset created, isPlayable check pending")
         let playerItem = AVPlayerItem(asset: asset)
         self.playerItem = playerItem
 
@@ -80,18 +97,23 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         setupObservers(for: playerItem, player: player)
 
         if let startPosition {
+            VanmoLogger.player.info("[AVEngine] seeking to start position: \(startPosition.seconds)s")
             await player.seek(to: startPosition, toleranceBefore: .zero, toleranceAfter: .zero)
         }
 
+        VanmoLogger.player.info("[AVEngine] waiting for playerItem to become ready...")
         try await waitForReady(playerItem)
+        VanmoLogger.player.info("[AVEngine] playerItem is ready, duration: \(playerItem.duration.seconds)s")
     }
 
     func play() {
+        VanmoLogger.player.info("[AVEngine] play(), rate: \(self.playbackRate)")
         player?.rate = playbackRate
         stateSubject.send(.playing)
     }
 
     func pause() {
+        VanmoLogger.player.info("[AVEngine] pause()")
         player?.pause()
         stateSubject.send(.paused)
     }
@@ -102,6 +124,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     }
 
     func stop() {
+        VanmoLogger.player.info("[AVEngine] stop()")
         if let timeObserver, let player {
             player.removeTimeObserver(timeObserver)
         }
@@ -170,6 +193,27 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         }
     }
 
+    // MARK: - URL Credential Handling
+
+    private static func assetURL(from url: URL) -> (URL, [String: Any]?) {
+        guard let user = url.user, !user.isEmpty else {
+            return (url, nil)
+        }
+        let password = url.password ?? ""
+        let credential = "\(user):\(password)"
+        let base64 = Data(credential.utf8).base64EncodedString()
+
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        components.user = nil
+        components.password = nil
+        let cleanURL = components.url ?? url
+
+        let headers: [String: String] = ["Authorization": "Basic \(base64)"]
+        let options: [String: Any] = ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        VanmoLogger.player.info("[AVEngine] URL contains credentials, stripped and added Authorization header")
+        return (cleanURL, options)
+    }
+
     // MARK: - Private
 
     private func setupAudioSession() {
@@ -190,10 +234,14 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         item.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] status in
+                VanmoLogger.player.info("[AVEngine] playerItem.status changed: \(status.rawValue) (0=unknown, 1=readyToPlay, 2=failed)")
                 switch status {
                 case .failed:
                     let message = item.error?.localizedDescription ?? "Unknown error"
+                    VanmoLogger.player.error("[AVEngine] playerItem failed: \(message)")
                     self?.stateSubject.send(.error(message))
+                case .readyToPlay:
+                    VanmoLogger.player.info("[AVEngine] playerItem readyToPlay")
                 default:
                     break
                 }
@@ -222,6 +270,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isReady in
                 if isReady, self?.state == .buffering {
+                    self?.player?.rate = self?.playbackRate ?? 1.0
                     self?.stateSubject.send(.playing)
                 }
             }
@@ -248,11 +297,15 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
 
     private func waitForReady(_ item: AVPlayerItem) async throws {
         for await status in item.publisher(for: \.status).values {
+            VanmoLogger.player.info("[AVEngine] waitForReady: status=\(status.rawValue)")
             switch status {
             case .readyToPlay:
+                VanmoLogger.player.info("[AVEngine] waitForReady: ready!")
                 return
             case .failed:
-                throw PlayerError.loadFailed(item.error?.localizedDescription ?? "Unknown error")
+                let msg = item.error?.localizedDescription ?? "Unknown error"
+                VanmoLogger.player.error("[AVEngine] waitForReady: failed - \(msg)")
+                throw PlayerError.loadFailed(msg)
             default:
                 continue
             }

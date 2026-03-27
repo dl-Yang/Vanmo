@@ -29,6 +29,9 @@ fastlane/test_output
 *.mobileprovision
 *.cer
 
+# FFmpeg built libraries (use scripts/build-ffmpeg-ios.sh to rebuild)
+Vanmo/Frameworks/FFmpeg/
+
 # OS
 .DS_Store
 Thumbs.db

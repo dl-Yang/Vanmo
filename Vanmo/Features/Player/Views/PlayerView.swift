@@ -1,9 +1,12 @@
 import SwiftUI
 import AVFoundation
+import MetalKit
 
 struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: PlayerViewModel
+    @State private var showSpeedPicker = false
+    @State private var showScaleModePicker = false
 
     init(item: MediaItem) {
         _viewModel = StateObject(wrappedValue: PlayerViewModel(item: item))
@@ -16,12 +19,33 @@ struct PlayerView: View {
             videoLayer
 
             gestureLayer
+                .allowsHitTesting(!viewModel.controlsVisible)
 
             if viewModel.controlsVisible {
                 controlsOverlay
             }
 
             feedbackOverlays
+
+            if showSpeedPicker || showScaleModePicker {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showSpeedPicker = false
+                            showScaleModePicker = false
+                        }
+                    }
+            }
+
+            if showSpeedPicker {
+                speedPickerPanel
+            }
+
+            if showScaleModePicker {
+                scalePickerPanel
+            }
         }
         .statusBarHidden(!viewModel.controlsVisible)
         .task { await viewModel.onAppear() }
@@ -30,13 +54,29 @@ struct PlayerView: View {
             TrackSelectorView(viewModel: viewModel)
                 .presentationDetents([.medium])
         }
+        .sheet(isPresented: $viewModel.showChapterList) {
+            ChapterListView(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
+        }
+        .onChange(of: viewModel.controlsVisible) { _, visible in
+            if !visible {
+                showSpeedPicker = false
+                showScaleModePicker = false
+            }
+        }
     }
 
     // MARK: - Video Layer
 
+    @ViewBuilder
     private var videoLayer: some View {
-        VideoPlayerLayer(player: viewModel.engine.avPlayer)
-            .ignoresSafeArea()
+        if let player = viewModel.avPlayer {
+            AVPlayerVideoLayer(player: player, scaleMode: viewModel.config.scaleMode)
+                .ignoresSafeArea()
+        } else if let renderer = viewModel.ffmpegRenderView {
+            MetalVideoLayer(renderer: renderer, scaleMode: viewModel.config.scaleMode)
+                .ignoresSafeArea()
+        }
     }
 
     // MARK: - Gesture Layer
@@ -44,7 +84,6 @@ struct PlayerView: View {
     private var gestureLayer: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
-                // Left side - brightness
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
@@ -56,15 +95,14 @@ struct PlayerView: View {
                             }
                     )
 
-                // Center - seek
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        viewModel.toggleControls()
-                    }
                     .onTapGesture(count: 2) {
                         viewModel.togglePlayPause()
+                    }
+                    .onTapGesture {
+                        viewModel.toggleControls()
                     }
                     .gesture(
                         DragGesture(minimumDistance: 20)
@@ -83,7 +121,6 @@ struct PlayerView: View {
                             }
                     )
 
-                // Right side - volume
                 Rectangle()
                     .fill(.clear)
                     .contentShape(Rectangle())
@@ -104,6 +141,9 @@ struct PlayerView: View {
         ZStack {
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
+                .onTapGesture {
+                    viewModel.toggleControls()
+                }
 
             VStack {
                 topBar
@@ -138,6 +178,16 @@ struct PlayerView: View {
             Spacer()
 
             HStack(spacing: 16) {
+                if !viewModel.chapters.isEmpty {
+                    Button {
+                        viewModel.showChapterList = true
+                    } label: {
+                        Image(systemName: "list.bullet")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
+
                 Button {
                     viewModel.showTrackSelector = true
                 } label: {
@@ -146,18 +196,10 @@ struct PlayerView: View {
                         .foregroundStyle(.white)
                 }
 
-                Menu {
-                    ForEach(PlayerConfig.availableRates, id: \.self) { rate in
-                        Button {
-                            viewModel.setRate(rate)
-                        } label: {
-                            HStack {
-                                Text("\(rate, specifier: "%.1f")x")
-                                if viewModel.config.playbackRate == rate {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSpeedPicker.toggle()
+                        showScaleModePicker = false
                     }
                 } label: {
                     Text("\(viewModel.config.playbackRate, specifier: "%.1f")x")
@@ -170,18 +212,10 @@ struct PlayerView: View {
                         .clipShape(Capsule())
                 }
 
-                Menu {
-                    ForEach(VideoScaleMode.allCases, id: \.self) { mode in
-                        Button {
-                            viewModel.setScaleMode(mode)
-                        } label: {
-                            HStack {
-                                Label(mode.displayName, systemImage: mode.icon)
-                                if viewModel.config.scaleMode == mode {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showScaleModePicker.toggle()
+                        showSpeedPicker = false
                     }
                 } label: {
                     Image(systemName: viewModel.config.scaleMode.icon)
@@ -294,6 +328,82 @@ struct PlayerView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.volumeOverlay)
         .animation(.easeInOut(duration: 0.2), value: viewModel.seekOverlay)
     }
+
+    // MARK: - Picker Panels
+
+    private var speedPickerPanel: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(PlayerConfig.availableRates.enumerated()), id: \.element) { index, rate in
+                Button {
+                    viewModel.setRate(rate)
+                    withAnimation(.easeInOut(duration: 0.2)) { showSpeedPicker = false }
+                } label: {
+                    HStack {
+                        Text("\(rate, specifier: "%.1f")x")
+                        Spacer()
+                        if viewModel.config.playbackRate == rate {
+                            Image(systemName: "checkmark")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                if index < PlayerConfig.availableRates.count - 1 {
+                    Divider().overlay(.white.opacity(0.15))
+                }
+            }
+        }
+        .frame(width: 150)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.top, 56)
+        .padding(.trailing, 16)
+        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
+    }
+
+    private var scalePickerPanel: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(VideoScaleMode.allCases.enumerated()), id: \.element) { index, mode in
+                Button {
+                    viewModel.setScaleMode(mode)
+                    withAnimation(.easeInOut(duration: 0.2)) { showScaleModePicker = false }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: mode.icon)
+                            .frame(width: 20)
+                        Text(mode.displayName)
+                        Spacer()
+                        if viewModel.config.scaleMode == mode {
+                            Image(systemName: "checkmark")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                if index < VideoScaleMode.allCases.count - 1 {
+                    Divider().overlay(.white.opacity(0.15))
+                }
+            }
+        }
+        .frame(width: 160)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.top, 56)
+        .padding(.trailing, 16)
+        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
+    }
 }
 
 // MARK: - Supporting Views
@@ -321,8 +431,11 @@ struct GaugeOverlay: View {
     }
 }
 
-struct VideoPlayerLayer: UIViewRepresentable {
-    let player: AVPlayer?
+// MARK: - AVPlayer Video Layer (AVFoundation Engine)
+
+struct AVPlayerVideoLayer: UIViewRepresentable {
+    let player: AVPlayer
+    let scaleMode: VideoScaleMode
 
     func makeUIView(context: Context) -> PlayerUIView {
         PlayerUIView()
@@ -330,6 +443,7 @@ struct VideoPlayerLayer: UIViewRepresentable {
 
     func updateUIView(_ uiView: PlayerUIView, context: Context) {
         uiView.playerLayer.player = player
+        uiView.playerLayer.videoGravity = scaleMode.avLayerVideoGravity
     }
 }
 
@@ -348,5 +462,84 @@ final class PlayerUIView: UIView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+}
+
+// MARK: - Metal Video Layer (FFmpeg Engine)
+
+struct MetalVideoLayer: UIViewRepresentable {
+    let renderer: VideoRenderer
+    let scaleMode: VideoScaleMode
+
+    func makeUIView(context: Context) -> MTKView {
+        renderer.setScaleMode(scaleMode)
+        return renderer.metalView
+    }
+
+    func updateUIView(_ uiView: MTKView, context: Context) {
+        renderer.setScaleMode(scaleMode)
+    }
+}
+
+private extension VideoScaleMode {
+    var avLayerVideoGravity: AVLayerVideoGravity {
+        switch self {
+        case .fit:
+            return .resizeAspect
+        case .fill:
+            return .resizeAspectFill
+        case .stretch:
+            return .resize
+        }
+    }
+}
+
+// MARK: - Chapter List View
+
+struct ChapterListView: View {
+    @ObservedObject var viewModel: PlayerViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(viewModel.chapters) { chapter in
+                    Button {
+                        viewModel.seekToChapter(chapter)
+                        dismiss()
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(chapter.title)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.primary)
+                                Text(chapter.displayTime)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if isCurrentChapter(chapter) {
+                                Image(systemName: "play.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.vanmoPrimary)
+                            }
+                        }
+                    }
+                    .tint(.primary)
+                }
+            }
+            .navigationTitle("章节")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func isCurrentChapter(_ chapter: Chapter) -> Bool {
+        let current = viewModel.currentTime
+        return current >= chapter.startTime.seconds && current < chapter.endTime.seconds
     }
 }

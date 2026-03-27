@@ -2,7 +2,7 @@ name: Vanmo
 options:
   bundleIdPrefix: com.vanmo
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "17.0"
   xcodeVersion: "15.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
@@ -18,14 +18,22 @@ settings:
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
+packages:
+  SWXMLHash:
+    url: https://github.com/drmohundro/SWXMLHash.git
+    majorVersion: 8.1.1
+
 targets:
   Vanmo:
     type: application
     platform: iOS
+    dependencies:
+      - package: SWXMLHash
     sources:
       - path: Vanmo
         excludes:
           - "**/*.xcassets/**/Contents.json"
+          - "Frameworks/**"
     resources:
       - path: Vanmo/Resources/Assets.xcassets
       - path: Vanmo/Resources/Info.plist
@@ -34,6 +42,29 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app
         INFOPLIST_FILE: Vanmo/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: false
+        SWIFT_OBJC_BRIDGING_HEADER: Vanmo/Vanmo-Bridging-Header.h
+        GCC_PREPROCESSOR_DEFINITIONS:
+          - "FFMPEG_ENABLED=1"
+          - "$(inherited)"
+        OTHER_SWIFT_FLAGS:
+          - "-DFFMPEG_ENABLED"
+        HEADER_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/Vanmo/Frameworks/FFmpeg/include"
+        LIBRARY_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/Vanmo/Frameworks/FFmpeg/lib/$(PLATFORM_NAME)"
+        OTHER_LDFLAGS:
+          - "-lavformat"
+          - "-lavcodec"
+          - "-lavutil"
+          - "-lswscale"
+          - "-lswresample"
+          - "-lz"
+          - "-lbz2"
+          - "-liconv"
+          - "-framework"
+          - "Security"
+          - "-framework"
+          - "CoreFoundation"
     entitlements:
       path: Vanmo/Vanmo.entitlements
       properties:

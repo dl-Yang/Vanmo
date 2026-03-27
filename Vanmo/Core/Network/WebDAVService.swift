@@ -15,7 +15,7 @@ final class WebDAVService: RemoteFileService {
     func connect(config: ConnectionConfig) async throws {
         self.config = config
 
-        let url = baseURL(for: config)
+        let url = baseURL(for: config).appendingPathComponent("dav")
         VanmoLogger.network.info("[WebDAV] Connecting to \(url.absoluteString)")
         
         var request = URLRequest(url: url)
@@ -80,8 +80,7 @@ final class WebDAVService: RemoteFileService {
             throw NetworkError.notConnected
         }
 
-        let url = baseURL(for: config)
-//            .appendingPathComponent(path)
+        let url = baseURL(for: config).appendingPathComponent(path)
         VanmoLogger.network.info("[WebDAV] Listing directory: \(url.absoluteString)")
 
         var request = URLRequest(url: url)
@@ -124,7 +123,7 @@ final class WebDAVService: RemoteFileService {
                 url = authedURL
             }
         }
-
+        VanmoLogger.network.debug("video streamUrl: \(url)")
         return url
     }
 
@@ -149,12 +148,6 @@ final class WebDAVService: RemoteFileService {
     private func baseURL(for config: ConnectionConfig) -> URL {
         let scheme = config.port == 443 ? "https" : "http"
         var urlString = "\(scheme)://\(config.host):\(config.port)"
-        if let path = config.path, !path.isEmpty {
-            if !path.hasPrefix("/") {
-                urlString += "/"
-            }
-            urlString += path
-        }
         return URL(string: urlString)!
     }
 
@@ -251,9 +244,8 @@ final class WebDAVService: RemoteFileService {
             let prop = response["propstat"]["prop"]
             let isDirectory = prop["resourcetype"]["collection"].element != nil
             let size = Int64(prop["getcontentlength"].element?.text ?? "0") ?? 0
-            let modifiedDate = prop["getlastmodified"].element?.text.flatMap {
-                rfc1123Formatter.date(from: $0)
-            }
+            let lastModified = prop["getlastmodified"].element?.text
+            let modifiedDate = lastModified.flatMap { rfc1123Formatter.date(from: $0) }
 
             let fileType: RemoteFileType = isDirectory ? .directory : RemoteFileType.from(filename: name)
             files.append(RemoteFile(

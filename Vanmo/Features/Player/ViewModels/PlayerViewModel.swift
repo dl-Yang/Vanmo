@@ -10,25 +10,39 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var bufferProgress: Double = 0
     @Published private(set) var audioTracks: [AudioTrackInfo] = []
     @Published private(set) var subtitleTracks: [SubtitleTrackInfo] = []
+    @Published private(set) var chapters: [Chapter] = []
 
     @Published var config = PlayerConfig()
     @Published var controlsVisible = true
     @Published var isSeeking = false
     @Published var seekTime: TimeInterval = 0
     @Published var showTrackSelector = false
+    @Published var showChapterList = false
     @Published var brightnessOverlay: Float?
     @Published var volumeOverlay: Float?
     @Published var seekOverlay: TimeInterval?
 
-    let engine: AVPlayerEngine
+    let engine: PlayerEngine
     private let item: MediaItem
     private var cancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
 
-    init(item: MediaItem, engine: AVPlayerEngine = AVPlayerEngine()) {
+    init(item: MediaItem) {
         self.item = item
-        self.engine = engine
+        VanmoLogger.player.info("[PlayerVM] init, file: \(item.fileURL.lastPathComponent), URL: \(item.fileURL.absoluteString)")
+        self.engine = PlayerEngineFactory.engine(for: item.fileURL)
+        VanmoLogger.player.info("[PlayerVM] engine type: \(self.engine.engineType == .avFoundation ? "AVFoundation" : "FFmpeg")")
         setupBindings()
+    }
+
+    // MARK: - Engine Access
+
+    var avPlayer: AVPlayer? {
+        (engine as? AVPlayerEngine)?.avPlayer
+    }
+
+    var ffmpegRenderView: VideoRenderer? {
+        (engine as? FFmpegPlayerEngine)?.renderView
     }
 
     // MARK: - Setup
@@ -36,7 +50,11 @@ final class PlayerViewModel: ObservableObject {
     private func setupBindings() {
         engine.statePublisher
             .receive(on: DispatchQueue.main)
-            .assign(to: &$playbackState)
+            .sink { [weak self] state in
+                VanmoLogger.player.info("[PlayerVM] state changed: \(String(describing: state))")
+                self?.playbackState = state
+            }
+            .store(in: &cancellables)
 
         engine.currentTimePublisher
             .receive(on: DispatchQueue.main)
@@ -48,7 +66,11 @@ final class PlayerViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .map { $0.seconds }
             .filter { $0.isFinite && !$0.isNaN }
-            .assign(to: &$duration)
+            .sink { [weak self] dur in
+                VanmoLogger.player.info("[PlayerVM] duration updated: \(dur)s")
+                self?.duration = dur
+            }
+            .store(in: &cancellables)
 
         engine.bufferProgressPublisher
             .receive(on: DispatchQueue.main)
@@ -58,21 +80,30 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func onAppear() async {
+        VanmoLogger.player.info("[PlayerVM] onAppear, loading file: \(self.item.fileURL.lastPathComponent)")
         do {
             let startPosition: CMTime? = item.lastPlaybackPosition > 0
                 ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
                 : nil
+            VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
             try await engine.load(url: item.fileURL, startPosition: startPosition)
+            VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
             audioTracks = engine.availableAudioTracks()
             subtitleTracks = engine.availableSubtitleTracks()
+            VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
+            loadChapters()
+            VanmoLogger.player.info("[PlayerVM] calling engine.play()")
             engine.play()
+            VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
             scheduleHideControls()
         } catch {
+            VanmoLogger.player.error("[PlayerVM] load failed: \(error.localizedDescription)")
             playbackState = .error(error.localizedDescription)
         }
     }
 
     func onDisappear() {
+        VanmoLogger.player.info("[PlayerVM] onDisappear, saving progress at \(self.currentTime)s")
         saveProgress()
         engine.stop()
     }
@@ -124,6 +155,7 @@ final class PlayerViewModel: ObservableObject {
 
     func setScaleMode(_ mode: VideoScaleMode) {
         config.scaleMode = mode
+        ffmpegRenderView?.setScaleMode(mode)
     }
 
     func selectAudioTrack(_ index: Int) {
@@ -134,6 +166,19 @@ final class PlayerViewModel: ObservableObject {
     func selectSubtitleTrack(_ index: Int?) {
         config.selectedSubtitleTrack = index
         engine.selectSubtitleTrack(index: index)
+    }
+
+    // MARK: - Chapters
+
+    func seekToChapter(_ chapter: Chapter) {
+        seek(to: chapter.startTime.seconds)
+        showControlsBriefly()
+    }
+
+    private func loadChapters() {
+        if let ffmpegEngine = engine as? FFmpegPlayerEngine {
+            chapters = ffmpegEngine.availableChapters
+        }
     }
 
     // MARK: - Controls Visibility
