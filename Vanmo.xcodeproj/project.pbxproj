@@ -70,6 +70,9 @@
 		A1B2C3D4E5F60001AABB0001 /* CountryMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002AABB0001 /* CountryMapper.swift */; };
 		A1B2C3D4E5F60001AABB0002 /* GenreFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002AABB0002 /* GenreFilterView.swift */; };
 		A1B2C3D4E5F60001AABB0003 /* PersonFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002AABB0003 /* PersonFilterView.swift */; };
+		A1B2C3D4E5F60001AABB0004 /* SecondFloorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002AABB0004 /* SecondFloorView.swift */; };
+		A1B2C3D4E5F60001AABB0005 /* SecondFloorItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002AABB0005 /* SecondFloorItemView.swift */; };
+		A1B2C3D4E5F60001AABB0006 /* DominantColorExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002AABB0006 /* DominantColorExtractor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -136,6 +139,9 @@
 		A1B2C3D4E5F60002AABB0001 /* CountryMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountryMapper.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60002AABB0002 /* GenreFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GenreFilterView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60002AABB0003 /* PersonFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonFilterView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60002AABB0004 /* SecondFloorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60002AABB0005 /* SecondFloorItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorItemView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60002AABB0006 /* DominantColorExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DominantColorExtractor.swift; sourceTree = "<group>"; };
 		FAE01D009AD30867E0E07D15 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProgressBar.swift; sourceTree = "<group>"; };
 		FF07CA3A5092C0C3CF890069 /* AudioRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRenderer.swift; sourceTree = "<group>"; };
@@ -373,6 +379,7 @@
 			children = (
 				A1B2C3D4E5F60002AABB0001 /* CountryMapper.swift */,
 				E6640160B8471B99B8B34464 /* KeychainManager.swift */,
+				A1B2C3D4E5F60002AABB0006 /* DominantColorExtractor.swift */,
 				DA0820A7D1C7C3A135E3E549 /* Logger.swift */,
 			);
 			path = Utilities;
@@ -395,6 +402,8 @@
 				BEC3480B949E6965C136DCA2 /* MediaDetailView.swift */,
 				2375890C4120A60A9A76B30F /* MediaListRow.swift */,
 				A1B2C3D4E5F60002AABB0003 /* PersonFilterView.swift */,
+				A1B2C3D4E5F60002AABB0004 /* SecondFloorView.swift */,
+				A1B2C3D4E5F60002AABB0005 /* SecondFloorItemView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -609,6 +618,9 @@
 				C0F7E0FE82C8F19F0BC3D20B /* MetadataService.swift in Sources */,
 				F81CDA7A6F126D61EA48E2F3 /* NetworkError.swift in Sources */,
 				A1B2C3D4E5F60001AABB0003 /* PersonFilterView.swift in Sources */,
+				A1B2C3D4E5F60001AABB0004 /* SecondFloorView.swift in Sources */,
+				A1B2C3D4E5F60001AABB0005 /* SecondFloorItemView.swift in Sources */,
+				A1B2C3D4E5F60001AABB0006 /* DominantColorExtractor.swift in Sources */,
 				2281344F0A25C3DC28C9AB47 /* PlaybackRecord.swift in Sources */,
 				82345C9CA31F050453C59FB0 /* PlayerEngine.swift in Sources */,
 				14EA1A3581D94AF5E0C7B3B6 /* PlayerEngineFactory.swift in Sources */,

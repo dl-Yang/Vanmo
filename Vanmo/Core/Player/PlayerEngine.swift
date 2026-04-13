@@ -19,10 +19,10 @@ protocol PlayerEngine: AnyObject {
     func seek(to time: CMTime) async
     func stop()
 
-    func selectAudioTrack(index: Int)
-    func selectSubtitleTrack(index: Int?)
-    func availableAudioTracks() -> [AudioTrackInfo]
-    func availableSubtitleTracks() -> [SubtitleTrackInfo]
+    func selectAudioTrack(index: Int) async
+    func selectSubtitleTrack(index: Int?) async
+    func availableAudioTracks() async -> [AudioTrackInfo]
+    func availableSubtitleTracks() async -> [SubtitleTrackInfo]
 }
 
 enum EngineType {
@@ -141,18 +141,18 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
 
     // MARK: - Track Selection
 
-    func selectAudioTrack(index: Int) {
+    func selectAudioTrack(index: Int) async {
         guard let item = playerItem,
-              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .audible) else { return }
+              let group = try? await item.asset.loadMediaSelectionGroup(for: .audible) else { return }
         let options = group.options
         if index < options.count {
             item.select(options[index], in: group)
         }
     }
 
-    func selectSubtitleTrack(index: Int?) {
+    func selectSubtitleTrack(index: Int?) async {
         guard let item = playerItem,
-              let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else { return }
+              let group = try? await item.asset.loadMediaSelectionGroup(for: .legible) else { return }
         if let index {
             let options = group.options
             if index < options.count {
@@ -163,8 +163,8 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         }
     }
 
-    func availableAudioTracks() -> [AudioTrackInfo] {
-        guard let group = playerItem?.asset.mediaSelectionGroup(forMediaCharacteristic: .audible) else {
+    func availableAudioTracks() async -> [AudioTrackInfo] {
+        guard let group = try? await playerItem?.asset.loadMediaSelectionGroup(for: .audible) else {
             return []
         }
         return group.options.enumerated().map { index, option in
@@ -178,8 +178,8 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         }
     }
 
-    func availableSubtitleTracks() -> [SubtitleTrackInfo] {
-        guard let group = playerItem?.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else {
+    func availableSubtitleTracks() async -> [SubtitleTrackInfo] {
+        guard let group = try? await playerItem?.asset.loadMediaSelectionGroup(for: .legible) else {
             return []
         }
         return group.options.enumerated().map { index, option in

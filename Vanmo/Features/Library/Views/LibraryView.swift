@@ -6,18 +6,23 @@ struct LibraryView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var viewModel = LibraryViewModel()
 
+    @State private var showSecondFloor = false
+    @State private var pullOffset: CGFloat = 0
+
     var body: some View {
-        ScrollView {
-            if viewModel.isLoading && viewModel.allItems.isEmpty {
-                LoadingView("加载媒体库...")
-                    .frame(minHeight: 400)
-            } else if viewModel.allItems.isEmpty {
-                emptyState
-            } else {
-                libraryContent
+        ZStack {
+            ScrollView {
+                if viewModel.isLoading && viewModel.allItems.isEmpty {
+                    LoadingView("加载媒体库...")
+                        .frame(minHeight: 400)
+                } else if viewModel.allItems.isEmpty {
+                    emptyState
+                } else {
+                    libraryContent
+                }
             }
+            .background(Color.vanmoBackground)
         }
-        .background(Color.vanmoBackground)
         .navigationTitle("Vanmo")
         .toolbar { toolbarContent }
         .task {
@@ -25,6 +30,12 @@ struct LibraryView: View {
             await viewModel.load()
         }
         .refreshable { await viewModel.load() }
+        .fullScreenCover(isPresented: $showSecondFloor) {
+            SecondFloorView(
+                isPresented: $showSecondFloor,
+                recentlyPlayed: viewModel.recentlyPlayed
+            )
+        }
     }
 
     // MARK: - Library Content
@@ -32,7 +43,7 @@ struct LibraryView: View {
     private var libraryContent: some View {
         LazyVStack(alignment: .leading, spacing: 24) {
             if !viewModel.recentlyPlayed.isEmpty {
-                mediaSection("继续观看", items: viewModel.recentlyPlayed, showProgress: true)
+                secondFloorEntryHint
             }
 
             if !viewModel.recentlyAdded.isEmpty {
@@ -44,6 +55,45 @@ struct LibraryView: View {
             filterContent
         }
         .padding(.vertical)
+    }
+
+    // MARK: - Second Floor Entry
+
+    private var secondFloorEntryHint: some View {
+        Button {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            showSecondFloor = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "play.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color.vanmoPrimary)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("继续观看")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+
+                    Text("\(viewModel.recentlyPlayed.count) 部影片有播放记录")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.vanmoSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
     }
 
     // MARK: - Filter Mode Picker

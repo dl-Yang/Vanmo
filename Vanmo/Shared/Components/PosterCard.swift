@@ -7,6 +7,7 @@ struct PosterCard: View {
     let rating: Double?
     let progress: Double?
     let originCountry: String?
+    var showShadow: Bool
 
     init(
         title: String,
@@ -14,7 +15,8 @@ struct PosterCard: View {
         subtitle: String? = nil,
         rating: Double? = nil,
         progress: Double? = nil,
-        originCountry: String? = nil
+        originCountry: String? = nil,
+        showShadow: Bool = true
     ) {
         self.title = title
         self.posterURL = posterURL
@@ -22,6 +24,7 @@ struct PosterCard: View {
         self.rating = rating
         self.progress = progress
         self.originCountry = originCountry
+        self.showShadow = showShadow
     }
 
     var body: some View {
@@ -30,7 +33,12 @@ struct PosterCard: View {
             titleOverlay
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
+        .shadow(
+            color: showShadow ? .black.opacity(0.25) : .clear,
+            radius: showShadow ? 8 : 0,
+            x: 0,
+            y: showShadow ? 4 : 0
+        )
     }
 
     private var posterImage: some View {

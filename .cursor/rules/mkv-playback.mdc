@@ -1,10 +1,6 @@
 ---
-description: MKV 视频解析与播放功能实现指南。用于开发 MKV 容器解析、FFmpeg 集成、多轨道提取、软硬解切换等功能时触发。已实现双引擎架构、MKVDemuxer、FFmpegPlayerEngine、VideoRenderer(Metal)、AudioRenderer(AVAudioEngine)、HardwareDecoder(VideoToolbox)、PlayerEngineFactory。需要添加 FFmpeg 静态库才能编译 FFmpeg 相关代码。
-globs:
-  - "**/Player/**/*.swift"
-  - "**/Core/Player/**/*.swift"
+alwaysApply: false
 ---
-
 # MKV 视频解析与播放
 
 ## 背景

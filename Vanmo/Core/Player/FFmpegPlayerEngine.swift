@@ -237,14 +237,14 @@ final class FFmpegPlayerEngine: PlayerEngine {
         bufferProgressSubject.send(0)
     }
 
-    func selectAudioTrack(index: Int) {
+    func selectAudioTrack(index: Int) async {
         let audioStreams = demuxer.audioStreams()
         guard index < audioStreams.count else { return }
         demuxer.selectAudio(streamIndex: audioStreams[index].index)
         setupAudioDecoder()
     }
 
-    func selectSubtitleTrack(index: Int?) {
+    func selectSubtitleTrack(index: Int?) async {
         if let index {
             let subtitleStreams = demuxer.subtitleStreams()
             guard index < subtitleStreams.count else { return }
@@ -254,7 +254,7 @@ final class FFmpegPlayerEngine: PlayerEngine {
         }
     }
 
-    func availableAudioTracks() -> [AudioTrackInfo] {
+    func availableAudioTracks() async -> [AudioTrackInfo] {
         demuxer.audioStreams().enumerated().map { index, stream in
             AudioTrackInfo(
                 id: index,
@@ -266,7 +266,7 @@ final class FFmpegPlayerEngine: PlayerEngine {
         }
     }
 
-    func availableSubtitleTracks() -> [SubtitleTrackInfo] {
+    func availableSubtitleTracks() async -> [SubtitleTrackInfo] {
         demuxer.subtitleStreams().enumerated().map { index, stream in
             SubtitleTrackInfo(
                 id: index,
@@ -904,10 +904,10 @@ final class FFmpegPlayerEngine: PlayerEngine {
 
     func seek(to time: CMTime) async {}
 
-    func selectAudioTrack(index: Int) {}
-    func selectSubtitleTrack(index: Int?) {}
-    func availableAudioTracks() -> [AudioTrackInfo] { [] }
-    func availableSubtitleTracks() -> [SubtitleTrackInfo] { [] }
+    func selectAudioTrack(index: Int) async {}
+    func selectSubtitleTrack(index: Int?) async {}
+    func availableAudioTracks() async -> [AudioTrackInfo] { [] }
+    func availableSubtitleTracks() async -> [SubtitleTrackInfo] { [] }
 
     #endif
 }

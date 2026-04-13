@@ -88,8 +88,8 @@ final class PlayerViewModel: ObservableObject {
             VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
             try await engine.load(url: item.fileURL, startPosition: startPosition)
             VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
-            audioTracks = engine.availableAudioTracks()
-            subtitleTracks = engine.availableSubtitleTracks()
+            audioTracks = await engine.availableAudioTracks()
+            subtitleTracks = await engine.availableSubtitleTracks()
             VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
             loadChapters()
             VanmoLogger.player.info("[PlayerVM] calling engine.play()")
@@ -160,12 +160,12 @@ final class PlayerViewModel: ObservableObject {
 
     func selectAudioTrack(_ index: Int) {
         config.selectedAudioTrack = index
-        engine.selectAudioTrack(index: index)
+        Task { await engine.selectAudioTrack(index: index) }
     }
 
     func selectSubtitleTrack(_ index: Int?) {
         config.selectedSubtitleTrack = index
-        engine.selectSubtitleTrack(index: index)
+        Task { await engine.selectSubtitleTrack(index: index) }
     }
 
     // MARK: - Chapters
