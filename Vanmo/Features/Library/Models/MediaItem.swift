@@ -26,6 +26,8 @@ final class MediaItem {
     var director: String?
     var cast: [String]
 
+    var originCountry: [String]
+
     var seasonNumber: Int?
     var episodeNumber: Int?
     var showTitle: String?
@@ -52,6 +54,7 @@ final class MediaItem {
         self.addedAt = Date()
         self.genres = []
         self.cast = []
+        self.originCountry = []
         self.audioTracks = []
         self.subtitleTracks = []
     }

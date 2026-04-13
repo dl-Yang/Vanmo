@@ -4,18 +4,24 @@ struct PosterCard: View {
     let title: String
     let posterURL: URL?
     let subtitle: String?
+    let rating: Double?
     let progress: Double?
+    let originCountry: String?
 
     init(
         title: String,
         posterURL: URL? = nil,
         subtitle: String? = nil,
-        progress: Double? = nil
+        rating: Double? = nil,
+        progress: Double? = nil,
+        originCountry: String? = nil
     ) {
         self.title = title
         self.posterURL = posterURL
         self.subtitle = subtitle
+        self.rating = rating
         self.progress = progress
+        self.originCountry = originCountry
     }
 
     var body: some View {
@@ -42,6 +48,23 @@ struct PosterCard: View {
                         .overlay(ProgressView().tint(.white))
                 @unknown default:
                     placeholderView
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if let rating, rating > 0 {
+                    RatingBadge(rating)
+                        .padding(6)
+                }
+            }
+            .overlay(alignment: .bottomLeading) {
+                if let originCountry, !originCountry.isEmpty {
+                    Text(originCountry)
+                        .font(.system(size: 9, weight: .medium))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(.ultraThinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .padding(6)
                 }
             }
 
@@ -105,13 +128,16 @@ struct PosterCard: View {
         PosterCard(
             title: "Inception",
             subtitle: "2010",
-            progress: 0.6
+            rating: 8.4,
+            progress: 0.6,
+            originCountry: "美国"
         )
         .frame(width: 130)
 
         PosterCard(
             title: "The Dark Knight",
-            subtitle: "2008"
+            subtitle: "2008",
+            rating: 9.0
         )
         .frame(width: 130)
     }

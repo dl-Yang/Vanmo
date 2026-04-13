@@ -9,6 +9,8 @@ enum RemoteServiceFactory {
             return WebDAVService()
         case .ftp, .sftp:
             return FTPService(useSFTP: type == .sftp)
+        case .emby:
+            return EmbyService()
         default:
             return GenericHTTPService()
         }

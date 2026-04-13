@@ -15,6 +15,30 @@ protocol RemoteFileService: AnyObject {
     ) async throws
 }
 
+protocol MediaServerService: RemoteFileService {
+    func fetchAllMediaItems() async throws -> [ServerMediaItem]
+}
+
+struct ServerMediaItem {
+    let serverId: String
+    let title: String
+    let originalTitle: String?
+    let year: Int?
+    let overview: String?
+    let rating: Double?
+    let mediaType: MediaType
+    let posterURL: URL?
+    let backdropURL: URL?
+    let genres: [String]
+    let director: String?
+    let cast: [String]
+    let originCountry: [String]
+    let tmdbID: Int?
+    let streamURL: URL
+    let fileSize: Int64
+    let duration: TimeInterval
+}
+
 struct ConnectionConfig {
     let type: ConnectionType
     let host: String

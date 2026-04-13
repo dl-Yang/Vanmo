@@ -58,6 +58,13 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
         default: return true
         }
     }
+
+    var isMediaServer: Bool {
+        switch self {
+        case .emby, .jellyfin, .plex: return true
+        default: return false
+        }
+    }
 }
 
 @Model

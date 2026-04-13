@@ -94,6 +94,47 @@ actor MediaScanner {
         return newItems
     }
 
+    @MainActor
+    func importServerMediaItems(
+        _ serverItems: [ServerMediaItem],
+        in context: ModelContext
+    ) async throws -> [MediaItem] {
+        let existingURLs = try existingFileURLs(in: context)
+        var newItems: [MediaItem] = []
+
+        for serverItem in serverItems {
+            let streamKey = serverItem.streamURL.absoluteString
+            guard !existingURLs.contains(streamKey) else { continue }
+
+            let item = MediaItem(
+                title: serverItem.title,
+                fileURL: serverItem.streamURL,
+                mediaType: serverItem.mediaType,
+                fileSize: serverItem.fileSize,
+                duration: serverItem.duration
+            )
+
+            item.originalTitle = serverItem.originalTitle
+            item.year = serverItem.year
+            item.overview = serverItem.overview
+            item.posterURL = serverItem.posterURL
+            item.backdropURL = serverItem.backdropURL
+            item.rating = serverItem.rating
+            item.genres = serverItem.genres
+            item.director = serverItem.director
+            item.cast = serverItem.cast
+            item.originCountry = serverItem.originCountry
+            item.tmdbID = serverItem.tmdbID
+
+            context.insert(item)
+            newItems.append(item)
+        }
+
+        try context.save()
+        VanmoLogger.library.info("Imported \(newItems.count) media items from server")
+        return newItems
+    }
+
     // MARK: - Private
 
     @MainActor

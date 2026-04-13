@@ -40,6 +40,7 @@ struct TMDbMovieDetail: Decodable {
     let runtime: Int?
     let genres: [TMDbGenre]
     let credits: TMDbCredits?
+    let productionCountries: [TMDbCountry]?
 
     var year: Int? {
         guard let dateStr = releaseDate, dateStr.count >= 4 else { return nil }
@@ -88,6 +89,7 @@ struct TMDbTVDetail: Decodable {
     let genres: [TMDbGenre]
     let credits: TMDbCredits?
     let seasons: [TMDbSeason]?
+    let originCountry: [String]?
 
     var year: Int? {
         guard let dateStr = firstAirDate, dateStr.count >= 4 else { return nil }
@@ -134,4 +136,14 @@ struct TMDbCrewMember: Decodable, Identifiable {
     let job: String
     let department: String?
     let profilePath: String?
+}
+
+struct TMDbCountry: Decodable {
+    let iso3166_1: String
+    let name: String
+
+    private enum CodingKeys: String, CodingKey {
+        case iso3166_1 = "iso_3166_1"
+        case name
+    }
 }

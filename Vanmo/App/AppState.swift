@@ -20,14 +20,14 @@ final class AppState: ObservableObject {
 
 enum AppTab: Int, CaseIterable {
     case library
-    case browse
+    case connections
     case search
     case settings
 
     var title: String {
         switch self {
         case .library: return "媒体库"
-        case .browse: return "浏览"
+        case .connections: return "连接"
         case .search: return "搜索"
         case .settings: return "设置"
         }
@@ -36,7 +36,7 @@ enum AppTab: Int, CaseIterable {
     var icon: String {
         switch self {
         case .library: return "film"
-        case .browse: return "folder"
+        case .connections: return "externaldrive.connected.to.line.below"
         case .search: return "magnifyingglass"
         case .settings: return "gearshape"
         }

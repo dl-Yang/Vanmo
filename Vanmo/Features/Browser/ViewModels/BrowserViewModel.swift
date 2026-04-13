@@ -1,25 +1,32 @@
 import SwiftUI
 import SwiftData
 import Combine
-import os.log
+
+enum ConnectionStatus {
+    case idle
+    case connecting
+    case connected
+    case failed
+}
 
 @MainActor
-final class BrowserViewModel: ObservableObject {
+final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var savedConnections: [SavedConnection] = []
-    @Published private(set) var currentFiles: [RemoteFile] = []
     @Published private(set) var isLoading = false
-    @Published private(set) var isConnected = false
-    @Published private(set) var currentPath: String = "/"
-    @Published var pathHistory: [String] = ["/"]
+    @Published private(set) var loadingMessage = "连接中..."
     @Published var showAddConnection = false
     @Published var showError = false
     @Published var errorMessage = ""
 
-    private var service: RemoteFileService?
+    private var connectionStatuses: [UUID: ConnectionStatus] = [:]
     private var modelContext: ModelContext?
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
+    }
+
+    func connectionStatus(for connection: SavedConnection) -> ConnectionStatus {
+        connectionStatuses[connection.id] ?? .idle
     }
 
     func loadSavedConnections() async {
@@ -35,84 +42,58 @@ final class BrowserViewModel: ObservableObject {
         }
     }
 
-    func connect(to connection: SavedConnection) async {
+    @discardableResult
+    func connectAndScan(_ connection: SavedConnection) async -> Bool {
+        connectionStatuses[connection.id] = .connecting
         isLoading = true
-        defer { isLoading = false }
+        loadingMessage = "连接到 \(connection.name)..."
 
-        VanmoLogger.network.info("[Browser] Connecting to \(connection.name) (\(connection.type.rawValue)://\(connection.host):\(connection.port))")
+        VanmoLogger.network.info("[Connections] Connecting to \(connection.name) (\(connection.type.rawValue)://\(connection.host):\(connection.port))")
 
         do {
             let password = try KeychainManager.shared.loadString(for: "conn_\(connection.id)")
-            VanmoLogger.network.debug("[Browser] Password loaded: \(password != nil ? "yes" : "no")")
-
             let config = ConnectionConfig(from: connection, password: password)
-            let newService = RemoteServiceFactory.create(for: connection.type)
-            VanmoLogger.network.debug("[Browser] Service created, starting connect...")
+            let service = RemoteServiceFactory.create(for: connection.type)
 
-            try await newService.connect(config: config)
-
-            service = newService
-            isConnected = true
-            currentPath = connection.path ?? "/"
-            pathHistory = [currentPath]
+            try await service.connect(config: config)
+            connectionStatuses[connection.id] = .connected
 
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
 
-            VanmoLogger.network.info("[Browser] Connected successfully, loading directory: \(self.currentPath)")
-            await loadDirectory(currentPath)
+            loadingMessage = "扫描媒体文件..."
+            guard let context = modelContext else {
+                isLoading = false
+                return true
+            }
+
+            let scanner = MediaScanner(modelContainer: context.container)
+
+            if let mediaServer = service as? MediaServerService {
+                let serverItems = try await mediaServer.fetchAllMediaItems()
+                _ = try await scanner.importServerMediaItems(serverItems, in: context)
+            } else {
+                let scanPath = connection.path ?? "/"
+                _ = try await scanner.scanRemoteDirectory(
+                    service: service,
+                    path: scanPath,
+                    in: context
+                )
+            }
+
+            await service.disconnect()
+
+            VanmoLogger.network.info("[Connections] Scan complete for \(connection.name)")
+            isLoading = false
+            return true
         } catch {
-            VanmoLogger.network.error("[Browser] Connection failed: \(error.localizedDescription)")
-            VanmoLogger.network.error("[Browser] Error type: \(String(describing: error))")
+            VanmoLogger.network.error("[Connections] Connection failed: \(error.localizedDescription)")
+            connectionStatuses[connection.id] = .failed
             errorMessage = error.localizedDescription
             showError = true
+            isLoading = false
+            return false
         }
-    }
-
-    func disconnect() async {
-        await service?.disconnect()
-        service = nil
-        isConnected = false
-        currentFiles = []
-        currentPath = "/"
-        pathHistory = ["/"]
-    }
-
-    func loadDirectory(_ path: String) async {
-        guard let service else { return }
-        isLoading = true
-        defer { isLoading = false }
-
-        do {
-            currentFiles = try await service.listDirectory(path: path)
-            currentPath = path
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-    }
-
-    func navigateTo(_ file: RemoteFile) async {
-        guard file.isDirectory else { return }
-        let newPath = currentPath == "/" ? "/\(file.name)" : "\(currentPath)/\(file.name)"
-        pathHistory.append(newPath)
-        await loadDirectory(newPath)
-    }
-
-    func navigateBack() async {
-        guard pathHistory.count > 1 else {
-            await disconnect()
-            return
-        }
-        pathHistory.removeLast()
-        if let previousPath = pathHistory.last {
-            await loadDirectory(previousPath)
-        }
-    }
-
-    func streamURL(for file: RemoteFile) async throws -> URL {
-        guard let service else { throw NetworkError.notConnected }
-        return try await service.streamURL(for: file)
     }
 
     func saveConnection(
@@ -147,6 +128,9 @@ final class BrowserViewModel: ObservableObject {
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
         modelContext?.delete(connection)
         try? modelContext?.save()
+        connectionStatuses.removeValue(forKey: connection.id)
         Task { await loadSavedConnections() }
     }
 }
+
+typealias BrowserViewModel = ConnectionsViewModel

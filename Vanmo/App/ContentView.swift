@@ -14,12 +14,12 @@ struct ContentView: View {
             .tag(AppTab.library)
 
             NavigationStack {
-                BrowserView()
+                ConnectionsView()
             }
             .tabItem {
-                Label(AppTab.browse.title, systemImage: AppTab.browse.icon)
+                Label(AppTab.connections.title, systemImage: AppTab.connections.icon)
             }
-            .tag(AppTab.browse)
+            .tag(AppTab.connections)
 
             NavigationStack {
                 SearchView()

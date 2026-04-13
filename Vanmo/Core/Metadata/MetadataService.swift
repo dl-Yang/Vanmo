@@ -28,6 +28,7 @@ actor MetadataService {
         item.director = result.director
         item.cast = result.cast
         item.tmdbID = result.tmdbID
+        item.originCountry = result.originCountry
 
         if let season = result.seasonNumber {
             item.seasonNumber = season
@@ -59,6 +60,7 @@ actor MetadataService {
             genres: detail.genres.map(\.name),
             director: detail.director,
             cast: detail.topCast,
+            originCountry: detail.productionCountries?.map(\.iso3166_1) ?? [],
             seasonNumber: nil,
             episodeNumber: nil,
             showTitle: nil
@@ -83,6 +85,7 @@ actor MetadataService {
             genres: detail.genres.map(\.name),
             director: nil,
             cast: detail.topCast,
+            originCountry: detail.originCountry ?? [],
             seasonNumber: parsed.season,
             episodeNumber: parsed.episode,
             showTitle: detail.name
@@ -102,6 +105,7 @@ struct MetadataResult {
     let genres: [String]
     let director: String?
     let cast: [String]
+    let originCountry: [String]
     let seasonNumber: Int?
     let episodeNumber: Int?
     let showTitle: String?

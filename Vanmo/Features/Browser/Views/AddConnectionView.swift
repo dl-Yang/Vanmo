@@ -31,13 +31,20 @@ struct AddConnectionView: View {
                     TextField("名称", text: $name)
                         .textContentType(.name)
 
-                    TextField("主机地址", text: $host)
-                        .textContentType(.URL)
-                        .autocapitalization(.none)
-                        .keyboardType(.URL)
+                    TextField(
+                        selectedType.isMediaServer
+                            ? "服务器地址（如 https://emby.example.com）"
+                            : "主机地址",
+                        text: $host
+                    )
+                    .textContentType(.URL)
+                    .autocapitalization(.none)
+                    .keyboardType(.URL)
 
-                    TextField("端口", text: $port)
-                        .keyboardType(.numberPad)
+                    if !hostContainsScheme {
+                        TextField("端口", text: $port)
+                            .keyboardType(.numberPad)
+                    }
 
                     TextField("路径 (可选)", text: $path)
                         .autocapitalization(.none)
@@ -73,8 +80,24 @@ struct AddConnectionView: View {
         }
     }
 
+    private var hostContainsScheme: Bool {
+        let trimmed = host.trimmingCharacters(in: .whitespaces).lowercased()
+        return trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
+    }
+
     private var isValid: Bool {
-        !name.isEmpty && !host.isEmpty
+        guard !name.isEmpty, !host.isEmpty else { return false }
+        if selectedType.requiresAuth {
+            return !username.isEmpty
+        }
+        return true
+    }
+
+    private var resolvedPort: Int {
+        if hostContainsScheme {
+            return selectedType.defaultPort
+        }
+        return Int(port) ?? selectedType.defaultPort
     }
 
     private func save() {
@@ -83,7 +106,7 @@ struct AddConnectionView: View {
                 name: name,
                 type: selectedType,
                 host: host,
-                port: Int(port) ?? selectedType.defaultPort,
+                port: resolvedPort,
                 username: username.isEmpty ? nil : username,
                 password: password.isEmpty ? nil : password,
                 path: path.isEmpty ? nil : path

@@ -1,21 +1,44 @@
 import SwiftUI
 import SwiftData
 
-struct BrowserView: View {
+struct ConnectionsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
-    @StateObject private var viewModel = BrowserViewModel()
+    @StateObject private var viewModel = ConnectionsViewModel()
 
     var body: some View {
-        Group {
-            if viewModel.isConnected {
-                fileListView
-            } else {
-                connectionListView
+        List {
+            if !viewModel.savedConnections.isEmpty {
+                savedConnectionsSection
+            }
+
+            protocolsSection
+        }
+        .overlay {
+            if viewModel.savedConnections.isEmpty && !viewModel.isLoading {
+                EmptyStateView(
+                    icon: "externaldrive.connected.to.line.below",
+                    title: "尚无连接",
+                    message: "添加网络共享以扫描并管理你的媒体"
+                ) {
+                    viewModel.showAddConnection = true
+                }
+            }
+
+            if viewModel.isLoading {
+                LoadingView(viewModel.loadingMessage)
             }
         }
-        .navigationTitle(viewModel.isConnected ? viewModel.currentPath : "浏览")
-        .toolbar { toolbarContent }
+        .navigationTitle("连接")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    viewModel.showAddConnection = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
         .task {
             viewModel.setModelContext(modelContext)
             await viewModel.loadSavedConnections()
@@ -30,134 +53,58 @@ struct BrowserView: View {
         }
     }
 
-    // MARK: - Connection List
+    // MARK: - Saved Connections
 
-    private var connectionListView: some View {
-        List {
-            if !viewModel.savedConnections.isEmpty {
-                Section("已保存的连接") {
-                    ForEach(viewModel.savedConnections) { connection in
-                        Button {
-                            Task { await viewModel.connect(to: connection) }
-                        } label: {
-                            ConnectionRow(connection: connection)
-                        }
-                        .tint(.primary)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                viewModel.deleteConnection(connection)
-                            } label: {
-                                Label("删除", systemImage: "trash")
-                            }
+    private var savedConnectionsSection: some View {
+        Section("已保存的连接") {
+            ForEach(viewModel.savedConnections) { connection in
+                Button {
+                    Task {
+                        let success = await viewModel.connectAndScan(connection)
+                        if success {
+                            appState.selectedTab = .library
                         }
                     }
-                }
-            }
-
-            Section {
-                ForEach(ConnectionType.allCases) { type in
-                    Button {
-                        viewModel.showAddConnection = true
-                    } label: {
-                        Label(type.displayName, systemImage: type.icon)
-                    }
-                }
-            } header: {
-                Text("添加新连接")
-            }
-        }
-        .overlay {
-            if viewModel.isLoading {
-                LoadingView("连接中...")
-            }
-        }
-    }
-
-    // MARK: - File List
-
-    private var fileListView: some View {
-        List {
-            if viewModel.currentFiles.isEmpty && !viewModel.isLoading {
-                ContentUnavailableView("文件夹为空", systemImage: "folder")
-            } else {
-                ForEach(viewModel.currentFiles) { file in
-                    Button {
-                        handleFileTap(file)
-                    } label: {
-                        RemoteFileRow(file: file)
-                    }
-                    .tint(.primary)
-                }
-            }
-        }
-        .overlay {
-            if viewModel.isLoading {
-                LoadingView()
-            }
-        }
-        .refreshable {
-            await viewModel.loadDirectory(viewModel.currentPath)
-        }
-    }
-
-    private func handleFileTap(_ file: RemoteFile) {
-        if file.isDirectory {
-            Task { await viewModel.navigateTo(file) }
-        } else if file.isVideo {
-            Task {
-                do {
-                    let url = try await viewModel.streamURL(for: file)
-                    let mediaItem = MediaItem(
-                        title: file.name,
-                        fileURL: url,
-                        fileSize: file.size
+                } label: {
+                    ConnectionStatusRow(
+                        connection: connection,
+                        status: viewModel.connectionStatus(for: connection)
                     )
-                    appState.play(mediaItem)
-                } catch {
-                    viewModel.errorMessage = error.localizedDescription
-                    viewModel.showError = true
+                }
+                .tint(.primary)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        viewModel.deleteConnection(connection)
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Toolbar
+    // MARK: - Protocols
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        if viewModel.isConnected {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    Task { await viewModel.navigateBack() }
-                } label: {
-                    Image(systemName: "chevron.left")
-                }
-            }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    Task { await viewModel.disconnect() }
-                } label: {
-                    Text("断开")
-                        .foregroundStyle(.red)
-                }
-            }
-        } else {
-            ToolbarItem(placement: .topBarTrailing) {
+    private var protocolsSection: some View {
+        Section {
+            ForEach(ConnectionType.allCases) { type in
                 Button {
                     viewModel.showAddConnection = true
                 } label: {
-                    Image(systemName: "plus")
+                    Label(type.displayName, systemImage: type.icon)
                 }
             }
+        } header: {
+            Text("添加新连接")
         }
     }
 }
 
-// MARK: - Connection Row
+// MARK: - Connection Status Row
 
-struct ConnectionRow: View {
+struct ConnectionStatusRow: View {
     let connection: SavedConnection
+    let status: ConnectionStatus
 
     var body: some View {
         HStack(spacing: 12) {
@@ -178,82 +125,40 @@ struct ConnectionRow: View {
 
             Spacer()
 
-            if connection.isFavorite {
-                Image(systemName: "star.fill")
-                    .font(.caption)
-                    .foregroundStyle(.yellow)
-            }
+            statusIndicator
         }
         .padding(.vertical, 4)
     }
-}
 
-// MARK: - Remote File Row
-
-struct RemoteFileRow: View {
-    let file: RemoteFile
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: iconName)
-                .font(.title3)
-                .foregroundStyle(iconColor)
-                .frame(width: 32)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(file.name)
-                    .font(.subheadline)
-                    .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    if !file.isDirectory {
-                        Text(file.size.formattedFileSize)
-                    }
-                    if let date = file.modifiedDate {
-                        Text(date, style: .date)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if file.isDirectory {
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.vertical, 2)
-    }
-
-    private var iconName: String {
-        switch file.type {
-        case .directory: return "folder.fill"
-        case .video: return "film"
-        case .subtitle: return "captions.bubble"
-        case .audio: return "music.note"
-        case .image: return "photo"
-        case .other: return "doc"
-        }
-    }
-
-    private var iconColor: Color {
-        switch file.type {
-        case .directory: return .vanmoPrimary
-        case .video: return .blue
-        case .subtitle: return .green
-        case .audio: return .purple
-        case .image: return .pink
-        case .other: return .secondary
+    @ViewBuilder
+    private var statusIndicator: some View {
+        switch status {
+        case .idle:
+            Circle()
+                .fill(.gray.opacity(0.5))
+                .frame(width: 8, height: 8)
+        case .connecting:
+            ProgressView()
+                .controlSize(.small)
+        case .connected:
+            Circle()
+                .fill(.green)
+                .frame(width: 8, height: 8)
+        case .failed:
+            Circle()
+                .fill(.red)
+                .frame(width: 8, height: 8)
         }
     }
 }
+
+// MARK: - Typealias for backward compatibility
+
+typealias BrowserView = ConnectionsView
 
 #Preview {
     NavigationStack {
-        BrowserView()
+        ConnectionsView()
     }
     .environmentObject(AppState())
     .preferredColorScheme(.dark)
