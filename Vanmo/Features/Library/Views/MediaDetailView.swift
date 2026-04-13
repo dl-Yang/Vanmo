@@ -6,11 +6,21 @@ struct MediaDetailView: View {
     let item: MediaItem
 
     @State private var showAllCast = false
+    @State private var dominantColor: Color = .black.opacity(0.0)
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 headerSection
+
+                LinearGradient(
+                    colors: [dominantColor, Color.vanmoBackground],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 60)
+                .animation(.easeInOut(duration: 0.6), value: dominantColor)
+
                 infoSection
             }
         }
@@ -32,56 +42,119 @@ struct MediaDetailView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        ZStack(alignment: .bottomLeading) {
-            BackdropHeader(imageURL: item.backdropURL ?? item.posterURL, height: 380)
-
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .bottom, spacing: 16) {
-                    AsyncImage(url: item.posterURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        default:
-                            Rectangle().fill(Color.vanmoSurface)
-                                .overlay {
-                                    Image(systemName: "film")
-                                        .font(.title)
-                                        .foregroundStyle(.tertiary)
-                                }
-                        }
-                    }
-                    .frame(width: 100, height: 150)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .shadow(radius: 8)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(item.title)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .shadow(radius: 4)
-
-                        HStack(spacing: 8) {
-                            if let year = item.year {
-                                Text("\(year)")
-                            }
-                            if item.duration > 0 {
-                                Text(item.duration.shortDuration)
-                            }
-                            Text(item.mediaType.displayName)
-                        }
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                        if let rating = item.rating {
-                            RatingBadge(rating)
-                        }
-                    }
-                }
-
-                playButton
-            }
-            .padding()
+        ZStack(alignment: .bottom) {
+            dominantColorBackground
+            posterLayer
+            mediaInfoOverlay
         }
+        .frame(height: 520)
+        .clipped()
+        .task {
+            dominantColor = await DominantColorExtractor.cachedColor(
+                for: item.posterURL
+            )
+        }
+    }
+
+    // MARK: - Layer 0: Dominant Color Background
+
+    private var dominantColorBackground: some View {
+        ZStack {
+            dominantColor
+                .ignoresSafeArea()
+
+            RadialGradient(
+                colors: [dominantColor, dominantColor.opacity(0.7)],
+                center: .center,
+                startRadius: 50,
+                endRadius: 400
+            )
+            .ignoresSafeArea()
+        }
+        .animation(.easeInOut(duration: 0.6), value: dominantColor)
+    }
+
+    // MARK: - Layer 1: Poster + Edge Fade
+
+    private var posterLayer: some View {
+        ZStack {
+            AsyncImage(url: item.posterURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fit)
+                default:
+                    Rectangle().fill(Color.vanmoSurface)
+                        .overlay {
+                            Image(systemName: "film")
+                                .font(.largeTitle)
+                                .foregroundStyle(.tertiary)
+                        }
+                }
+            }
+            .frame(maxWidth: 240)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
+            .mask(posterEdgeFadeMask)
+            .padding(.bottom, 100)
+
+            LinearGradient(
+                colors: [.clear, dominantColor],
+                startPoint: .init(x: 0.5, y: 0.6),
+                endPoint: .bottom
+            )
+            .animation(.easeInOut(duration: 0.6), value: dominantColor)
+        }
+    }
+
+    private var posterEdgeFadeMask: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [.clear, .white],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 40)
+
+            Rectangle().fill(.white)
+
+            LinearGradient(
+                colors: [.white, .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+        }
+    }
+
+    // MARK: - Layer 2: Media Info Overlay
+
+    private var mediaInfoOverlay: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Spacer()
+
+            Text(item.title)
+                .font(.title2.bold())
+                .shadow(color: .black.opacity(0.6), radius: 4, y: 2)
+
+            HStack(spacing: 8) {
+                if let year = item.year {
+                    Text("\(year)")
+                }
+                if item.duration > 0 {
+                    Text(item.duration.shortDuration)
+                }
+                Text(item.mediaType.displayName)
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            if let rating = item.rating {
+                RatingBadge(rating)
+            }
+
+            playButton
+        }
+        .padding()
     }
 
     private var playButton: some View {
