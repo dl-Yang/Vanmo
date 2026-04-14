@@ -1,15 +1,27 @@
 import SwiftUI
-import CoreImage
-import CoreImage.CIFilterBuiltins
+import Kingfisher
 
 enum DominantColorExtractor {
-    private static let context = CIContext()
     private static let cache = NSCache<NSString, UIColor>()
 
     private static let sampleWidth = 48
     private static let hueBinCount = 16
 
     // MARK: - Public API
+
+    static func cachedColor(for url: URL?) async -> Color {
+        guard let url else { return .black.opacity(0.9) }
+        let key = url.absoluteString as NSString
+        if let cached = cache.object(forKey: key) {
+            return Color(cached)
+        }
+        guard let image = await retrieveImage(for: url),
+              let color = extractDominantColor(from: image) else {
+            return .black.opacity(0.9)
+        }
+        cache.setObject(UIColor(color), forKey: key)
+        return color
+    }
 
     static func extractDominantColor(from image: UIImage) -> Color? {
         let allPixels = extractPixelHSB(from: image)
@@ -19,35 +31,26 @@ enum DominantColorExtractor {
             $0.saturation > 0.08 && $0.brightness > 0.06 && $0.brightness < 0.94
         }
 
-        guard chromatic.count >= 8,
-              let best = selectBestHue(from: chromatic) else {
-            return averageFallback(from: image)
+        if chromatic.count >= 8, let best = selectBestHue(from: chromatic) {
+            return refineForBackground(best)
         }
 
-        return refineForBackground(best)
+        return averageFallback(from: allPixels)
     }
 
-    static func extractDominantColor(from url: URL?) async -> Color {
-        guard let url else { return .black.opacity(0.9) }
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard let uiImage = UIImage(data: data) else { return .black.opacity(0.9) }
-            return extractDominantColor(from: uiImage) ?? .black.opacity(0.9)
-        } catch {
-            return .black.opacity(0.9)
-        }
-    }
+    // MARK: - Image Retrieval (Kingfisher cache → network)
 
-    static func cachedColor(for url: URL?) async -> Color {
-        guard let url else { return .black.opacity(0.9) }
-        let key = url.absoluteString as NSString
-        if let cached = cache.object(forKey: key) {
-            return Color(cached)
+    private static func retrieveImage(for url: URL) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            KingfisherManager.shared.retrieveImage(with: url) { result in
+                switch result {
+                case .success(let value):
+                    continuation.resume(returning: value.image)
+                case .failure:
+                    continuation.resume(returning: nil)
+                }
+            }
         }
-        let color = await extractDominantColor(from: url)
-        let uiColor = UIColor(color)
-        cache.setObject(uiColor, forKey: key)
-        return color
     }
 
     // MARK: - Pixel Extraction
@@ -158,33 +161,22 @@ enum DominantColorExtractor {
 
     // MARK: - Fallback
 
-    private static func averageFallback(from image: UIImage) -> Color? {
-        guard let ciImage = CIImage(image: image) else { return nil }
-
-        let filter = CIFilter.areaAverage()
-        filter.inputImage = ciImage
-        filter.extent = ciImage.extent
-
-        guard let output = filter.outputImage else { return nil }
-
-        var bitmap = [UInt8](repeating: 0, count: 4)
-        context.render(
-            output, toBitmap: &bitmap, rowBytes: 4,
-            bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
-            format: .RGBA8,
-            colorSpace: CGColorSpaceCreateDeviceRGB()
-        )
-
-        let hsb = rgbToHSB(
-            r: Double(bitmap[0]) / 255,
-            g: Double(bitmap[1]) / 255,
-            b: Double(bitmap[2]) / 255
-        )
-
+    private static func averageFallback(from pixels: [HSBPixel]) -> Color? {
+        guard !pixels.isEmpty else { return nil }
+        var hueX = 0.0, hueY = 0.0, satSum = 0.0, briSum = 0.0
+        for p in pixels {
+            hueX += cos(p.hue * 2 * .pi)
+            hueY += sin(p.hue * 2 * .pi)
+            satSum += p.saturation
+            briSum += p.brightness
+        }
+        let n = Double(pixels.count)
+        var avgHue = atan2(hueY / n, hueX / n) / (2 * .pi)
+        if avgHue < 0 { avgHue += 1 }
         return Color(
-            hue: hsb.hue,
-            saturation: min(hsb.saturation * 1.1, 0.65),
-            brightness: clamp(hsb.brightness * 0.5, low: 0.10, high: 0.30)
+            hue: avgHue,
+            saturation: min(satSum / n * 1.1, 0.65),
+            brightness: clamp(briSum / n * 0.5, low: 0.10, high: 0.30)
         )
     }
 

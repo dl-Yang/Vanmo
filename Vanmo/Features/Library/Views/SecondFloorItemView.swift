@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct SecondFloorItemView: View {
     let item: MediaItem
@@ -34,13 +35,8 @@ struct SecondFloorItemView: View {
     // MARK: - Poster
 
     private var posterImage: some View {
-        AsyncImage(url: item.posterURL) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(2 / 3, contentMode: .fit)
-            default:
+        KFImage(item.posterURL)
+            .placeholder {
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .aspectRatio(2 / 3, contentMode: .fit)
@@ -50,7 +46,9 @@ struct SecondFloorItemView: View {
                             .foregroundStyle(.white.opacity(0.3))
                     }
             }
-        }
+            .fade(duration: 0.25)
+            .resizable()
+            .aspectRatio(2 / 3, contentMode: .fit)
         .frame(maxHeight: 360)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.5), radius: 20, y: 10)

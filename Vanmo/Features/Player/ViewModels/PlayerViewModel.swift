@@ -4,6 +4,9 @@ import Combine
 
 @MainActor
 final class PlayerViewModel: ObservableObject {
+    @AppStorage("subtitle.autoLoad") private var subtitleAutoLoad = true
+    @AppStorage("subtitle.preferredLanguage") private var subtitlePreferredLanguage = "zh"
+
     @Published private(set) var playbackState: PlaybackState = .idle
     @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
@@ -90,6 +93,7 @@ final class PlayerViewModel: ObservableObject {
             VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
             audioTracks = await engine.availableAudioTracks()
             subtitleTracks = await engine.availableSubtitleTracks()
+            await applyPreferredSubtitleIfNeeded()
             VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
             loadChapters()
             VanmoLogger.player.info("[PlayerVM] calling engine.play()")
@@ -166,6 +170,79 @@ final class PlayerViewModel: ObservableObject {
     func selectSubtitleTrack(_ index: Int?) {
         config.selectedSubtitleTrack = index
         Task { await engine.selectSubtitleTrack(index: index) }
+    }
+
+    private func applyPreferredSubtitleIfNeeded() async {
+        guard !subtitleTracks.isEmpty else { return }
+
+        if !subtitleAutoLoad {
+            config.selectedSubtitleTrack = nil
+            await engine.selectSubtitleTrack(index: nil)
+            return
+        }
+
+        guard let preferredIndex = preferredSubtitleIndex(
+            for: subtitlePreferredLanguage,
+            tracks: subtitleTracks
+        ) else { return }
+
+        config.selectedSubtitleTrack = preferredIndex
+        await engine.selectSubtitleTrack(index: preferredIndex)
+    }
+
+    private func preferredSubtitleIndex(
+        for preferredLanguage: String,
+        tracks: [SubtitleTrackInfo]
+    ) -> Int? {
+        let aliases = languageAliases(for: preferredLanguage)
+
+        var bestIndex: Int?
+        var bestScore = Int.min
+
+        for track in tracks {
+            let lang = normalizedLanguageCode(track.language)
+            let title = normalizedLanguageCode(track.title)
+
+            let score: Int
+            if let lang, aliases.contains(lang) {
+                score = 3
+            } else if let title, aliases.contains(title) {
+                score = 2
+            } else if let lang, lang.starts(with: preferredLanguage) {
+                score = 1
+            } else {
+                score = 0
+            }
+
+            if score > bestScore {
+                bestScore = score
+                bestIndex = track.id
+            }
+        }
+
+        return bestScore > 0 ? bestIndex : nil
+    }
+
+    private func languageAliases(for preferredLanguage: String) -> Set<String> {
+        switch preferredLanguage {
+        case "zh":
+            return ["zh", "zho", "chi", "chs", "cht", "cn", "chinese", "中文", "简体", "繁体"]
+        case "en":
+            return ["en", "eng", "english", "英文"]
+        case "ja":
+            return ["ja", "jpn", "japanese", "日语", "日本語"]
+        case "ko":
+            return ["ko", "kor", "korean", "韩语", "한국어"]
+        default:
+            return [preferredLanguage]
+        }
+    }
+
+    private func normalizedLanguageCode(_ value: String?) -> String? {
+        guard let value else { return nil }
+        return value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
     }
 
     // MARK: - Chapters

@@ -15,7 +15,7 @@ final class SettingsViewModel: ObservableObject {
     @AppStorage("library.autoScan") var libraryAutoScan = true
     @AppStorage("library.showUnwatched") var showUnwatchedBadge = true
 
-    @AppStorage("appearance.theme") var appearance: AppearanceMode = .dark
+    @AppStorage("appearance.theme") var appearance: AppearanceMode = .system
 
     @Published var tmdbAPIKey: String = ""
     @Published var isAPIKeyValid: Bool? = nil
@@ -107,7 +107,7 @@ final class SettingsViewModel: ObservableObject {
         subtitlePreferredLanguage = "zh"
         libraryAutoScan = true
         showUnwatchedBadge = true
-        appearance = .dark
+        appearance = .system
     }
 }
 

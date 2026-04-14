@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct MediaDetailView: View {
     @EnvironmentObject private var appState: AppState
@@ -78,11 +79,8 @@ struct MediaDetailView: View {
 
     private var posterLayer: some View {
         ZStack {
-            AsyncImage(url: item.posterURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fit)
-                default:
+            KFImage(item.posterURL)
+                .placeholder {
                     Rectangle().fill(Color.vanmoSurface)
                         .overlay {
                             Image(systemName: "film")
@@ -90,7 +88,9 @@ struct MediaDetailView: View {
                                 .foregroundStyle(.tertiary)
                         }
                 }
-            }
+                .fade(duration: 0.25)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
             .frame(maxWidth: 240)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(0.5), radius: 20, y: 10)

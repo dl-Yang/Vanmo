@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct MediaListRow: View {
     let item: MediaItem
@@ -16,11 +17,8 @@ struct MediaListRow: View {
     }
 
     private var poster: some View {
-        AsyncImage(url: item.posterURL) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().aspectRatio(contentMode: .fill)
-            default:
+        KFImage(item.posterURL)
+            .placeholder {
                 Rectangle()
                     .fill(Color.vanmoSurface)
                     .overlay {
@@ -28,7 +26,9 @@ struct MediaListRow: View {
                             .foregroundStyle(.tertiary)
                     }
             }
-        }
+            .fade(duration: 0.25)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
         .frame(width: 60, height: 90)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }

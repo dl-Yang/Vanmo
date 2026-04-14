@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Kingfisher
 
 struct SearchView: View {
     @Environment(\.modelContext) private var modelContext
@@ -7,22 +8,23 @@ struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
 
     var body: some View {
-        Group {
-            if viewModel.searchText.isEmpty {
-                emptySearchState
-            } else if viewModel.isSearching {
-                LoadingView("搜索中...")
-            } else {
-                searchResults
+        VStack(spacing: 0) {
+            if !viewModel.searchText.isEmpty {
+                scopePicker
+            }
+
+            Group {
+                if viewModel.searchText.isEmpty {
+                    emptySearchState
+                } else if viewModel.isSearching {
+                    LoadingView("搜索中...")
+                } else {
+                    searchResults
+                }
             }
         }
         .navigationTitle("搜索")
         .searchable(text: $viewModel.searchText, prompt: "搜索电影、剧集...")
-        .searchScopes($viewModel.searchScope) {
-            ForEach(SearchScope.allCases, id: \.self) { scope in
-                Text(scope.displayName).tag(scope)
-            }
-        }
         .onChange(of: viewModel.searchText) { _, _ in
             viewModel.search()
         }
@@ -49,6 +51,23 @@ struct SearchView: View {
     }
 
     // MARK: - Results
+
+    private var scopePicker: some View {
+        VStack(spacing: 0) {
+            Picker("搜索范围", selection: $viewModel.searchScope) {
+                ForEach(SearchScope.allCases, id: \.self) { scope in
+                    Text(scope.displayName).tag(scope)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(height: 56)
+            .padding(.horizontal)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+        }
+//       .background(Color.vanmoBackground)
+        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+    }
 
     private var searchResults: some View {
         ScrollView {
@@ -130,11 +149,8 @@ struct TMDbResultRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: TMDbService.shared.posterURL(posterPath, size: .w92)) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                default:
+            KFImage(TMDbService.shared.posterURL(posterPath, size: .w92))
+                .placeholder {
                     Rectangle()
                         .fill(Color.vanmoSurface)
                         .overlay {
@@ -142,7 +158,9 @@ struct TMDbResultRow: View {
                                 .foregroundStyle(.tertiary)
                         }
                 }
-            }
+                .fade(duration: 0.25)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
             .frame(width: 50, height: 75)
             .clipShape(RoundedRectangle(cornerRadius: 6))
 

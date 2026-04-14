@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct BackdropHeader: View {
     let imageURL: URL?
@@ -11,20 +12,14 @@ struct BackdropHeader: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            AsyncImage(url: imageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .failure, .empty:
-                    Rectangle()
-                        .fill(Color.vanmoSurface)
-                @unknown default:
+            KFImage(imageURL)
+                .placeholder {
                     Rectangle()
                         .fill(Color.vanmoSurface)
                 }
-            }
+                .fade(duration: 0.25)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
             .frame(height: height)
             .clipped()
 

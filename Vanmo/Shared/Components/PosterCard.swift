@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct PosterCard: View {
     let title: String
@@ -43,49 +44,48 @@ struct PosterCard: View {
 
     private var posterImage: some View {
         ZStack(alignment: .bottom) {
-            AsyncImage(url: posterURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
+            Rectangle()
+                .fill(.clear)
+                .overlay {
+                    KFImage(posterURL)
+                        .placeholder {
+                            placeholderView
+                                .overlay(ProgressView().tint(.white))
+                        }
+                        .fade(duration: 0.25)
                         .resizable()
-                        .aspectRatio(2/3, contentMode: .fill)
-                case .failure:
-                    placeholderView
-                case .empty:
-                    placeholderView
-                        .overlay(ProgressView().tint(.white))
-                @unknown default:
-                    placeholderView
+                        .scaledToFill()
                 }
-            }
-            .overlay(alignment: .topTrailing) {
-                if let rating, rating > 0 {
-                    RatingBadge(rating)
-                        .padding(6)
+                .overlay(alignment: .topTrailing) {
+                    if let rating, rating > 0 {
+                        RatingBadge(rating)
+                            .padding(6)
+                    }
                 }
-            }
-            .overlay(alignment: .bottomLeading) {
-                if let originCountry, !originCountry.isEmpty {
-                    Text(originCountry)
-                        .font(.system(size: 9, weight: .medium))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .padding(6)
+                .overlay(alignment: .bottomLeading) {
+                    if let originCountry, !originCountry.isEmpty {
+                        Text(originCountry)
+                            .font(.system(size: 9, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .padding(6)
+                    }
                 }
-            }
 
             if let progress, progress > 0, progress < 1.0 {
                 progressBar(progress)
             }
         }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(2 / 3, contentMode: .fit)
+        .clipped()
     }
 
     private var placeholderView: some View {
         Rectangle()
             .fill(Color.vanmoSurface)
-            .aspectRatio(2/3, contentMode: .fill)
             .overlay {
                 Image(systemName: "film")
                     .font(.largeTitle)
@@ -126,7 +126,8 @@ struct PosterCard: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: 44)
         .background(.ultraThinMaterial)
     }
 }
