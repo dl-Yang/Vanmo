@@ -36,22 +36,23 @@ final class LibraryViewModel: ObservableObject {
 
         do {
             let fetched = try context.fetch(FetchDescriptor<MediaItem>())
-            allItems = fetched
+            let libraryItems = fetched.filter { $0.mediaType != .tvEpisode }
+            allItems = libraryItems
 
-            recentlyPlayed = fetched
+            recentlyPlayed = libraryItems
                 .filter { $0.lastPlayedAt != nil }
                 .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
                 .prefix(20)
                 .map { $0 }
 
-            recentlyAdded = fetched
+            recentlyAdded = libraryItems
                 .sorted { $0.addedAt > $1.addedAt }
                 .prefix(20)
                 .map { $0 }
 
-            movies = fetched.filter { $0.mediaType == .movie }
-            tvShows = fetched.filter { $0.mediaType == .tvShow || $0.mediaType == .tvEpisode }
-            favorites = fetched.filter { $0.isFavorite }
+            movies = libraryItems.filter { $0.mediaType == .movie }
+            tvShows = libraryItems.filter { $0.mediaType == .tvShow }
+            favorites = libraryItems.filter { $0.isFavorite }
         } catch {
             errorMessage = error.localizedDescription
             showError = true

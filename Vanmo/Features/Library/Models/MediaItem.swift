@@ -31,6 +31,10 @@ final class MediaItem {
     var seasonNumber: Int?
     var episodeNumber: Int?
     var showTitle: String?
+    var episodeTitle: String?
+
+    var serverId: String?
+    var seriesId: String?
 
     var audioTracks: [AudioTrackInfo]
     var subtitleTracks: [SubtitleTrackInfo]
@@ -112,12 +116,23 @@ struct AudioTrackInfo: Codable, Identifiable, Hashable {
     var codec: String?
     var channels: Int?
 
+    var channelLayoutName: String? {
+        guard let channels else { return nil }
+        switch channels {
+        case 1: return "Mono"
+        case 2: return "Stereo"
+        case 6: return "5.1"
+        case 8: return "7.1"
+        default: return "\(channels)ch"
+        }
+    }
+
     var displayName: String {
         var parts: [String] = []
         if let title { parts.append(title) }
         if let language { parts.append(language) }
         if let codec { parts.append(codec) }
-        if let channels { parts.append("\(channels)ch") }
+        if let layout = channelLayoutName { parts.append(layout) }
         return parts.isEmpty ? "Track \(id)" : parts.joined(separator: " · ")
     }
 }

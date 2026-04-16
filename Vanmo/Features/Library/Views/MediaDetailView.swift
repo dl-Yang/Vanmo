@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import Kingfisher
 
 struct MediaDetailView: View {
@@ -8,6 +9,9 @@ struct MediaDetailView: View {
 
     @State private var showAllCast = false
     @State private var dominantColor: Color = .black.opacity(0.0)
+    @State private var episodes: [EpisodeInfo] = []
+    @State private var isLoadingEpisodes = false
+    @State private var selectedSeason: Int?
 
     var body: some View {
         ScrollView {
@@ -15,14 +19,18 @@ struct MediaDetailView: View {
                 headerSection
 
                 LinearGradient(
-                    colors: [dominantColor, Color.vanmoBackground],
+                    colors: [dominantColor, .white.opacity(0.0)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 60)
+                .frame(height: 20)
                 .animation(.easeInOut(duration: 0.6), value: dominantColor)
 
                 infoSection
+
+                if item.mediaType == .tvShow {
+                    episodeSection
+                }
             }
         }
         .ignoresSafeArea(edges: .top)
@@ -36,6 +44,11 @@ struct MediaDetailView: View {
                     Image(systemName: item.isFavorite ? "heart.fill" : "heart")
                         .foregroundStyle(item.isFavorite ? .red : .white)
                 }
+            }
+        }
+        .task {
+            if item.mediaType == .tvShow {
+                await loadEpisodes()
             }
         }
     }
@@ -140,7 +153,9 @@ struct MediaDetailView: View {
                 if let year = item.year {
                     Text("\(year)")
                 }
-                if item.duration > 0 {
+                if item.mediaType == .tvShow, !episodes.isEmpty {
+                    Text("\(seasonNumbers.count)季 · \(episodes.count)集")
+                } else if item.duration > 0 {
                     Text(item.duration.shortDuration)
                 }
                 Text(item.mediaType.displayName)
@@ -159,11 +174,22 @@ struct MediaDetailView: View {
 
     private var playButton: some View {
         Button {
-            appState.play(item)
+            if item.mediaType == .tvShow {
+                if let ep = nextEpisodeToPlay {
+                    playEpisode(ep)
+                }
+            } else {
+                appState.play(item)
+            }
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "play.fill")
-                Text(item.lastPlaybackPosition > 0 ? "继续播放" : "播放")
+                if isLoadingEpisodes {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Image(systemName: "play.fill")
+                }
+                Text(playButtonTitle)
                     .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)
@@ -171,6 +197,156 @@ struct MediaDetailView: View {
             .background(Color.vanmoPrimary)
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .disabled(item.mediaType == .tvShow && episodes.isEmpty)
+    }
+
+    private var playButtonTitle: String {
+        if item.mediaType == .tvShow {
+            if isLoadingEpisodes { return "加载中..." }
+            if let ep = nextEpisodeToPlay {
+                return "播放 S\(String(format: "%02d", ep.seasonNumber))E\(String(format: "%02d", ep.episodeNumber))"
+            }
+            return "播放"
+        }
+        return item.lastPlaybackPosition > 0 ? "继续播放" : "播放"
+    }
+
+    // MARK: - Episodes
+
+    private var seasonNumbers: [Int] {
+        Array(Set(episodes.map(\.seasonNumber))).sorted()
+    }
+
+    private var currentSeasonEpisodes: [EpisodeInfo] {
+        let season = selectedSeason ?? seasonNumbers.first ?? 1
+        return episodes
+            .filter { $0.seasonNumber == season }
+            .sorted { $0.episodeNumber < $1.episodeNumber }
+    }
+
+    private var nextEpisodeToPlay: EpisodeInfo? {
+        episodes.sorted { ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber) }.first
+    }
+
+    private var episodeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if isLoadingEpisodes {
+                ProgressView("加载剧集...")
+                    .frame(maxWidth: .infinity, minHeight: 60)
+            } else if episodes.isEmpty {
+                Text("暂无剧集信息")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+            } else {
+                if seasonNumbers.count > 1 {
+                    seasonPicker
+                }
+
+                ForEach(currentSeasonEpisodes) { episode in
+                    episodeRow(episode)
+                }
+            }
+        }
+        .padding()
+    }
+
+    private var seasonPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(seasonNumbers, id: \.self) { season in
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedSeason = season
+                        }
+                    } label: {
+                        Text("第 \(season) 季")
+                            .font(.subheadline)
+                            .fontWeight((selectedSeason ?? seasonNumbers.first) == season ? .semibold : .regular)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                (selectedSeason ?? seasonNumbers.first) == season
+                                    ? Color.vanmoPrimary.opacity(0.15)
+                                    : Color.vanmoSurface
+                            )
+                            .foregroundStyle(
+                                (selectedSeason ?? seasonNumbers.first) == season
+                                    ? Color.vanmoPrimary
+                                    : .secondary
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func episodeRow(_ episode: EpisodeInfo) -> some View {
+        Button {
+            playEpisode(episode)
+        } label: {
+            HStack(spacing: 12) {
+                Text("\(episode.episodeNumber)")
+                    .font(.headline)
+                    .foregroundStyle(Color.vanmoPrimary)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(episode.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+
+                    if episode.duration > 0 {
+                        Text(episode.duration.shortDuration)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "play.circle")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(Color.vanmoSurface.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func playEpisode(_ episode: EpisodeInfo) {
+        let episodeItem = MediaItem(
+            title: item.title,
+            fileURL: episode.streamURL,
+            mediaType: .tvEpisode,
+            duration: episode.duration
+        )
+        episodeItem.showTitle = item.title
+        episodeItem.seasonNumber = episode.seasonNumber
+        episodeItem.episodeNumber = episode.episodeNumber
+        episodeItem.episodeTitle = episode.title
+        episodeItem.posterURL = item.posterURL
+        appState.play(episodeItem)
+    }
+
+    private func loadEpisodes() async {
+        guard let seriesServerId = item.serverId else { return }
+
+        isLoadingEpisodes = true
+        defer { isLoadingEpisodes = false }
+
+        do {
+            episodes = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
+        } catch {
+            VanmoLogger.library.error("[Emby] Failed to load episodes: \(error.localizedDescription)")
+            episodes = []
         }
     }
 
@@ -223,7 +399,9 @@ struct MediaDetailView: View {
                 }
             }
 
-            fileInfoSection
+            if item.mediaType != .tvShow {
+                fileInfoSection
+            }
 
             if !item.audioTracks.isEmpty || !item.subtitleTracks.isEmpty {
                 trackInfoSection

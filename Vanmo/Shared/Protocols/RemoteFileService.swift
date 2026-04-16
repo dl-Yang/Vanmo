@@ -37,6 +37,12 @@ struct ServerMediaItem {
     let streamURL: URL
     let fileSize: Int64
     let duration: TimeInterval
+
+    let showTitle: String?
+    let seasonNumber: Int?
+    let episodeNumber: Int?
+    let episodeTitle: String?
+    let seriesId: String?
 }
 
 struct ConnectionConfig {

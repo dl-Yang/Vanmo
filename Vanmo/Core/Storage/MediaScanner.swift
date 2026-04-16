@@ -99,12 +99,11 @@ actor MediaScanner {
         _ serverItems: [ServerMediaItem],
         in context: ModelContext
     ) async throws -> [MediaItem] {
-        let existingURLs = try existingFileURLs(in: context)
+        let existingServerIds = try existingServerIds(in: context)
         var newItems: [MediaItem] = []
 
         for serverItem in serverItems {
-            let streamKey = serverItem.streamURL.absoluteString
-            guard !existingURLs.contains(streamKey) else { continue }
+            guard !existingServerIds.contains(serverItem.serverId) else { continue }
 
             let item = MediaItem(
                 title: serverItem.title,
@@ -114,6 +113,8 @@ actor MediaScanner {
                 duration: serverItem.duration
             )
 
+            item.serverId = serverItem.serverId
+            item.seriesId = serverItem.seriesId
             item.originalTitle = serverItem.originalTitle
             item.year = serverItem.year
             item.overview = serverItem.overview
@@ -125,6 +126,10 @@ actor MediaScanner {
             item.cast = serverItem.cast
             item.originCountry = serverItem.originCountry
             item.tmdbID = serverItem.tmdbID
+            item.showTitle = serverItem.showTitle
+            item.seasonNumber = serverItem.seasonNumber
+            item.episodeNumber = serverItem.episodeNumber
+            item.episodeTitle = serverItem.episodeTitle
 
             context.insert(item)
             newItems.append(item)
@@ -142,6 +147,13 @@ actor MediaScanner {
         let descriptor = FetchDescriptor<MediaItem>()
         let items = try context.fetch(descriptor)
         return Set(items.map { $0.fileURL.absoluteString })
+    }
+
+    @MainActor
+    private func existingServerIds(in context: ModelContext) throws -> Set<String> {
+        let descriptor = FetchDescriptor<MediaItem>()
+        let items = try context.fetch(descriptor)
+        return Set(items.compactMap(\.serverId))
     }
 
     private func videoDuration(for url: URL) async -> TimeInterval {

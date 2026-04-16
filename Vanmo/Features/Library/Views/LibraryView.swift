@@ -295,6 +295,8 @@ struct LibraryView: View {
                     }
                 }
                 .padding(.horizontal)
+                .padding(.top, 10)
+                .padding(.bottom, 18)
             }
         }
     }
@@ -303,10 +305,12 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func itemContextMenu(_ item: MediaItem) -> some View {
-        Button {
-            appState.play(item)
-        } label: {
-            Label("播放", systemImage: "play.fill")
+        if item.mediaType != .tvShow {
+            Button {
+                appState.play(item)
+            } label: {
+                Label("播放", systemImage: "play.fill")
+            }
         }
 
         Button {

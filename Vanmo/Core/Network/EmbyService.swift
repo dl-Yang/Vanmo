@@ -71,6 +71,8 @@ final class EmbyService: MediaServerService {
         self.userId = authResult.user.id
         self.isConnected = true
 
+        EmbyCredentialStore.save(baseURL: base.absoluteString, token: authResult.accessToken)
+
         VanmoLogger.network.info("[Emby] Authenticated as \(authResult.user.name), userId=\(authResult.user.id)")
     }
 
@@ -199,9 +201,9 @@ final class EmbyService: MediaServerService {
             URLQueryItem(name: "Recursive", value: "true"),
             URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
             URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations"),
-            URLQueryItem(name: "SortBy", value: "DateCreated"),
-            URLQueryItem(name: "SortOrder", value: "Descending"),
-            URLQueryItem(name: "Limit", value: "500"),
+            URLQueryItem(name: "SortBy", value: "SortName"),
+            URLQueryItem(name: "SortOrder", value: "Ascending"),
+            URLQueryItem(name: "Limit", value: "2000"),
             URLQueryItem(name: "api_key", value: token),
         ]
 
@@ -231,7 +233,12 @@ final class EmbyService: MediaServerService {
     }
 
     private func mapEmbyMediaItem(_ item: EmbyMediaDetail, baseURL: URL, token: String) -> ServerMediaItem? {
-        let mediaType: MediaType = item.type == "Movie" ? .movie : .tvShow
+        let mediaType: MediaType
+        switch item.type {
+        case "Movie": mediaType = .movie
+        case "Series": mediaType = .tvShow
+        default: return nil
+        }
 
         let posterURL: URL? = if item.imageTags?.primary != nil {
             URL(string: "\(baseURL.absoluteString)/emby/Items/\(item.id)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)")
@@ -245,7 +252,12 @@ final class EmbyService: MediaServerService {
             nil
         }
 
-        let streamURL = URL(string: "\(baseURL.absoluteString)/emby/Videos/\(item.id)/stream?static=true&api_key=\(token)")!
+        let streamURL: URL
+        if mediaType == .tvShow {
+            streamURL = URL(string: "vanmo://series/\(item.id)")!
+        } else {
+            streamURL = URL(string: "\(baseURL.absoluteString)/emby/Videos/\(item.id)/stream?static=true&api_key=\(token)")!
+        }
 
         let director = item.people?.first(where: { $0.type == "Director" })?.name
         let cast = item.people?.filter { $0.type == "Actor" }.prefix(10).map(\.name) ?? []
@@ -281,7 +293,12 @@ final class EmbyService: MediaServerService {
             tmdbID: tmdbID,
             streamURL: streamURL,
             fileSize: 0,
-            duration: durationSeconds
+            duration: durationSeconds,
+            showTitle: nil,
+            seasonNumber: nil,
+            episodeNumber: nil,
+            episodeTitle: nil,
+            seriesId: nil
         )
     }
 
@@ -309,6 +326,7 @@ final class EmbyService: MediaServerService {
             request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
         }
     }
+
 }
 
 // MARK: - Emby API Models
@@ -389,6 +407,12 @@ private struct EmbyMediaDetail: Decodable {
     let backdropImageTags: [String]?
     let productionLocations: [String]?
 
+    let seriesName: String?
+    let seriesId: String?
+    let parentIndexNumber: Int?
+    let indexNumber: Int?
+    let seriesPrimaryImageTag: String?
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -404,6 +428,11 @@ private struct EmbyMediaDetail: Decodable {
         case imageTags = "ImageTags"
         case backdropImageTags = "BackdropImageTags"
         case productionLocations = "ProductionLocations"
+        case seriesName = "SeriesName"
+        case seriesId = "SeriesId"
+        case parentIndexNumber = "ParentIndexNumber"
+        case indexNumber = "IndexNumber"
+        case seriesPrimaryImageTag = "SeriesPrimaryImageTag"
     }
 }
 
@@ -422,5 +451,97 @@ private struct EmbyImageTags: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case primary = "Primary"
+    }
+}
+
+// MARK: - Credential Store & On-Demand Episode Fetching
+
+enum EmbyCredentialStore {
+    private static let baseURLKey = "emby.baseURL"
+    private static let tokenKey = "emby.accessToken"
+
+    static func save(baseURL: String, token: String) {
+        UserDefaults.standard.set(baseURL, forKey: baseURLKey)
+        UserDefaults.standard.set(token, forKey: tokenKey)
+    }
+
+    static var baseURL: String? { UserDefaults.standard.string(forKey: baseURLKey) }
+    static var token: String? { UserDefaults.standard.string(forKey: tokenKey) }
+
+    static func clear() {
+        UserDefaults.standard.removeObject(forKey: baseURLKey)
+        UserDefaults.standard.removeObject(forKey: tokenKey)
+    }
+}
+
+struct EpisodeInfo: Identifiable {
+    let id: String
+    let title: String
+    let seasonNumber: Int
+    let episodeNumber: Int
+    let duration: TimeInterval
+    let overview: String?
+    let streamURL: URL
+}
+
+enum EmbyEpisodeFetcher {
+    static func fetchEpisodes(seriesId: String) async throws -> [EpisodeInfo] {
+        guard let baseURLStr = EmbyCredentialStore.baseURL,
+              let token = EmbyCredentialStore.token,
+              let baseURL = URL(string: baseURLStr) else {
+            throw NetworkError.notConnected
+        }
+
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("emby/Shows/\(seriesId)/Episodes"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks"),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        VanmoLogger.network.info("[Emby] Fetching episodes for series \(seriesId)")
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw NetworkError.connectionFailed("Failed to fetch episodes")
+        }
+
+        let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
+        VanmoLogger.network.info("[Emby] Fetched \(result.items.count) episodes for series \(seriesId)")
+
+        return result.items.compactMap { item -> EpisodeInfo? in
+            guard let season = item.parentIndexNumber,
+                  let episode = item.indexNumber else { return nil }
+
+            let duration: TimeInterval = if let ticks = item.runTimeTicks {
+                Double(ticks) / 10_000_000.0
+            } else {
+                0
+            }
+
+            let streamURL = URL(string: "\(baseURLStr)/emby/Videos/\(item.id)/stream?static=true&api_key=\(token)")!
+
+            return EpisodeInfo(
+                id: item.id,
+                title: item.name,
+                seasonNumber: season,
+                episodeNumber: episode,
+                duration: duration,
+                overview: item.overview,
+                streamURL: streamURL
+            )
+        }
     }
 }
