@@ -11,12 +11,18 @@ struct FavoritesListView: View {
             if viewModel.isLoading && viewModel.items.isEmpty {
                 LoadingView("加载收藏...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
             } else if viewModel.items.isEmpty {
                 emptyState
+                    .transition(.opacity)
             } else {
                 content
+                    .transition(.opacity)
             }
         }
+        .animation(.smooth(duration: 0.3), value: viewModel.scope)
+        .animation(.smooth(duration: 0.3), value: viewModel.items.isEmpty)
+        .animation(.smooth(duration: 0.3), value: viewModel.isLoading)
         .background(Color.vanmoBackground)
         .navigationTitle("我的收藏")
         .navigationBarTitleDisplayMode(.large)
@@ -49,10 +55,13 @@ struct FavoritesListView: View {
                         MediaDetailView(item: item)
                     } label: {
                         FavoriteMediaRow(item: item) {
-                            viewModel.unfavorite(item)
+                            withAnimation(.smooth(duration: 0.25)) {
+                                viewModel.unfavorite(item)
+                            }
                         }
                     }
                     .buttonStyle(.plain)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .onAppear {
                         Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
                     }
@@ -249,10 +258,10 @@ private final class FavoritesListViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        resetPaging()
-
         do {
-            try await loadFirstPage()
+            let result = try await fetchNextBatch(startDBOffset: 0)
+            let newItems = result.ids.compactMap { modelContext?.model(for: $0) as? MediaItem }
+            replaceItems(newItems, dbScanned: result.dbScanned, reachedEnd: result.reachedEnd)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -290,14 +299,6 @@ private final class FavoritesListViewModel: ObservableObject {
         try? modelContext?.save()
         loadedItemIDs.remove(item.persistentModelID)
         items.removeAll { $0.id == item.id }
-    }
-
-    private func loadFirstPage() async throws {
-        let result = try await fetchNextBatch(startDBOffset: 0)
-        let newItems = result.ids.compactMap { modelContext?.model(for: $0) as? MediaItem }
-        appendItems(newItems)
-        dbOffset = result.dbScanned
-        hasMore = !result.reachedEnd
     }
 
     private func fetchNextBatch(startDBOffset: Int) async throws -> FavoritesBatchResult {
@@ -346,11 +347,13 @@ private final class FavoritesListViewModel: ObservableObject {
         }.value
     }
 
-    private func resetPaging() {
-        dbOffset = 0
-        hasMore = true
-        loadedItemIDs = []
-        items = []
+    private func replaceItems(_ newItems: [MediaItem], dbScanned: Int, reachedEnd: Bool) {
+        dbOffset = dbScanned
+        hasMore = !reachedEnd
+        loadedItemIDs = Set(newItems.map(\.persistentModelID))
+        withAnimation(.smooth(duration: 0.3)) {
+            items = newItems
+        }
     }
 
     private func appendItems(_ newItems: [MediaItem]) {
