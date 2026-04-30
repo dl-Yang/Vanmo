@@ -17,15 +17,6 @@ struct MediaDetailView: View {
         ScrollView {
             VStack(spacing: 0) {
                 headerSection
-
-                LinearGradient(
-                    colors: [dominantColor, .white.opacity(0.0)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 20)
-                .animation(.easeInOut(duration: 0.6), value: dominantColor)
-
                 infoSection
 
                 if item.mediaType == .tvShow {
@@ -33,6 +24,7 @@ struct MediaDetailView: View {
                 }
             }
         }
+        .background(Color.vanmoBackground)
         .ignoresSafeArea(edges: .top)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -85,7 +77,7 @@ struct MediaDetailView: View {
             )
             .ignoresSafeArea()
         }
-        .animation(.easeInOut(duration: 0.6), value: dominantColor)
+//        .animation(.easeInOut(duration: 0.3), value: dominantColor)
     }
 
     // MARK: - Layer 1: Poster + Edge Fade
@@ -104,7 +96,7 @@ struct MediaDetailView: View {
                 .fade(duration: 0.25)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-            .frame(maxWidth: 240)
+            .frame(maxWidth: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
             .mask(posterEdgeFadeMask)
@@ -115,7 +107,7 @@ struct MediaDetailView: View {
                 startPoint: .init(x: 0.5, y: 0.6),
                 endPoint: .bottom
             )
-            .animation(.easeInOut(duration: 0.6), value: dominantColor)
+//            .animation(.easeInOut(duration: 0.3), value: dominantColor)
         }
     }
 
@@ -147,6 +139,7 @@ struct MediaDetailView: View {
 
             Text(item.title)
                 .font(.title2.bold())
+                .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.6), radius: 4, y: 2)
 
             HStack(spacing: 8) {
@@ -160,6 +153,7 @@ struct MediaDetailView: View {
                 }
                 Text(item.mediaType.displayName)
             }
+            .foregroundStyle(.white.opacity(0.7))
             .font(.subheadline)
             .foregroundStyle(.secondary)
 
@@ -353,61 +347,72 @@ struct MediaDetailView: View {
     // MARK: - Info
 
     private var infoSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            if let overview = item.overview, !overview.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("简介")
-                        .font(.headline)
-                    Text(overview)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(4)
+        ZStack(alignment: .top){
+            VStack(alignment: .leading, spacing: 20) {
+                if let overview = item.overview, !overview.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("简介")
+                            .font(.headline)
+                        Text(overview)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(4)
+                    }.padding(.top,40)
                 }
-            }
 
-            if !item.genres.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("类型")
-                        .font(.headline)
-                    genreTags
-                }
-            }
-
-            if let director = item.director {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("导演")
-                        .font(.headline)
-                    Text(director)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if !item.cast.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("演员")
-                        .font(.headline)
-                    Text(item.cast.prefix(showAllCast ? item.cast.count : 5).joined(separator: "、"))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    if item.cast.count > 5 {
-                        Button(showAllCast ? "收起" : "显示全部") {
-                            withAnimation { showAllCast.toggle() }
-                        }
-                        .font(.caption)
+                if !item.genres.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("类型")
+                            .font(.headline)
+                        genreTags
                     }
                 }
-            }
 
-            if item.mediaType != .tvShow {
-                fileInfoSection
-            }
+                if let director = item.director {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("导演")
+                            .font(.headline)
+                        Text(director)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
-            if !item.audioTracks.isEmpty || !item.subtitleTracks.isEmpty {
-                trackInfoSection
+                if !item.cast.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("演员")
+                            .font(.headline)
+                        Text(item.cast.prefix(showAllCast ? item.cast.count : 5).joined(separator: "、"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        if item.cast.count > 5 {
+                            Button(showAllCast ? "收起" : "显示全部") {
+                                withAnimation { showAllCast.toggle() }
+                            }
+                            .font(.caption)
+                        }
+                    }
+                }
+
+                if item.mediaType != .tvShow {
+                    fileInfoSection
+                }
+
+                if !item.audioTracks.isEmpty || !item.subtitleTracks.isEmpty {
+                    trackInfoSection
+                }
             }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color.vanmoBackground)
+            LinearGradient(
+                colors: [dominantColor, dominantColor.opacity(0.7), .clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 100)
+//            .animation(.easeInOut(duration: 0.3), value: dominantColor)
         }
-        .padding()
     }
 
     private var genreTags: some View {

@@ -8,13 +8,7 @@ final class TMDbService {
     private let session: URLSession
     private let decoder: JSONDecoder
 
-    var apiKey: String {
-        (try? KeychainManager.shared.loadString(for: "tmdb.apiKey")) ?? ""
-    }
-
-    func setAPIKey(_ key: String) throws {
-        try KeychainManager.shared.save(key, for: "tmdb.apiKey")
-    }
+    let apiKey = "d62dcf21c42fe368d62b967f5790c805"
 
     private init(session: URLSession = .shared) {
         self.session = session

@@ -1,37 +1,46 @@
 import SwiftUI
 
 struct SubtitleOverlayView: View {
-    let text: String?
+    let content: SubtitleContent?
     let style: SubtitleStyle
 
     var body: some View {
         VStack {
             Spacer()
 
-            if let text, !text.isEmpty {
-                Text(text)
-                    .font(.system(size: style.fontSize))
-                    .fontWeight(.medium)
-                    .foregroundStyle(style.textColor)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(style.backgroundColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, style.bottomPadding)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.15), value: text)
+            if let content, !content.isEmpty {
+                Group {
+                    if let text = content.text, !text.isEmpty {
+                        Text(text)
+                            .font(.system(size: style.fontSize))
+                            .fontWeight(.medium)
+                            .foregroundStyle(style.textColor)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(style.backgroundColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    } else if let uiImage = content.image {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: style.fontSize * 2)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, style.bottomPadding)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.15), value: content.text)
             }
         }
     }
 }
 
 struct SubtitleStyle {
-    var fontSize: CGFloat = 18
+    var fontSize: CGFloat = 14
     var textColor: Color = .white
     var backgroundColor: Color = Color.black.opacity(0.6)
-    var bottomPadding: CGFloat = 60
+    var bottomPadding: CGFloat = 40
     var position: SubtitlePosition = .bottom
 
     enum SubtitlePosition {
@@ -105,7 +114,7 @@ struct SubtitleSettingsView: View {
     ZStack {
         Color.black.ignoresSafeArea()
         SubtitleOverlayView(
-            text: "这是一段字幕文本\nThis is subtitle text",
+            content: SubtitleContent(text: "这是一段字幕文本\nThis is subtitle text"),
             style: SubtitleStyle()
         )
     }

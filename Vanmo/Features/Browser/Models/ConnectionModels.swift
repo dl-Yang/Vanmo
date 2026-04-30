@@ -78,6 +78,7 @@ final class SavedConnection {
     var path: String?
     var isFavorite: Bool
     var lastConnectedAt: Date?
+    var lastSyncedAt: Date?
     var addedAt: Date
 
     init(

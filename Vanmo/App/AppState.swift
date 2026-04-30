@@ -7,6 +7,11 @@ final class AppState: ObservableObject {
     @Published var isPlayerPresented = false
     @Published var currentPlayingItem: MediaItem?
 
+    /// Settings tab 的导航路径。提到 `AppState` 中是为了在 `VanmoApp` 用
+    /// `.id(theme)` 触发 `ContentView` 重建（用于刷新 vanmo* 颜色）时，
+    /// 二级页面（如外观设置）的导航栈仍能保留，用户体验上不会被弹回根。
+    @Published var settingsPath = NavigationPath()
+
     func play(_ item: MediaItem) {
         currentPlayingItem = item
         isPlayerPresented = true
@@ -16,6 +21,11 @@ final class AppState: ObservableObject {
         isPlayerPresented = false
         currentPlayingItem = nil
     }
+}
+
+/// Settings tab 内的导航路由。
+enum SettingsRoute: Hashable {
+    case appearance
 }
 
 enum AppTab: Int, CaseIterable {

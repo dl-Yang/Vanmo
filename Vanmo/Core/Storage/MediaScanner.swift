@@ -61,36 +61,83 @@ actor MediaScanner {
     func scanRemoteDirectory(
         service: RemoteFileService,
         path: String,
-        in context: ModelContext
+        in context: ModelContext,
+        maxDepth: Int = 8,
+        batchSize: Int = 200
     ) async throws -> [MediaItem] {
-        let files = try await service.listDirectory(path: path)
+        var existing = try await MainActor.run { try existingServerIds(in: context) }
         var newItems: [MediaItem] = []
+        var pendingInBatch = 0
 
-        for file in files where file.isVideo {
-            let streamURL = try await service.streamURL(for: file)
-            let parsed = FileNameParser.parse(file.name)
+        var queue: [(path: String, depth: Int)] = [(path, 0)]
+        var visited: Set<String> = []
 
-            let item = MediaItem(
-                title: parsed.title,
-                fileURL: streamURL,
-                mediaType: parsed.isTV ? .tvEpisode : .movie,
-                fileSize: file.size
-            )
+        while !queue.isEmpty {
+            try Task.checkCancellation()
+            let (current, depth) = queue.removeFirst()
 
-            item.year = parsed.year
-            item.seasonNumber = parsed.season
-            item.episodeNumber = parsed.episode
+            guard !visited.contains(current) else { continue }
+            visited.insert(current)
 
-            await MainActor.run {
-                context.insert(item)
+            let files: [RemoteFile]
+            do {
+                files = try await service.listDirectory(path: current)
+            } catch {
+                VanmoLogger.library.error("Failed to list \(current): \(error.localizedDescription)")
+                continue
             }
-            newItems.append(item)
+
+            for file in files {
+                if file.isDirectory {
+                    if depth < maxDepth {
+                        queue.append((file.path, depth + 1))
+                    }
+                    continue
+                }
+                guard file.isVideo else { continue }
+                guard !existing.contains(file.path) else { continue }
+
+                let streamURL: URL
+                do {
+                    streamURL = try await service.streamURL(for: file)
+                } catch {
+                    VanmoLogger.library.error("Failed to get stream URL for \(file.name): \(error.localizedDescription)")
+                    continue
+                }
+
+                let parsed = FileNameParser.parse(file.name)
+
+                let item = MediaItem(
+                    title: parsed.title,
+                    fileURL: streamURL,
+                    mediaType: parsed.isTV ? .tvEpisode : .movie,
+                    fileSize: file.size
+                )
+                item.year = parsed.year
+                item.seasonNumber = parsed.season
+                item.episodeNumber = parsed.episode
+                if parsed.isTV {
+                    item.showTitle = parsed.title
+                }
+                item.serverId = file.path
+
+                await MainActor.run { context.insert(item) }
+                newItems.append(item)
+                existing.insert(file.path)
+                pendingInBatch += 1
+
+                if pendingInBatch >= batchSize {
+                    await MainActor.run { try? context.save() }
+                    pendingInBatch = 0
+                }
+            }
         }
 
-        await MainActor.run {
-            try? context.save()
+        if pendingInBatch > 0 {
+            await MainActor.run { try? context.save() }
         }
 
+        VanmoLogger.library.info("Remote scan complete: \(newItems.count) new items found under \(path)")
         return newItems
     }
 
@@ -99,48 +146,60 @@ actor MediaScanner {
         _ serverItems: [ServerMediaItem],
         in context: ModelContext
     ) async throws -> [MediaItem] {
-        let existingServerIds = try existingServerIds(in: context)
+        let existingMap = try existingServerItemMap(in: context)
         var newItems: [MediaItem] = []
 
         for serverItem in serverItems {
-            guard !existingServerIds.contains(serverItem.serverId) else { continue }
-
-            let item = MediaItem(
-                title: serverItem.title,
-                fileURL: serverItem.streamURL,
-                mediaType: serverItem.mediaType,
-                fileSize: serverItem.fileSize,
-                duration: serverItem.duration
-            )
-
-            item.serverId = serverItem.serverId
-            item.seriesId = serverItem.seriesId
-            item.originalTitle = serverItem.originalTitle
-            item.year = serverItem.year
-            item.overview = serverItem.overview
-            item.posterURL = serverItem.posterURL
-            item.backdropURL = serverItem.backdropURL
-            item.rating = serverItem.rating
-            item.genres = serverItem.genres
-            item.director = serverItem.director
-            item.cast = serverItem.cast
-            item.originCountry = serverItem.originCountry
-            item.tmdbID = serverItem.tmdbID
-            item.showTitle = serverItem.showTitle
-            item.seasonNumber = serverItem.seasonNumber
-            item.episodeNumber = serverItem.episodeNumber
-            item.episodeTitle = serverItem.episodeTitle
-
-            context.insert(item)
-            newItems.append(item)
+            if let existing = existingMap[serverItem.serverId] {
+                apply(serverItem: serverItem, to: existing)
+            } else {
+                let item = MediaItem(
+                    title: serverItem.title,
+                    fileURL: serverItem.streamURL,
+                    mediaType: serverItem.mediaType,
+                    fileSize: serverItem.fileSize,
+                    duration: serverItem.duration
+                )
+                apply(serverItem: serverItem, to: item)
+                context.insert(item)
+                newItems.append(item)
+            }
         }
 
         try context.save()
-        VanmoLogger.library.info("Imported \(newItems.count) media items from server")
+        VanmoLogger.library.info("Imported \(newItems.count) new / updated \(serverItems.count - newItems.count) existing media items from server")
         return newItems
     }
 
     // MARK: - Private
+
+    @MainActor
+    private func apply(serverItem: ServerMediaItem, to item: MediaItem) {
+        item.title = serverItem.title
+        item.originalTitle = serverItem.originalTitle
+        item.year = serverItem.year
+        item.overview = serverItem.overview
+        item.posterURL = serverItem.posterURL
+        item.backdropURL = serverItem.backdropURL
+        item.rating = serverItem.rating
+        item.mediaType = serverItem.mediaType
+        item.fileURL = serverItem.streamURL
+        item.fileSize = serverItem.fileSize
+        if serverItem.duration > 0 {
+            item.duration = serverItem.duration
+        }
+        item.genres = serverItem.genres
+        item.director = serverItem.director
+        item.cast = serverItem.cast
+        item.originCountry = serverItem.originCountry
+        item.tmdbID = serverItem.tmdbID
+        item.serverId = serverItem.serverId
+        item.seriesId = serverItem.seriesId
+        item.showTitle = serverItem.showTitle
+        item.seasonNumber = serverItem.seasonNumber
+        item.episodeNumber = serverItem.episodeNumber
+        item.episodeTitle = serverItem.episodeTitle
+    }
 
     @MainActor
     private func existingFileURLs(in context: ModelContext) throws -> Set<String> {
@@ -154,6 +213,19 @@ actor MediaScanner {
         let descriptor = FetchDescriptor<MediaItem>()
         let items = try context.fetch(descriptor)
         return Set(items.compactMap(\.serverId))
+    }
+
+    @MainActor
+    private func existingServerItemMap(in context: ModelContext) throws -> [String: MediaItem] {
+        let descriptor = FetchDescriptor<MediaItem>()
+        let items = try context.fetch(descriptor)
+        var map: [String: MediaItem] = [:]
+        for item in items {
+            if let sid = item.serverId {
+                map[sid] = item
+            }
+        }
+        return map
     }
 
     private func videoDuration(for url: URL) async -> TimeInterval {

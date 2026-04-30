@@ -16,7 +16,10 @@ protocol RemoteFileService: AnyObject {
 }
 
 protocol MediaServerService: RemoteFileService {
-    func fetchAllMediaItems() async throws -> [ServerMediaItem]
+    func streamMediaItems(
+        since: Date?,
+        pageSize: Int
+    ) -> AsyncThrowingStream<[ServerMediaItem], Error>
 }
 
 struct ServerMediaItem {

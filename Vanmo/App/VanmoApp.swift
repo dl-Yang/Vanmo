@@ -4,7 +4,7 @@ import SwiftData
 @main
 struct VanmoApp: App {
     @StateObject private var appState = AppState()
-    @AppStorage("appearance.theme") private var appearance = AppearanceMode.system
+    @AppStorage(ColorTheme.storageKey) private var theme: ColorTheme = .system
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -27,7 +27,8 @@ struct VanmoApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
-                .preferredColorScheme(appearance.colorScheme)
+                .preferredColorScheme(theme.preferredColorScheme)
+                .id(theme)
         }
         .modelContainer(sharedModelContainer)
     }

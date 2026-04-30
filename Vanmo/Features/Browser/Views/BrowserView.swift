@@ -14,16 +14,18 @@ struct ConnectionsView: View {
 
             protocolsSection
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.vanmoBackground)
         .overlay {
-            if viewModel.savedConnections.isEmpty && !viewModel.isLoading {
-                EmptyStateView(
-                    icon: "externaldrive.connected.to.line.below",
-                    title: "尚无连接",
-                    message: "添加网络共享以扫描并管理你的媒体"
-                ) {
-                    viewModel.showAddConnection = true
-                }
-            }
+//            if viewModel.savedConnections.isEmpty && !viewModel.isLoading {
+//                EmptyStateView(
+//                    icon: "externaldrive.connected.to.line.below",
+//                    title: "尚无连接",
+//                    message: "添加网络共享以扫描并管理你的媒体"
+//                ) {
+//                    viewModel.showAddConnection = true
+//                }
+//            }
 
             if viewModel.isLoading {
                 LoadingView(viewModel.loadingMessage)

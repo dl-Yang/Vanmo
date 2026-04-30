@@ -1,10 +1,10 @@
 import SwiftUI
 import AVFoundation
-import MetalKit
 
 struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: PlayerViewModel
+    @AppStorage("subtitle.fontSize") private var subtitleFontSize: Double = 18
     @State private var showSpeedPicker = false
     @State private var showScaleModePicker = false
 
@@ -17,6 +17,13 @@ struct PlayerView: View {
             Color.black.ignoresSafeArea()
 
             videoLayer
+
+            SubtitleOverlayView(
+                content: viewModel.currentSubtitleContent,
+                style: SubtitleStyle(fontSize: subtitleFontSize)
+            )
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
 
             gestureLayer
                 .allowsHitTesting(!viewModel.controlsVisible)
@@ -73,8 +80,8 @@ struct PlayerView: View {
         if let player = viewModel.avPlayer {
             AVPlayerVideoLayer(player: player, scaleMode: viewModel.config.scaleMode)
                 .ignoresSafeArea()
-        } else if let renderer = viewModel.ffmpegRenderView {
-            MetalVideoLayer(renderer: renderer, scaleMode: viewModel.config.scaleMode)
+        } else if let ksView = viewModel.ksPlayerVideoView {
+            KSPlayerVideoLayer(videoView: ksView, scaleMode: viewModel.config.scaleMode)
                 .ignoresSafeArea()
         }
     }
@@ -465,19 +472,29 @@ final class PlayerUIView: UIView {
     }
 }
 
-// MARK: - Metal Video Layer (FFmpeg Engine)
+// MARK: - KSPlayer Video Layer
 
-struct MetalVideoLayer: UIViewRepresentable {
-    let renderer: VideoRenderer
+struct KSPlayerVideoLayer: UIViewRepresentable {
+    let videoView: UIView
     let scaleMode: VideoScaleMode
 
-    func makeUIView(context: Context) -> MTKView {
-        renderer.setScaleMode(scaleMode)
-        return renderer.metalView
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .black
+        videoView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(videoView)
+        NSLayoutConstraint.activate([
+            videoView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            videoView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            videoView.topAnchor.constraint(equalTo: container.topAnchor),
+            videoView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+        videoView.contentMode = scaleMode.uiViewContentMode
+        return container
     }
 
-    func updateUIView(_ uiView: MTKView, context: Context) {
-        renderer.setScaleMode(scaleMode)
+    func updateUIView(_ uiView: UIView, context: Context) {
+        videoView.contentMode = scaleMode.uiViewContentMode
     }
 }
 

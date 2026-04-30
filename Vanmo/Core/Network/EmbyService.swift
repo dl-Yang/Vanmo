@@ -186,51 +186,102 @@ final class EmbyService: MediaServerService {
 
     // MARK: - MediaServerService
 
-    func fetchAllMediaItems() async throws -> [ServerMediaItem] {
+    func streamMediaItems(
+        since: Date?,
+        pageSize: Int
+    ) -> AsyncThrowingStream<[ServerMediaItem], Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    try await fetchPages(since: since, pageSize: pageSize, yield: { page in
+                        continuation.yield(page)
+                    })
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func fetchPages(
+        since: Date?,
+        pageSize: Int,
+        yield: ([ServerMediaItem]) -> Void
+    ) async throws {
         guard isConnected, let config, let token = accessToken, let userId else {
             throw NetworkError.notConnected
         }
 
         let base = baseURL(for: config)
 
-        var components = URLComponents(
-            url: base.appendingPathComponent("emby/Users/\(userId)/Items"),
-            resolvingAgainstBaseURL: false
-        )!
-        components.queryItems = [
-            URLQueryItem(name: "Recursive", value: "true"),
-            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
-            URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations"),
-            URLQueryItem(name: "SortBy", value: "SortName"),
-            URLQueryItem(name: "SortOrder", value: "Ascending"),
-            URLQueryItem(name: "Limit", value: "2000"),
-            URLQueryItem(name: "api_key", value: token),
-        ]
+        var startIndex = 0
+        var page = 0
+        while true {
+            try Task.checkCancellation()
 
-        guard let url = components.url else {
-            throw NetworkError.invalidURL
-        }
+            var components = URLComponents(
+                url: base.appendingPathComponent("emby/Users/\(userId)/Items"),
+                resolvingAgainstBaseURL: false
+            )!
+            var queryItems: [URLQueryItem] = [
+                URLQueryItem(name: "Recursive", value: "true"),
+                URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
+                URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,DateLastSaved"),
+                URLQueryItem(name: "SortBy", value: "SortName"),
+                URLQueryItem(name: "SortOrder", value: "Ascending"),
+                URLQueryItem(name: "StartIndex", value: String(startIndex)),
+                URLQueryItem(name: "Limit", value: String(pageSize)),
+                URLQueryItem(name: "api_key", value: token),
+            ]
+            if let since {
+                queryItems.append(URLQueryItem(name: "MinDateLastSaved", value: Self.embyDateFormatter.string(from: since)))
+            }
+            components.queryItems = queryItems
 
-        VanmoLogger.network.info("[Emby] Fetching all media items: \(url.absoluteString)")
+            guard let url = components.url else {
+                throw NetworkError.invalidURL
+            }
 
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 30
-        addAuth(to: &request)
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 30
+            addAuth(to: &request)
 
-        let (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.connectionFailed("Failed to fetch media items")
-        }
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw NetworkError.connectionFailed("Failed to fetch media items")
+            }
 
-        let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
-        VanmoLogger.network.info("[Emby] Fetched \(result.items.count) media items")
+            let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
+            let mapped = result.items.compactMap { item in
+                mapEmbyMediaItem(item, baseURL: base, token: token)
+            }
 
-        return result.items.compactMap { item in
-            mapEmbyMediaItem(item, baseURL: base, token: token)
+            VanmoLogger.network.info("[Emby] page=\(page) start=\(startIndex) fetched=\(result.items.count) total=\(result.totalRecordCount)")
+
+            if !mapped.isEmpty {
+                yield(mapped)
+            }
+
+            startIndex += result.items.count
+            page += 1
+
+            if result.items.isEmpty || startIndex >= result.totalRecordCount {
+                break
+            }
         }
     }
+
+    private static let embyDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
 
     private func mapEmbyMediaItem(_ item: EmbyMediaDetail, baseURL: URL, token: String) -> ServerMediaItem? {
         let mediaType: MediaType

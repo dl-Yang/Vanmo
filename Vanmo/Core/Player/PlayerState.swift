@@ -1,5 +1,6 @@
 import Foundation
 import CoreMedia
+import UIKit
 
 enum PlaybackState: Equatable {
     case idle
@@ -38,6 +39,14 @@ enum VideoScaleMode: String, CaseIterable {
         case .stretch: return "rectangle.expand.vertical"
         }
     }
+
+    var uiViewContentMode: UIView.ContentMode {
+        switch self {
+        case .fit: return .scaleAspectFit
+        case .fill: return .scaleAspectFill
+        case .stretch: return .scaleToFill
+        }
+    }
 }
 
 struct PlayerConfig {
@@ -51,6 +60,33 @@ struct PlayerConfig {
     var isMuted: Bool = false
 
     static let availableRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
+}
+
+enum AudioOutputMode: String, CaseIterable {
+    case auto
+    case stereo
+    case surround
+
+    var displayName: String {
+        switch self {
+        case .auto: return "自动"
+        case .stereo: return "立体声"
+        case .surround: return "环绕声 / 空间音频"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .auto: return "waveform"
+        case .stereo: return "speaker.wave.2"
+        case .surround: return "hifispeaker.2"
+        }
+    }
+
+    static var current: AudioOutputMode {
+        let raw = UserDefaults.standard.string(forKey: "audio.outputMode") ?? "auto"
+        return AudioOutputMode(rawValue: raw) ?? .auto
+    }
 }
 
 struct Chapter: Identifiable, Equatable {

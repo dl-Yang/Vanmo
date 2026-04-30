@@ -14,6 +14,7 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var audioTracks: [AudioTrackInfo] = []
     @Published private(set) var subtitleTracks: [SubtitleTrackInfo] = []
     @Published private(set) var chapters: [Chapter] = []
+    @Published private(set) var currentSubtitleContent: SubtitleContent?
 
     @Published var config = PlayerConfig()
     @Published var controlsVisible = true
@@ -34,7 +35,7 @@ final class PlayerViewModel: ObservableObject {
         self.item = item
         VanmoLogger.player.info("[PlayerVM] init, file: \(item.fileURL.lastPathComponent), URL: \(item.fileURL.absoluteString)")
         self.engine = PlayerEngineFactory.engine(for: item.fileURL)
-        VanmoLogger.player.info("[PlayerVM] engine type: \(self.engine.engineType == .avFoundation ? "AVFoundation" : "FFmpeg")")
+        VanmoLogger.player.info("[PlayerVM] engine type: \(self.engine.engineType == .avFoundation ? "AVFoundation" : "KSPlayer")")
         setupBindings()
     }
 
@@ -44,8 +45,8 @@ final class PlayerViewModel: ObservableObject {
         (engine as? AVPlayerEngine)?.avPlayer
     }
 
-    var ffmpegRenderView: VideoRenderer? {
-        (engine as? FFmpegPlayerEngine)?.renderView
+    var ksPlayerVideoView: UIView? {
+        (engine as? KSPlayerEngine)?.videoView
     }
 
     // MARK: - Setup
@@ -78,6 +79,14 @@ final class PlayerViewModel: ObservableObject {
         engine.bufferProgressPublisher
             .receive(on: DispatchQueue.main)
             .assign(to: &$bufferProgress)
+
+        engine.subtitleContentPublisher
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] content in
+                self?.currentSubtitleContent = content
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Lifecycle
@@ -159,7 +168,9 @@ final class PlayerViewModel: ObservableObject {
 
     func setScaleMode(_ mode: VideoScaleMode) {
         config.scaleMode = mode
-        ffmpegRenderView?.setScaleMode(mode)
+        if let ksEngine = engine as? KSPlayerEngine {
+            ksEngine.setContentMode(mode.uiViewContentMode)
+        }
     }
 
     func selectAudioTrack(_ index: Int) {
@@ -168,14 +179,19 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func selectSubtitleTrack(_ index: Int?) {
+        VanmoLogger.player.info("[PlayerVM] selectSubtitleTrack: index=\(String(describing: index))")
         config.selectedSubtitleTrack = index
         Task { await engine.selectSubtitleTrack(index: index) }
     }
 
     private func applyPreferredSubtitleIfNeeded() async {
-        guard !subtitleTracks.isEmpty else { return }
+        guard !subtitleTracks.isEmpty else {
+            VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: no subtitle tracks available")
+            return
+        }
 
         if !subtitleAutoLoad {
+            VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: auto-load disabled")
             config.selectedSubtitleTrack = nil
             await engine.selectSubtitleTrack(index: nil)
             return
@@ -184,8 +200,12 @@ final class PlayerViewModel: ObservableObject {
         guard let preferredIndex = preferredSubtitleIndex(
             for: subtitlePreferredLanguage,
             tracks: subtitleTracks
-        ) else { return }
+        ) else {
+            VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: no matching track for '\(self.subtitlePreferredLanguage)'")
+            return
+        }
 
+        VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: auto-selecting index=\(preferredIndex) for '\(self.subtitlePreferredLanguage)'")
         config.selectedSubtitleTrack = preferredIndex
         await engine.selectSubtitleTrack(index: preferredIndex)
     }
@@ -253,8 +273,8 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func loadChapters() {
-        if let ffmpegEngine = engine as? FFmpegPlayerEngine {
-            chapters = ffmpegEngine.availableChapters
+        if let ksEngine = engine as? KSPlayerEngine {
+            chapters = ksEngine.availableChapters
         }
     }
 
@@ -344,4 +364,5 @@ final class PlayerViewModel: ObservableObject {
             withAnimation { self[keyPath: keyPath] = nil }
         }
     }
+
 }

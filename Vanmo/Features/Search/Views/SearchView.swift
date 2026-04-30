@@ -23,6 +23,8 @@ struct SearchView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.vanmoBackground)
         .navigationTitle("搜索")
         .searchable(text: $viewModel.searchText, prompt: "搜索电影、剧集...")
         .onChange(of: viewModel.searchText) { _, _ in
@@ -65,7 +67,7 @@ struct SearchView: View {
             .padding(.top, 10)
             .padding(.bottom, 12)
         }
-//       .background(Color.vanmoBackground)
+        .background(Color.vanmoBackground)
         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
     }
 

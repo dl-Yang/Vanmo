@@ -61,6 +61,8 @@ struct AddConnectionView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.vanmoBackground)
             .navigationTitle("添加连接")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -70,8 +70,16 @@ final class ConnectionsViewModel: ObservableObject {
             let scanner = MediaScanner(modelContainer: context.container)
 
             if let mediaServer = service as? MediaServerService {
-                let serverItems = try await mediaServer.fetchAllMediaItems()
-                _ = try await scanner.importServerMediaItems(serverItems, in: context)
+                let since = connection.lastSyncedAt
+                let syncStart = Date()
+                var totalImported = 0
+                for try await page in mediaServer.streamMediaItems(since: since, pageSize: 500) {
+                    let inserted = try await scanner.importServerMediaItems(page, in: context)
+                    totalImported += inserted.count
+                    loadingMessage = "已同步 \(totalImported) 项..."
+                }
+                connection.lastSyncedAt = syncStart
+                try? modelContext?.save()
             } else {
                 let scanPath = connection.path ?? "/"
                 _ = try await scanner.scanRemoteDirectory(

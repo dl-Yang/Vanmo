@@ -1,6 +1,18 @@
 import Foundation
 import AVFoundation
 import Combine
+import UIKit
+
+struct SubtitleContent: Equatable {
+    var text: String?
+    var image: UIImage?
+
+    var isEmpty: Bool { text == nil && image == nil }
+
+    static func == (lhs: SubtitleContent, rhs: SubtitleContent) -> Bool {
+        lhs.text == rhs.text && lhs.image === rhs.image
+    }
+}
 
 protocol PlayerEngine: AnyObject {
     var statePublisher: AnyPublisher<PlaybackState, Never> { get }
@@ -23,11 +35,13 @@ protocol PlayerEngine: AnyObject {
     func selectSubtitleTrack(index: Int?) async
     func availableAudioTracks() async -> [AudioTrackInfo]
     func availableSubtitleTracks() async -> [SubtitleTrackInfo]
+
+    var subtitleContentPublisher: AnyPublisher<SubtitleContent?, Never> { get }
 }
 
 enum EngineType {
     case avFoundation
-    case ffmpeg
+    case ksPlayer
 }
 
 extension PlayerEngine {
@@ -35,7 +49,7 @@ extension PlayerEngine {
         if self is AVPlayerEngine {
             return .avFoundation
         }
-        return .ffmpeg
+        return .ksPlayer
     }
 }
 
@@ -43,17 +57,20 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var timeObserver: Any?
+    private var legibleOutput: AVPlayerItemLegibleOutput?
     private var cancellables = Set<AnyCancellable>()
 
     private let stateSubject = CurrentValueSubject<PlaybackState, Never>(.idle)
     private let currentTimeSubject = CurrentValueSubject<CMTime, Never>(.zero)
     private let durationSubject = CurrentValueSubject<CMTime, Never>(.zero)
     private let bufferProgressSubject = CurrentValueSubject<Double, Never>(0)
+    private let subtitleContentSubject = CurrentValueSubject<SubtitleContent?, Never>(nil)
 
     var statePublisher: AnyPublisher<PlaybackState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentTimePublisher: AnyPublisher<CMTime, Never> { currentTimeSubject.eraseToAnyPublisher() }
     var durationPublisher: AnyPublisher<CMTime, Never> { durationSubject.eraseToAnyPublisher() }
     var bufferProgressPublisher: AnyPublisher<Double, Never> { bufferProgressSubject.eraseToAnyPublisher() }
+    var subtitleContentPublisher: AnyPublisher<SubtitleContent?, Never> { subtitleContentSubject.eraseToAnyPublisher() }
 
     var state: PlaybackState { stateSubject.value }
     var currentTime: CMTime { currentTimeSubject.value }
@@ -90,6 +107,12 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         VanmoLogger.player.info("[AVEngine] AVURLAsset created, isPlayable check pending")
         let playerItem = AVPlayerItem(asset: asset)
         self.playerItem = playerItem
+
+        let output = AVPlayerItemLegibleOutput()
+        output.setDelegate(self, queue: .main)
+        output.suppressesPlayerRendering = true
+        playerItem.add(output)
+        self.legibleOutput = output
 
         let player = AVPlayer(playerItem: playerItem)
         self.player = player
@@ -129,6 +152,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
             player.removeTimeObserver(timeObserver)
         }
         timeObserver = nil
+        legibleOutput = nil
         cancellables.removeAll()
         player?.pause()
         player?.replaceCurrentItem(with: nil)
@@ -137,6 +161,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         stateSubject.send(.idle)
         currentTimeSubject.send(.zero)
         durationSubject.send(.zero)
+        subtitleContentSubject.send(nil)
     }
 
     // MARK: - Track Selection
@@ -160,6 +185,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
             }
         } else {
             item.select(nil, in: group)
+            subtitleContentSubject.send(nil)
         }
     }
 
@@ -309,6 +335,23 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
             default:
                 continue
             }
+        }
+    }
+}
+
+// MARK: - AVPlayerItemLegibleOutputPushDelegate
+
+extension AVPlayerEngine: AVPlayerItemLegibleOutputPushDelegate {
+    func legibleOutput(
+        _ output: AVPlayerItemLegibleOutput,
+        didOutputAttributedStrings strings: [NSAttributedString],
+        nativeSampleBuffers nativeSamples: [Any],
+        forItemTime itemTime: CMTime
+    ) {
+        let text = strings.map { $0.string }.joined(separator: "\n")
+        let content: SubtitleContent? = text.isEmpty ? nil : SubtitleContent(text: text)
+        if content != subtitleContentSubject.value {
+            subtitleContentSubject.send(content)
         }
     }
 }

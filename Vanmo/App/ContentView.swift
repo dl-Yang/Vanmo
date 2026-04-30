@@ -29,8 +29,14 @@ struct ContentView: View {
             }
             .tag(AppTab.search)
 
-            NavigationStack {
+            NavigationStack(path: $appState.settingsPath) {
                 SettingsView()
+                    .navigationDestination(for: SettingsRoute.self) { route in
+                        switch route {
+                        case .appearance:
+                            AppearanceSettingsView()
+                        }
+                    }
             }
             .tabItem {
                 Label(AppTab.settings.title, systemImage: AppTab.settings.icon)
