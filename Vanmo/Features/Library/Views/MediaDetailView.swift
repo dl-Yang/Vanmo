@@ -193,6 +193,7 @@ struct MediaDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .disabled(item.mediaType == .tvShow && episodes.isEmpty)
+        .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: 8)
     }
 
     private var playButtonTitle: String {

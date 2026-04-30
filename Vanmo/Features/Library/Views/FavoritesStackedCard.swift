@@ -22,10 +22,12 @@ struct FavoritesStackedCard: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 8) {
-                    countBadge("\(movieCount) 部电影", icon: "film")
-                    countBadge("\(tvShowCount) 部剧集", icon: "tv")
-                }
+                countBadge("\(movieCount) 部电影", icon: "film")
+                countBadge("\(tvShowCount) 部剧集", icon: "tv")
+//                HStack(spacing: 8) {
+//                    countBadge("\(movieCount) 部电影", icon: "film")
+////                    countBadge("\(tvShowCount) 部剧集", icon: "tv")
+//                }
 
                 Text("共 \(totalCount) 部")
                     .font(.caption)

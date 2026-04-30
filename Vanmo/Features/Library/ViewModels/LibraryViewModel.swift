@@ -31,6 +31,7 @@ final class LibraryViewModel: ObservableObject {
     private var dbOffset = 0
     private var modelContext: ModelContext?
     private var loadedItemIDs: Set<PersistentIdentifier> = []
+    private var hasLoadedInitial = false
 
     var hasActiveFilters: Bool {
         !selectedGenres.isEmpty || !selectedRegions.isEmpty
@@ -44,6 +45,7 @@ final class LibraryViewModel: ObservableObject {
 
     func loadInitialSections() async {
         guard let context = modelContext else { return }
+        guard !hasLoadedInitial else { return }
         isLoading = true
         defer { isLoading = false }
 
@@ -97,6 +99,7 @@ final class LibraryViewModel: ObservableObject {
 
             try await loadFirstPage()
             isLibraryEmpty = recentlyAdded.isEmpty && recentlyPlayed.isEmpty && favorites.isEmpty && loadedItems.isEmpty
+            hasLoadedInitial = true
         } catch {
             errorMessage = error.localizedDescription
             showError = true
