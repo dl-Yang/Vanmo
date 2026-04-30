@@ -45,11 +45,19 @@ final class LibraryViewModel: ObservableObject {
 
     func loadInitialSections() async {
         guard let context = modelContext else { return }
-        guard !hasLoadedInitial else { return }
-        isLoading = true
-        defer { isLoading = false }
+        let isFirstLoad = !hasLoadedInitial
+        if isFirstLoad {
+            isLoading = true
+        }
+        defer {
+            if isFirstLoad {
+                isLoading = false
+            }
+        }
 
-        resetPagedItems()
+        if isFirstLoad {
+            resetPagedItems()
+        }
 
         let container = context.container
         let limit = highlightSectionLimit
@@ -97,9 +105,11 @@ final class LibraryViewModel: ObservableObject {
             favoriteMovieCount = snapshot.favoriteMovieCount
             favoriteTVShowCount = snapshot.favoriteTVShowCount
 
-            try await loadFirstPage()
+            if isFirstLoad {
+                try await loadFirstPage()
+                hasLoadedInitial = true
+            }
             isLibraryEmpty = recentlyAdded.isEmpty && recentlyPlayed.isEmpty && favorites.isEmpty && loadedItems.isEmpty
-            hasLoadedInitial = true
         } catch {
             errorMessage = error.localizedDescription
             showError = true
