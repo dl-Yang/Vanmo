@@ -9,6 +9,7 @@ struct MediaDetailView: View {
 
     @State private var showAllCast = false
     @State private var dominantColor: Color = .black.opacity(0.0)
+    @State private var accentColor: Color = Color(hue: 0, saturation: 0.05, brightness: 0.88)
     @State private var episodes: [EpisodeInfo] = []
     @State private var isLoadingEpisodes = false
     @State private var selectedSeason: Int?
@@ -56,9 +57,11 @@ struct MediaDetailView: View {
         .frame(height: 520)
         .clipped()
         .task {
-            dominantColor = await DominantColorExtractor.cachedColor(
-                for: item.posterURL
-            )
+            async let dominant = DominantColorExtractor.cachedColor(for: item.posterURL)
+            async let accent = DominantColorExtractor.cachedAccentColor(for: item.posterURL)
+            let (d, a) = await (dominant, accent)
+            dominantColor = d
+            accentColor = a
         }
     }
 
@@ -179,7 +182,7 @@ struct MediaDetailView: View {
             HStack(spacing: 8) {
                 if isLoadingEpisodes {
                     ProgressView()
-                        .tint(.white)
+                        .tint(playButtonForeground)
                 } else {
                     Image(systemName: "play.fill")
                 }
@@ -188,12 +191,19 @@ struct MediaDetailView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.vanmoPrimary)
-            .foregroundStyle(.white)
+            .background(accentColor)
+            .foregroundStyle(playButtonForeground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .disabled(item.mediaType == .tvShow && episodes.isEmpty)
         .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: 8)
+    }
+
+    /// 按钮前景色根据按钮背景亮度自适应：浅色背景用深色字，深色背景用白字。
+    private var playButtonForeground: Color {
+        DominantColorExtractor.relativeLuminance(of: accentColor) > 0.55
+            ? Color.black.opacity(0.85)
+            : .white
     }
 
     private var playButtonTitle: String {

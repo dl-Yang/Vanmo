@@ -356,6 +356,7 @@ final class PlayerViewModel: ObservableObject {
         if currentTime / max(duration, 1) > 0.9 {
             item.isWatched = true
         }
+        try? item.modelContext?.save()
     }
 
     private func dismissOverlay<T>(_ keyPath: ReferenceWritableKeyPath<PlayerViewModel, T?>, after: TimeInterval = 1.0) {
