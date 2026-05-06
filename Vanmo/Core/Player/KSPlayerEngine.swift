@@ -61,6 +61,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     override init() {
         super.init()
         setupAudioSession()
+        // 使用 AVSampleBufferAudioRenderer + AVSampleBufferRenderSynchronizer 进行 A/V 同步，
+        // 避免 AudioEnginePlayer 在 5.1→stereo downmix 路径下手工推算 audio clock 出现速率漂移（实测 ~1.37×），
+        // 该漂移会让视频被定义为持续落后并被反复丢帧。
+        KSOptions.audioPlayerType = AudioRendererPlayer.self
     }
 
     deinit {
