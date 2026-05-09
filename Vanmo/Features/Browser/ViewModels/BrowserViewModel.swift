@@ -20,6 +20,10 @@ final class ConnectionsViewModel: ObservableObject {
 
     private var connectionStatuses: [UUID: ConnectionStatus] = [:]
     private var modelContext: ModelContext?
+    private var didAttemptAutoReconnect = false
+    /// 仅 localFolder 用：保留正在持有 security-scoped access 的 service 实例，
+    /// 让 App 生命周期内 file:// URL 始终可读，避免播放时权限失效。
+    private var activeLocalServices: [UUID: LocalFolderService] = [:]
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
@@ -42,22 +46,79 @@ final class ConnectionsViewModel: ObservableObject {
         }
     }
 
+    /// 应用启动时尝试自动重连最近一次成功连接过的服务。
+    /// 在整个 App 生命周期内只会触发一次。失败时静默处理，不打扰用户。
+    func attemptAutoReconnectIfNeeded() async {
+        guard !didAttemptAutoReconnect else { return }
+        didAttemptAutoReconnect = true
+
+        if savedConnections.isEmpty {
+            await loadSavedConnections()
+        }
+
+        // 优先恢复所有本地文件夹的 security-scoped access，让媒体库里的本地视频
+        // 在 App 启动后无需用户重新进入"连接"页就能直接播放。
+        await restoreLocalFolderAccess()
+
+        // savedConnections 已按 lastConnectedAt 倒序排列。
+        guard let last = savedConnections.first(where: { $0.lastConnectedAt != nil }) else {
+            VanmoLogger.network.info("[Connections] Auto-reconnect skipped: no previous connection")
+            return
+        }
+
+        VanmoLogger.network.info("[Connections] Auto-reconnect to \(last.name)")
+        await connectAndScan(last, showErrorAlert: false)
+    }
+
+    /// 仅打开本地文件夹的 bookmark 并保持 access，不触发扫描。
+    private func restoreLocalFolderAccess() async {
+        for connection in savedConnections where connection.type == .localFolder {
+            guard activeLocalServices[connection.id] == nil else { continue }
+            guard connection.bookmarkData != nil else { continue }
+
+            let service = LocalFolderService()
+            let config = ConnectionConfig(from: connection)
+            do {
+                try await service.connect(config: config)
+                activeLocalServices[connection.id] = service
+                VanmoLogger.network.info("[Connections] Restored local access: \(connection.name)")
+            } catch {
+                VanmoLogger.network.error("[Connections] Restore local access failed for \(connection.name): \(error.localizedDescription)")
+            }
+        }
+    }
+
     @discardableResult
-    func connectAndScan(_ connection: SavedConnection) async -> Bool {
+    func connectAndScan(_ connection: SavedConnection, showErrorAlert: Bool = true) async -> Bool {
         connectionStatuses[connection.id] = .connecting
         isLoading = true
         loadingMessage = "连接到 \(connection.name)..."
 
         VanmoLogger.network.info("[Connections] Connecting to \(connection.name) (\(connection.type.rawValue)://\(connection.host):\(connection.port))")
 
+        let isLocal = connection.type == .localFolder
+
         do {
-            let password = try KeychainManager.shared.loadString(for: "conn_\(connection.id)")
-            let config = ConnectionConfig(from: connection, password: password)
-            let service = RemoteServiceFactory.create(for: connection.type)
+            let service: RemoteFileService
+            if isLocal {
+                if let cached = activeLocalServices[connection.id] {
+                    service = cached
+                } else {
+                    let local = LocalFolderService()
+                    let config = ConnectionConfig(from: connection)
+                    try await local.connect(config: config)
+                    activeLocalServices[connection.id] = local
+                    service = local
+                }
+            } else {
+                let password = try KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+                let config = ConnectionConfig(from: connection, password: password)
+                let remote = RemoteServiceFactory.create(for: connection.type)
+                try await remote.connect(config: config)
+                service = remote
+            }
 
-            try await service.connect(config: config)
             connectionStatuses[connection.id] = .connected
-
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
 
@@ -89,7 +150,11 @@ final class ConnectionsViewModel: ObservableObject {
                 )
             }
 
-            await service.disconnect()
+            // 本地文件夹保持 access，让媒体库里的视频后续可直接播放；
+            // 远端协议照常释放连接。
+            if !isLocal {
+                await service.disconnect()
+            }
 
             VanmoLogger.network.info("[Connections] Scan complete for \(connection.name)")
             isLoading = false
@@ -97,8 +162,10 @@ final class ConnectionsViewModel: ObservableObject {
         } catch {
             VanmoLogger.network.error("[Connections] Connection failed: \(error.localizedDescription)")
             connectionStatuses[connection.id] = .failed
-            errorMessage = error.localizedDescription
-            showError = true
+            if showErrorAlert {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
             isLoading = false
             return false
         }
@@ -111,7 +178,8 @@ final class ConnectionsViewModel: ObservableObject {
         port: Int,
         username: String?,
         password: String?,
-        path: String?
+        path: String?,
+        bookmarkData: Data? = nil
     ) async {
         let connection = SavedConnection(
             name: name,
@@ -119,7 +187,8 @@ final class ConnectionsViewModel: ObservableObject {
             host: host,
             port: port,
             username: username,
-            path: path
+            path: path,
+            bookmarkData: bookmarkData
         )
 
         modelContext?.insert(connection)
@@ -134,6 +203,11 @@ final class ConnectionsViewModel: ObservableObject {
 
     func deleteConnection(_ connection: SavedConnection) {
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
+
+        if let active = activeLocalServices.removeValue(forKey: connection.id) {
+            Task { await active.disconnect() }
+        }
+
         modelContext?.delete(connection)
         try? modelContext?.save()
         connectionStatuses.removeValue(forKey: connection.id)

@@ -4,7 +4,7 @@ import SwiftData
 struct ConnectionsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
-    @StateObject private var viewModel = ConnectionsViewModel()
+    @EnvironmentObject private var viewModel: ConnectionsViewModel
 
     var body: some View {
         List {
@@ -163,5 +163,6 @@ typealias BrowserView = ConnectionsView
         ConnectionsView()
     }
     .environmentObject(AppState())
+    .environmentObject(ConnectionsViewModel())
     .preferredColorScheme(.dark)
 }

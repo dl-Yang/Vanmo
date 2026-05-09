@@ -46,6 +46,8 @@ actor MediaScanner {
             if parsed.isTV {
                 item.showTitle = parsed.title
             }
+            item.originalFileName = fileURL.lastPathComponent
+            item.container = fileURL.pathExtension.isEmpty ? nil : fileURL.pathExtension.lowercased()
 
             context.insert(item)
             newItems.append(item)
@@ -120,6 +122,9 @@ actor MediaScanner {
                     item.showTitle = parsed.title
                 }
                 item.serverId = file.path
+                item.originalFileName = file.name
+                let ext = (file.name as NSString).pathExtension
+                item.container = ext.isEmpty ? nil : ext.lowercased()
 
                 await MainActor.run { context.insert(item) }
                 newItems.append(item)
@@ -185,6 +190,8 @@ actor MediaScanner {
         item.mediaType = serverItem.mediaType
         item.fileURL = serverItem.streamURL
         item.fileSize = serverItem.fileSize
+        item.originalFileName = serverItem.originalFileName
+        item.container = serverItem.container
         if serverItem.duration > 0 {
             item.duration = serverItem.duration
         }

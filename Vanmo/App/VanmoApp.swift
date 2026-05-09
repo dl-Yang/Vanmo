@@ -3,7 +3,12 @@ import SwiftData
 
 @main
 struct VanmoApp: App {
+    init() {
+        PrefetchTemporaryStore.cleanupOrphans()
+    }
+
     @StateObject private var appState = AppState()
+    @StateObject private var connectionsViewModel = ConnectionsViewModel()
     @AppStorage(ColorTheme.storageKey) private var theme: ColorTheme = .system
 
     var sharedModelContainer: ModelContainer = {
@@ -27,6 +32,7 @@ struct VanmoApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .environmentObject(connectionsViewModel)
                 .preferredColorScheme(theme.preferredColorScheme)
                 .id(theme)
         }

@@ -15,6 +15,8 @@ final class MediaItem {
     var fileURL: URL
     var fileSize: Int64
     var duration: TimeInterval
+    var originalFileName: String?
+    var container: String?
     var lastPlayedAt: Date?
     var lastPlaybackPosition: TimeInterval
     var isWatched: Bool

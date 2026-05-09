@@ -7,4 +7,5 @@ enum VanmoLogger {
     static let metadata = Logger(subsystem: "com.vanmo.app", category: "Metadata")
     static let subtitle = Logger(subsystem: "com.vanmo.app", category: "Subtitle")
     static let storage = Logger(subsystem: "com.vanmo.app", category: "Storage")
+    static let prefetch = Logger(subsystem: "com.vanmo.app", category: "Prefetch")
 }

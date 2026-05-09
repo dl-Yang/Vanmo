@@ -107,14 +107,35 @@ struct SecondFloorView: View {
     // MARK: - Page Indicator
 
     private var pageIndicator: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<recentlyPlayed.count, id: \.self) { i in
-                Circle()
-                    .fill(i == selectedIndex ? Color.white : Color.white.opacity(0.3))
-                    .frame(width: i == selectedIndex ? 8 : 6, height: i == selectedIndex ? 8 : 6)
-                    .animation(.easeInOut(duration: 0.2), value: selectedIndex)
+        let count = recentlyPlayed.count
+        let maxVisible = 6
+        let dotSlot: CGFloat = 8
+        let spacing: CGFloat = 8
+        let step = dotSlot + spacing
+        let visibleCount = min(count, maxVisible)
+        let containerWidth = CGFloat(visibleCount) * dotSlot + CGFloat(max(visibleCount - 1, 0)) * spacing
+        let needsScroll = count > maxVisible
+        let windowStart: Int = {
+            guard needsScroll else { return 0 }
+            let target = selectedIndex - (maxVisible / 2 - 1)
+            return max(0, min(count - maxVisible, target))
+        }()
+
+        return ZStack(alignment: .leading) {
+            HStack(spacing: spacing) {
+                ForEach(0..<count, id: \.self) { i in
+                    let isSelected = i == selectedIndex
+                    Circle()
+                        .fill(isSelected ? Color.white : Color.white.opacity(0.3))
+                        .frame(width: isSelected ? 8 : 6, height: isSelected ? 8 : 6)
+                        .frame(width: dotSlot, height: dotSlot)
+                }
             }
+            .offset(x: -CGFloat(windowStart) * step)
         }
+        .frame(width: containerWidth, height: dotSlot, alignment: .leading)
+        .clipped()
+        .animation(.easeInOut(duration: 0.25), value: selectedIndex)
     }
 
     // MARK: - Dismiss Gesture

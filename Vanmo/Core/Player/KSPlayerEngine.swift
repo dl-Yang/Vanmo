@@ -84,6 +84,11 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             options.startPlayTime = startPosition.seconds
         }
         options.isAccurateSeek = true
+        // 缓冲水位：吸收稳态吞吐略低于码率时的抖动，降低 buffering 次数。
+        options.isSecondOpen = true
+        options.preferredForwardBufferDuration = 10
+        options.maxBufferDuration = 60
+        options.formatContextOptions["buffer_size"] = 8 * 1024 * 1024
 
         Self.configureAudioOptions(options)
 

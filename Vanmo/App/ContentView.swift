@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -49,10 +51,18 @@ struct ContentView: View {
                 PlayerView(item: item)
             }
         }
+        .task {
+            // App 启动后自动重连最近一次连接成功的服务，刷新媒体库。
+            // ConnectionsViewModel 是 App 级别的 @StateObject，跨 ContentView 重建仍能保留
+            // didAttemptAutoReconnect 标志，避免主题切换时重复触发。
+            connectionsViewModel.setModelContext(modelContext)
+            await connectionsViewModel.attemptAutoReconnectIfNeeded()
+        }
     }
 }
 
 #Preview {
     ContentView()
         .environmentObject(AppState())
+        .environmentObject(ConnectionsViewModel())
 }

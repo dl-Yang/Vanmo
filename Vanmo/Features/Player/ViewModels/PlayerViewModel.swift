@@ -30,6 +30,7 @@ final class PlayerViewModel: ObservableObject {
     private let item: MediaItem
     private var cancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
+    private var prefetchToken: String?
 
     init(item: MediaItem) {
         self.item = item
@@ -94,11 +95,25 @@ final class PlayerViewModel: ObservableObject {
     func onAppear() async {
         VanmoLogger.player.info("[PlayerVM] onAppear, loading file: \(self.item.fileURL.lastPathComponent)")
         do {
+            prefetchToken = nil
+            let originalURL = item.fileURL
+            let loadURL: URL
+            if originalURL.isFileURL {
+                loadURL = originalURL
+            } else if let registration = await PrefetchProxy.shared.register(originalURL: originalURL) {
+                loadURL = registration.url
+                prefetchToken = registration.token
+                VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
+            } else {
+                loadURL = originalURL
+                VanmoLogger.player.info("[PlayerVM] prefetch unavailable, loading remote URL directly")
+            }
+
             let startPosition: CMTime? = item.lastPlaybackPosition > 0
                 ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
                 : nil
             VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
-            try await engine.load(url: item.fileURL, startPosition: startPosition)
+            try await engine.load(url: loadURL, startPosition: startPosition)
             VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
             audioTracks = await engine.availableAudioTracks()
             subtitleTracks = await engine.availableSubtitleTracks()
@@ -119,6 +134,12 @@ final class PlayerViewModel: ObservableObject {
         VanmoLogger.player.info("[PlayerVM] onDisappear, saving progress at \(self.currentTime)s")
         saveProgress()
         engine.stop()
+        if let token = prefetchToken {
+            prefetchToken = nil
+            Task {
+                await PrefetchProxy.shared.unregister(token: token)
+            }
+        }
     }
 
     // MARK: - Playback Control

@@ -327,6 +327,11 @@ final class EmbyService: MediaServerService {
 
         let countries = item.productionLocations ?? []
 
+        let primarySource = item.mediaSources?.first
+        let originalFileName = primarySource?.path.flatMap(Self.extractFileName(from:))
+        let container = primarySource?.container.flatMap { $0.isEmpty ? nil : $0 }
+        let fileSize = primarySource?.size ?? 0
+
         return ServerMediaItem(
             serverId: item.id,
             title: item.name,
@@ -343,14 +348,23 @@ final class EmbyService: MediaServerService {
             originCountry: countries,
             tmdbID: tmdbID,
             streamURL: streamURL,
-            fileSize: 0,
+            fileSize: fileSize,
             duration: durationSeconds,
+            originalFileName: originalFileName,
+            container: container,
             showTitle: nil,
             seasonNumber: nil,
             episodeNumber: nil,
             episodeTitle: nil,
             seriesId: nil
         )
+    }
+
+    /// 从 Emby 返回的 Path 中提取文件名，兼容 Unix (`/`) 与 Windows (`\`) 分隔符。
+    private static func extractFileName(from path: String) -> String? {
+        let separators = CharacterSet(charactersIn: "/\\")
+        let parts = path.components(separatedBy: separators)
+        return parts.last(where: { !$0.isEmpty })
     }
 
     // MARK: - Private
@@ -463,6 +477,7 @@ private struct EmbyMediaDetail: Decodable {
     let parentIndexNumber: Int?
     let indexNumber: Int?
     let seriesPrimaryImageTag: String?
+    let mediaSources: [EmbyMediaSource]?
 
     enum CodingKeys: String, CodingKey {
         case id = "Id"
@@ -484,6 +499,19 @@ private struct EmbyMediaDetail: Decodable {
         case parentIndexNumber = "ParentIndexNumber"
         case indexNumber = "IndexNumber"
         case seriesPrimaryImageTag = "SeriesPrimaryImageTag"
+        case mediaSources = "MediaSources"
+    }
+}
+
+private struct EmbyMediaSource: Decodable {
+    let path: String?
+    let container: String?
+    let size: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case path = "Path"
+        case container = "Container"
+        case size = "Size"
     }
 }
 

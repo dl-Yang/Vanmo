@@ -40,6 +40,8 @@ struct ServerMediaItem {
     let streamURL: URL
     let fileSize: Int64
     let duration: TimeInterval
+    let originalFileName: String?
+    let container: String?
 
     let showTitle: String?
     let seasonNumber: Int?
@@ -55,6 +57,8 @@ struct ConnectionConfig {
     let username: String?
     let password: String?
     let path: String?
+    /// localFolder 协议下用于解析 security-scoped bookmark；其他协议为 nil。
+    let bookmarkData: Data?
 
     init(from saved: SavedConnection, password: String? = nil) {
         self.type = saved.type
@@ -63,6 +67,7 @@ struct ConnectionConfig {
         self.username = saved.username
         self.password = password
         self.path = saved.path
+        self.bookmarkData = saved.bookmarkData
     }
 
     init(
@@ -71,7 +76,8 @@ struct ConnectionConfig {
         port: Int? = nil,
         username: String? = nil,
         password: String? = nil,
-        path: String? = nil
+        path: String? = nil,
+        bookmarkData: Data? = nil
     ) {
         self.type = type
         self.host = host
@@ -79,5 +85,6 @@ struct ConnectionConfig {
         self.username = username
         self.password = password
         self.path = path
+        self.bookmarkData = bookmarkData
     }
 }

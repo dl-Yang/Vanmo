@@ -445,12 +445,39 @@ struct MediaDetailView: View {
                 .font(.headline)
 
             VStack(spacing: 6) {
-                infoRow("文件名", value: item.fileURL.lastPathComponent)
-                infoRow("大小", value: item.fileSize.formattedFileSize)
-                infoRow("时长", value: item.duration.formattedDuration)
-                infoRow("格式", value: item.fileURL.pathExtension.uppercased())
+                if let fileName = displayFileName {
+                    infoRow("文件名", value: fileName)
+                }
+                if item.fileSize > 0 {
+                    infoRow("大小", value: item.fileSize.formattedFileSize)
+                }
+                if item.duration > 0 {
+                    infoRow("时长", value: item.duration.formattedDuration)
+                }
+                if let format = displayFormat {
+                    infoRow("格式", value: format)
+                }
             }
         }
+    }
+
+    /// 文件名优先取持久化的原始文件名；远程流式 URL 没有可读文件名时返回 nil。
+    private var displayFileName: String? {
+        if let name = item.originalFileName, !name.isEmpty { return name }
+        if item.fileURL.isFileURL {
+            let last = item.fileURL.lastPathComponent
+            return last.isEmpty ? nil : last
+        }
+        return nil
+    }
+
+    /// 容器格式优先取持久化字段；本地文件回退到扩展名。
+    private var displayFormat: String? {
+        if let container = item.container, !container.isEmpty {
+            return container.uppercased()
+        }
+        let ext = item.fileURL.pathExtension
+        return ext.isEmpty ? nil : ext.uppercased()
     }
 
     private var trackInfoSection: some View {

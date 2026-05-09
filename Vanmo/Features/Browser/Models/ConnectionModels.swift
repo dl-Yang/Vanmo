@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 
 enum ConnectionType: String, Codable, CaseIterable, Identifiable {
+    case localFolder
     case smb
     case ftp
     case sftp
@@ -16,6 +17,7 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
+        case .localFolder: return "本地文件夹"
         case .smb: return "SMB"
         case .ftp: return "FTP"
         case .sftp: return "SFTP"
@@ -30,6 +32,7 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .localFolder: return "folder"
         case .smb, .nfs: return "externaldrive.connected.to.line.below"
         case .ftp, .sftp: return "arrow.up.arrow.down.circle"
         case .webdav: return "globe"
@@ -40,6 +43,7 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
 
     var defaultPort: Int {
         switch self {
+        case .localFolder: return 0
         case .smb: return 445
         case .ftp: return 21
         case .sftp: return 22
@@ -54,7 +58,7 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
 
     var requiresAuth: Bool {
         switch self {
-        case .dlna: return false
+        case .localFolder, .dlna: return false
         default: return true
         }
     }
@@ -64,6 +68,11 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
         case .emby, .jellyfin, .plex: return true
         default: return false
         }
+    }
+
+    /// 本地协议无需主机/端口/账户，UI 与连接流程走专门分支。
+    var isLocal: Bool {
+        self == .localFolder
     }
 }
 
@@ -76,6 +85,8 @@ final class SavedConnection {
     var port: Int
     var username: String?
     var path: String?
+    /// 仅 localFolder 使用：security-scoped bookmark，跨 App 重启恢复访问权限。
+    var bookmarkData: Data?
     var isFavorite: Bool
     var lastConnectedAt: Date?
     var lastSyncedAt: Date?
@@ -87,7 +98,8 @@ final class SavedConnection {
         host: String,
         port: Int? = nil,
         username: String? = nil,
-        path: String? = nil
+        path: String? = nil,
+        bookmarkData: Data? = nil
     ) {
         self.id = UUID()
         self.name = name
@@ -96,6 +108,7 @@ final class SavedConnection {
         self.port = port ?? type.defaultPort
         self.username = username
         self.path = path
+        self.bookmarkData = bookmarkData
         self.isFavorite = false
         self.addedAt = Date()
     }

@@ -55,6 +55,22 @@ Vanmo 播放器采用**双引擎架构**，通过统一的 `PlayerEngine` 协议
 | `PlayerState.swift` | `Core/Player/` | 状态枚举、配置、音频模式等数据类型 |
 | `PlayerViewModel.swift` | `Features/Player/ViewModels/` | 播放业务逻辑，桥接 Engine 与 View |
 | `PlayerView.swift` | `Features/Player/Views/` | SwiftUI 播放界面 |
+| `Prefetch/*.swift` | `Core/Player/Prefetch/` | 本地 HTTP 代理 + Range 缓存与预读（见下文） |
+
+---
+
+## 网络预缓存（Prefetch）
+
+远程非 `file://` URL 在进入引擎前经 **`PrefetchProxy`** 改写为 `http://127.0.0.1:<随机端口>/stream/<sessionToken>`。引擎仍按扩展名由 `PlayerEngineFactory` 选型（依据 **`MediaItem.fileURL`**，与代理 URL 无关）。
+
+- **监听**：`Network.framework` / `NWListener` 绑定本机端口，仅解析 GET + `Range: bytes=…`。
+- **回源**：`RemoteFetcher` 将 URL 内嵌凭据转为 `Authorization: Basic`，与 `AVPlayerEngine` 一致。
+- **缓存**：`RangeCache` 按 256KB chunk 写入内存与 `tmp/prefetch/<sessionId>/`，内存上限 64 MB，LRU spill 仅限**完整 chunk**。
+- **回源并发**：`PrefetchSession.bodyStream` 维护 16 路并发 pipeline（`maxConcurrentFetches`），`FetchLimiter` 全局限流；新 GET 进来时主动 cancel 旧 bodyStream，避免幽灵下载抢带宽。
+- **FFmpeg 缓冲水位**：`KSOptions` 配置 `isSecondOpen=true` + `preferredForwardBufferDuration=10s` + `maxBufferDuration=60s` + `buffer_size=8MB`，吸收瞬时吞吐抖动。
+- **生命周期**：退出播放器 `unregister`；App 启动时 `PrefetchTemporaryStore.cleanupOrphans()` 清理崩溃残留。
+
+详细参数依据、调优历程与时序图见 [`player-buffering.md`](./player-buffering.md)。
 
 ---
 

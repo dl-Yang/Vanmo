@@ -24,6 +24,11 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Vanmo 需要访问本地网络以发现和连接 NAS、DLNA 设备及媒体服务器。</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_smb._tcp</string>

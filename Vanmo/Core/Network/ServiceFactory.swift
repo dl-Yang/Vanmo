@@ -3,6 +3,8 @@ import Foundation
 enum RemoteServiceFactory {
     static func create(for type: ConnectionType) -> RemoteFileService {
         switch type {
+        case .localFolder:
+            return LocalFolderService()
         case .smb:
             return SMBService()
         case .webdav:
