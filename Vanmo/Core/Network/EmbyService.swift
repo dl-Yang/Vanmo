@@ -12,7 +12,12 @@ final class EmbyService: MediaServerService {
 
     private static let clientName = "Vanmo"
     private static let clientVersion = "1.0.0"
-    private static let deviceName = "iPhone"
+    /// 与现有 `UIDevice.current.identifierForVendor` 同步访问保持一致；
+    /// 在 Swift 6 严格并发模式下需要主线程隔离，这里和现有代码一起当作已知 trade-off。
+    private static var deviceName: String {
+        let model = UIDevice.current.model
+        return model.isEmpty ? "iPhone" : model
+    }
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -112,11 +117,7 @@ final class EmbyService: MediaServerService {
         addAuth(to: &request)
 
         let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.connectionFailed("Failed to list items")
-        }
+        try validateEmbyResponse(response, body: data, context: "list items")
 
         let result = try JSONDecoder().decode(EmbyItemsResponse.self, from: data)
         VanmoLogger.network.info("[Emby] Found \(result.items.count) items")
@@ -179,7 +180,17 @@ final class EmbyService: MediaServerService {
         var request = URLRequest(url: url)
         addAuth(to: &request)
 
-        let (tempURL, _) = try await session.download(for: request)
+        let (tempURL, response) = try await session.download(for: request)
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                try? FileManager.default.removeItem(at: tempURL)
+                throw NetworkError.authenticationFailed
+            }
+            guard (200...299).contains(httpResponse.statusCode) else {
+                try? FileManager.default.removeItem(at: tempURL)
+                throw NetworkError.connectionFailed("download HTTP \(httpResponse.statusCode)")
+            }
+        }
         try FileManager.default.moveItem(at: tempURL, to: localURL)
         progress(1.0)
     }
@@ -249,11 +260,7 @@ final class EmbyService: MediaServerService {
             addAuth(to: &request)
 
             let (data, response) = try await session.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
-                throw NetworkError.connectionFailed("Failed to fetch media items")
-            }
+            try validateEmbyResponse(response, body: data, context: "fetch media items")
 
             let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
             let mapped = result.items.compactMap { item in
@@ -392,6 +399,26 @@ final class EmbyService: MediaServerService {
         }
     }
 
+}
+
+// MARK: - Shared Response Validation
+
+/// 统一处理 Emby 接口非 2xx 响应：
+/// - 401 / 403 → `NetworkError.authenticationFailed`
+/// - 其它 → 带状态码与 body 前 200 字符的 `connectionFailed`
+private func validateEmbyResponse(_ response: URLResponse, body: Data, context: String) throws {
+    guard let httpResponse = response as? HTTPURLResponse else {
+        throw NetworkError.connectionFailed("\(context): invalid response type")
+    }
+    if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+        VanmoLogger.network.error("[Emby] \(context) auth failed: status=\(httpResponse.statusCode)")
+        throw NetworkError.authenticationFailed
+    }
+    guard (200...299).contains(httpResponse.statusCode) else {
+        let preview = String(data: body, encoding: .utf8)?.prefix(200) ?? ""
+        VanmoLogger.network.error("[Emby] \(context) failed: status=\(httpResponse.statusCode) body=\(preview)")
+        throw NetworkError.connectionFailed("\(context) HTTP \(httpResponse.statusCode): \(preview)")
+    }
 }
 
 // MARK: - Emby API Models
@@ -535,21 +562,47 @@ private struct EmbyImageTags: Decodable {
 
 // MARK: - Credential Store & On-Demand Episode Fetching
 
+/// 跨调用点共享的 Emby 会话凭据。`baseURL` 不是 secret，仍走 UserDefaults；
+/// `token` 是 access token，必须存在 Keychain（SKILL 红线）。
+///
+/// 为兼容老安装，第一次读 token 时会把残留在 UserDefaults 里的值迁移到
+/// Keychain，并清掉 UserDefaults 副本。
 enum EmbyCredentialStore {
     private static let baseURLKey = "emby.baseURL"
-    private static let tokenKey = "emby.accessToken"
+    private static let legacyTokenKey = "emby.accessToken"
+    private static let tokenKeychainAccount = "emby.accessToken"
 
     static func save(baseURL: String, token: String) {
         UserDefaults.standard.set(baseURL, forKey: baseURLKey)
-        UserDefaults.standard.set(token, forKey: tokenKey)
+        do {
+            try KeychainManager.shared.save(token, for: tokenKeychainAccount)
+            UserDefaults.standard.removeObject(forKey: legacyTokenKey)
+        } catch {
+            VanmoLogger.network.error("[Emby] Failed to persist access token to Keychain: \(error.localizedDescription)")
+        }
     }
 
-    static var baseURL: String? { UserDefaults.standard.string(forKey: baseURLKey) }
-    static var token: String? { UserDefaults.standard.string(forKey: tokenKey) }
+    static var baseURL: String? {
+        UserDefaults.standard.string(forKey: baseURLKey)
+    }
+
+    static var token: String? {
+        if let stored = try? KeychainManager.shared.loadString(for: tokenKeychainAccount) {
+            return stored
+        }
+        // 从老版本 UserDefaults 迁移过来。
+        if let legacy = UserDefaults.standard.string(forKey: legacyTokenKey) {
+            try? KeychainManager.shared.save(legacy, for: tokenKeychainAccount)
+            UserDefaults.standard.removeObject(forKey: legacyTokenKey)
+            return legacy
+        }
+        return nil
+    }
 
     static func clear() {
         UserDefaults.standard.removeObject(forKey: baseURLKey)
-        UserDefaults.standard.removeObject(forKey: tokenKey)
+        UserDefaults.standard.removeObject(forKey: legacyTokenKey)
+        try? KeychainManager.shared.delete(for: tokenKeychainAccount)
     }
 }
 
@@ -591,11 +644,7 @@ enum EmbyEpisodeFetcher {
         request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.connectionFailed("Failed to fetch episodes")
-        }
+        try validateEmbyResponse(response, body: data, context: "fetch episodes")
 
         let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
         VanmoLogger.network.info("[Emby] Fetched \(result.items.count) episodes for series \(seriesId)")
