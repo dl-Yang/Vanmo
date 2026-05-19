@@ -2,7 +2,7 @@ import Foundation
 import UIKit
 
 final class EmbyService: MediaServerService {
-    let type: ConnectionType = .emby
+    let type: ConnectionType
     private(set) var isConnected = false
 
     private var config: ConnectionConfig?
@@ -10,16 +10,26 @@ final class EmbyService: MediaServerService {
     private var userId: String?
     private let session: URLSession
 
+    /// API 路径前缀。Emby 默认 `"emby/"`，Jellyfin 默认 `""`（无前缀）。
+    /// 必须以 `/` 结尾或为空，便于与后续路径段直接拼接。
+    private let apiPrefix: String
+
     private static let clientName = "Vanmo"
     private static let clientVersion = "1.0.0"
     /// 与现有 `UIDevice.current.identifierForVendor` 同步访问保持一致；
-    /// 在 Swift 6 严格并发模式下需要主线程隔离，这里和现有代码一起当作已知 trade-off。
+    /// 在 Swift 6 严格并发模式下需要主线程隔离,这里和现有代码一起当作已知 trade-off。
     private static var deviceName: String {
         let model = UIDevice.current.model
         return model.isEmpty ? "iPhone" : model
     }
 
-    init(session: URLSession = .shared) {
+    init(
+        type: ConnectionType = .emby,
+        apiPrefix: String = "emby/",
+        session: URLSession = .shared
+    ) {
+        self.type = type
+        self.apiPrefix = apiPrefix
         self.session = session
     }
 
@@ -33,9 +43,9 @@ final class EmbyService: MediaServerService {
         }
 
         let base = baseURL(for: config)
-        let url = base.appendingPathComponent("emby/Users/AuthenticateByName")
+        let url = base.appendingPathComponent("\(apiPrefix)Users/AuthenticateByName")
 
-        VanmoLogger.network.info("[Emby] Authenticating to \(base.absoluteString) as \(username)")
+        VanmoLogger.network.info("[\(self.type.displayName)] Authenticating to \(base.absoluteString) as \(username)")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -54,7 +64,7 @@ final class EmbyService: MediaServerService {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            VanmoLogger.network.error("[Emby] Connection failed: \(error.localizedDescription)")
+            VanmoLogger.network.error("[\(self.type.displayName)] Connection failed: \(error.localizedDescription)")
             throw NetworkError.connectionFailed(error.localizedDescription)
         }
 
@@ -62,7 +72,7 @@ final class EmbyService: MediaServerService {
             throw NetworkError.connectionFailed("Invalid response")
         }
 
-        VanmoLogger.network.info("[Emby] Auth response status: \(httpResponse.statusCode)")
+        VanmoLogger.network.info("[\(self.type.displayName)] Auth response status: \(httpResponse.statusCode)")
 
         guard (200...299).contains(httpResponse.statusCode) else {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
@@ -76,9 +86,13 @@ final class EmbyService: MediaServerService {
         self.userId = authResult.user.id
         self.isConnected = true
 
-        EmbyCredentialStore.save(baseURL: base.absoluteString, token: authResult.accessToken)
+        EmbyCredentialStore.save(
+            baseURL: base.absoluteString,
+            token: authResult.accessToken,
+            apiPrefix: apiPrefix
+        )
 
-        VanmoLogger.network.info("[Emby] Authenticated as \(authResult.user.name), userId=\(authResult.user.id)")
+        VanmoLogger.network.info("[\(self.type.displayName)] Authenticated as \(authResult.user.name), userId=\(authResult.user.id)")
     }
 
     func disconnect() async {
@@ -97,11 +111,11 @@ final class EmbyService: MediaServerService {
 
         let url: URL
         if path == "/" {
-            var components = URLComponents(url: base.appendingPathComponent("emby/Users/\(userId)/Views"), resolvingAgainstBaseURL: false)!
+            var components = URLComponents(url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Views"), resolvingAgainstBaseURL: false)!
             components.queryItems = [URLQueryItem(name: "api_key", value: token)]
             url = components.url!
         } else {
-            var components = URLComponents(url: base.appendingPathComponent("emby/Users/\(userId)/Items"), resolvingAgainstBaseURL: false)!
+            var components = URLComponents(url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items"), resolvingAgainstBaseURL: false)!
             components.queryItems = [
                 URLQueryItem(name: "ParentId", value: path),
                 URLQueryItem(name: "Fields", value: "Path,Size,DateCreated,MediaSources"),
@@ -110,7 +124,7 @@ final class EmbyService: MediaServerService {
             url = components.url!
         }
 
-        VanmoLogger.network.info("[Emby] Listing: \(url.absoluteString)")
+        VanmoLogger.network.info("[\(self.type.displayName)] Listing: \(url.absoluteString)")
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
@@ -120,7 +134,7 @@ final class EmbyService: MediaServerService {
         try validateEmbyResponse(response, body: data, context: "list items")
 
         let result = try JSONDecoder().decode(EmbyItemsResponse.self, from: data)
-        VanmoLogger.network.info("[Emby] Found \(result.items.count) items")
+        VanmoLogger.network.info("[\(self.type.displayName)] Found \(result.items.count) items")
 
         return result.items.map { item in
             let isFolder = item.isFolder ?? (item.type == "Folder" || item.type == "CollectionFolder" || item.type == "UserView")
@@ -143,7 +157,7 @@ final class EmbyService: MediaServerService {
 
         let base = baseURL(for: config)
         var components = URLComponents(
-            url: base.appendingPathComponent("emby/Videos/\(file.path)/stream"),
+            url: base.appendingPathComponent("\(apiPrefix)Videos/\(file.path)/stream"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
@@ -168,7 +182,7 @@ final class EmbyService: MediaServerService {
 
         let base = baseURL(for: config)
         var components = URLComponents(
-            url: base.appendingPathComponent("emby/Items/\(file.path)/Download"),
+            url: base.appendingPathComponent("\(apiPrefix)Items/\(file.path)/Download"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [URLQueryItem(name: "api_key", value: token)]
@@ -233,7 +247,7 @@ final class EmbyService: MediaServerService {
             try Task.checkCancellation()
 
             var components = URLComponents(
-                url: base.appendingPathComponent("emby/Users/\(userId)/Items"),
+                url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items"),
                 resolvingAgainstBaseURL: false
             )!
             var queryItems: [URLQueryItem] = [
@@ -267,7 +281,7 @@ final class EmbyService: MediaServerService {
                 mapEmbyMediaItem(item, baseURL: base, token: token)
             }
 
-            VanmoLogger.network.info("[Emby] page=\(page) start=\(startIndex) fetched=\(result.items.count) total=\(result.totalRecordCount)")
+            VanmoLogger.network.info("[\(self.type.displayName)] page=\(page) start=\(startIndex) fetched=\(result.items.count) total=\(result.totalRecordCount)")
 
             if !mapped.isEmpty {
                 yield(mapped)
@@ -299,13 +313,13 @@ final class EmbyService: MediaServerService {
         }
 
         let posterURL: URL? = if item.imageTags?.primary != nil {
-            URL(string: "\(baseURL.absoluteString)/emby/Items/\(item.id)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)")
+            URL(string: "\(baseURL.absoluteString)/\(apiPrefix)Items/\(item.id)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)")
         } else {
             nil
         }
 
         let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
-            URL(string: "\(baseURL.absoluteString)/emby/Items/\(item.id)/Images/Backdrop?maxWidth=1920&quality=80&api_key=\(token)")
+            URL(string: "\(baseURL.absoluteString)/\(apiPrefix)Items/\(item.id)/Images/Backdrop?maxWidth=1920&quality=80&api_key=\(token)")
         } else {
             nil
         }
@@ -314,7 +328,7 @@ final class EmbyService: MediaServerService {
         if mediaType == .tvShow {
             streamURL = URL(string: "vanmo://series/\(item.id)")!
         } else {
-            streamURL = URL(string: "\(baseURL.absoluteString)/emby/Videos/\(item.id)/stream?static=true&api_key=\(token)")!
+            streamURL = URL(string: "\(baseURL.absoluteString)/\(apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(token)")!
         }
 
         let director = item.people?.first(where: { $0.type == "Director" })?.name
@@ -411,12 +425,12 @@ private func validateEmbyResponse(_ response: URLResponse, body: Data, context: 
         throw NetworkError.connectionFailed("\(context): invalid response type")
     }
     if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-        VanmoLogger.network.error("[Emby] \(context) auth failed: status=\(httpResponse.statusCode)")
+        VanmoLogger.network.error("[MediaServer] \(context) auth failed: status=\(httpResponse.statusCode)")
         throw NetworkError.authenticationFailed
     }
     guard (200...299).contains(httpResponse.statusCode) else {
         let preview = String(data: body, encoding: .utf8)?.prefix(200) ?? ""
-        VanmoLogger.network.error("[Emby] \(context) failed: status=\(httpResponse.statusCode) body=\(preview)")
+        VanmoLogger.network.error("[MediaServer] \(context) failed: status=\(httpResponse.statusCode) body=\(preview)")
         throw NetworkError.connectionFailed("\(context) HTTP \(httpResponse.statusCode): \(preview)")
     }
 }
@@ -562,28 +576,41 @@ private struct EmbyImageTags: Decodable {
 
 // MARK: - Credential Store & On-Demand Episode Fetching
 
-/// 跨调用点共享的 Emby 会话凭据。`baseURL` 不是 secret，仍走 UserDefaults；
-/// `token` 是 access token，必须存在 Keychain（SKILL 红线）。
+/// 跨调用点共享的 Emby/Jellyfin 会话凭据。
+///
+/// - `baseURL` 与 `apiPrefix` 不是 secret，走 UserDefaults。
+/// - `token` 是 access token，必须存在 Keychain（SKILL 红线）。
+///
+/// 同一时刻只保存最近一次连接成功的服务器凭据；如果用户同时连接 Emby 和
+/// Jellyfin，后连接者会覆盖前者，这是已知 trade-off（与 `EmbyEpisodeFetcher`
+/// 这种全局静态调用的设计绑定）。
 ///
 /// 为兼容老安装，第一次读 token 时会把残留在 UserDefaults 里的值迁移到
 /// Keychain，并清掉 UserDefaults 副本。
 enum EmbyCredentialStore {
     private static let baseURLKey = "emby.baseURL"
+    private static let apiPrefixKey = "emby.apiPrefix"
     private static let legacyTokenKey = "emby.accessToken"
     private static let tokenKeychainAccount = "emby.accessToken"
 
-    static func save(baseURL: String, token: String) {
+    static func save(baseURL: String, token: String, apiPrefix: String) {
         UserDefaults.standard.set(baseURL, forKey: baseURLKey)
+        UserDefaults.standard.set(apiPrefix, forKey: apiPrefixKey)
         do {
             try KeychainManager.shared.save(token, for: tokenKeychainAccount)
             UserDefaults.standard.removeObject(forKey: legacyTokenKey)
         } catch {
-            VanmoLogger.network.error("[Emby] Failed to persist access token to Keychain: \(error.localizedDescription)")
+            VanmoLogger.network.error("[MediaServer] Failed to persist access token to Keychain: \(error.localizedDescription)")
         }
     }
 
     static var baseURL: String? {
         UserDefaults.standard.string(forKey: baseURLKey)
+    }
+
+    /// 当前活跃服务器的 API 前缀。老安装无该字段，回退到 `"emby/"`。
+    static var apiPrefix: String {
+        UserDefaults.standard.string(forKey: apiPrefixKey) ?? "emby/"
     }
 
     static var token: String? {
@@ -601,6 +628,7 @@ enum EmbyCredentialStore {
 
     static func clear() {
         UserDefaults.standard.removeObject(forKey: baseURLKey)
+        UserDefaults.standard.removeObject(forKey: apiPrefixKey)
         UserDefaults.standard.removeObject(forKey: legacyTokenKey)
         try? KeychainManager.shared.delete(for: tokenKeychainAccount)
     }
@@ -623,9 +651,10 @@ enum EmbyEpisodeFetcher {
               let baseURL = URL(string: baseURLStr) else {
             throw NetworkError.notConnected
         }
+        let apiPrefix = EmbyCredentialStore.apiPrefix
 
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("emby/Shows/\(seriesId)/Episodes"),
+            url: baseURL.appendingPathComponent("\(apiPrefix)Shows/\(seriesId)/Episodes"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
@@ -637,7 +666,7 @@ enum EmbyEpisodeFetcher {
             throw NetworkError.invalidURL
         }
 
-        VanmoLogger.network.info("[Emby] Fetching episodes for series \(seriesId)")
+        VanmoLogger.network.info("[MediaServer] Fetching episodes for series \(seriesId)")
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
@@ -647,7 +676,7 @@ enum EmbyEpisodeFetcher {
         try validateEmbyResponse(response, body: data, context: "fetch episodes")
 
         let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
-        VanmoLogger.network.info("[Emby] Fetched \(result.items.count) episodes for series \(seriesId)")
+        VanmoLogger.network.info("[MediaServer] Fetched \(result.items.count) episodes for series \(seriesId)")
 
         return result.items.compactMap { item -> EpisodeInfo? in
             guard let season = item.parentIndexNumber,
@@ -659,7 +688,7 @@ enum EmbyEpisodeFetcher {
                 0
             }
 
-            let streamURL = URL(string: "\(baseURLStr)/emby/Videos/\(item.id)/stream?static=true&api_key=\(token)")!
+            let streamURL = URL(string: "\(baseURLStr)/\(apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(token)")!
 
             return EpisodeInfo(
                 id: item.id,

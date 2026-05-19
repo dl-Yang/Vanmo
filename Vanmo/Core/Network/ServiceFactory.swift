@@ -13,6 +13,8 @@ enum RemoteServiceFactory {
             return FTPService(useSFTP: type == .sftp)
         case .emby:
             return EmbyService()
+        case .jellyfin:
+            return JellyfinService()
         default:
             return GenericHTTPService()
         }
