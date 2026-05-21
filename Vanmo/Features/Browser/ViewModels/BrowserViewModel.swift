@@ -14,6 +14,8 @@ final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var savedConnections: [SavedConnection] = []
     @Published private(set) var isLoading = false
     @Published private(set) var loadingMessage = "连接中..."
+    @Published private(set) var librarySyncMessage: String?
+    @Published private(set) var librarySyncCompletionID = 0
     @Published var showAddConnection = false
     @Published var showError = false
     @Published var errorMessage = ""
@@ -93,6 +95,7 @@ final class ConnectionsViewModel: ObservableObject {
         connectionStatuses[connection.id] = .connecting
         isLoading = true
         loadingMessage = "连接到 \(connection.name)..."
+        librarySyncMessage = "正在连接 \(connection.name)..."
 
         VanmoLogger.network.info("[Connections] Connecting to \(connection.name) (\(connection.type.rawValue)://\(connection.host):\(connection.port))")
 
@@ -123,8 +126,11 @@ final class ConnectionsViewModel: ObservableObject {
             try? modelContext?.save()
 
             loadingMessage = "扫描媒体文件..."
+            librarySyncMessage = "正在同步数据..."
             guard let context = modelContext else {
                 isLoading = false
+                librarySyncMessage = nil
+                librarySyncCompletionID += 1
                 return true
             }
 
@@ -137,7 +143,9 @@ final class ConnectionsViewModel: ObservableObject {
                 for try await page in mediaServer.streamMediaItems(since: since, pageSize: 500) {
                     let inserted = try await scanner.importServerMediaItems(page, in: context)
                     totalImported += inserted.count
-                    loadingMessage = "已同步 \(totalImported) 项..."
+                    let message = "已同步 \(totalImported) 项..."
+                    loadingMessage = message
+                    librarySyncMessage = message
                 }
                 connection.lastSyncedAt = syncStart
                 try? modelContext?.save()
@@ -158,6 +166,8 @@ final class ConnectionsViewModel: ObservableObject {
 
             VanmoLogger.network.info("[Connections] Scan complete for \(connection.name)")
             isLoading = false
+            librarySyncMessage = nil
+            librarySyncCompletionID += 1
             return true
         } catch {
             VanmoLogger.network.error("[Connections] Connection failed: \(error.localizedDescription)")
@@ -167,6 +177,7 @@ final class ConnectionsViewModel: ObservableObject {
                 showError = true
             }
             isLoading = false
+            librarySyncMessage = nil
             return false
         }
     }

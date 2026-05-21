@@ -15,6 +15,8 @@ enum RemoteServiceFactory {
             return EmbyService()
         case .jellyfin:
             return JellyfinService()
+        case .plex:
+            return PlexService()
         default:
             return GenericHTTPService()
         }

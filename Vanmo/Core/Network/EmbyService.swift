@@ -89,7 +89,8 @@ final class EmbyService: MediaServerService {
         EmbyCredentialStore.save(
             baseURL: base.absoluteString,
             token: authResult.accessToken,
-            apiPrefix: apiPrefix
+            apiPrefix: apiPrefix,
+            userId: authResult.user.id
         )
 
         VanmoLogger.network.info("[\(self.type.displayName)] Authenticated as \(authResult.user.name), userId=\(authResult.user.id)")
@@ -252,8 +253,7 @@ final class EmbyService: MediaServerService {
             )!
             var queryItems: [URLQueryItem] = [
                 URLQueryItem(name: "Recursive", value: "true"),
-                URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
-                URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,DateLastSaved"),
+                URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,DateLastSaved,SeriesName,SeriesId,ParentIndexNumber,IndexNumber"),
                 URLQueryItem(name: "SortBy", value: "SortName"),
                 URLQueryItem(name: "SortOrder", value: "Ascending"),
                 URLQueryItem(name: "StartIndex", value: String(startIndex)),
@@ -305,84 +305,11 @@ final class EmbyService: MediaServerService {
     }()
 
     private func mapEmbyMediaItem(_ item: EmbyMediaDetail, baseURL: URL, token: String) -> ServerMediaItem? {
-        let mediaType: MediaType
-        switch item.type {
-        case "Movie": mediaType = .movie
-        case "Series": mediaType = .tvShow
-        default: return nil
-        }
-
-        let posterURL: URL? = if item.imageTags?.primary != nil {
-            URL(string: "\(baseURL.absoluteString)/\(apiPrefix)Items/\(item.id)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)")
-        } else {
-            nil
-        }
-
-        let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
-            URL(string: "\(baseURL.absoluteString)/\(apiPrefix)Items/\(item.id)/Images/Backdrop?maxWidth=1920&quality=80&api_key=\(token)")
-        } else {
-            nil
-        }
-
-        let streamURL: URL
-        if mediaType == .tvShow {
-            streamURL = URL(string: "vanmo://series/\(item.id)")!
-        } else {
-            streamURL = URL(string: "\(baseURL.absoluteString)/\(apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(token)")!
-        }
-
-        let director = item.people?.first(where: { $0.type == "Director" })?.name
-        let cast = item.people?.filter { $0.type == "Actor" }.prefix(10).map(\.name) ?? []
-
-        let durationSeconds: TimeInterval = if let ticks = item.runTimeTicks {
-            Double(ticks) / 10_000_000.0
-        } else {
-            0
-        }
-
-        let tmdbID: Int? = if let tmdbStr = item.providerIds?["Tmdb"] {
-            Int(tmdbStr)
-        } else {
-            nil
-        }
-
-        let countries = item.productionLocations ?? []
-
-        let primarySource = item.mediaSources?.first
-        let originalFileName = primarySource?.path.flatMap(Self.extractFileName(from:))
-        let container = primarySource?.container.flatMap { $0.isEmpty ? nil : $0 }
-        let fileSize = primarySource?.size ?? 0
-
-        return ServerMediaItem(
-            serverId: item.id,
-            title: item.name,
-            originalTitle: item.originalTitle,
-            year: item.productionYear,
-            overview: item.overview,
-            rating: item.communityRating,
-            mediaType: mediaType,
-            posterURL: posterURL,
-            backdropURL: backdropURL,
-            genres: item.genres ?? [],
-            director: director,
-            cast: cast,
-            originCountry: countries,
-            tmdbID: tmdbID,
-            streamURL: streamURL,
-            fileSize: fileSize,
-            duration: durationSeconds,
-            originalFileName: originalFileName,
-            container: container,
-            showTitle: nil,
-            seasonNumber: nil,
-            episodeNumber: nil,
-            episodeTitle: nil,
-            seriesId: nil
-        )
+        EmbyItemMapper.map(item, baseURL: baseURL, apiPrefix: apiPrefix, token: token)
     }
 
     /// 从 Emby 返回的 Path 中提取文件名，兼容 Unix (`/`) 与 Windows (`\`) 分隔符。
-    private static func extractFileName(from path: String) -> String? {
+    static func extractFileName(from path: String) -> String? {
         let separators = CharacterSet(charactersIn: "/\\")
         let parts = path.components(separatedBy: separators)
         return parts.last(where: { !$0.isEmpty })
@@ -413,6 +340,100 @@ final class EmbyService: MediaServerService {
         }
     }
 
+}
+
+// MARK: - Item Mapping
+
+fileprivate enum EmbyItemMapper {
+    static func map(
+        _ item: EmbyMediaDetail,
+        baseURL: URL,
+        apiPrefix: String,
+        token: String
+    ) -> ServerMediaItem? {
+        let mediaType = MediaType.from(embyType: item.type)
+        let base = baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let prefix = apiPrefix.isEmpty ? "" : apiPrefix
+
+        let posterURL: URL? = if item.imageTags?.primary != nil {
+            URL(string: "\(base)/\(prefix)Items/\(item.id)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)")
+        } else {
+            nil
+        }
+
+        let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
+            URL(string: "\(base)/\(prefix)Items/\(item.id)/Images/Backdrop?maxWidth=1920&quality=80&api_key=\(token)")
+        } else {
+            nil
+        }
+
+        let streamURL: URL
+        if mediaType == .tvShow {
+            streamURL = URL(string: "vanmo://series/\(item.id)")!
+        } else if mediaType.isBrowsable {
+            streamURL = URL(string: "vanmo://emby-container/\(item.id)")!
+        } else if mediaType == .audio {
+            streamURL = URL(string: "\(base)/\(prefix)Audio/\(item.id)/stream?api_key=\(token)")!
+        } else if mediaType == .photo {
+            streamURL = URL(string: "\(base)/\(prefix)Items/\(item.id)/Images/Primary?api_key=\(token)")!
+        } else if mediaType == .movie || mediaType == .tvEpisode || mediaType == .other {
+            streamURL = URL(string: "\(base)/\(prefix)Videos/\(item.id)/stream?static=true&api_key=\(token)")!
+        } else {
+            streamURL = URL(string: "vanmo://emby-item/\(item.id)")!
+        }
+
+        let director = item.people?.first(where: { $0.type == "Director" })?.name
+        let cast = item.people?.filter { $0.type == "Actor" }.prefix(10).map(\.name) ?? []
+
+        let durationSeconds: TimeInterval = if let ticks = item.runTimeTicks {
+            Double(ticks) / 10_000_000.0
+        } else {
+            0
+        }
+
+        let tmdbID: Int? = if let tmdbStr = item.providerIds?["Tmdb"] {
+            Int(tmdbStr)
+        } else {
+            nil
+        }
+
+        let primarySource = item.mediaSources?.first
+        let originalFileName = primarySource?.path.flatMap(EmbyService.extractFileName(from:))
+        let container = primarySource?.container.flatMap { $0.isEmpty ? nil : $0 }
+        let fileSize = primarySource?.size ?? 0
+
+        let showTitle = item.seriesName
+        let seasonNumber = item.parentIndexNumber
+        let episodeNumber = item.indexNumber
+        let episodeTitle = mediaType == .tvEpisode ? item.name : nil
+
+        return ServerMediaItem(
+            serverId: item.id,
+            title: item.name,
+            originalTitle: item.originalTitle,
+            year: item.productionYear,
+            overview: item.overview,
+            rating: item.communityRating,
+            mediaType: mediaType,
+            posterURL: posterURL,
+            backdropURL: backdropURL,
+            genres: item.genres ?? [],
+            director: director,
+            cast: cast,
+            originCountry: item.productionLocations ?? [],
+            tmdbID: tmdbID,
+            streamURL: streamURL,
+            fileSize: fileSize,
+            duration: durationSeconds,
+            originalFileName: originalFileName,
+            container: container,
+            showTitle: showTitle,
+            seasonNumber: seasonNumber,
+            episodeNumber: episodeNumber,
+            episodeTitle: episodeTitle,
+            seriesId: item.seriesId
+        )
+    }
 }
 
 // MARK: - Shared Response Validation
@@ -590,12 +611,14 @@ private struct EmbyImageTags: Decodable {
 enum EmbyCredentialStore {
     private static let baseURLKey = "emby.baseURL"
     private static let apiPrefixKey = "emby.apiPrefix"
+    private static let userIdKey = "emby.userId"
     private static let legacyTokenKey = "emby.accessToken"
     private static let tokenKeychainAccount = "emby.accessToken"
 
-    static func save(baseURL: String, token: String, apiPrefix: String) {
+    static func save(baseURL: String, token: String, apiPrefix: String, userId: String) {
         UserDefaults.standard.set(baseURL, forKey: baseURLKey)
         UserDefaults.standard.set(apiPrefix, forKey: apiPrefixKey)
+        UserDefaults.standard.set(userId, forKey: userIdKey)
         do {
             try KeychainManager.shared.save(token, for: tokenKeychainAccount)
             UserDefaults.standard.removeObject(forKey: legacyTokenKey)
@@ -611,6 +634,10 @@ enum EmbyCredentialStore {
     /// 当前活跃服务器的 API 前缀。老安装无该字段，回退到 `"emby/"`。
     static var apiPrefix: String {
         UserDefaults.standard.string(forKey: apiPrefixKey) ?? "emby/"
+    }
+
+    static var userId: String? {
+        UserDefaults.standard.string(forKey: userIdKey)
     }
 
     static var token: String? {
@@ -629,8 +656,55 @@ enum EmbyCredentialStore {
     static func clear() {
         UserDefaults.standard.removeObject(forKey: baseURLKey)
         UserDefaults.standard.removeObject(forKey: apiPrefixKey)
+        UserDefaults.standard.removeObject(forKey: userIdKey)
         UserDefaults.standard.removeObject(forKey: legacyTokenKey)
         try? KeychainManager.shared.delete(for: tokenKeychainAccount)
+    }
+}
+
+// MARK: - Child Items (Folder / Season navigation)
+
+enum EmbyChildItemsFetcher {
+    static func fetchChildren(parentId: String) async throws -> [ServerMediaItem] {
+        guard let baseURLStr = EmbyCredentialStore.baseURL,
+              let token = EmbyCredentialStore.token,
+              let userId = EmbyCredentialStore.userId,
+              let baseURL = URL(string: baseURLStr) else {
+            throw NetworkError.notConnected
+        }
+        let apiPrefix = EmbyCredentialStore.apiPrefix
+
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "ParentId", value: parentId),
+            URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber"),
+            URLQueryItem(name: "SortBy", value: "SortName"),
+            URLQueryItem(name: "SortOrder", value: "Ascending"),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        VanmoLogger.network.info("[MediaServer] Fetching children for parent \(parentId)")
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateEmbyResponse(response, body: data, context: "fetch child items")
+
+        let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
+        let mapped = result.items.compactMap { item in
+            EmbyItemMapper.map(item, baseURL: baseURL, apiPrefix: apiPrefix, token: token)
+        }
+        VanmoLogger.network.info("[MediaServer] Fetched \(mapped.count) children for parent \(parentId)")
+        return mapped
     }
 }
 

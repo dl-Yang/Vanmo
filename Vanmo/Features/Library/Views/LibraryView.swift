@@ -4,26 +4,35 @@ import SwiftData
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
     @StateObject private var viewModel = LibraryViewModel()
 
     @State private var showSecondFloor = false
-    @Namespace private var sectionNamespace
+    @State private var syncToastMessage: String?
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
+            if let syncToastMessage {
+                LibrarySyncToast(message: syncToastMessage)
+                    .padding(.top, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(2)
+            }
             ScrollView {
-                if shouldShowInitialLoading {
-                    LoadingView("加载媒体库...")
-                        .frame(minHeight: 400)
-                } else if viewModel.isLibraryEmpty {
+                if let message = connectionsViewModel.librarySyncMessage {
+                    librarySyncStatusOverlay(message: message)
+                        .zIndex(3)
+                }
+                if viewModel.isLibraryEmpty {
                     emptyState
                 } else {
                     libraryContent
                 }
             }
             .background(Color.vanmoBackground)
+
         }
-        .navigationTitle("Vanmo")
+//        .navigationTitle("Vanmo")
         .toolbar { toolbarContent }
         .task {
             viewModel.setModelContext(modelContext)
@@ -40,6 +49,13 @@ struct LibraryView: View {
         }
         .onChange(of: viewModel.selectedRegions) { _, _ in
             Task { await viewModel.reloadForFilterChange() }
+        }
+        .onChange(of: connectionsViewModel.librarySyncCompletionID) { _, newValue in
+            guard newValue > 0 else { return }
+            Task {
+                await viewModel.refreshAfterLibrarySync()
+                showSyncToast("数据同步完成")
+            }
         }
         .fullScreenCover(isPresented: $showSecondFloor) {
             SecondFloorView(
@@ -65,20 +81,12 @@ struct LibraryView: View {
                 mediaSection("最近添加", items: viewModel.recentlyAdded)
             }
 
-            sectionTabBar
+            libraryHeader
             filtersBar
 
             pagedSection
         }
         .padding(.vertical)
-    }
-
-    private var shouldShowInitialLoading: Bool {
-        viewModel.isLoading
-            && viewModel.loadedItems.isEmpty
-            && viewModel.recentlyPlayed.isEmpty
-            && viewModel.recentlyAdded.isEmpty
-            && viewModel.favorites.isEmpty
     }
 
     // MARK: - Second Floor Entry
@@ -138,72 +146,24 @@ struct LibraryView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Section + Filters
+    // MARK: - Library Header
 
-    private var sectionTabBar: some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.section.title)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .contentTransition(.opacity)
+    private var libraryHeader: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("全部")
+                .font(.title2)
+                .fontWeight(.bold)
 
-//                    Text("\(viewModel.loadedItems.count) 部已加载")
-//                        .font(.caption)
-//                        .foregroundStyle(.secondary)
-//                        .contentTransition(.numericText())
-                }
+            Spacer()
 
-                Spacer()
-
-                Image(systemName: viewModel.section.mediaType.icon)
-                    .font(.title3)
-                    .foregroundStyle(Color.vanmoPrimary)
-                    .frame(width: 34, height: 34)
-                    .background(Color.vanmoPrimary.opacity(0.12))
-                    .clipShape(Circle())
-            }
-            .padding(.horizontal, 2)
-
-            HStack(spacing: 6) {
-                ForEach(LibrarySection.allCases) { section in
-                    Button {
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        Task { await viewModel.changeSection(section) }
-                    } label: {
-                        ZStack {
-                            if viewModel.section == section {
-                                Capsule()
-                                    .fill(Color.vanmoPrimary)
-                                    .matchedGeometryEffect(id: "sectionIndicator", in: sectionNamespace)
-                            }
-
-                            Text(section.title)
-                                .font(viewModel.section == section ? .headline : .subheadline)
-                                .fontWeight(viewModel.section == section ? .bold : .semibold)
-                                .foregroundStyle(viewModel.section == section ? .white : .secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(5)
-            .background(Color.vanmoSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(.white.opacity(0.04), lineWidth: 1)
-            }
+            Image(systemName: "square.grid.2x2")
+                .font(.title3)
+                .foregroundStyle(Color.vanmoPrimary)
+                .frame(width: 34, height: 34)
+                .background(Color.vanmoPrimary.opacity(0.12))
+                .clipShape(Circle())
         }
         .padding(.horizontal)
-        .padding(.vertical, 4)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
-        .zIndex(1)
-        .animation(.easeInOut(duration: 0.2), value: viewModel.section)
-        .animation(.easeInOut(duration: 0.2), value: viewModel.loadedItems.count)
     }
 
     private var filtersBar: some View {
@@ -256,12 +216,12 @@ struct LibraryView: View {
         return LazyVGrid(columns: columns, spacing: 16) {
             ForEach(items) { item in
                 NavigationLink {
-                    MediaDetailView(item: item)
+                    LibraryItemDestination(item: item)
                 } label: {
                     PosterCard(
-                        title: item.title,
+                        title: item.displayTitle,
                         posterURL: item.posterURL,
-                        subtitle: item.year.map { "\($0)" },
+                        subtitle: libraryItemSubtitle(item),
                         rating: item.rating,
                         progress: item.playbackProgress > 0 ? item.playbackProgress : nil
                     )
@@ -281,7 +241,7 @@ struct LibraryView: View {
         return LazyVStack(spacing: 1) {
             ForEach(items) { item in
                 NavigationLink {
-                    MediaDetailView(item: item)
+                    LibraryItemDestination(item: item)
                 } label: {
                     MediaListRow(item: item)
                 }
@@ -349,12 +309,12 @@ struct LibraryView: View {
                 LazyHStack(spacing: 12) {
                     ForEach(items) { item in
                         NavigationLink {
-                            MediaDetailView(item: item)
+                            LibraryItemDestination(item: item)
                         } label: {
                             PosterCard(
-                                title: item.title,
+                                title: item.displayTitle,
                                 posterURL: item.posterURL,
-                                subtitle: item.year.map { "\($0)" },
+                                subtitle: libraryItemSubtitle(item),
                                 rating: item.rating,
                                 progress: showProgress ? item.playbackProgress : nil
                             )
@@ -373,9 +333,16 @@ struct LibraryView: View {
 
     // MARK: - Context Menu
 
+    private func libraryItemSubtitle(_ item: MediaItem) -> String? {
+        if let year = item.year {
+            return "\(item.mediaType.displayName) · \(year)"
+        }
+        return item.mediaType.displayName
+    }
+
     @ViewBuilder
     private func itemContextMenu(_ item: MediaItem) -> some View {
-        if item.mediaType != .tvShow {
+        if item.mediaType == .movie || item.mediaType == .tvEpisode {
             Button {
                 appState.play(item)
             } label: {
@@ -405,6 +372,33 @@ struct LibraryView: View {
         } label: {
             Label("删除", systemImage: "trash")
         }
+    }
+
+    private func librarySyncStatusOverlay(message: String) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                SyncActivityIndicator()
+                    .frame(width: 22, height: 22)
+
+                Text(message)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: 140, alignment: .leading)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 16)
+//        .padding(.top, 8)
+//        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("正在同步数据")
+        .accessibilityValue(message)
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     // MARK: - Toolbar
@@ -456,13 +450,97 @@ struct LibraryView: View {
 
     private var filteredEmptyState: some View {
         EmptyStateView(
-            icon: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle" : viewModel.section.mediaType.icon,
-            title: viewModel.hasActiveFilters ? "没有匹配的\(viewModel.section.title)" : "暂无\(viewModel.section.title)",
+            icon: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle" : "film.stack",
+            title: viewModel.hasActiveFilters ? "没有匹配的媒体" : "暂无媒体",
             message: viewModel.hasActiveFilters ? "尝试更改类型或地区筛选" : "添加媒体后会显示在这里"
         )
         .frame(minHeight: 240)
         .frame(maxWidth: .infinity)
         .padding(.horizontal)
+    }
+
+    private func showSyncToast(_ message: String) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            syncToastMessage = message
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+            guard syncToastMessage == message else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                syncToastMessage = nil
+            }
+        }
+    }
+}
+
+private struct SyncActivityIndicator: View {
+    private let cycleDuration = 1.05
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: false)) { context in
+            let elapsed = context.date.timeIntervalSinceReferenceDate
+            let rotation = (elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration) * 360
+
+            ZStack {
+                Circle()
+                    .stroke(
+                        Color.vanmoPrimary.opacity(0.18),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                    )
+
+                Circle()
+                    .trim(from: 0.12, to: 0.88)
+                    .stroke(
+                        Color.vanmoPrimary,
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(rotation))
+
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 7.5, weight: .semibold))
+                    .foregroundStyle(Color.vanmoPrimary)
+                    .symbolEffect(.pulse.byLayer, options: .repeating.speed(0.85))
+            }
+        }
+        .frame(width: 18, height: 18)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct LibrarySyncToast: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.body)
+                .foregroundStyle(Color.vanmoPrimary)
+                .symbolEffect(.bounce, value: message)
+
+            Text(message)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.vanmoPrimary.opacity(0.28),
+                            .white.opacity(0.08),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        }
+        .shadow(color: Color.vanmoPrimary.opacity(0.1), radius: 12, y: 5)
+        .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
     }
 }
 
@@ -528,5 +606,6 @@ private struct SectionPlaceholderRow: View {
         LibraryView()
     }
     .environmentObject(AppState())
+    .environmentObject(ConnectionsViewModel())
     .preferredColorScheme(.dark)
 }

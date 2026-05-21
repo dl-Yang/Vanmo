@@ -348,9 +348,17 @@ struct MediaDetailView: View {
         defer { isLoadingEpisodes = false }
 
         do {
-            episodes = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
+            // 按 streamURL host 区分 series 来源:
+            // - "plex-series" → Plex Media Server
+            // - 其他（包括 "series" 或缺失）→ Emby/Jellyfin（共享 fetcher）
+            switch item.fileURL.host {
+            case "plex-series":
+                episodes = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
+            default:
+                episodes = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
+            }
         } catch {
-            VanmoLogger.library.error("[Emby] Failed to load episodes: \(error.localizedDescription)")
+            VanmoLogger.library.error("[MediaServer] Failed to load episodes: \(error.localizedDescription)")
             episodes = []
         }
     }

@@ -90,6 +90,12 @@ enum MediaType: String, Codable, CaseIterable {
     case movie
     case tvShow
     case tvEpisode
+    case season
+    case folder
+    case collectionFolder
+    case audio
+    case musicAlbum
+    case photo
     case other
 
     var displayName: String {
@@ -97,6 +103,12 @@ enum MediaType: String, Codable, CaseIterable {
         case .movie: return "电影"
         case .tvShow: return "电视剧"
         case .tvEpisode: return "单集"
+        case .season: return "季"
+        case .folder: return "文件夹"
+        case .collectionFolder: return "媒体库"
+        case .audio: return "音频"
+        case .musicAlbum: return "专辑"
+        case .photo: return "照片"
         case .other: return "其他"
         }
     }
@@ -106,8 +118,83 @@ enum MediaType: String, Codable, CaseIterable {
         case .movie: return "film"
         case .tvShow: return "tv"
         case .tvEpisode: return "play.rectangle"
+        case .season: return "square.stack"
+        case .folder: return "folder"
+        case .collectionFolder: return "rectangle.stack"
+        case .audio: return "music.note"
+        case .musicAlbum: return "opticaldisc"
+        case .photo: return "photo"
         case .other: return "doc.richtext"
         }
+    }
+
+    /// 可进入子级列表（Folder / 媒体库 / 季）。电视剧仍走详情页分集列表。
+    var isBrowsable: Bool {
+        switch self {
+        case .folder, .collectionFolder, .season:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 是否适合出现在「最近添加 / 继续观看」等精选区。
+    var showsInHighlights: Bool {
+        switch self {
+        case .tvEpisode, .season, .folder:
+            return false
+        default:
+            return true
+        }
+    }
+
+    /// 从 Emby/Jellyfin `Type` 字段映射到本地类型。
+    static func from(embyType: String) -> MediaType {
+        switch embyType {
+        case "Movie", "Video": return .movie
+        case "Series": return .tvShow
+        case "Episode": return .tvEpisode
+        case "Season": return .season
+        case "Folder": return .folder
+        case "CollectionFolder", "UserView", "BoxSet": return .collectionFolder
+        case "Audio": return .audio
+        case "MusicAlbum": return .musicAlbum
+        case "Photo": return .photo
+        default: return .other
+        }
+    }
+}
+
+extension ServerMediaItem {
+    @MainActor
+    func makeMediaItem() -> MediaItem {
+        let item = MediaItem(
+            title: title,
+            fileURL: streamURL,
+            mediaType: mediaType,
+            fileSize: fileSize,
+            duration: duration
+        )
+        item.originalTitle = originalTitle
+        item.year = year
+        item.overview = overview
+        item.posterURL = posterURL
+        item.backdropURL = backdropURL
+        item.rating = rating
+        item.originalFileName = originalFileName
+        item.container = container
+        item.genres = genres
+        item.director = director
+        item.cast = cast
+        item.originCountry = originCountry
+        item.tmdbID = tmdbID
+        item.serverId = serverId
+        item.seriesId = seriesId
+        item.showTitle = showTitle
+        item.seasonNumber = seasonNumber
+        item.episodeNumber = episodeNumber
+        item.episodeTitle = episodeTitle
+        return item
     }
 }
 

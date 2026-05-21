@@ -1,26 +1,5 @@
 import Foundation
 
-enum LibrarySection: String, CaseIterable, Identifiable, Sendable {
-    case movie
-    case tvShow
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .movie: return "电影"
-        case .tvShow: return "电视剧"
-        }
-    }
-
-    var mediaType: MediaType {
-        switch self {
-        case .movie: return .movie
-        case .tvShow: return .tvShow
-        }
-    }
-}
-
 struct LibraryRegionFilter: Identifiable, Hashable, Sendable {
     let title: String
     let isoCodes: Set<String>

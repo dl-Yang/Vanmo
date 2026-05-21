@@ -57,6 +57,7 @@
 		A1B2C3D4E5F70001AABB0105 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F70002AABB0105 /* FlowLayout.swift */; };
 		A3B4C5D6E7F8A9B0C1D2E3F4 /* EmbyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E8F1A2B3C4D5E6F7A8B9C0 /* EmbyService.swift */; };
 		B4C5D6E7F8A9B0C1D2E3F4A5 /* JellyfinService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F9A2B3C4D5E6F7B8C9D0E1 /* JellyfinService.swift */; };
+		A6B7C8D9E0F1A2B3C4D5E6F7 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A1B2C3D4E5F6A7B8C9D0E1 /* PlexService.swift */; };
 
 		B7A9D4A1B82703BC7469CFD1 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4899D11636AAC1F440051DA /* SearchView.swift */; };
 		B81860158F229AAAC96C7CD5 /* TrackSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB50A9840B362764031D0025 /* TrackSelectorView.swift */; };
@@ -77,6 +78,7 @@
 		E54F50FCB644F08D13A587BE /* VTTParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA203DB4D4DA228418D9C0F1 /* VTTParser.swift */; };
 		EEE94A8BC9E412841A4FA59F /* SubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B7332CE86F10F0D7D0A3A4 /* SubtitleOverlayView.swift */; };
 		EF67AFEA69D6D34EF1AC1A4E /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B3D0B1F917828F998055F1 /* LibraryView.swift */; };
+		A1B2C3D4E5F80001AABB0201 /* EmbyFolderBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F80002AABB0201 /* EmbyFolderBrowseView.swift */; };
 		E8F100010001000001000002 /* PrefetchConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F100010001000001000001 /* PrefetchConfig.swift */; };
 		E8F100010002000002000002 /* PrefetchTemporaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F100010002000002000001 /* PrefetchTemporaryStore.swift */; };
 		E8F100010003000003000002 /* RangeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F100010003000003000001 /* RangeCache.swift */; };
@@ -135,6 +137,7 @@
 		A1B2C3D4E5F70002AABB0105 /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		A3B7332CE86F10F0D7D0A3A4 /* SubtitleOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleOverlayView.swift; sourceTree = "<group>"; };
 		A6B3D0B1F917828F998055F1 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F80002AABB0201 /* EmbyFolderBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyFolderBrowseView.swift; sourceTree = "<group>"; };
 		AA6A41E312952F47F072C7E3 /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
 
 
@@ -152,6 +155,7 @@
 		CF351F2AF61293E876B9506A /* PlayerState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerState.swift; sourceTree = "<group>"; };
 		D4E8F1A2B3C4D5E6F7A8B9C0 /* EmbyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyService.swift; sourceTree = "<group>"; };
 		E5F9A2B3C4D5E6F7B8C9D0E1 /* JellyfinService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JellyfinService.swift; sourceTree = "<group>"; };
+		F6A1B2C3D4E5F6A7B8C9D0E1 /* PlexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexService.swift; sourceTree = "<group>"; };
 
 
 		D692958D69686AB80F38C635 /* TMDbModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMDbModels.swift; sourceTree = "<group>"; };
@@ -455,6 +459,7 @@
 				A1B2C3D4E5F70002AABB0102 /* FilterChipsRow.swift */,
 				A1B2C3D4E5F70002AABB0105 /* FlowLayout.swift */,
 				A6B3D0B1F917828F998055F1 /* LibraryView.swift */,
+				A1B2C3D4E5F80002AABB0201 /* EmbyFolderBrowseView.swift */,
 				BEC3480B949E6965C136DCA2 /* MediaDetailView.swift */,
 				2375890C4120A60A9A76B30F /* MediaListRow.swift */,
 				A1B2C3D4E5F60002AABB0004 /* SecondFloorView.swift */,
@@ -500,6 +505,7 @@
 				E5F9A2B3C4D5E6F7B8C9D0E1 /* JellyfinService.swift */,
 				D1F2A3B4C5D6E7F8A9B0C1D2 /* LocalFolderService.swift */,
 				255BC9880082B37A6C9F5612 /* NetworkError.swift */,
+				F6A1B2C3D4E5F6A7B8C9D0E1 /* PlexService.swift */,
 				97B2C802C4391AAEDAC4EFD7 /* ServiceFactory.swift */,
 				05B61CB7E7AA5DC184A6CDF5 /* SMBService.swift */,
 				C900FB34F4BBFFF323A8041B /* WebDAVService.swift */,
@@ -692,6 +698,7 @@
 				C2F316B291D4AD249A16B8B4 /* KeychainManager.swift in Sources */,
 				A1B2C3D4E5F70001AABB0101 /* LibraryFilters.swift in Sources */,
 				EF67AFEA69D6D34EF1AC1A4E /* LibraryView.swift in Sources */,
+				A1B2C3D4E5F80001AABB0201 /* EmbyFolderBrowseView.swift in Sources */,
 				FF84C30ADC33D47677635F7B /* LibraryViewModel.swift in Sources */,
 				40B23352EAEA2801537E0094 /* LoadingView.swift in Sources */,
 				D7DF318522A915C85933D66A /* Logger.swift in Sources */,
@@ -747,6 +754,7 @@
 				8BB64D8644EE2B2352FB49BC /* View+Extensions.swift in Sources */,
 				A3B4C5D6E7F8A9B0C1D2E3F4 /* EmbyService.swift in Sources */,
 				B4C5D6E7F8A9B0C1D2E3F4A5 /* JellyfinService.swift in Sources */,
+				A6B7C8D9E0F1A2B3C4D5E6F7 /* PlexService.swift in Sources */,
 				826D18F64711A688F69C554F /* WebDAVService.swift in Sources */,
 				D2F3A4B5C6D7E8F9A0B1C2D3 /* LocalFolderService.swift in Sources */,
 			);

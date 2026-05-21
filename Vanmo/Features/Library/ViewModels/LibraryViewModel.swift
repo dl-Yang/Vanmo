@@ -19,7 +19,6 @@ final class LibraryViewModel: ObservableObject {
 
     @Published var viewMode: LibraryViewMode = .grid
     @Published var sortOption: LibrarySortOption = .addedDate
-    @Published var section: LibrarySection = .movie
     @Published var selectedGenres: Set<String> = []
     @Published var selectedRegions: Set<String> = []
 
@@ -59,51 +58,8 @@ final class LibraryViewModel: ObservableObject {
             resetPagedItems()
         }
 
-        let container = context.container
-        let limit = highlightSectionLimit
-
         do {
-            let snapshot: InitialSnapshot = try await Task.detached(priority: .userInitiated) {
-                let bgCtx = ModelContext(container)
-
-                var addedDescriptor = FetchDescriptor<MediaItem>(
-                    sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
-                )
-                addedDescriptor.fetchLimit = limit * 3
-                let addedIds = try bgCtx.fetch(addedDescriptor)
-                    .filter { $0.mediaType != .tvEpisode }
-                    .prefix(limit)
-                    .map(\.persistentModelID)
-
-                var playedDescriptor = FetchDescriptor<MediaItem>(
-                    predicate: Self.recentlyPlayedPredicate,
-                    sortBy: [SortDescriptor(\.lastPlayedAt, order: .reverse)]
-                )
-                playedDescriptor.fetchLimit = limit * 3
-                let playedIds = try bgCtx.fetch(playedDescriptor)
-                    .filter { $0.mediaType != .tvEpisode }
-                    .prefix(limit)
-                    .map(\.persistentModelID)
-
-                let favoriteItems = try bgCtx.fetch(Self.favoriteDescriptor)
-                    .filter { $0.mediaType != .tvEpisode }
-
-                return InitialSnapshot(
-                    addedIds: Array(addedIds),
-                    playedIds: Array(playedIds),
-                    favoriteIds: Array(favoriteItems.prefix(limit).map(\.persistentModelID)),
-                    favoriteTotal: favoriteItems.count,
-                    favoriteMovieCount: favoriteItems.filter { $0.mediaType == .movie }.count,
-                    favoriteTVShowCount: favoriteItems.filter { $0.mediaType == .tvShow }.count
-                )
-            }.value
-
-            recentlyAdded = snapshot.addedIds.compactMap { context.model(for: $0) as? MediaItem }
-            recentlyPlayed = snapshot.playedIds.compactMap { context.model(for: $0) as? MediaItem }
-            favorites = snapshot.favoriteIds.compactMap { context.model(for: $0) as? MediaItem }
-            totalFavoritesCount = snapshot.favoriteTotal
-            favoriteMovieCount = snapshot.favoriteMovieCount
-            favoriteTVShowCount = snapshot.favoriteTVShowCount
+            try await reloadHighlights(in: context)
 
             if isFirstLoad {
                 try await loadFirstPage()
@@ -116,15 +72,25 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Filter Updates
+    func refreshAfterLibrarySync() async {
+        guard let context = modelContext else { return }
+        isReloadingSection = true
+        defer { isReloadingSection = false }
 
-    func changeSection(_ newSection: LibrarySection) async {
-        guard section != newSection else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
-            section = newSection
+        resetPagedItems()
+
+        do {
+            try await reloadHighlights(in: context)
+            try await loadFirstPage()
+            hasLoadedInitial = true
+            isLibraryEmpty = recentlyAdded.isEmpty && recentlyPlayed.isEmpty && favorites.isEmpty && loadedItems.isEmpty
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
         }
-        await reloadPagedItems()
     }
+
+    // MARK: - Filter Updates
 
     func reloadForSortChange() async {
         await reloadPagedItems()
@@ -195,7 +161,6 @@ final class LibraryViewModel: ObservableObject {
         }
         let container = context.container
         let query = LibraryQuery(
-            section: section,
             selectedGenres: selectedGenres,
             selectedRegions: selectedRegions,
             sortOption: sortOption
@@ -279,6 +244,56 @@ final class LibraryViewModel: ObservableObject {
         loadedItemIDs = []
     }
 
+    private func reloadHighlights(in context: ModelContext) async throws {
+        let snapshot = try await loadHighlightSnapshot(in: context)
+        recentlyAdded = snapshot.addedIds.compactMap { context.model(for: $0) as? MediaItem }
+        recentlyPlayed = snapshot.playedIds.compactMap { context.model(for: $0) as? MediaItem }
+        favorites = snapshot.favoriteIds.compactMap { context.model(for: $0) as? MediaItem }
+        totalFavoritesCount = snapshot.favoriteTotal
+        favoriteMovieCount = snapshot.favoriteMovieCount
+        favoriteTVShowCount = snapshot.favoriteTVShowCount
+    }
+
+    private func loadHighlightSnapshot(in context: ModelContext) async throws -> InitialSnapshot {
+        let container = context.container
+        let limit = highlightSectionLimit
+
+        return try await Task.detached(priority: .userInitiated) {
+            let bgCtx = ModelContext(container)
+
+            var addedDescriptor = FetchDescriptor<MediaItem>(
+                sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
+            )
+            addedDescriptor.fetchLimit = limit * 3
+            let addedIds = try bgCtx.fetch(addedDescriptor)
+                .filter { $0.mediaType.showsInHighlights }
+                .prefix(limit)
+                .map(\.persistentModelID)
+
+            var playedDescriptor = FetchDescriptor<MediaItem>(
+                predicate: Self.recentlyPlayedPredicate,
+                sortBy: [SortDescriptor(\.lastPlayedAt, order: .reverse)]
+            )
+            playedDescriptor.fetchLimit = limit * 3
+            let playedIds = try bgCtx.fetch(playedDescriptor)
+                .filter { $0.mediaType.showsInHighlights }
+                .prefix(limit)
+                .map(\.persistentModelID)
+
+            let favoriteItems = try bgCtx.fetch(Self.favoriteDescriptor)
+                .filter { $0.mediaType.showsInHighlights }
+
+            return InitialSnapshot(
+                addedIds: Array(addedIds),
+                playedIds: Array(playedIds),
+                favoriteIds: Array(favoriteItems.prefix(limit).map(\.persistentModelID)),
+                favoriteTotal: favoriteItems.count,
+                favoriteMovieCount: favoriteItems.filter { $0.mediaType == .movie }.count,
+                favoriteTVShowCount: favoriteItems.filter { $0.mediaType == .tvShow }.count
+            )
+        }.value
+    }
+
     private func appendItems(_ items: [MediaItem]) {
         for item in items where loadedItemIDs.insert(item.persistentModelID).inserted {
             loadedItems.append(item)
@@ -325,7 +340,6 @@ final class LibraryViewModel: ObservableObject {
     }
 
     private struct LibraryQuery: Sendable {
-        let section: LibrarySection
         let selectedGenres: Set<String>
         let selectedRegions: Set<String>
         let sortOption: LibrarySortOption
@@ -360,8 +374,7 @@ final class LibraryViewModel: ObservableObject {
     }
 
     private nonisolated static func matchesQuery(_ item: MediaItem, query: LibraryQuery) -> Bool {
-        item.mediaType == query.section.mediaType
-            && matchesGenres(item, selectedGenres: query.selectedGenres)
+        matchesGenres(item, selectedGenres: query.selectedGenres)
             && matchesRegions(item, selectedRegions: query.selectedRegions)
     }
 
