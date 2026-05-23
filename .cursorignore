@@ -1,0 +1,43 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+# Xcode
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+DerivedData/
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+build/
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+# CocoaPods
+Pods/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Environment & Secrets
+.env
+*.p12
+*.mobileprovision
+*.cer
+
+# FFmpeg built libraries (use scripts/build-ffmpeg-ios.sh to rebuild)
+Vanmo/Frameworks/FFmpeg/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+*.swp
+*.swo
+*~

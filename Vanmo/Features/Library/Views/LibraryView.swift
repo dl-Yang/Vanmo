@@ -32,7 +32,7 @@ struct LibraryView: View {
             .background(Color.vanmoBackground)
 
         }
-//        .navigationTitle("Vanmo")
+        .navigationTitle("首页")
         .toolbar { toolbarContent }
         .task {
             viewModel.setModelContext(modelContext)
