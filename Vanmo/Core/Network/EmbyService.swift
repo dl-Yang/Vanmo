@@ -68,6 +68,12 @@ final class EmbyService: MediaServerService {
             throw NetworkError.connectionFailed(error.localizedDescription)
         }
 
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Auth URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Auth status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Auth body:\n\(EmbyDebugLog.describe(data: data))")
+        #endif
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.connectionFailed("Invalid response")
         }
@@ -132,6 +138,13 @@ final class EmbyService: MediaServerService {
         addAuth(to: &request)
 
         let (data, response) = try await session.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] List URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] List status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] List body:\n\(EmbyDebugLog.describe(data: data))")
+        #endif
+
         try validateEmbyResponse(response, body: data, context: "list items")
 
         let result = try JSONDecoder().decode(EmbyItemsResponse.self, from: data)
@@ -196,6 +209,13 @@ final class EmbyService: MediaServerService {
         addAuth(to: &request)
 
         let (tempURL, response) = try await session.download(for: request)
+
+        #if DEBUG
+        let downloadedSize = (try? FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int64) ?? -1
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Download URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Download status: \((response as? HTTPURLResponse)?.statusCode ?? -1) bytes=\(downloadedSize)")
+        #endif
+
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 try? FileManager.default.removeItem(at: tempURL)
@@ -242,6 +262,14 @@ final class EmbyService: MediaServerService {
 
         let base = baseURL(for: config)
 
+        #if DEBUG
+        if let since {
+            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan mode: INCREMENTAL since \(Self.embyDateFormatter.string(from: since))")
+        } else {
+            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan mode: FULL (no since filter)")
+        }
+        #endif
+
         var startIndex = 0
         var page = 0
         while true {
@@ -274,6 +302,13 @@ final class EmbyService: MediaServerService {
             addAuth(to: &request)
 
             let (data, response) = try await session.data(for: request)
+
+            #if DEBUG
+            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan page=\(page) URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan page=\(page) status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan page=\(page) body:\n\(EmbyDebugLog.describe(data: data))")
+            #endif
+
             try validateEmbyResponse(response, body: data, context: "fetch media items")
 
             let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
@@ -433,6 +468,105 @@ fileprivate enum EmbyItemMapper {
             episodeTitle: episodeTitle,
             seriesId: item.seriesId
         )
+    }
+}
+
+// MARK: - Debug Logging Helpers
+
+/// Emby / Jellyfin 网络请求的调试日志工具。
+///
+/// 仅在 DEBUG 构建中使用，目的是让真机 / 模拟器调试时能在 Xcode Console
+/// 看到「请求 URL + 状态码 + 响应体」。所有输出会做两件事：
+///
+/// 1. 把 URL 里的 `api_key` / `X-Emby-Token` / `AccessToken` 等查询参数脱敏成
+///    `=***`，避免在控制台粘贴时把 access token 顺手贴出去。
+/// 2. 把响应 JSON 里的 `AccessToken`、`Password`、`Pw` 等字段递归脱敏；非 JSON
+///    或解析失败时降级为原始字符串预览。
+///
+/// 响应体最长截断到 `maxLength` 字符（默认 4000），避免单条日志把 Console
+/// 撑爆——扫库分页的响应单页可达数百 KB。
+fileprivate enum EmbyDebugLog {
+    /// JSON 中需要脱敏的字段名（大小写不敏感）。
+    private static let sensitiveJSONKeys: Set<String> = [
+        "accesstoken",
+        "access_token",
+        "token",
+        "password",
+        "pw",
+        "x-emby-token",
+        "api_key",
+        "apikey",
+    ]
+
+    /// URL 查询参数中需要脱敏的 key（大小写不敏感）。
+    private static let sensitiveURLKeys: [String] = [
+        "api_key",
+        "ApiKey",
+        "AccessToken",
+        "X-Emby-Token",
+        "X-MediaBrowser-Token",
+        "Pw",
+    ]
+
+    /// 返回脱敏后的 URL 字符串：把 `?api_key=xxx` 替换成 `?api_key=***`。
+    static func redactURL(_ urlString: String) -> String {
+        var result = urlString
+        for key in sensitiveURLKeys {
+            let pattern = "(?i)(\(NSRegularExpression.escapedPattern(for: key)))=[^&]*"
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let range = NSRange(result.startIndex..., in: result)
+            result = regex.stringByReplacingMatches(
+                in: result,
+                options: [],
+                range: range,
+                withTemplate: "$1=***"
+            )
+        }
+        return result
+    }
+
+    /// 把响应 `Data` 描述为可读字符串：优先美化 JSON，必要时截断。
+    static func describe(data: Data, maxLength: Int = 4000) -> String {
+        if data.isEmpty {
+            return "<empty>"
+        }
+        if let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
+            let sanitized = sanitize(obj)
+            if let pretty = try? JSONSerialization.data(
+                withJSONObject: sanitized,
+                options: [.prettyPrinted, .sortedKeys, .fragmentsAllowed]
+            ), let str = String(data: pretty, encoding: .utf8) {
+                return truncate(str, max: maxLength, totalBytes: data.count)
+            }
+        }
+        if let str = String(data: data, encoding: .utf8) {
+            return truncate(str, max: maxLength, totalBytes: data.count)
+        }
+        return "<binary \(data.count) bytes>"
+    }
+
+    private static func sanitize(_ value: Any) -> Any {
+        if let dict = value as? [String: Any] {
+            var copy: [String: Any] = [:]
+            copy.reserveCapacity(dict.count)
+            for (k, v) in dict {
+                if sensitiveJSONKeys.contains(k.lowercased()) {
+                    copy[k] = "***"
+                } else {
+                    copy[k] = sanitize(v)
+                }
+            }
+            return copy
+        }
+        if let arr = value as? [Any] {
+            return arr.map(sanitize)
+        }
+        return value
+    }
+
+    private static func truncate(_ str: String, max: Int, totalBytes: Int) -> String {
+        guard str.count > max else { return str }
+        return String(str.prefix(max)) + "\n...[truncated, total \(totalBytes) bytes]"
     }
 }
 
@@ -697,6 +831,13 @@ enum EmbyChildItemsFetcher {
         request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][MediaServer] Children URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][MediaServer] Children status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        VanmoLogger.network.debug("[Debug][MediaServer] Children body:\n\(EmbyDebugLog.describe(data: data))")
+        #endif
+
         try validateEmbyResponse(response, body: data, context: "fetch child items")
 
         let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
@@ -747,6 +888,13 @@ enum EmbyEpisodeFetcher {
         request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][MediaServer] Episodes URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][MediaServer] Episodes status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        VanmoLogger.network.debug("[Debug][MediaServer] Episodes body:\n\(EmbyDebugLog.describe(data: data))")
+        #endif
+
         try validateEmbyResponse(response, body: data, context: "fetch episodes")
 
         let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)

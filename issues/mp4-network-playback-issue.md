@@ -90,10 +90,12 @@ var audioClock: TimeInterval {
 
 ## 涉及文件
 
-| 文件 | 变更 |
-|------|------|
-| `Vanmo/Core/Player/MKVDemuxer.swift` | 重写 `openNetworkStream`，移除自定义 AVIO，提取凭据为 HTTP 头 |
-| `Vanmo/Core/Player/AudioRenderer.swift` | 修正 `audioClock` 计算逻辑，引入 basePTS |
+
+| 文件                                      | 变更                                             |
+| --------------------------------------- | ---------------------------------------------- |
+| `Vanmo/Core/Player/MKVDemuxer.swift`    | 重写 `openNetworkStream`，移除自定义 AVIO，提取凭据为 HTTP 头 |
+| `Vanmo/Core/Player/AudioRenderer.swift` | 修正 `audioClock` 计算逻辑，引入 basePTS                |
+
 
 ## 参考日志
 
@@ -102,3 +104,4 @@ var audioClock: TimeInterval {
 [mov,mp4,m4a,3gp,3g2,mj2 @ 0x121df0a00] moov atom not found
 [Demuxer] avformat_open_input failed: Invalid data found when processing input (code: -1094995529)
 ```
+

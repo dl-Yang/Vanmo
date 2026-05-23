@@ -81,6 +81,19 @@ struct ConnectionsView: View {
                         Label("删除", systemImage: "trash")
                     }
                 }
+                .swipeActions(edge: .leading) {
+                    Button {
+                        Task {
+                            let success = await viewModel.connectAndScan(connection, forceFullScan: true)
+                            if success {
+                                appState.selectedTab = .library
+                            }
+                        }
+                    } label: {
+                        Label("全量重扫", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .tint(.blue)
+                }
             }
         }
     }

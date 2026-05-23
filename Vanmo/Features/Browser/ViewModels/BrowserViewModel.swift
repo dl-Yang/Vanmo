@@ -91,13 +91,17 @@ final class ConnectionsViewModel: ObservableObject {
     }
 
     @discardableResult
-    func connectAndScan(_ connection: SavedConnection, showErrorAlert: Bool = true) async -> Bool {
+    func connectAndScan(
+        _ connection: SavedConnection,
+        showErrorAlert: Bool = true,
+        forceFullScan: Bool = false
+    ) async -> Bool {
         connectionStatuses[connection.id] = .connecting
         isLoading = true
-        loadingMessage = "连接到 \(connection.name)..."
+        loadingMessage = forceFullScan ? "全量重扫 \(connection.name)..." : "连接到 \(connection.name)..."
         librarySyncMessage = "正在连接 \(connection.name)..."
 
-        VanmoLogger.network.info("[Connections] Connecting to \(connection.name) (\(connection.type.rawValue)://\(connection.host):\(connection.port))")
+        VanmoLogger.network.info("[Connections] Connecting to \(connection.name) (\(connection.type.rawValue)://\(connection.host):\(connection.port)) fullScan=\(forceFullScan)")
 
         let isLocal = connection.type == .localFolder
 
@@ -137,7 +141,7 @@ final class ConnectionsViewModel: ObservableObject {
             let scanner = MediaScanner(modelContainer: context.container)
 
             if let mediaServer = service as? MediaServerService {
-                let since = connection.lastSyncedAt
+                let since: Date? = forceFullScan ? nil : connection.lastSyncedAt
                 let syncStart = Date()
                 var totalImported = 0
                 for try await page in mediaServer.streamMediaItems(since: since, pageSize: 500) {
