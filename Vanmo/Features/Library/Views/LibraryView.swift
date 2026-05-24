@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Kingfisher
 
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
@@ -60,7 +61,7 @@ struct LibraryView: View {
     // MARK: - Library Content
 
     private var libraryContent: some View {
-        LazyVStack(alignment: .leading, spacing: 24) {
+        LazyVStack(alignment: .leading, spacing: 28) {
             if !viewModel.recentlyPlayed.isEmpty {
                 secondFloorEntryHint
             }
@@ -87,9 +88,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var collectionFolderSections: some View {
         if viewModel.isLoadingEmbyHome && viewModel.serverCollectionFolders.isEmpty {
-            ProgressView("加载媒体库...")
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+            CollectionFolderLoadingSection()
         } else {
             ForEach(viewModel.orderedEmbyConnections) { connection in
                 if let folders = viewModel.serverCollectionFolders[connection.id], !folders.isEmpty {
@@ -111,32 +110,58 @@ struct LibraryView: View {
         folders: [CollectionFolder],
         connection: SavedConnection
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(serverName)
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.vanmoSurface)
 
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 12)],
-                spacing: 16
-            ) {
-                ForEach(folders) { folder in
-                    NavigationLink {
-                        CollectionFolderListView(folder: folder, connection: connection)
-                    } label: {
-                        PosterCard(
-                            title: folder.name,
-                            posterURL: folder.posterURL,
-                            subtitle: folder.collectionType.displayName,
-                            rating: nil,
-                            progress: nil
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.vanmoPrimary)
                 }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(serverName)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Text("\(folders.count) 个媒体库")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                Text("\(folders.count)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(Color.vanmoSurface, in: Capsule())
             }
             .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(folders) { folder in
+                        NavigationLink {
+                            CollectionFolderListView(folder: folder, connection: connection)
+                        } label: {
+                            CollectionFolderHomeCard(folder: folder)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 4)
+                .padding(.bottom, 26)
+            }
+            .scrollClipDisabled()
         }
     }
 
@@ -248,6 +273,212 @@ struct LibraryView: View {
                 syncToastMessage = nil
             }
         }
+    }
+}
+
+private struct CollectionFolderHomeCard: View {
+    let folder: CollectionFolder
+
+    private let cardWidth: CGFloat = 172
+    private let artworkHeight: CGFloat = 104
+
+    private var accent: Color {
+        switch folder.collectionType {
+        case .movies:
+            return Color.orange
+        case .tvshows:
+            return Color.cyan
+        case .playlists:
+            return Color.green
+        }
+    }
+
+    private var secondaryAccent: Color {
+        switch folder.collectionType {
+        case .movies:
+            return Color.red
+        case .tvshows:
+            return Color.indigo
+        case .playlists:
+            return Color.teal
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            artwork
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text(folder.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .frame(height: 38, alignment: .topLeading)
+
+                HStack(spacing: 6) {
+                    Image(systemName: folder.collectionType.icon)
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+
+                    Text(folder.collectionType.displayName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(width: cardWidth, height: 190, alignment: .topLeading)
+        .background(Color.vanmoSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.14), radius: 14, x: 0, y: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(folder.name)，\(folder.collectionType.displayName)媒体库")
+    }
+
+    private var artwork: some View {
+        ZStack {
+            KFImage(folder.posterURL)
+                .placeholder {
+                    placeholderArtwork
+                }
+                .fade(duration: 0.22)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    .black.opacity(0.62),
+                ],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+        }
+        .frame(width: cardWidth - 20, height: artworkHeight)
+        .overlay(alignment: .bottomLeading) {
+            coverTypeTag
+                .padding(9)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var coverTypeTag: some View {
+        HStack(spacing: 8) {
+            Image(systemName: folder.collectionType.icon)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+
+            Text(folder.collectionType.displayName)
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+        .frame(maxWidth: cardWidth - 38, alignment: .leading)
+    }
+
+    private var placeholderArtwork: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    accent.opacity(0.76),
+                    secondaryAccent.opacity(0.5),
+                    Color.vanmoPrimary.opacity(0.34),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Image(systemName: folder.collectionType.icon)
+                .font(.system(size: 48, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.22))
+                .offset(x: 42, y: -18)
+
+            Image(systemName: "rectangle.stack.fill")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.72))
+                .offset(x: -42, y: 24)
+        }
+    }
+}
+
+private struct CollectionFolderLoadingSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.vanmoSurface)
+                    .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.vanmoSurface)
+                        .frame(width: 120, height: 14)
+
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.vanmoSurface.opacity(0.72))
+                        .frame(width: 86, height: 10)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        CollectionFolderLoadingCard()
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 4)
+                .padding(.bottom, 26)
+            }
+            .scrollClipDisabled()
+        }
+        .redacted(reason: .placeholder)
+    }
+}
+
+private struct CollectionFolderLoadingCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.vanmoSurface)
+                .frame(height: 104)
+
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color.vanmoSurface)
+                .frame(height: 13)
+
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color.vanmoSurface.opacity(0.72))
+                .frame(width: 86, height: 11)
+        }
+        .padding(10)
+        .frame(width: 172, height: 190, alignment: .topLeading)
+        .background(Color.vanmoSurface.opacity(0.58))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
 
