@@ -140,7 +140,9 @@ final class ConnectionsViewModel: ObservableObject {
 
             let scanner = MediaScanner(modelContainer: context.container)
 
-            if let mediaServer = service as? MediaServerService {
+            if let mediaServer = service as? MediaServerService,
+               connection.type != .emby,
+               connection.type != .jellyfin {
                 let since: Date? = forceFullScan ? nil : connection.lastSyncedAt
                 let syncStart = Date()
                 var totalImported = 0
@@ -153,7 +155,7 @@ final class ConnectionsViewModel: ObservableObject {
                 }
                 connection.lastSyncedAt = syncStart
                 try? modelContext?.save()
-            } else {
+            } else if connection.type != .emby && connection.type != .jellyfin {
                 let scanPath = connection.path ?? "/"
                 _ = try await scanner.scanRemoteDirectory(
                     service: service,

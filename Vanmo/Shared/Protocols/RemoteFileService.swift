@@ -48,6 +48,72 @@ struct ServerMediaItem {
     let episodeNumber: Int?
     let episodeTitle: String?
     let seriesId: String?
+
+  /// Live API 条目可选元数据（继续观看 / 最近添加 / 收藏）。
+    let dateCreated: Date?
+    let lastPlayedAt: Date?
+    let lastPlaybackPosition: TimeInterval
+    let isFavoriteOnServer: Bool
+
+    init(
+        serverId: String,
+        title: String,
+        originalTitle: String? = nil,
+        year: Int? = nil,
+        overview: String? = nil,
+        rating: Double? = nil,
+        mediaType: MediaType,
+        posterURL: URL? = nil,
+        backdropURL: URL? = nil,
+        genres: [String] = [],
+        director: String? = nil,
+        cast: [String] = [],
+        originCountry: [String] = [],
+        tmdbID: Int? = nil,
+        streamURL: URL,
+        fileSize: Int64 = 0,
+        duration: TimeInterval = 0,
+        originalFileName: String? = nil,
+        container: String? = nil,
+        showTitle: String? = nil,
+        seasonNumber: Int? = nil,
+        episodeNumber: Int? = nil,
+        episodeTitle: String? = nil,
+        seriesId: String? = nil,
+        dateCreated: Date? = nil,
+        lastPlayedAt: Date? = nil,
+        lastPlaybackPosition: TimeInterval = 0,
+        isFavoriteOnServer: Bool = false
+    ) {
+        self.serverId = serverId
+        self.title = title
+        self.originalTitle = originalTitle
+        self.year = year
+        self.overview = overview
+        self.rating = rating
+        self.mediaType = mediaType
+        self.posterURL = posterURL
+        self.backdropURL = backdropURL
+        self.genres = genres
+        self.director = director
+        self.cast = cast
+        self.originCountry = originCountry
+        self.tmdbID = tmdbID
+        self.streamURL = streamURL
+        self.fileSize = fileSize
+        self.duration = duration
+        self.originalFileName = originalFileName
+        self.container = container
+        self.showTitle = showTitle
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
+        self.episodeTitle = episodeTitle
+        self.seriesId = seriesId
+        self.dateCreated = dateCreated
+        self.lastPlayedAt = lastPlayedAt
+        self.lastPlaybackPosition = lastPlaybackPosition
+        self.isFavoriteOnServer = isFavoriteOnServer
+    }
 }
 
 struct ConnectionConfig {

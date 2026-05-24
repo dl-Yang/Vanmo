@@ -51,6 +51,7 @@ struct MediaDetailView: View {
     private var headerSection: some View {
         ZStack(alignment: .bottom) {
             dominantColorBackground
+            
             posterLayer
             mediaInfoOverlay
         }

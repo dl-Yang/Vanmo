@@ -375,6 +375,256 @@ final class EmbyService: MediaServerService {
         }
     }
 
+    // MARK: - Live Library API
+
+    private static let liveItemFields =
+        "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,DateCreated,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
+
+    /// 拉取 `/Library/VirtualFolders`，仅保留 movies / tvshows / playlists。
+    func fetchVirtualFolders(
+        connectionId: UUID,
+        connectionName: String
+    ) async throws -> [CollectionFolder] {
+        guard isConnected, let config, let token = accessToken else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Library/VirtualFolders"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "api_key", value: token)]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        addAuth(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] VirtualFolders URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] VirtualFolders status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        #endif
+
+        try validateEmbyResponse(response, body: data, context: "fetch virtual folders")
+
+        let folders = try Self.makeJSONDecoder().decode([EmbyVirtualFolder].self, from: data)
+        let baseStr = base.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let prefix = apiPrefix.isEmpty ? "" : apiPrefix
+
+        return folders.compactMap { folder in
+            guard let collectionType = EmbyCollectionType(raw: folder.collectionType) else {
+                return nil
+            }
+
+            let imageItemId = folder.primaryImageItemId ?? folder.id
+            let posterURL = URL(
+                string: "\(baseStr)/\(prefix)Items/\(imageItemId)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)"
+            )
+
+            return CollectionFolder(
+                id: folder.id,
+                name: folder.name,
+                collectionType: collectionType,
+                posterURL: posterURL,
+                serverConnectionId: connectionId,
+                serverConnectionName: connectionName
+            )
+        }
+    }
+
+    /// CollectionFolder 二级列表：仅 Movie / Series / Video。
+    func fetchCollectionFolderItems(
+        parentId: String,
+        startIndex: Int = 0,
+        pageSize: Int = 50
+    ) async throws -> ServerItemsPage {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "ParentId", value: parentId),
+            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series,Video"),
+            URLQueryItem(name: "Recursive", value: "false"),
+            URLQueryItem(name: "Fields", value: Self.liveItemFields),
+            URLQueryItem(name: "SortBy", value: "SortName"),
+            URLQueryItem(name: "SortOrder", value: "Ascending"),
+            URLQueryItem(name: "StartIndex", value: String(startIndex)),
+            URLQueryItem(name: "Limit", value: String(pageSize)),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        return try await fetchItemsPage(components: components, baseURL: base, token: token, context: "fetch collection folder items")
+    }
+
+    /// 继续观看。
+    func fetchResumeItems(limit: Int = 20) async throws -> [ServerMediaItem] {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items/Resume"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            // Emby Resume 端点默认不递归且类型范围窄，需显式带上
+            // Recursive + MediaTypes=Video 才能拿到全部正在观看的视频。
+            URLQueryItem(name: "Recursive", value: "true"),
+            URLQueryItem(name: "MediaTypes", value: "Video"),
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "Fields", value: Self.liveItemFields),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        let page = try await fetchItemsPage(components: components, baseURL: base, token: token, context: "fetch resume items")
+        return page.items
+    }
+
+    /// 最近添加。
+    func fetchLatestItems(limit: Int = 20) async throws -> [ServerMediaItem] {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items/Latest"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
+            URLQueryItem(name: "Fields", value: Self.liveItemFields),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        let page = try await fetchItemsPage(components: components, baseURL: base, token: token, context: "fetch latest items")
+        return page.items
+    }
+
+    /// 收藏。
+    func fetchFavoriteItems() async throws -> [ServerMediaItem] {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "Filters", value: "IsFavorite"),
+            URLQueryItem(name: "Recursive", value: "true"),
+            // 收藏可以是 Movie / Series / Episode / 通用 Video，统一放宽。
+            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series,Episode,Video"),
+            URLQueryItem(name: "Fields", value: Self.liveItemFields),
+            URLQueryItem(name: "SortBy", value: "SortName"),
+            URLQueryItem(name: "SortOrder", value: "Ascending"),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        let page = try await fetchItemsPage(components: components, baseURL: base, token: token, context: "fetch favorite items")
+        return page.items
+    }
+
+    private func fetchItemsPage(
+        components: URLComponents,
+        baseURL: URL,
+        token: String,
+        context: String
+    ) async throws -> ServerItemsPage {
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        addAuth(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] \(context) URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] \(context) status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        #endif
+
+        try validateEmbyResponse(response, body: data, context: context)
+
+        // 不同 Emby 端点的响应 shape 不一致：
+        //  - `/Users/{id}/Items`、`/Users/{id}/Items/Resume` 返回 `{Items, TotalRecordCount}` 包装。
+        //  - `/Users/{id}/Items/Latest` 直接返回 `[BaseItemDto, ...]` 顶层数组。
+        // 这里同时兼容两种格式，保持上层 ServerItemsPage 不变。
+        let topLevelIsArray: Bool = {
+            guard let obj = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+                return false
+            }
+            return obj is [Any]
+        }()
+
+        let detailItems: [EmbyMediaDetail]
+        let totalCount: Int
+        if topLevelIsArray {
+            detailItems = try Self.makeJSONDecoder().decode([EmbyMediaDetail].self, from: data)
+            totalCount = detailItems.count
+        } else {
+            let result = try Self.makeJSONDecoder().decode(EmbyMediaResponse.self, from: data)
+            detailItems = result.items
+            totalCount = result.totalRecordCount
+        }
+
+        let mapped = detailItems.compactMap { item in
+            EmbyItemMapper.map(item, baseURL: baseURL, apiPrefix: apiPrefix, token: token)
+        }
+
+        return ServerItemsPage(items: mapped, totalRecordCount: totalCount)
+    }
+
+    private static func makeJSONDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let string = try container.decode(String.self)
+            // Emby 常见输出 `2026-05-23T12:10:31.0000000Z`（7 位 fractional），
+            // ISO8601DateFormatter 只支持 3 位，先把多余位截掉再解析。
+            let normalized = string.replacingOccurrences(
+                of: #"\.(\d{3})\d+"#,
+                with: ".$1",
+                options: .regularExpression
+            )
+            if let date = iso8601WithFractional.date(from: normalized) ?? iso8601Basic.date(from: normalized) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(string)")
+        }
+        return decoder
+    }
+
+    private static let iso8601WithFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let iso8601Basic: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
 }
 
 // MARK: - Item Mapping
@@ -442,6 +692,25 @@ fileprivate enum EmbyItemMapper {
         let episodeNumber = item.indexNumber
         let episodeTitle = mediaType == .tvEpisode ? item.name : nil
 
+        let lastPlaybackPosition: TimeInterval = if let ticks = item.userData?.playbackPositionTicks {
+            Double(ticks) / 10_000_000.0
+        } else {
+            0
+        }
+
+        // Emby Resume API 返回的项一定有 PlaybackPositionTicks，但 LastPlayedDate
+        // 在某些版本/配置下可能缺失。为了让"继续观看"能识别，这种情况用
+        // dateCreated 作 fallback，保留 nil 行为仅限于完全没看过的项。
+        let resolvedLastPlayedAt: Date? = {
+            if let date = item.userData?.lastPlayedDate {
+                return date
+            }
+            if lastPlaybackPosition > 0 {
+                return item.dateCreated ?? Date()
+            }
+            return nil
+        }()
+
         return ServerMediaItem(
             serverId: item.id,
             title: item.name,
@@ -466,7 +735,11 @@ fileprivate enum EmbyItemMapper {
             seasonNumber: seasonNumber,
             episodeNumber: episodeNumber,
             episodeTitle: episodeTitle,
-            seriesId: item.seriesId
+            seriesId: item.seriesId,
+            dateCreated: item.dateCreated,
+            lastPlayedAt: resolvedLastPlayedAt,
+            lastPlaybackPosition: lastPlaybackPosition,
+            isFavoriteOnServer: item.userData?.isFavorite ?? false
         )
     }
 }
@@ -674,6 +947,8 @@ private struct EmbyMediaDetail: Decodable {
     let indexNumber: Int?
     let seriesPrimaryImageTag: String?
     let mediaSources: [EmbyMediaSource]?
+    let dateCreated: Date?
+    let userData: EmbyUserData?
 
     enum CodingKeys: String, CodingKey {
         case id = "Id"
@@ -696,6 +971,34 @@ private struct EmbyMediaDetail: Decodable {
         case indexNumber = "IndexNumber"
         case seriesPrimaryImageTag = "SeriesPrimaryImageTag"
         case mediaSources = "MediaSources"
+        case dateCreated = "DateCreated"
+        case userData = "UserData"
+    }
+}
+
+private struct EmbyUserData: Decodable {
+    let playbackPositionTicks: Int64?
+    let isFavorite: Bool?
+    let lastPlayedDate: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case playbackPositionTicks = "PlaybackPositionTicks"
+        case isFavorite = "IsFavorite"
+        case lastPlayedDate = "LastPlayedDate"
+    }
+}
+
+private struct EmbyVirtualFolder: Decodable {
+    let name: String
+    let id: String
+    let collectionType: String?
+    let primaryImageItemId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name = "Name"
+        case id = "Id"
+        case collectionType = "CollectionType"
+        case primaryImageItemId = "PrimaryImageItemId"
     }
 }
 
@@ -726,6 +1029,44 @@ private struct EmbyImageTags: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case primary = "Primary"
+    }
+}
+
+// MARK: - Connection Helper
+
+enum EmbyConnectionHelper {
+    static func connect(_ connection: SavedConnection) async throws -> EmbyService {
+        guard connection.type == .emby || connection.type == .jellyfin else {
+            throw NetworkError.unsupportedProtocol
+        }
+
+        let password = try KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+        let config = ConnectionConfig(from: connection, password: password)
+        let service = EmbyService(
+            type: connection.type,
+            apiPrefix: connection.type == .jellyfin ? "" : "emby/"
+        )
+        try await service.connect(config: config)
+        return service
+    }
+}
+
+// MARK: - Collection Folder Items Fetcher
+
+enum CollectionFolderItemsFetcher {
+    static func fetchPage(
+        connection: SavedConnection,
+        parentId: String,
+        startIndex: Int,
+        pageSize: Int
+    ) async throws -> ServerItemsPage {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await service.fetchCollectionFolderItems(
+            parentId: parentId,
+            startIndex: startIndex,
+            pageSize: pageSize
+        )
     }
 }
 

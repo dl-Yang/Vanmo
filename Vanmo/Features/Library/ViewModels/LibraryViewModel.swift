@@ -4,17 +4,18 @@ import SwiftData
 @MainActor
 final class LibraryViewModel: ObservableObject {
     @Published private(set) var recentlyPlayed: [MediaItem] = []
-    @Published private(set) var recentlyAdded: [MediaItem] = []
     @Published private(set) var favorites: [MediaItem] = []
     @Published private(set) var totalFavoritesCount = 0
     @Published private(set) var favoriteMovieCount = 0
     @Published private(set) var favoriteTVShowCount = 0
-    @Published private(set) var loadedItems: [MediaItem] = []
+
+    @Published private(set) var serverCollectionFolders: [UUID: [CollectionFolder]] = [:]
+    @Published private(set) var embyConnectionsById: [UUID: SavedConnection] = [:]
+    @Published private(set) var hasConfiguredEmbyConnections = false
+    @Published private(set) var isLoadingEmbyHome = false
+    @Published private(set) var embyHomeError: String?
 
     @Published private(set) var isLoading = false
-    @Published private(set) var isLoadingMore = false
-    @Published private(set) var isReloadingSection = false
-    @Published private(set) var hasMore = true
     @Published private(set) var isLibraryEmpty = true
 
     @Published var viewMode: LibraryViewMode = .grid
@@ -25,12 +26,18 @@ final class LibraryViewModel: ObservableObject {
     @Published var showError = false
     @Published var errorMessage = ""
 
-    private let pageSize = 30
     private let highlightSectionLimit = 20
-    private var dbOffset = 0
     private var modelContext: ModelContext?
-    private var loadedItemIDs: Set<PersistentIdentifier> = []
     private var hasLoadedInitial = false
+    /// App 启动后是否已经向 Emby 拉过一次 live 数据并写入 SwiftData。
+    /// 真值表示后续进入首页 / 切 tab 时不再触发网络请求。
+    private var hasRefreshedLiveThisLaunch = false
+
+    var orderedEmbyConnections: [SavedConnection] {
+        embyConnectionsById.values.sorted {
+            ($0.lastConnectedAt ?? .distantPast) > ($1.lastConnectedAt ?? .distantPast)
+        }
+    }
 
     var hasActiveFilters: Bool {
         !selectedGenres.isEmpty || !selectedRegions.isEmpty
@@ -40,165 +47,125 @@ final class LibraryViewModel: ObservableObject {
         self.modelContext = context
     }
 
+    func connection(for folder: CollectionFolder) -> SavedConnection? {
+        embyConnectionsById[folder.serverConnectionId]
+    }
+
     // MARK: - Initial Load
 
-    func loadInitialSections() async {
+    /// 首页进入时调用。首次启动会拉一次 live 数据写入 SwiftData，再读 SwiftData；
+    /// 之后切 tab 重新进入会立即返回，避免重复刷新闪烁。
+    func loadInitialSections(connections: [SavedConnection]) async {
         guard let context = modelContext else { return }
-        let isFirstLoad = !hasLoadedInitial
-        if isFirstLoad {
-            isLoading = true
-        }
-        defer {
-            if isFirstLoad {
-                isLoading = false
-            }
+
+        if hasLoadedInitial {
+            return
         }
 
-        if isFirstLoad {
-            resetPagedItems()
-        }
+        isLoading = true
+        defer { isLoading = false }
 
         do {
             try await reloadHighlights(in: context)
 
-            if isFirstLoad {
-                try await loadFirstPage()
-                hasLoadedInitial = true
+            if !hasRefreshedLiveThisLaunch {
+                hasRefreshedLiveThisLaunch = true
+                await refreshEmbyAndPersist(connections: connections, in: context)
+                try await reloadHighlights(in: context)
             }
-            isLibraryEmpty = recentlyAdded.isEmpty && recentlyPlayed.isEmpty && favorites.isEmpty && loadedItems.isEmpty
-        } catch {
-            errorMessage = error.localizedDescription
-            showError = true
-        }
-    }
 
-    func refreshAfterLibrarySync() async {
-        guard let context = modelContext else { return }
-        isReloadingSection = true
-        defer { isReloadingSection = false }
-
-        resetPagedItems()
-
-        do {
-            try await reloadHighlights(in: context)
-            try await loadFirstPage()
             hasLoadedInitial = true
-            isLibraryEmpty = recentlyAdded.isEmpty && recentlyPlayed.isEmpty && favorites.isEmpty && loadedItems.isEmpty
+            updateLibraryEmptyState(connections: connections)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
     }
 
-    // MARK: - Filter Updates
-
-    func reloadForSortChange() async {
-        await reloadPagedItems()
-    }
-
-    func reloadForFilterChange() async {
-        await reloadPagedItems()
-    }
-
-    private func reloadPagedItems() async {
-        guard modelContext != nil else { return }
-        isReloadingSection = true
-        defer { isReloadingSection = false }
-
-        resetPagedItems()
+    /// 数据同步完成后（用户新连接服务器）重读 SwiftData，并对 Emby 服务器再做一次 live 刷新。
+    func refreshAfterLibrarySync(connections: [SavedConnection]) async {
+        guard let context = modelContext else { return }
 
         do {
-            try await loadFirstPage()
-            isLibraryEmpty = recentlyAdded.isEmpty && recentlyPlayed.isEmpty && favorites.isEmpty && loadedItems.isEmpty
+            await refreshEmbyAndPersist(connections: connections, in: context)
+            try await reloadHighlights(in: context)
+            updateLibraryEmptyState(connections: connections)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
     }
 
-    // MARK: - Pagination
-
-    func loadNextPageIfNeeded(currentItem item: MediaItem) async {
-        guard hasMore, !isLoadingMore, !isLoading, !isReloadingSection else { return }
-        let threshold = 5
-        guard let index = loadedItems.firstIndex(where: { $0.id == item.id }) else { return }
-        if index >= loadedItems.count - threshold {
-            await loadNextPage()
-        }
-    }
-
-    private func loadFirstPage() async throws {
-        let result = try await fetchNextBatch(startDBOffset: 0)
-        let items = result.ids.compactMap { modelContext?.model(for: $0) as? MediaItem }
-        appendItems(items)
-        dbOffset = result.dbScanned
-        hasMore = !result.reachedEnd
-    }
-
-    func loadNextPage() async {
-        guard modelContext != nil, hasMore, !isLoadingMore, !isReloadingSection else { return }
-        isLoadingMore = true
-        defer { isLoadingMore = false }
-
+    /// 用户下拉刷新触发：强制重新拉取 live 数据并刷新 SwiftData。
+    func refreshEmbyHome(connections: [SavedConnection]) async {
+        guard let context = modelContext else { return }
+        await refreshEmbyAndPersist(connections: connections, in: context)
         do {
-            let result = try await fetchNextBatch(startDBOffset: dbOffset)
-            let items = result.ids.compactMap { modelContext?.model(for: $0) as? MediaItem }
-            appendItems(items)
-            dbOffset += result.dbScanned
-            hasMore = !result.reachedEnd
+            try await reloadHighlights(in: context)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
+        updateLibraryEmptyState(connections: connections)
     }
 
-    /// 从指定数据库偏移开始扫描，过滤后累积到一页数据。
-    /// SwiftData 对数组字段和枚举常量的复杂 predicate 支持有限，这里保留数据库分页扫描，
-    /// 再在后台上下文内完成 mediaType / genre AND / region OR 过滤。
-    private func fetchNextBatch(startDBOffset: Int) async throws -> BatchResult {
-        guard let context = modelContext else {
-            return BatchResult(ids: [], dbScanned: 0, reachedEnd: true)
+    // MARK: - Emby Live Refresh + Persist
+
+    private func refreshEmbyAndPersist(
+        connections: [SavedConnection],
+        in context: ModelContext
+    ) async {
+        let embyConnections = connections.filter { $0.type == .emby || $0.type == .jellyfin }
+        hasConfiguredEmbyConnections = !embyConnections.isEmpty
+        guard !embyConnections.isEmpty else {
+            serverCollectionFolders = [:]
+            embyConnectionsById = [:]
+            return
         }
-        let container = context.container
-        let query = LibraryQuery(
-            selectedGenres: selectedGenres,
-            selectedRegions: selectedRegions,
-            sortOption: sortOption
-        )
-        let target = pageSize
-        let batchSize = pageSize * 2
 
-        return try await Task.detached(priority: .userInitiated) {
-            let bgCtx = ModelContext(container)
-            var collectedIds: [PersistentIdentifier] = []
-            var dbScanned = 0
-            var reachedEnd = false
+        isLoadingEmbyHome = true
+        embyHomeError = nil
+        defer { isLoadingEmbyHome = false }
 
-            while collectedIds.count < target {
-                var descriptor = FetchDescriptor<MediaItem>(
-                    sortBy: Self.sortDescriptors(for: query.sortOption)
+        var foldersByServer: [UUID: [CollectionFolder]] = [:]
+        var connectionsById: [UUID: SavedConnection] = [:]
+        var allLiveItems: [ServerMediaItem] = []
+        var firstError: String?
+
+        for connection in embyConnections {
+            do {
+                let service = try await EmbyConnectionHelper.connect(connection)
+                defer { Task { await service.disconnect() } }
+
+                let folders = try await service.fetchVirtualFolders(
+                    connectionId: connection.id,
+                    connectionName: connection.name
                 )
-                descriptor.fetchLimit = batchSize
-                descriptor.fetchOffset = startDBOffset + dbScanned
+                let resume = try await service.fetchResumeItems(limit: highlightSectionLimit)
+                let serverFavorites = try await service.fetchFavoriteItems()
 
-                let batch = try bgCtx.fetch(descriptor)
-                if batch.isEmpty {
-                    reachedEnd = true
-                    break
-                }
-
-                dbScanned += batch.count
-                let filtered = batch.filter { Self.matchesQuery($0, query: query) }
-                collectedIds.append(contentsOf: filtered.map(\.persistentModelID))
-
-                if batch.count < batchSize {
-                    reachedEnd = true
-                    break
-                }
+                connectionsById[connection.id] = connection
+                foldersByServer[connection.id] = folders
+                allLiveItems.append(contentsOf: resume)
+                allLiveItems.append(contentsOf: serverFavorites)
+            } catch {
+                firstError = firstError ?? error.localizedDescription
+                VanmoLogger.network.error("[LibraryHome] refresh failed for \(connection.name): \(error.localizedDescription)")
             }
+        }
 
-            return BatchResult(ids: collectedIds, dbScanned: dbScanned, reachedEnd: reachedEnd)
-        }.value
+        serverCollectionFolders = foldersByServer
+        embyConnectionsById = connectionsById
+        embyHomeError = firstError
+
+        if !allLiveItems.isEmpty {
+            do {
+                let scanner = MediaScanner(modelContainer: context.container)
+                _ = try await scanner.importServerMediaItems(allLiveItems, in: context)
+            } catch {
+                VanmoLogger.network.error("[LibraryHome] persist live items failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Item Actions
@@ -219,9 +186,6 @@ final class LibraryViewModel: ObservableObject {
         modelContext?.delete(item)
         try? modelContext?.save()
 
-        loadedItemIDs.remove(item.persistentModelID)
-        loadedItems.removeAll { $0.id == item.id }
-        recentlyAdded.removeAll { $0.id == item.id }
         recentlyPlayed.removeAll { $0.id == item.id }
         favorites.removeAll { $0.id == item.id }
         if wasFavorite {
@@ -232,21 +196,12 @@ final class LibraryViewModel: ObservableObject {
                 favoriteTVShowCount = max(0, favoriteTVShowCount - 1)
             }
         }
-        isLibraryEmpty = recentlyAdded.isEmpty && recentlyPlayed.isEmpty && favorites.isEmpty && loadedItems.isEmpty
     }
 
-    // MARK: - Internals
-
-    private func resetPagedItems() {
-        dbOffset = 0
-        hasMore = true
-        loadedItems = []
-        loadedItemIDs = []
-    }
+    // MARK: - SwiftData Read
 
     private func reloadHighlights(in context: ModelContext) async throws {
         let snapshot = try await loadHighlightSnapshot(in: context)
-        recentlyAdded = snapshot.addedIds.compactMap { context.model(for: $0) as? MediaItem }
         recentlyPlayed = snapshot.playedIds.compactMap { context.model(for: $0) as? MediaItem }
         favorites = snapshot.favoriteIds.compactMap { context.model(for: $0) as? MediaItem }
         totalFavoritesCount = snapshot.favoriteTotal
@@ -261,43 +216,25 @@ final class LibraryViewModel: ObservableObject {
         return try await Task.detached(priority: .userInitiated) {
             let bgCtx = ModelContext(container)
 
-            var addedDescriptor = FetchDescriptor<MediaItem>(
-                sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
-            )
-            addedDescriptor.fetchLimit = limit * 3
-            let addedIds = try bgCtx.fetch(addedDescriptor)
-                .filter { $0.mediaType.showsInHighlights }
-                .prefix(limit)
-                .map(\.persistentModelID)
-
+            // 继续观看：lastPlayedAt 非空即视为可恢复播放，不再额外按 mediaType 过滤，
+            // 让 Emby resume API 返回的 Episode 也能进入这个区。
             var playedDescriptor = FetchDescriptor<MediaItem>(
                 predicate: Self.recentlyPlayedPredicate,
                 sortBy: [SortDescriptor(\.lastPlayedAt, order: .reverse)]
             )
-            playedDescriptor.fetchLimit = limit * 3
-            let playedIds = try bgCtx.fetch(playedDescriptor)
-                .filter { $0.mediaType.showsInHighlights }
-                .prefix(limit)
-                .map(\.persistentModelID)
+            playedDescriptor.fetchLimit = limit
+            let playedIds = try bgCtx.fetch(playedDescriptor).map(\.persistentModelID)
 
             let favoriteItems = try bgCtx.fetch(Self.favoriteDescriptor)
-                .filter { $0.mediaType.showsInHighlights }
 
             return InitialSnapshot(
-                addedIds: Array(addedIds),
-                playedIds: Array(playedIds),
+                playedIds: playedIds,
                 favoriteIds: Array(favoriteItems.prefix(limit).map(\.persistentModelID)),
                 favoriteTotal: favoriteItems.count,
                 favoriteMovieCount: favoriteItems.filter { $0.mediaType == .movie }.count,
                 favoriteTVShowCount: favoriteItems.filter { $0.mediaType == .tvShow }.count
             )
         }.value
-    }
-
-    private func appendItems(_ items: [MediaItem]) {
-        for item in items where loadedItemIDs.insert(item.persistentModelID).inserted {
-            loadedItems.append(item)
-        }
     }
 
     private func updateFavoriteSnapshot(afterToggling item: MediaItem) {
@@ -324,25 +261,22 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    private func updateLibraryEmptyState(connections: [SavedConnection]) {
+        let hasCollectionFolders = serverCollectionFolders.values.contains { !$0.isEmpty }
+        let hasAnyConnection = !connections.isEmpty
+        isLibraryEmpty =
+            recentlyPlayed.isEmpty &&
+            favorites.isEmpty &&
+            !hasCollectionFolders &&
+            !hasAnyConnection
+    }
+
     private struct InitialSnapshot: Sendable {
-        let addedIds: [PersistentIdentifier]
         let playedIds: [PersistentIdentifier]
         let favoriteIds: [PersistentIdentifier]
         let favoriteTotal: Int
         let favoriteMovieCount: Int
         let favoriteTVShowCount: Int
-    }
-
-    private struct BatchResult: Sendable {
-        let ids: [PersistentIdentifier]
-        let dbScanned: Int
-        let reachedEnd: Bool
-    }
-
-    private struct LibraryQuery: Sendable {
-        let selectedGenres: Set<String>
-        let selectedRegions: Set<String>
-        let sortOption: LibrarySortOption
     }
 
     private nonisolated static var recentlyPlayedPredicate: Predicate<MediaItem> {
@@ -358,54 +292,6 @@ final class LibraryViewModel: ObservableObject {
             },
             sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
         )
-    }
-
-    private nonisolated static func sortDescriptors(for option: LibrarySortOption) -> [SortDescriptor<MediaItem>] {
-        switch option {
-        case .title:
-            return [SortDescriptor(\.title, order: .forward)]
-        case .addedDate:
-            return [SortDescriptor(\.addedAt, order: .reverse)]
-        case .year:
-            return [SortDescriptor(\.year, order: .reverse)]
-        case .rating:
-            return [SortDescriptor(\.rating, order: .reverse)]
-        }
-    }
-
-    private nonisolated static func matchesQuery(_ item: MediaItem, query: LibraryQuery) -> Bool {
-        matchesGenres(item, selectedGenres: query.selectedGenres)
-            && matchesRegions(item, selectedRegions: query.selectedRegions)
-    }
-
-    private nonisolated static func matchesGenres(_ item: MediaItem, selectedGenres: Set<String>) -> Bool {
-        guard !selectedGenres.isEmpty else { return true }
-        let itemGenres = Set(item.genres)
-        return selectedGenres.allSatisfy { selectedGenre in
-            !LibraryFilters.aliases(for: selectedGenre).isDisjoint(with: itemGenres)
-        }
-    }
-
-    private nonisolated static func matchesRegions(_ item: MediaItem, selectedRegions: Set<String>) -> Bool {
-        guard !selectedRegions.isEmpty else { return true }
-        guard !item.originCountry.isEmpty else { return false }
-
-        let itemCodes = Set(item.originCountry.map { $0.uppercased() })
-        let selectedFilters = selectedRegions.compactMap(LibraryFilters.region(for:))
-        let selectedCodes = selectedFilters.reduce(into: Set<String>()) { result, region in
-            guard !region.isOther else { return }
-            result.formUnion(region.isoCodes)
-        }
-
-        if !selectedCodes.isDisjoint(with: itemCodes) {
-            return true
-        }
-
-        guard selectedFilters.contains(where: \.isOther) else {
-            return false
-        }
-
-        return !itemCodes.isSubset(of: LibraryFilters.allRegionCodes)
     }
 }
 

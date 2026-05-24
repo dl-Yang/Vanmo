@@ -206,6 +206,21 @@ actor MediaScanner {
         item.seasonNumber = serverItem.seasonNumber
         item.episodeNumber = serverItem.episodeNumber
         item.episodeTitle = serverItem.episodeTitle
+
+        // Live API 元数据：服务器是 resume / favorite 的权威来源。
+        if let serverPlayed = serverItem.lastPlayedAt {
+            if let existingPlayed = item.lastPlayedAt {
+                item.lastPlayedAt = max(serverPlayed, existingPlayed)
+            } else {
+                item.lastPlayedAt = serverPlayed
+            }
+        }
+        if serverItem.lastPlaybackPosition > 0 {
+            item.lastPlaybackPosition = serverItem.lastPlaybackPosition
+        }
+        if serverItem.isFavoriteOnServer {
+            item.isFavorite = true
+        }
     }
 
     @MainActor

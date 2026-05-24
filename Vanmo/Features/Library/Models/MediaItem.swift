@@ -148,18 +148,14 @@ enum MediaType: String, Codable, CaseIterable {
         }
     }
 
-    /// 从 Emby/Jellyfin `Type` 字段映射到本地类型。
+    /// 从 Emby/Jellyfin `Type` 字段映射到本地类型（白名单）。
     static func from(embyType: String) -> MediaType {
         switch embyType {
         case "Movie", "Video": return .movie
         case "Series": return .tvShow
         case "Episode": return .tvEpisode
         case "Season": return .season
-        case "Folder": return .folder
-        case "CollectionFolder", "UserView", "BoxSet": return .collectionFolder
-        case "Audio": return .audio
-        case "MusicAlbum": return .musicAlbum
-        case "Photo": return .photo
+        case "CollectionFolder": return .collectionFolder
         default: return .other
         }
     }
@@ -194,6 +190,14 @@ extension ServerMediaItem {
         item.seasonNumber = seasonNumber
         item.episodeNumber = episodeNumber
         item.episodeTitle = episodeTitle
+        item.lastPlaybackPosition = lastPlaybackPosition
+        if let lastPlayedAt {
+            item.lastPlayedAt = lastPlayedAt
+        }
+        if let dateCreated {
+            item.addedAt = dateCreated
+        }
+        item.isFavorite = isFavoriteOnServer
         return item
     }
 }

@@ -33,27 +33,19 @@ struct LibraryView: View {
 
         }
         .navigationTitle("首页")
-        .toolbar { toolbarContent }
         .task {
             viewModel.setModelContext(modelContext)
-            await viewModel.loadInitialSections()
+            await connectionsViewModel.loadSavedConnections()
+            await viewModel.loadInitialSections(connections: connectionsViewModel.savedConnections)
         }
-//        .refreshable {
-//            await viewModel.loadInitialSections()
-//        }
-        .onChange(of: viewModel.sortOption) { _, _ in
-            Task { await viewModel.reloadForSortChange() }
-        }
-        .onChange(of: viewModel.selectedGenres) { _, _ in
-            Task { await viewModel.reloadForFilterChange() }
-        }
-        .onChange(of: viewModel.selectedRegions) { _, _ in
-            Task { await viewModel.reloadForFilterChange() }
+        .refreshable {
+            await connectionsViewModel.loadSavedConnections()
+            await viewModel.refreshEmbyHome(connections: connectionsViewModel.savedConnections)
         }
         .onChange(of: connectionsViewModel.librarySyncCompletionID) { _, newValue in
             guard newValue > 0 else { return }
             Task {
-                await viewModel.refreshAfterLibrarySync()
+                await viewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
                 showSyncToast("数据同步完成")
             }
         }
@@ -77,16 +69,75 @@ struct LibraryView: View {
                 favoritesStackedSection
             }
 
-            if !viewModel.recentlyAdded.isEmpty {
-                mediaSection("最近添加", items: viewModel.recentlyAdded)
+            if hasEmbyConnectionsConfigured {
+                collectionFolderSections
             }
-
-            libraryHeader
-            filtersBar
-
-            pagedSection
         }
         .padding(.vertical)
+    }
+
+    private var hasEmbyConnectionsConfigured: Bool {
+        connectionsViewModel.savedConnections.contains { connection in
+            connection.type == .emby || connection.type == .jellyfin
+        }
+    }
+
+    // MARK: - Collection Folder Grid
+
+    @ViewBuilder
+    private var collectionFolderSections: some View {
+        if viewModel.isLoadingEmbyHome && viewModel.serverCollectionFolders.isEmpty {
+            ProgressView("加载媒体库...")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+        } else {
+            ForEach(viewModel.orderedEmbyConnections) { connection in
+                if let folders = viewModel.serverCollectionFolders[connection.id], !folders.isEmpty {
+                    collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
+                }
+            }
+
+            if let error = viewModel.embyHomeError, viewModel.serverCollectionFolders.isEmpty {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+            }
+        }
+    }
+
+    private func collectionFolderSection(
+        serverName: String,
+        folders: [CollectionFolder],
+        connection: SavedConnection
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(serverName)
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 12)],
+                spacing: 16
+            ) {
+                ForEach(folders) { folder in
+                    NavigationLink {
+                        CollectionFolderListView(folder: folder, connection: connection)
+                    } label: {
+                        PosterCard(
+                            title: folder.name,
+                            posterURL: folder.posterURL,
+                            subtitle: folder.collectionType.displayName,
+                            rating: nil,
+                            progress: nil
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+        }
     }
 
     // MARK: - Second Floor Entry
@@ -146,234 +197,6 @@ struct LibraryView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Library Header
-
-    private var libraryHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("全部")
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Spacer()
-
-            Image(systemName: "square.grid.2x2")
-                .font(.title3)
-                .foregroundStyle(Color.vanmoPrimary)
-                .frame(width: 34, height: 34)
-                .background(Color.vanmoPrimary.opacity(0.12))
-                .clipShape(Circle())
-        }
-        .padding(.horizontal)
-    }
-
-    private var filtersBar: some View {
-        VStack(spacing: 16) {
-            FilterChipsRow(
-                title: "类型",
-                options: LibraryFilters.genres,
-                selection: $viewModel.selectedGenres
-            )
-
-            FilterChipsRow(
-                title: "地区",
-                options: LibraryFilters.regions.map(\.title),
-                selection: $viewModel.selectedRegions
-            )
-        }
-    }
-
-    // MARK: - Paged Content
-
-    @ViewBuilder
-    private var pagedSection: some View {
-        ZStack(alignment: .top) {
-            if viewModel.isReloadingSection {
-                sectionLoadingPlaceholder
-                    .transition(.opacity)
-            } else if viewModel.loadedItems.isEmpty {
-                filteredEmptyState
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            } else {
-                VStack(spacing: 0) {
-                    if viewModel.viewMode == .grid {
-                        pagedGrid
-                    } else {
-                        pagedList
-                    }
-
-                    paginationFooter
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-//        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: viewModel.section)
-//        .animation(.easeInOut(duration: 0.18), value: viewModel.isReloadingSection)
-    }
-
-    private var pagedGrid: some View {
-        let items = viewModel.loadedItems
-        let columns = [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 12)]
-        return LazyVGrid(columns: columns, spacing: 16) {
-            ForEach(items) { item in
-                NavigationLink {
-                    LibraryItemDestination(item: item)
-                } label: {
-                    PosterCard(
-                        title: item.displayTitle,
-                        posterURL: item.posterURL,
-                        subtitle: libraryItemSubtitle(item),
-                        rating: item.rating,
-                        progress: item.playbackProgress > 0 ? item.playbackProgress : nil
-                    )
-                    .contextMenu { itemContextMenu(item) }
-                }
-                .buttonStyle(.plain)
-                .onAppear {
-                    Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    private var pagedList: some View {
-        let items = viewModel.loadedItems
-        return LazyVStack(spacing: 1) {
-            ForEach(items) { item in
-                NavigationLink {
-                    LibraryItemDestination(item: item)
-                } label: {
-                    MediaListRow(item: item)
-                }
-                .buttonStyle(.plain)
-                .contextMenu { itemContextMenu(item) }
-                .onAppear {
-                    Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var sectionLoadingPlaceholder: some View {
-        if viewModel.viewMode == .grid {
-            let columns = [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 12)]
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(0..<8, id: \.self) { _ in
-                    SectionPlaceholderCard()
-                }
-            }
-            .padding(.horizontal)
-        } else {
-            LazyVStack(spacing: 10) {
-                ForEach(0..<5, id: \.self) { _ in
-                    SectionPlaceholderRow()
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-
-    @ViewBuilder
-    private var paginationFooter: some View {
-        if viewModel.isLoadingMore {
-            HStack {
-                Spacer()
-                ProgressView()
-                    .padding(.vertical, 16)
-                Spacer()
-            }
-        } else if !viewModel.hasMore && !viewModel.loadedItems.isEmpty {
-            Text("已加载全部")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-        }
-    }
-
-    // MARK: - Shared Sections
-
-    private func mediaSection(
-        _ title: String,
-        items: [MediaItem],
-        showProgress: Bool = false
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(items) { item in
-                        NavigationLink {
-                            LibraryItemDestination(item: item)
-                        } label: {
-                            PosterCard(
-                                title: item.displayTitle,
-                                posterURL: item.posterURL,
-                                subtitle: libraryItemSubtitle(item),
-                                rating: item.rating,
-                                progress: showProgress ? item.playbackProgress : nil
-                            )
-                            .frame(width: 130)
-                            .contextMenu { itemContextMenu(item) }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 10)
-                .padding(.bottom, 18)
-            }
-        }
-    }
-
-    // MARK: - Context Menu
-
-    private func libraryItemSubtitle(_ item: MediaItem) -> String? {
-        if let year = item.year {
-            return "\(item.mediaType.displayName) · \(year)"
-        }
-        return item.mediaType.displayName
-    }
-
-    @ViewBuilder
-    private func itemContextMenu(_ item: MediaItem) -> some View {
-        if item.mediaType == .movie || item.mediaType == .tvEpisode {
-            Button {
-                appState.play(item)
-            } label: {
-                Label("播放", systemImage: "play.fill")
-            }
-        }
-
-        Button {
-            viewModel.toggleFavorite(item)
-        } label: {
-            Label(
-                item.isFavorite ? "取消收藏" : "收藏",
-                systemImage: item.isFavorite ? "heart.slash" : "heart"
-            )
-        }
-
-        Button {
-            viewModel.markAsWatched(item)
-        } label: {
-            Label("标记为已看", systemImage: "checkmark.circle")
-        }
-
-        Divider()
-
-        Button(role: .destructive) {
-            viewModel.deleteItem(item)
-        } label: {
-            Label("删除", systemImage: "trash")
-        }
-    }
-
     private func librarySyncStatusOverlay(message: String) -> some View {
         HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
@@ -401,40 +224,6 @@ struct LibraryView: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                withAnimation(.spring(response: 0.3)) {
-                    viewModel.viewMode = viewModel.viewMode == .grid ? .list : .grid
-                }
-            } label: {
-                Image(systemName: viewModel.viewMode.icon)
-            }
-        }
-
-        ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                ForEach(LibrarySortOption.allCases, id: \.self) { option in
-                    Button {
-                        viewModel.sortOption = option
-                    } label: {
-                        HStack {
-                            Text(option.displayName)
-                            if viewModel.sortOption == option {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-            }
-        }
-    }
-
     // MARK: - Empty State
 
     private var emptyState: some View {
@@ -446,17 +235,6 @@ struct LibraryView: View {
             appState.selectedTab = .connections
         }
         .frame(minHeight: 500)
-    }
-
-    private var filteredEmptyState: some View {
-        EmptyStateView(
-            icon: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle" : "film.stack",
-            title: viewModel.hasActiveFilters ? "没有匹配的媒体" : "暂无媒体",
-            message: viewModel.hasActiveFilters ? "尝试更改类型或地区筛选" : "添加媒体后会显示在这里"
-        )
-        .frame(minHeight: 240)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal)
     }
 
     private func showSyncToast(_ message: String) {

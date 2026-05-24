@@ -86,9 +86,14 @@ struct LibraryItemDestination: View {
     let item: MediaItem
 
     var body: some View {
-        if item.mediaType.isBrowsable, item.serverId != nil {
-            EmbyFolderBrowseView(container: item)
-        } else {
+        switch item.mediaType {
+        case .folder, .season:
+            if item.serverId != nil {
+                EmbyFolderBrowseView(container: item)
+            } else {
+                MediaDetailView(item: item)
+            }
+        default:
             MediaDetailView(item: item)
         }
     }
