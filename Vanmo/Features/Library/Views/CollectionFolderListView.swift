@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 /// CollectionFolder 二级列表页：展示媒体库内的 Movie / Series / Video。
 struct CollectionFolderListView: View {
@@ -12,15 +13,19 @@ struct CollectionFolderListView: View {
     @State private var isLoadingMore = false
     @State private var hasMore = true
     @State private var startIndex = 0
+    @State private var totalRecordCount = 0
     @State private var errorMessage: String?
+    @State private var loadMoreErrorMessage: String?
 
     private let pageSize = 50
+    private let gridColumns = [
+        GridItem(.adaptive(minimum: 112, maximum: 160), spacing: 14)
+    ]
 
     var body: some View {
         Group {
             if isLoading {
-                ProgressView("加载中...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                CollectionFolderListLoadingView(folder: folder, connectionName: connection.name)
             } else if let errorMessage {
                 EmptyStateView(
                     icon: "exclamationmark.triangle",
@@ -35,52 +40,112 @@ struct CollectionFolderListView: View {
                 )
             } else {
                 ScrollView {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: 12)],
-                        spacing: 16
-                    ) {
-                        ForEach(items) { item in
-                            NavigationLink {
-                                LibraryItemDestination(item: item)
-                            } label: {
-                                PosterCard(
-                                    title: item.displayTitle,
-                                    posterURL: item.posterURL,
-                                    subtitle: listItemSubtitle(item),
-                                    rating: item.rating,
-                                    progress: item.playbackProgress > 0 ? item.playbackProgress : nil
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                listItemContextMenu(item)
-                            }
-                            .onAppear {
-                                Task { await loadNextPageIfNeeded(currentItem: item) }
-                            }
-                        }
-                    }
-                    .padding()
+                    VStack(alignment: .leading, spacing: 20) {
+                        CollectionFolderListHeader(
+                            folder: folder,
+                            connectionName: connection.name,
+                            loadedCount: items.count,
+                            totalCount: totalRecordCount,
+                            movieCount: movieCount,
+                            seriesCount: seriesCount
+                        )
+                        .padding(.horizontal)
 
-                    if isLoadingMore {
-                        ProgressView()
-                            .padding(.vertical, 16)
-                    } else if !hasMore {
-                        Text("已加载全部")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
+                        mediaGrid
+
+                        loadStateFooter
                     }
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
+                .scrollClipDisabled()
             }
         }
         .background(Color.vanmoBackground)
         .navigationTitle(folder.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .task(id: folder.id) {
             await loadInitialPage()
         }
+    }
+
+    private var mediaGrid: some View {
+        LazyVGrid(
+            columns: gridColumns,
+            spacing: 18
+        ) {
+            ForEach(items) { item in
+                NavigationLink {
+                    LibraryItemDestination(item: item)
+                } label: {
+                    PosterCard(
+                        title: item.displayTitle,
+                        posterURL: item.posterURL,
+                        subtitle: listItemSubtitle(item),
+                        rating: item.rating,
+                        progress: item.playbackProgress > 0 ? item.playbackProgress : nil
+                    )
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    listItemContextMenu(item)
+                }
+                .onAppear {
+                    Task { await loadNextPageIfNeeded(currentItem: item) }
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private var loadStateFooter: some View {
+        if loadMoreErrorMessage != nil {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.circle")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+
+                Text("加载中断")
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        } else if isLoadingMore {
+            HStack(spacing: 10) {
+                ProgressView()
+
+                Text("继续加载...")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+        } else if !hasMore {
+            Text(loadedSummaryText)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+        }
+    }
+
+    private var movieCount: Int {
+        items.filter { $0.mediaType == .movie }.count
+    }
+
+    private var seriesCount: Int {
+        items.filter { $0.mediaType == .tvShow }.count
+    }
+
+    private var loadedSummaryText: String {
+        if totalRecordCount > 0 {
+            return "已加载全部 \(totalRecordCount) 项"
+        }
+        return "已加载全部"
     }
 
     @ViewBuilder
@@ -104,8 +169,10 @@ struct CollectionFolderListView: View {
     private func loadInitialPage() async {
         isLoading = true
         errorMessage = nil
+        loadMoreErrorMessage = nil
         items = []
         startIndex = 0
+        totalRecordCount = 0
         hasMore = true
 
         do {
@@ -117,7 +184,8 @@ struct CollectionFolderListView: View {
             )
             items = page.items.map { $0.makeMediaItem() }
             startIndex = page.items.count
-            hasMore = page.hasMore
+            totalRecordCount = page.totalRecordCount
+            hasMore = startIndex < page.totalRecordCount
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -136,6 +204,7 @@ struct CollectionFolderListView: View {
     private func loadNextPage() async {
         guard hasMore, !isLoadingMore else { return }
         isLoadingMore = true
+        loadMoreErrorMessage = nil
         defer { isLoadingMore = false }
 
         do {
@@ -149,10 +218,261 @@ struct CollectionFolderListView: View {
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: newItems.filter { !existingIDs.contains($0.id) })
             startIndex += page.items.count
-            hasMore = page.hasMore
+            totalRecordCount = page.totalRecordCount
+            hasMore = !page.items.isEmpty && startIndex < page.totalRecordCount
         } catch {
-            errorMessage = error.localizedDescription
+            loadMoreErrorMessage = error.localizedDescription
+            hasMore = false
         }
+    }
+}
+
+private struct CollectionFolderListHeader: View {
+    let folder: CollectionFolder
+    let connectionName: String
+    let loadedCount: Int
+    let totalCount: Int
+    let movieCount: Int
+    let seriesCount: Int
+
+    private var progressText: String {
+        if totalCount > 0 {
+            return "已加载 \(loadedCount) / \(totalCount)"
+        }
+        return "已加载 \(loadedCount)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 14) {
+                artwork
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(folder.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: "server.rack")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+
+                        Text(connectionName)
+                            .lineLimit(1)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    HStack(spacing: 8) {
+                        CollectionFolderListPill(
+                            text: folder.collectionType.displayName,
+                            icon: folder.collectionType.icon,
+                            tint: Color.vanmoPrimary
+                        )
+
+                        CollectionFolderListPill(
+                            text: progressText,
+                            icon: "square.grid.2x2",
+                            tint: Color.secondary
+                        )
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                CollectionFolderListStat(value: "\(loadedCount)", label: "条目", icon: "square.grid.2x2")
+                CollectionFolderListStat(value: "\(movieCount)", label: "电影", icon: "film")
+                CollectionFolderListStat(value: "\(seriesCount)", label: "剧集", icon: "tv")
+            }
+        }
+        .padding(16)
+        .background(Color.vanmoSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(folder.name)，\(folder.collectionType.displayName)，\(progressText)")
+    }
+
+    private var artwork: some View {
+        ZStack {
+            KFImage(folder.posterURL)
+                .placeholder {
+                    placeholderArtwork
+                }
+                .fade(duration: 0.22)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 76, height: 96)
+                .clipped()
+
+            LinearGradient(
+                colors: [
+                    .clear,
+                    .black.opacity(0.5),
+                ],
+                startPoint: .center,
+                endPoint: .bottom
+            )
+
+            Image(systemName: folder.collectionType.icon)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(8)
+        }
+        .frame(width: 76, height: 96)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.16), radius: 10, x: 0, y: 6)
+    }
+
+    private var placeholderArtwork: some View {
+        LinearGradient(
+            colors: [
+                Color.vanmoPrimary.opacity(0.72),
+                Color.vanmoSurface,
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .overlay {
+            Image(systemName: folder.collectionType.icon)
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.26))
+        }
+    }
+}
+
+private struct CollectionFolderListPill: View {
+    let text: String
+    let icon: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .fontWeight(.semibold)
+
+            Text(text)
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(tint.opacity(0.12), in: Capsule())
+    }
+}
+
+private struct CollectionFolderListStat: View {
+    let value: String
+    let label: String
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.vanmoPrimary)
+                .frame(width: 24, height: 24)
+                .background(Color.vanmoPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+        .background(Color.vanmoBackground, in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private struct CollectionFolderListLoadingView: View {
+    let folder: CollectionFolder
+    let connectionName: String
+
+    private let gridColumns = [
+        GridItem(.adaptive(minimum: 112, maximum: 160), spacing: 14)
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                CollectionFolderListHeader(
+                    folder: folder,
+                    connectionName: connectionName,
+                    loadedCount: 0,
+                    totalCount: 0,
+                    movieCount: 0,
+                    seriesCount: 0
+                )
+                .padding(.horizontal)
+
+                LazyVGrid(
+                    columns: gridColumns,
+                    spacing: 18
+                ) {
+                    ForEach(0..<8, id: \.self) { _ in
+                        CollectionFolderPosterPlaceholder()
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .scrollClipDisabled()
+        .redacted(reason: .placeholder)
+    }
+}
+
+private struct CollectionFolderPosterPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.vanmoSurface)
+                .aspectRatio(2 / 3, contentMode: .fit)
+
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.vanmoSurface)
+                    .frame(height: 10)
+
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.vanmoSurface.opacity(0.72))
+                    .frame(width: 58, height: 8)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 44)
+            .background(.ultraThinMaterial)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
