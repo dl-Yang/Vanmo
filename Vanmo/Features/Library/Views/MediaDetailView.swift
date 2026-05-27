@@ -10,34 +10,73 @@ struct MediaDetailView: View {
     @State private var showAllCast = false
     @State private var dominantColor: Color = .black.opacity(0.0)
     @State private var accentColor: Color = Color(hue: 0, saturation: 0.05, brightness: 0.88)
+    @State private var scrollOffset: CGFloat = 0
+    @State private var headerGlobalMinY: CGFloat = 0
+    @State private var heroRestMinY: CGFloat?
     @State private var episodes: [EpisodeInfo] = []
     @State private var isLoadingEpisodes = false
     @State private var selectedSeason: Int?
 
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                headerSection
-                infoSection
+    private let heroHeight: CGFloat = 540
+    private let backdropHeight: CGFloat = 300
 
-                if item.mediaType == .tvShow {
-                    episodeSection
+    /// 合并下拉（named 坐标探针）与上滑（global 坐标 header）的滚动增量。
+    private var heroScrollDelta: CGFloat {
+        let pullDown = max(scrollOffset, 0)
+        guard let rest = heroRestMinY else { return pullDown }
+        let headerDelta = headerGlobalMinY - rest
+        if headerDelta < 0 { return headerDelta }
+        return max(pullDown, headerDelta)
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            stretchyBackdropLayer
+                .allowsHitTesting(false)
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    GeometryReader { proxy in
+                        let minY = proxy.frame(in: .named("detailScroll")).minY
+                        Color.clear
+                            .onChange(of: minY) { _, newValue in
+                                scrollOffset = newValue
+                            }
+                    }
+                    .frame(height: 0)
+
+                    headerForeground
+
+                    VStack(alignment: .leading, spacing: 24) {
+                        infoSection
+
+                        if item.mediaType == .tvShow {
+                            episodeSection
+                        }
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 32)
                 }
             }
+            .coordinateSpace(name: "detailScroll")
         }
-        .background(Color.vanmoBackground)
+        .background(detailBackground)
         .ignoresSafeArea(edges: .top)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    item.isFavorite.toggle()
-                    try? modelContext.save()
-                } label: {
-                    Image(systemName: item.isFavorite ? "heart.fill" : "heart")
-                        .foregroundStyle(item.isFavorite ? .red : .white)
-                }
+                favoriteButton
             }
+        }
+        .task {
+            async let dominant = DominantColorExtractor.cachedColor(for: item.posterURL)
+            async let accent = DominantColorExtractor.cachedAccentColor(for: item.posterURL)
+            let (d, a) = await (dominant, accent)
+            dominantColor = d
+            accentColor = a
         }
         .task {
             if item.mediaType == .tvShow {
@@ -46,128 +85,236 @@ struct MediaDetailView: View {
         }
     }
 
+    private var detailBackground: some View {
+        Color.vanmoBackground
+            .overlay(alignment: .top) {
+                LinearGradient(
+                    colors: [
+                        dominantColor.opacity(0.28),
+                        Color.vanmoBackground.opacity(0.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: backdropHeight)
+                .ignoresSafeArea()
+            }
+    }
+
+    private var stretchyBackdropLayer: some View {
+        GeometryReader { geometry in
+            let delta = heroScrollDelta
+            let extra = max(delta, 0)
+            let yOffset = min(delta, 0)
+            let opacity = max(0, min(1, 1 + (delta / 180)))
+
+            heroBackdrop(width: geometry.size.width, height: backdropHeight + extra)
+                .frame(width: geometry.size.width, height: backdropHeight + extra, alignment: .top)
+                .offset(y: yOffset)
+                .opacity(opacity)
+        }
+        .frame(height: backdropHeight, alignment: .top)
+    }
+
+    private var favoriteButton: some View {
+        Button {
+            item.isFavorite.toggle()
+            try? modelContext.save()
+        } label: {
+            Image(systemName: item.isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(item.isFavorite ? .red : .white)
+                .frame(width: 34, height: 34)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.22), radius: 10, x: 0, y: 5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.isFavorite ? "取消收藏" : "收藏")
+    }
+
     // MARK: - Header
 
-    private var headerSection: some View {
-        ZStack(alignment: .bottom) {
-            dominantColorBackground
-            
-            posterLayer
-            mediaInfoOverlay
-        }
-        .frame(height: 520)
-        .clipped()
-        .task {
-            async let dominant = DominantColorExtractor.cachedColor(for: item.posterURL)
-            async let accent = DominantColorExtractor.cachedAccentColor(for: item.posterURL)
-            let (d, a) = await (dominant, accent)
-            dominantColor = d
-            accentColor = a
-        }
-    }
+    private var headerForeground: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Spacer(minLength: 0)
 
-    // MARK: - Layer 0: Dominant Color Background
+            HStack(alignment: .bottom, spacing: 16) {
+                heroPoster
 
-    private var dominantColorBackground: some View {
-        ZStack {
-            dominantColor
-                .ignoresSafeArea()
-
-            RadialGradient(
-                colors: [dominantColor, dominantColor.opacity(0.7)],
-                center: .center,
-                startRadius: 50,
-                endRadius: 400
-            )
-            .ignoresSafeArea()
-        }
-//        .animation(.easeInOut(duration: 0.3), value: dominantColor)
-    }
-
-    // MARK: - Layer 1: Poster + Edge Fade
-
-    private var posterLayer: some View {
-        ZStack {
-            KFImage(item.posterURL)
-                .placeholder {
-                    Rectangle().fill(Color.vanmoSurface)
-                        .overlay {
-                            Image(systemName: "film")
-                                .font(.largeTitle)
-                                .foregroundStyle(.tertiary)
-                        }
-                }
-                .fade(duration: 0.25)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
-            .mask(posterEdgeFadeMask)
-            .padding(.bottom, 100)
-
-            LinearGradient(
-                colors: [.clear, dominantColor],
-                startPoint: .init(x: 0.5, y: 0.6),
-                endPoint: .bottom
-            )
-//            .animation(.easeInOut(duration: 0.3), value: dominantColor)
-        }
-    }
-
-    private var posterEdgeFadeMask: some View {
-        VStack(spacing: 0) {
-            LinearGradient(
-                colors: [.clear, .white],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 40)
-
-            Rectangle().fill(.white)
-
-            LinearGradient(
-                colors: [.white, .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 80)
-        }
-    }
-
-    // MARK: - Layer 2: Media Info Overlay
-
-    private var mediaInfoOverlay: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Spacer()
-
-            Text(item.title)
-                .font(.title2.bold())
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.6), radius: 4, y: 2)
-
-            HStack(spacing: 8) {
-                if let year = item.year {
-                    Text("\(year)")
-                }
-                if item.mediaType == .tvShow, !episodes.isEmpty {
-                    Text("\(seasonNumbers.count)季 · \(episodes.count)集")
-                } else if item.duration > 0 {
-                    Text(item.duration.shortDuration)
-                }
-                Text(item.mediaType.displayName)
-            }
-            .foregroundStyle(.white.opacity(0.7))
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-
-            if let rating = item.rating {
-                RatingBadge(rating)
+                mediaInfoOverlay
+                    .layoutPriority(1)
             }
 
             playButton
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.bottom, 24)
+        .frame(height: heroHeight)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        let minY = proxy.frame(in: .global).minY
+                        headerGlobalMinY = minY
+                        if heroRestMinY == nil {
+                            heroRestMinY = minY
+                        }
+                    }
+                    .onChange(of: proxy.frame(in: .global).minY) { _, newValue in
+                        headerGlobalMinY = newValue
+                        if heroRestMinY == nil {
+                            heroRestMinY = newValue
+                        }
+                    }
+            }
+        }
+    }
+
+    private func heroBackdrop(
+        width: CGFloat,
+        height: CGFloat
+    ) -> some View {
+        ZStack {
+            dominantColor
+
+            heroBackdropImage(width: width, height: height)
+
+            LinearGradient(
+                colors: [
+                    .black.opacity(0.22),
+                    .black.opacity(0.38),
+                    .black.opacity(0.88),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            LinearGradient(
+                colors: [
+                    .black.opacity(0.54),
+                    .clear,
+                    .black.opacity(0.34),
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            VStack{
+                Spacer()
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        Color.vanmoBackground
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ).frame(height:300)
+            }
+        }
+        .frame(width: width, height: height)
+    }
+
+    @ViewBuilder
+    private func heroBackdropImage(
+        width: CGFloat,
+        height: CGFloat
+    ) -> some View {
+        if let backdropURL = item.backdropURL {
+            KFImage(backdropURL)
+                .placeholder {
+                    Rectangle()
+                        .fill(dominantColor)
+                }
+                .fade(duration: 0.25)
+                .resizable()
+                .scaledToFill()
+                .frame(width: width)
+                .frame(width: width, height: height, alignment: .top)
+                .clipped()
+        } else {
+            KFImage(item.posterURL)
+                .placeholder {
+                    Rectangle()
+                        .fill(dominantColor)
+                }
+                .fade(duration: 0.25)
+                .resizable()
+                .scaledToFill()
+                .frame(width: width, height: height)
+                .blur(radius: 16)
+                .scaleEffect(1.08)
+                .clipped()
+        }
+    }
+
+    private var heroPoster: some View {
+        KFImage(item.posterURL)
+            .placeholder {
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color.vanmoSurface)
+                    .overlay {
+                        Image(systemName: item.mediaType.icon)
+                            .font(.largeTitle)
+                            .foregroundStyle(.tertiary)
+                    }
+            }
+            .fade(duration: 0.25)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 122, height: 183)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.42), radius: 22, x: 0, y: 14)
+    }
+
+    private var heroMetaItems: [String] {
+        var values: [String] = []
+        if let year = item.year {
+            values.append("\(year)")
+        }
+        if item.mediaType == .tvShow, !episodes.isEmpty {
+            values.append("\(seasonNumbers.count)季 · \(episodes.count)集")
+        } else if item.duration > 0 {
+            values.append(item.duration.shortDuration)
+        }
+        values.append(item.mediaType.displayName)
+        return values
+    }
+
+    private var mediaInfoOverlay: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(item.title)
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(3)
+                .minimumScaleFactor(0.82)
+                .shadow(color: .black.opacity(0.55), radius: 8, y: 3)
+
+            Text(heroMetaItems.joined(separator: "  ·  "))
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(.white.opacity(0.78))
+                .lineLimit(2)
+
+            HStack(spacing: 8) {
+                if let rating = item.rating {
+                    RatingBadge(rating)
+                }
+
+                MediaDetailPill(
+                    text: item.mediaType.displayName,
+                    icon: item.mediaType.icon,
+                    tint: .white
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var playButton: some View {
@@ -191,13 +338,18 @@ struct MediaDetailView: View {
                     .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .padding(.vertical, 15)
             .background(accentColor)
             .foregroundStyle(playButtonForeground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+            }
         }
         .disabled(item.mediaType == .tvShow && episodes.isEmpty)
-        .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: 8)
+        .shadow(color: accentColor.opacity(0.28), radius: 18, x: 0, y: 10)
+        .shadow(color: .black.opacity(0.2), radius: 16, x: 0, y: 8)
     }
 
     /// 按钮前景色根据按钮背景亮度自适应：浅色背景用深色字，深色背景用白字。
@@ -236,26 +388,71 @@ struct MediaDetailView: View {
     }
 
     private var episodeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: "list.bullet.rectangle")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.vanmoPrimary)
+                    .frame(width: 26, height: 26)
+                    .background(Color.vanmoPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+
+                Text("剧集")
+                    .font(.headline)
+
+                Spacer()
+
+                if !episodes.isEmpty {
+                    Text("\(episodes.count) 集")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Color.vanmoBackground, in: Capsule())
+                }
+            }
+
             if isLoadingEpisodes {
-                ProgressView("加载剧集...")
-                    .frame(maxWidth: .infinity, minHeight: 60)
+                HStack(spacing: 10) {
+                    ProgressView()
+
+                    Text("加载剧集...")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 72)
             } else if episodes.isEmpty {
-                Text("暂无剧集信息")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 60)
+                VStack(spacing: 8) {
+                    Image(systemName: "rectangle.stack.badge.questionmark")
+                        .font(.title3)
+                        .foregroundStyle(.tertiary)
+
+                    Text("暂无剧集信息")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 96)
             } else {
                 if seasonNumbers.count > 1 {
                     seasonPicker
                 }
 
-                ForEach(currentSeasonEpisodes) { episode in
-                    episodeRow(episode)
+                VStack(spacing: 10) {
+                    ForEach(currentSeasonEpisodes) { episode in
+                        episodeRow(episode)
+                    }
                 }
             }
         }
-        .padding()
+        .padding(16)
+        .background(Color.vanmoSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        }
+        .padding(.horizontal, 20)
     }
 
     private var seasonPicker: some View {
@@ -270,12 +467,12 @@ struct MediaDetailView: View {
                         Text("第 \(season) 季")
                             .font(.subheadline)
                             .fontWeight((selectedSeason ?? seasonNumbers.first) == season ? .semibold : .regular)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(
                                 (selectedSeason ?? seasonNumbers.first) == season
-                                    ? Color.vanmoPrimary.opacity(0.15)
-                                    : Color.vanmoSurface
+                                    ? Color.vanmoPrimary.opacity(0.16)
+                                    : Color.vanmoBackground
                             )
                             .foregroundStyle(
                                 (selectedSeason ?? seasonNumbers.first) == season
@@ -287,23 +484,33 @@ struct MediaDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.vertical, 2)
         }
+        .scrollClipDisabled()
     }
 
     private func episodeRow(_ episode: EpisodeInfo) -> some View {
         Button {
             playEpisode(episode)
         } label: {
-            HStack(spacing: 12) {
-                Text("\(episode.episodeNumber)")
-                    .font(.headline)
-                    .foregroundStyle(Color.vanmoPrimary)
-                    .frame(width: 32)
+            HStack(spacing: 14) {
+                VStack(spacing: 2) {
+                    Text("E\(String(format: "%02d", episode.episodeNumber))")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.vanmoPrimary)
+
+                    Text("S\(String(format: "%02d", episode.seasonNumber))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(width: 46, height: 46)
+                .background(Color.vanmoPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(episode.title)
+                    Text(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : episode.title)
                         .font(.subheadline)
-                        .fontWeight(.medium)
+                        .fontWeight(.semibold)
                         .lineLimit(1)
 
                     if episode.duration > 0 {
@@ -315,14 +522,14 @@ struct MediaDetailView: View {
 
                 Spacer()
 
-                Image(systemName: "play.circle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                Image(systemName: "play.fill")
+                    .font(.caption)
+                    .foregroundStyle(playButtonForeground)
+                    .frame(width: 32, height: 32)
+                    .background(accentColor, in: Circle())
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .background(Color.vanmoSurface.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(12)
+            .background(Color.vanmoBackground, in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
     }
@@ -367,93 +574,83 @@ struct MediaDetailView: View {
     // MARK: - Info
 
     private var infoSection: some View {
-        ZStack(alignment: .top){
-            VStack(alignment: .leading, spacing: 20) {
-                if let overview = item.overview, !overview.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("简介")
-                            .font(.headline)
-                        Text(overview)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(4)
-                    }.padding(.top,40)
-                }
-
-                if !item.genres.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("类型")
-                            .font(.headline)
-                        genreTags
-                    }
-                }
-
-                if let director = item.director {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("导演")
-                            .font(.headline)
-                        Text(director)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if !item.cast.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("演员")
-                            .font(.headline)
-                        Text(item.cast.prefix(showAllCast ? item.cast.count : 5).joined(separator: "、"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        if item.cast.count > 5 {
-                            Button(showAllCast ? "收起" : "显示全部") {
-                                withAnimation { showAllCast.toggle() }
-                            }
-                            .font(.caption)
-                        }
-                    }
-                }
-
-                if item.mediaType != .tvShow {
-                    fileInfoSection
-                }
-
-                if !item.audioTracks.isEmpty || !item.subtitleTracks.isEmpty {
-                    trackInfoSection
+        VStack(alignment: .leading, spacing: 20) {
+            if let overview = item.overview, !overview.isEmpty {
+                detailSection(title: "简介", icon: "text.alignleft") {
+                    Text(overview)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(3)
+                        .lineLimit(6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color.vanmoBackground)
-            LinearGradient(
-                colors: [dominantColor, dominantColor.opacity(0.7), .clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 100)
-//            .animation(.easeInOut(duration: 0.3), value: dominantColor)
+
+            if !item.genres.isEmpty {
+                detailSection(title: "类型", icon: "tag") {
+                    genreTags
+                }
+            }
+
+            if item.director != nil || !item.cast.isEmpty {
+                creditsSection
+            }
+
+            if item.mediaType != .tvShow {
+                fileInfoSection
+            }
+
+            if !item.audioTracks.isEmpty || !item.subtitleTracks.isEmpty {
+                trackInfoSection
+            }
         }
+        .padding(.horizontal, 20)
     }
 
     private var genreTags: some View {
         FlowLayout(spacing: 8) {
             ForEach(item.genres, id: \.self) { genre in
-                Text(genre)
-                    .font(.caption)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.vanmoSurface)
-                    .clipShape(Capsule())
+                MediaDetailPill(text: genre, icon: nil, tint: Color.vanmoPrimary)
+            }
+        }
+    }
+
+    private var creditsSection: some View {
+        detailSection(title: "演职员", icon: "person.2") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let director = item.director {
+                    infoRow("导演", value: director)
+                }
+
+                if !item.cast.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        infoRow(
+                            "演员",
+                            value: item.cast.prefix(showAllCast ? item.cast.count : 5).joined(separator: "、")
+                        )
+
+                        if item.cast.count > 5 {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showAllCast.toggle()
+                                }
+                            } label: {
+                                Text(showAllCast ? "收起" : "显示全部")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.vanmoPrimary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
             }
         }
     }
 
     private var fileInfoSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("文件信息")
-                .font(.headline)
-
-            VStack(spacing: 6) {
+        detailSection(title: "文件信息", icon: "doc.text.magnifyingglass") {
+            VStack(spacing: 10) {
                 if let fileName = displayFileName {
                     infoRow("文件名", value: fileName)
                 }
@@ -490,30 +687,91 @@ struct MediaDetailView: View {
     }
 
     private var trackInfoSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("轨道信息")
-                .font(.headline)
+        detailSection(title: "轨道信息", icon: "waveform") {
+            VStack(spacing: 10) {
+                ForEach(item.audioTracks) { track in
+                    infoRow("音频 \(track.id + 1)", value: track.displayName)
+                }
 
-            ForEach(item.audioTracks) { track in
-                infoRow("音频 \(track.id + 1)", value: track.displayName)
-            }
-
-            ForEach(item.subtitleTracks) { track in
-                infoRow("字幕 \(track.id + 1)", value: track.displayName)
+                ForEach(item.subtitleTracks) { track in
+                    infoRow("字幕 \(track.id + 1)", value: track.displayName)
+                }
             }
         }
     }
 
+    private func detailSection<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.vanmoPrimary)
+                    .frame(width: 24, height: 24)
+                    .background(Color.vanmoPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
+
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.vanmoSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+        }
+    }
+
     private func infoRow(_ label: String, value: String) -> some View {
-        HStack {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(label)
-                .font(.subheadline)
+                .font(.caption)
+                .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 62, alignment: .leading)
+
             Text(value)
                 .font(.subheadline)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct MediaDetailPill: View {
+    let text: String
+    let icon: String?
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+            }
+
+            Text(text)
+                .font(.caption)
+                .fontWeight(.semibold)
                 .lineLimit(1)
-            Spacer()
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.14), in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(tint.opacity(0.12), lineWidth: 1)
         }
     }
 }

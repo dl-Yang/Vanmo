@@ -7,7 +7,7 @@ description: Guide iOS real-device Debug troubleshooting without remote log inst
 
 ## 核心规则
 
-当我在 ios 真机调试运行时，cursor 中的 debug 模式不要再进行远程日志插桩，而是添加调试日志，让我从 console 中手动复制
+**当我在 ios 真机调试运行时，cursor 中的 debug 模式不要再进行远程日志插桩，而是添加调试日志，让我从 console 中手动复制**
 
 ## 使用场景
 
