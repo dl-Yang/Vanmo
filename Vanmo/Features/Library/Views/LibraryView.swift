@@ -4,6 +4,7 @@ import Kingfisher
 
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
     @StateObject private var viewModel = LibraryViewModel()
@@ -43,6 +44,12 @@ struct LibraryView: View {
             await connectionsViewModel.loadSavedConnections()
             await viewModel.refreshEmbyHome(connections: connectionsViewModel.savedConnections)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in
+            Task {
+                await connectionsViewModel.loadSavedConnections()
+                await viewModel.refreshEmbyHome(connections: connectionsViewModel.savedConnections)
+            }
+        }
         .onChange(of: connectionsViewModel.librarySyncCompletionID) { _, newValue in
             guard newValue > 0 else { return }
             Task {
@@ -50,11 +57,19 @@ struct LibraryView: View {
                 showSyncToast("数据同步完成")
             }
         }
-        .fullScreenCover(isPresented: $showSecondFloor) {
+        .fullScreenCover(isPresented: compactSecondFloorBinding) {
             SecondFloorView(
                 isPresented: $showSecondFloor,
                 recentlyPlayed: viewModel.recentlyPlayed
             )
+        }
+        .sheet(isPresented: regularSecondFloorBinding) {
+            SecondFloorView(
+                isPresented: $showSecondFloor,
+                recentlyPlayed: viewModel.recentlyPlayed
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -63,7 +78,7 @@ struct LibraryView: View {
     private var libraryContent: some View {
         LazyVStack(alignment: .leading, spacing: 28) {
             if !viewModel.recentlyPlayed.isEmpty {
-                secondFloorEntryHint
+                continueWatchingSection
             }
 
             if viewModel.totalFavoritesCount > 0 {
@@ -83,6 +98,32 @@ struct LibraryView: View {
         }
     }
 
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
+    private var compactSecondFloorBinding: Binding<Bool> {
+        Binding(
+            get: { showSecondFloor && !isRegularWidth },
+            set: { newValue in
+                if !newValue {
+                    showSecondFloor = false
+                }
+            }
+        )
+    }
+
+    private var regularSecondFloorBinding: Binding<Bool> {
+        Binding(
+            get: { showSecondFloor && isRegularWidth },
+            set: { newValue in
+                if !newValue {
+                    showSecondFloor = false
+                }
+            }
+        )
+    }
+
     // MARK: - Collection Folder Grid
 
     @ViewBuilder
@@ -91,7 +132,8 @@ struct LibraryView: View {
             CollectionFolderLoadingSection()
         } else {
             ForEach(viewModel.orderedEmbyConnections) { connection in
-                if let folders = viewModel.serverCollectionFolders[connection.id], !folders.isEmpty {
+                let folders = viewModel.homeVisibleFolders(for: connection.id)
+                if !folders.isEmpty {
                     collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
                 }
             }
@@ -110,99 +152,223 @@ struct LibraryView: View {
         folders: [CollectionFolder],
         connection: SavedConnection
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.vanmoSurface)
+        VStack(alignment: .leading, spacing: 18) {
+            serverSectionHeader(serverName: serverName, folderCount: folders.count)
 
-                    Image(systemName: "rectangle.stack.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.vanmoPrimary)
+            ForEach(folders) { folder in
+                folderRow(folder: folder, connection: connection)
+            }
+        }
+    }
+
+    private func serverSectionHeader(serverName: String, folderCount: Int) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.vanmoSurface)
+
+                Image(systemName: "rectangle.stack.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.vanmoPrimary)
+            }
+            .frame(width: 42, height: 42)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(serverName)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text("\(folderCount) 个媒体库")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            Text("\(folderCount)")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.vanmoSurface, in: Capsule())
+        }
+        .padding(.horizontal)
+    }
+
+    private func folderRow(folder: CollectionFolder, connection: SavedConnection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(folder.name)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                folderTypePill(folder.collectionType)
+
+                Spacer(minLength: 8)
+
+                NavigationLink {
+                    CollectionFolderListView(folder: folder, connection: connection)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("查看全部")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.vanmoSurface, in: Capsule())
                 }
-                .frame(width: 42, height: 42)
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(serverName)
+            folderPreviewContent(folder: folder)
+        }
+    }
+
+    @ViewBuilder
+    private func folderPreviewContent(folder: CollectionFolder) -> some View {
+        let previewItems = viewModel.previewItems(for: folder)
+        let isLoaded = viewModel.isFolderPreviewLoaded(folder.id)
+
+        if !isLoaded {
+            folderPreviewSkeletonRow
+        } else if !previewItems.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(previewItems) { item in
+                        NavigationLink {
+                            LibraryItemDestination(item: item)
+                        } label: {
+                            PosterCard(
+                                title: item.displayTitle,
+                                posterURL: item.posterURL,
+                                subtitle: folderPreviewSubtitle(item),
+                                rating: item.rating,
+                                progress: item.playbackProgress > 0 ? item.playbackProgress : nil,
+                                showShadow: false
+                            )
+                            .frame(width: isRegularWidth ? 120 : 112)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    private var folderPreviewSkeletonRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<5, id: \.self) { _ in
+                    FolderPreviewPosterPlaceholder()
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 4)
+        }
+        .scrollClipDisabled()
+        .redacted(reason: .placeholder)
+    }
+
+    private func folderTypePill(_ type: EmbyCollectionType) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: type.icon)
+                .font(.caption2)
+            Text(type.displayName)
+                .font(.caption2)
+                .fontWeight(.semibold)
+        }
+        .foregroundStyle(Color.vanmoPrimary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.vanmoPrimary.opacity(0.12), in: Capsule())
+    }
+
+    private func folderPreviewSubtitle(_ item: MediaItem) -> String? {
+        if let year = item.year {
+            return "\(item.mediaType.displayName) · \(year)"
+        }
+        return item.mediaType.displayName
+    }
+
+    // MARK: - Second Floor Entry
+
+    private var continueWatchingSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("继续观看")
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
 
-                    Text("\(folders.count) 个媒体库")
+                    Text("点卡片可继续播放，轻拉可进入二楼")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 12)
 
-                Text("\(folders.count)")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 6)
-                    .background(Color.vanmoSurface, in: Capsule())
+                Button {
+                    presentSecondFloor()
+                } label: {
+                    Label("二楼", systemImage: "sparkles")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.vanmoSurface, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 12) {
-                    ForEach(folders) { folder in
-                        NavigationLink {
-                            CollectionFolderListView(folder: folder, connection: connection)
-                        } label: {
-                            CollectionFolderHomeCard(folder: folder)
+                LazyHStack(spacing: isRegularWidth ? 16 : 12) {
+                    ForEach(viewModel.recentlyPlayed) { item in
+                        ContinueWatchingHeroCard(
+                            item: item,
+                            cardWidth: isRegularWidth ? 360 : 276
+                        ) {
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                            appState.play(item)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal)
-                .padding(.top, 4)
-                .padding(.bottom, 26)
+                .padding(.bottom, 4)
             }
-            .scrollClipDisabled()
+            .simultaneousGesture(secondFloorUnlockGesture)
         }
     }
 
-    // MARK: - Second Floor Entry
-
-    private var secondFloorEntryHint: some View {
-        Button {
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-            showSecondFloor = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "play.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(Color.vanmoPrimary)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("继续观看")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
-
-                    Text("\(viewModel.recentlyPlayed.count) 部影片有播放记录")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+    private var secondFloorUnlockGesture: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                guard value.translation.height > 96 else { return }
+                guard abs(value.translation.width) < 90 else { return }
+                presentSecondFloor()
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color.vanmoSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal)
-        .shadow(color: .black.opacity(0.16), radius: 16, x: 0, y: 8)
+    }
+
+    private func presentSecondFloor() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        showSecondFloor = true
     }
 
     // MARK: - Favorites
@@ -212,13 +378,19 @@ struct LibraryView: View {
             FavoritesListView()
         } label: {
             FavoritesStackedCard(
-                posterURLs: viewModel.favorites.prefix(5).map(\.posterURL),
+                entries: viewModel.favorites.prefix(3).map {
+                    FavoritesStackedCard.FavoriteEntry(
+                        title: $0.displayTitle,
+                        subtitle: $0.mediaType.displayName,
+                        posterURL: $0.posterURL
+                    )
+                },
                 totalCount: viewModel.totalFavoritesCount,
                 movieCount: viewModel.favoriteMovieCount,
                 tvShowCount: viewModel.favoriteTVShowCount
             )
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FavoritesCardButtonStyle())
         .padding(.horizontal)
     }
 
@@ -276,155 +448,131 @@ struct LibraryView: View {
     }
 }
 
-private struct CollectionFolderHomeCard: View {
-    let folder: CollectionFolder
+private struct HomeGlassCardStyle: ViewModifier {
+    let cornerRadius: CGFloat
 
-    private let cardWidth: CGFloat = 172
-    private let artworkHeight: CGFloat = 104
-
-    private var accent: Color {
-        switch folder.collectionType {
-        case .movies:
-            return Color.orange
-        case .tvshows:
-            return Color.cyan
-        case .playlists:
-            return Color.green
-        }
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.22),
+                                .white.opacity(0.05),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.24), radius: 16, x: 0, y: 10)
     }
+}
 
-    private var secondaryAccent: Color {
-        switch folder.collectionType {
-        case .movies:
-            return Color.red
-        case .tvshows:
-            return Color.indigo
-        case .playlists:
-            return Color.teal
+private struct FolderPreviewPosterPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.vanmoSurface)
+                .aspectRatio(2 / 3, contentMode: .fit)
+
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.vanmoSurface)
+                    .frame(height: 10)
+
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.vanmoSurface.opacity(0.72))
+                    .frame(width: 58, height: 8)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 44)
+            .background(Color.vanmoSurface.opacity(0.58))
         }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .frame(width: 112)
+    }
+}
+
+private struct ContinueWatchingHeroCard: View {
+    let item: MediaItem
+    let cardWidth: CGFloat
+    let onTap: () -> Void
+
+    private var progress: Double {
+        min(max(item.playbackProgress, 0), 1)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            artwork
+        Button(action: onTap) {
+            ZStack(alignment: .bottomLeading) {
+                backdrop
 
-            VStack(alignment: .leading, spacing: 7) {
-                Text(folder.name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .frame(height: 38, alignment: .topLeading)
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        .black.opacity(0.72),
+                        .black.opacity(0.9),
+                    ],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
 
-                HStack(spacing: 6) {
-                    Image(systemName: folder.collectionType.icon)
-                        .font(.caption2)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(item.displayTitle)
+                        .font(.subheadline)
                         .fontWeight(.semibold)
+                        .lineLimit(2)
+                        .foregroundStyle(.white)
 
-                    Text(folder.collectionType.displayName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
+                    ProgressView(value: progress)
+                        .tint(Color.vanmoPrimary)
 
-                    Spacer(minLength: 0)
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                        .fontWeight(.bold)
+                    HStack(spacing: 8) {
+                        Text(item.lastPlaybackPosition.shortDuration)
+                        Text("·")
+                        Text("共 \(item.duration.shortDuration)")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.72))
                 }
-                .foregroundStyle(.secondary)
+                .padding(12)
             }
+            .frame(width: cardWidth, height: cardWidth * 0.56)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .modifier(HomeGlassCardStyle(cornerRadius: 16))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
+            .hoverEffect(.lift)
         }
-        .padding(10)
-        .frame(width: cardWidth, height: 190, alignment: .topLeading)
-        .background(Color.vanmoSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.14), radius: 14, x: 0, y: 8)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(folder.name)，\(folder.collectionType.displayName)媒体库")
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(item.displayTitle)，继续播放")
+        .accessibilityValue("进度 \(Int(progress * 100))%")
     }
 
-    private var artwork: some View {
-        ZStack {
-            KFImage(folder.posterURL)
-                .placeholder {
-                    placeholderArtwork
+    private var backdrop: some View {
+        KFImage(item.backdropURL ?? item.posterURL)
+            .placeholder {
+                ZStack {
+                    Color.vanmoSurface
+                    Image(systemName: item.mediaType.icon)
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
                 }
-                .fade(duration: 0.22)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-
-            LinearGradient(
-                colors: [
-                    .clear,
-                    .black.opacity(0.62),
-                ],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-        }
-        .frame(width: cardWidth - 20, height: artworkHeight)
-        .overlay(alignment: .bottomLeading) {
-            coverTypeTag
-                .padding(9)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    private var coverTypeTag: some View {
-        HStack(spacing: 8) {
-            Image(systemName: folder.collectionType.icon)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-
-            Text(folder.collectionType.displayName)
-                .font(.caption2)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(.ultraThinMaterial, in: Capsule())
-        }
-        .frame(maxWidth: cardWidth - 38, alignment: .leading)
-    }
-
-    private var placeholderArtwork: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    accent.opacity(0.76),
-                    secondaryAccent.opacity(0.5),
-                    Color.vanmoPrimary.opacity(0.34),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Image(systemName: folder.collectionType.icon)
-                .font(.system(size: 48, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.22))
-                .offset(x: 42, y: -18)
-
-            Image(systemName: "rectangle.stack.fill")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.72))
-                .offset(x: -42, y: 24)
-        }
+            }
+            .fade(duration: 0.2)
+            .resizable()
+            .scaledToFill()
     }
 }
 
 private struct CollectionFolderLoadingSection: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.vanmoSurface)
@@ -444,41 +592,44 @@ private struct CollectionFolderLoadingSection: View {
             }
             .padding(.horizontal)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        CollectionFolderLoadingCard()
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
-                .padding(.bottom, 26)
+            ForEach(0..<3, id: \.self) { _ in
+                CollectionFolderLoadingRow()
             }
-            .scrollClipDisabled()
         }
         .redacted(reason: .placeholder)
     }
 }
 
-private struct CollectionFolderLoadingCard: View {
+private struct CollectionFolderLoadingRow: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.vanmoSurface)
-                .frame(height: 104)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.vanmoSurface)
+                    .frame(width: 120, height: 16)
 
-            RoundedRectangle(cornerRadius: 5)
-                .fill(Color.vanmoSurface)
-                .frame(height: 13)
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.vanmoSurface.opacity(0.72))
+                    .frame(width: 56, height: 22)
 
-            RoundedRectangle(cornerRadius: 5)
-                .fill(Color.vanmoSurface.opacity(0.72))
-                .frame(width: 86, height: 11)
+                Spacer()
+
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.vanmoSurface.opacity(0.72))
+                    .frame(width: 72, height: 28)
+            }
+            .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(0..<5, id: \.self) { _ in
+                        FolderPreviewPosterPlaceholder()
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .scrollClipDisabled()
         }
-        .padding(10)
-        .frame(width: 172, height: 190, alignment: .topLeading)
-        .background(Color.vanmoSurface.opacity(0.58))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
 

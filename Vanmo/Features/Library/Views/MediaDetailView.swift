@@ -15,6 +15,8 @@ struct MediaDetailView: View {
     @State private var heroRestMinY: CGFloat?
     @State private var episodes: [EpisodeInfo] = []
     @State private var isLoadingEpisodes = false
+    @State private var isUpdatingFavorite = false
+    @State private var favoriteErrorMessage: String?
     @State private var selectedSeason: Int?
 
     private let heroHeight: CGFloat = 540
@@ -83,6 +85,11 @@ struct MediaDetailView: View {
                 await loadEpisodes()
             }
         }
+        .alert("收藏失败", isPresented: favoriteErrorBinding) {
+            Button("确定") {}
+        } message: {
+            Text(favoriteErrorMessage ?? "")
+        }
     }
 
     private var detailBackground: some View {
@@ -118,8 +125,9 @@ struct MediaDetailView: View {
 
     private var favoriteButton: some View {
         Button {
-            item.isFavorite.toggle()
-            try? modelContext.save()
+            Task {
+                await setFavorite(!item.isFavorite)
+            }
         } label: {
             Image(systemName: item.isFavorite ? "heart.fill" : "heart")
                 .font(.system(size: 15, weight: .semibold))
@@ -133,7 +141,48 @@ struct MediaDetailView: View {
                 .shadow(color: .black.opacity(0.22), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
+        .disabled(isUpdatingFavorite)
         .accessibilityLabel(item.isFavorite ? "取消收藏" : "收藏")
+    }
+
+    private var favoriteErrorBinding: Binding<Bool> {
+        Binding {
+            favoriteErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented {
+                favoriteErrorMessage = nil
+            }
+        }
+    }
+
+    private func setFavorite(_ isFavorite: Bool) async {
+        guard !isUpdatingFavorite else { return }
+
+        isUpdatingFavorite = true
+        defer { isUpdatingFavorite = false }
+
+        do {
+            try await EmbyFavoriteUpdater.setFavorite(item, isFavorite: isFavorite)
+            item.isFavorite = isFavorite
+            try updateStoredFavoriteState(isFavorite)
+            try modelContext.save()
+            NotificationCenter.default.post(name: .mediaFavoriteDidChange, object: item)
+        } catch {
+            favoriteErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func updateStoredFavoriteState(_ isFavorite: Bool) throws {
+        guard let serverId = item.serverId else { return }
+
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { mediaItem in
+                mediaItem.serverId == serverId
+            }
+        )
+        if let storedItem = try modelContext.fetch(descriptor).first {
+            storedItem.isFavorite = isFavorite
+        }
     }
 
     // MARK: - Header

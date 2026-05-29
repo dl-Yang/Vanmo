@@ -11,6 +11,8 @@ final class LibraryViewModel: ObservableObject {
 
     @Published private(set) var serverCollectionFolders: [UUID: [CollectionFolder]] = [:]
     @Published private(set) var embyConnectionsById: [UUID: SavedConnection] = [:]
+    @Published private(set) var folderPreviews: [String: [MediaItem]] = [:]
+    @Published private(set) var folderTotalCounts: [String: Int] = [:]
     @Published private(set) var hasConfiguredEmbyConnections = false
     @Published private(set) var isLoadingEmbyHome = false
     @Published private(set) var embyHomeError: String?
@@ -27,6 +29,8 @@ final class LibraryViewModel: ObservableObject {
     @Published var errorMessage = ""
 
     private let highlightSectionLimit = 20
+    private let folderPreviewPageSize = 12
+    private let homeCollectionCache = HomeCollectionCache.shared
     private var modelContext: ModelContext?
     private var hasLoadedInitial = false
     /// App 启动后是否已经向 Emby 拉过一次 live 数据并写入 SwiftData。
@@ -51,6 +55,34 @@ final class LibraryViewModel: ObservableObject {
         embyConnectionsById[folder.serverConnectionId]
     }
 
+    func isFolderPreviewLoaded(_ folderId: String) -> Bool {
+        folderPreviews.keys.contains(folderId)
+    }
+
+    func previewItems(for folder: CollectionFolder) -> [MediaItem] {
+        folderPreviews[folder.id] ?? []
+    }
+
+    /// 首页展示的媒体库：仅保留电影 / 电视剧类型，并隐藏确定为空的媒体库。
+    /// 其它类型（如播放列表）仍保留在 `serverCollectionFolders` 中，只是不在首页渲染。
+    func homeVisibleFolders(for connectionId: UUID) -> [CollectionFolder] {
+        (serverCollectionFolders[connectionId] ?? []).filter(isFolderVisibleOnHome)
+    }
+
+    private func isFolderVisibleOnHome(_ folder: CollectionFolder) -> Bool {
+        guard folder.collectionType == .movies || folder.collectionType == .tvshows else {
+            return false
+        }
+        // 已知总数为 0，或预览已加载但为空，视为空库并隐藏；尚未加载时先保留以展示骨架。
+        if let total = folderTotalCounts[folder.id] {
+            return total > 0
+        }
+        if let preview = folderPreviews[folder.id] {
+            return !preview.isEmpty
+        }
+        return true
+    }
+
     // MARK: - Initial Load
 
     /// 首页进入时调用。首次启动会拉一次 live 数据写入 SwiftData，再读 SwiftData；
@@ -67,15 +99,15 @@ final class LibraryViewModel: ObservableObject {
 
         do {
             try await reloadHighlights(in: context)
+            await restoreHomeCacheIfNeeded(connections: connections)
+            updateLibraryEmptyState(connections: connections)
 
             if !hasRefreshedLiveThisLaunch {
                 hasRefreshedLiveThisLaunch = true
-                await refreshEmbyAndPersist(connections: connections, in: context)
-                try await reloadHighlights(in: context)
+                refreshEmbyHomeInBackground(connections: connections, in: context)
             }
 
             hasLoadedInitial = true
-            updateLibraryEmptyState(connections: connections)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -120,6 +152,9 @@ final class LibraryViewModel: ObservableObject {
         guard !embyConnections.isEmpty else {
             serverCollectionFolders = [:]
             embyConnectionsById = [:]
+            folderPreviews = [:]
+            folderTotalCounts = [:]
+            await homeCollectionCache.clear()
             return
         }
 
@@ -127,8 +162,11 @@ final class LibraryViewModel: ObservableObject {
         embyHomeError = nil
         defer { isLoadingEmbyHome = false }
 
-        var foldersByServer: [UUID: [CollectionFolder]] = [:]
-        var connectionsById: [UUID: SavedConnection] = [:]
+        let activeConnectionIds = Set(embyConnections.map(\.id))
+        var foldersByServer = serverCollectionFolders.filter { activeConnectionIds.contains($0.key) }
+        var connectionsById = embyConnectionsById.filter { activeConnectionIds.contains($0.key) }
+        var previewsByFolder = folderPreviews
+        var totalCountsByFolder = folderTotalCounts
         var allLiveItems: [ServerMediaItem] = []
         var firstError: String?
 
@@ -148,15 +186,40 @@ final class LibraryViewModel: ObservableObject {
                 foldersByServer[connection.id] = folders
                 allLiveItems.append(contentsOf: resume)
                 allLiveItems.append(contentsOf: serverFavorites)
+
+                for folder in folders {
+                    do {
+                        let page = try await service.fetchCollectionFolderItems(
+                            parentId: folder.id,
+                            collectionType: folder.collectionType,
+                            startIndex: 0,
+                            pageSize: folderPreviewPageSize
+                        )
+                        previewsByFolder[folder.id] = page.items.map { $0.makeMediaItem() }
+                        totalCountsByFolder[folder.id] = page.totalRecordCount
+                    } catch {
+                        previewsByFolder[folder.id] = []
+                        VanmoLogger.network.error(
+                            "[LibraryHome] folder preview failed for \(folder.name): \(error.localizedDescription)"
+                        )
+                    }
+                }
             } catch {
                 firstError = firstError ?? error.localizedDescription
                 VanmoLogger.network.error("[LibraryHome] refresh failed for \(connection.name): \(error.localizedDescription)")
             }
         }
 
+        let activeFolderIds = Set(foldersByServer.values.flatMap { $0.map(\.id) })
+        previewsByFolder = previewsByFolder.filter { activeFolderIds.contains($0.key) }
+        totalCountsByFolder = totalCountsByFolder.filter { activeFolderIds.contains($0.key) }
+
         serverCollectionFolders = foldersByServer
         embyConnectionsById = connectionsById
+        folderPreviews = previewsByFolder
+        folderTotalCounts = totalCountsByFolder
         embyHomeError = firstError
+        await persistHomeCache()
 
         if !allLiveItems.isEmpty {
             do {
@@ -165,6 +228,145 @@ final class LibraryViewModel: ObservableObject {
             } catch {
                 VanmoLogger.network.error("[LibraryHome] persist live items failed: \(error.localizedDescription)")
             }
+        }
+    }
+
+    // MARK: - Home Collection Cache
+
+    private func restoreHomeCacheIfNeeded(connections: [SavedConnection]) async {
+        let embyConnections = connections.filter { $0.type == .emby || $0.type == .jellyfin }
+        hasConfiguredEmbyConnections = !embyConnections.isEmpty
+        guard !embyConnections.isEmpty else {
+            await homeCollectionCache.clear()
+            return
+        }
+
+        guard let snapshot = await homeCollectionCache.load() else { return }
+        let activeConnectionsById = Dictionary(uniqueKeysWithValues: embyConnections.map { ($0.id, $0) })
+
+        var restoredFoldersByServer: [UUID: [CollectionFolder]] = [:]
+        var restoredConnectionsById: [UUID: SavedConnection] = [:]
+        var restoredPreviewsByFolder: [String: [MediaItem]] = [:]
+        var restoredTotalCountsByFolder: [String: Int] = [:]
+
+        for connectionCache in snapshot.connections {
+            guard let connection = activeConnectionsById[connectionCache.connectionId] else { continue }
+
+            let folders = connectionCache.folders.map { folderCache in
+                CollectionFolder(
+                    id: folderCache.id,
+                    name: folderCache.name,
+                    collectionType: folderCache.collectionType,
+                    posterURL: folderCache.posterURL,
+                    serverConnectionId: connection.id,
+                    serverConnectionName: connection.name
+                )
+            }
+
+            guard !folders.isEmpty else { continue }
+            restoredFoldersByServer[connection.id] = folders
+            restoredConnectionsById[connection.id] = connection
+
+            for folderCache in connectionCache.folders {
+                restoredPreviewsByFolder[folderCache.id] = folderCache.preview.map(makePreviewItem)
+                if let totalCount = folderCache.totalCount {
+                    restoredTotalCountsByFolder[folderCache.id] = totalCount
+                }
+            }
+        }
+
+        guard !restoredFoldersByServer.isEmpty else { return }
+        serverCollectionFolders = restoredFoldersByServer
+        embyConnectionsById = restoredConnectionsById
+        folderPreviews = restoredPreviewsByFolder
+        folderTotalCounts = restoredTotalCountsByFolder
+    }
+
+    private func makePreviewItem(from cache: HomePreviewItemCache) -> MediaItem {
+        let item = MediaItem(
+            title: cache.title,
+            fileURL: cache.streamURL,
+            mediaType: MediaType(rawValue: cache.mediaType) ?? .other,
+            duration: cache.duration
+        )
+        item.serverId = cache.serverId
+        item.showTitle = cache.showTitle
+        item.seasonNumber = cache.seasonNumber
+        item.episodeNumber = cache.episodeNumber
+        item.posterURL = cache.posterURL
+        item.year = cache.year
+        item.rating = cache.rating
+        item.lastPlaybackPosition = cache.lastPlaybackPosition
+        return item
+    }
+
+    private func persistHomeCache() async {
+        let snapshot = makeHomeCacheSnapshot()
+        guard !snapshot.connections.isEmpty else {
+            await homeCollectionCache.clear()
+            return
+        }
+        await homeCollectionCache.save(snapshot)
+    }
+
+    private func makeHomeCacheSnapshot() -> HomeCollectionCacheSnapshot {
+        let connectionCaches = orderedEmbyConnections.compactMap { connection -> HomeConnectionCache? in
+            guard let folders = serverCollectionFolders[connection.id], !folders.isEmpty else {
+                return nil
+            }
+
+            let folderCaches = folders.map { folder in
+                HomeFolderCache(
+                    id: folder.id,
+                    name: folder.name,
+                    collectionType: folder.collectionType,
+                    posterURL: folder.posterURL,
+                    totalCount: folderTotalCounts[folder.id],
+                    preview: (folderPreviews[folder.id] ?? []).map(makePreviewCache)
+                )
+            }
+
+            return HomeConnectionCache(
+                connectionId: connection.id,
+                connectionName: connection.name,
+                folders: folderCaches
+            )
+        }
+
+        return HomeCollectionCacheSnapshot(connections: connectionCaches)
+    }
+
+    private func makePreviewCache(from item: MediaItem) -> HomePreviewItemCache {
+        HomePreviewItemCache(
+            serverId: item.serverId,
+            title: item.title,
+            showTitle: item.showTitle,
+            seasonNumber: item.seasonNumber,
+            episodeNumber: item.episodeNumber,
+            mediaType: item.mediaType.rawValue,
+            posterURL: item.posterURL,
+            year: item.year,
+            rating: item.rating,
+            lastPlaybackPosition: item.lastPlaybackPosition,
+            duration: item.duration,
+            streamURL: item.fileURL
+        )
+    }
+
+    private func refreshEmbyHomeInBackground(
+        connections: [SavedConnection],
+        in context: ModelContext
+    ) {
+        Task { [weak self] in
+            guard let self else { return }
+            await self.refreshEmbyAndPersist(connections: connections, in: context)
+            do {
+                try await self.reloadHighlights(in: context)
+            } catch {
+                self.errorMessage = error.localizedDescription
+                self.showError = true
+            }
+            self.updateLibraryEmptyState(connections: connections)
         }
     }
 
@@ -313,4 +515,8 @@ enum LibrarySortOption: String, CaseIterable, Sendable {
         case .rating: return "评分"
         }
     }
+}
+
+extension Notification.Name {
+    static let mediaFavoriteDidChange = Notification.Name("mediaFavoriteDidChange")
 }

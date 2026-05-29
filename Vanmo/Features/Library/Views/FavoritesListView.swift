@@ -55,9 +55,7 @@ struct FavoritesListView: View {
                         MediaDetailView(item: item)
                     } label: {
                         FavoriteMediaRow(item: item) {
-                            withAnimation(.smooth(duration: 0.25)) {
-                                viewModel.unfavorite(item)
-                            }
+                            await viewModel.unfavorite(item)
                         }
                     }
                     .buttonStyle(.plain)
@@ -120,7 +118,7 @@ struct FavoritesListView: View {
 
 private struct FavoriteMediaRow: View {
     let item: MediaItem
-    let unfavorite: () -> Void
+    let unfavorite: () async -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -193,7 +191,11 @@ private struct FavoriteMediaRow: View {
     }
 
     private var favoriteButton: some View {
-        Button(action: unfavorite) {
+        Button {
+            Task {
+                await unfavorite()
+            }
+        } label: {
             Image(systemName: "heart.fill")
                 .font(.title3)
                 .foregroundStyle(.red)
@@ -294,11 +296,22 @@ private final class FavoritesListViewModel: ObservableObject {
         }
     }
 
-    func unfavorite(_ item: MediaItem) {
-        item.isFavorite = false
-        try? modelContext?.save()
-        loadedItemIDs.remove(item.persistentModelID)
-        items.removeAll { $0.id == item.id }
+    func unfavorite(_ item: MediaItem) async {
+        do {
+            try await EmbyFavoriteUpdater.setFavorite(item, isFavorite: false)
+            item.isFavorite = false
+            if let modelContext {
+                try modelContext.save()
+            }
+            loadedItemIDs.remove(item.persistentModelID)
+            withAnimation(.smooth(duration: 0.25)) {
+                items.removeAll { $0.id == item.id }
+            }
+            NotificationCenter.default.post(name: .mediaFavoriteDidChange, object: item)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
     }
 
     private func fetchNextBatch(startDBOffset: Int) async throws -> FavoritesBatchResult {

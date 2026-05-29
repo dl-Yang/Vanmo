@@ -179,6 +179,7 @@ struct CollectionFolderListView: View {
             let page = try await CollectionFolderItemsFetcher.fetchPage(
                 connection: connection,
                 parentId: folder.id,
+                collectionType: folder.collectionType,
                 startIndex: 0,
                 pageSize: pageSize
             )
@@ -211,6 +212,7 @@ struct CollectionFolderListView: View {
             let page = try await CollectionFolderItemsFetcher.fetchPage(
                 connection: connection,
                 parentId: folder.id,
+                collectionType: folder.collectionType,
                 startIndex: startIndex,
                 pageSize: pageSize
             )

@@ -109,6 +109,40 @@ final class EmbyService: MediaServerService {
         config = nil
     }
 
+    /// 复用已持久化的会话信息，避免每次都重新 AuthenticateByName。
+    /// 调用方应在后续执行 `validateSession()`，无效时回退到完整认证流程。
+    func restoreSession(config: ConnectionConfig, token: String, userId: String) {
+        self.config = config
+        self.accessToken = token
+        self.userId = userId
+        self.isConnected = true
+    }
+
+    /// 校验当前 access token 是否仍然有效。
+    func validateSession() async throws {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "api_key", value: token)]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        addAuth(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+        try validateEmbyResponse(response, body: data, context: "validate stored session")
+    }
+
     func listDirectory(path: String) async throws -> [RemoteFile] {
         guard isConnected, let config, let token = accessToken, let userId else {
             throw NetworkError.notConnected
@@ -380,6 +414,17 @@ final class EmbyService: MediaServerService {
     private static let liveItemFields =
         "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,DateCreated,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
 
+    private static func includeItemTypes(for collectionType: EmbyCollectionType) -> String {
+        switch collectionType {
+        case .movies:
+            return "Movie"
+        case .tvshows:
+            return "Series"
+        case .playlists:
+            return "Movie,Series,Video"
+        }
+    }
+
     /// 拉取 `/Library/VirtualFolders`，仅保留 movies / tvshows / playlists。
     func fetchVirtualFolders(
         connectionId: UUID,
@@ -438,9 +483,10 @@ final class EmbyService: MediaServerService {
         }
     }
 
-    /// CollectionFolder 二级列表：仅 Movie / Series / Video。
+    /// CollectionFolder 二级列表。
     func fetchCollectionFolderItems(
         parentId: String,
+        collectionType: EmbyCollectionType,
         startIndex: Int = 0,
         pageSize: Int = 50
     ) async throws -> ServerItemsPage {
@@ -455,8 +501,8 @@ final class EmbyService: MediaServerService {
         )!
         components.queryItems = [
             URLQueryItem(name: "ParentId", value: parentId),
-            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series,Video"),
-            URLQueryItem(name: "Recursive", value: "false"),
+            URLQueryItem(name: "IncludeItemTypes", value: Self.includeItemTypes(for: collectionType)),
+            URLQueryItem(name: "Recursive", value: "true"),
             URLQueryItem(name: "Fields", value: Self.liveItemFields),
             URLQueryItem(name: "SortBy", value: "SortName"),
             URLQueryItem(name: "SortOrder", value: "Ascending"),
@@ -539,6 +585,38 @@ final class EmbyService: MediaServerService {
 
         let page = try await fetchItemsPage(components: components, baseURL: base, token: token, context: "fetch favorite items")
         return page.items
+    }
+
+    /// 设置条目的收藏状态。
+    func setFavorite(itemId: String, isFavorite: Bool) async throws {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/FavoriteItems/\(itemId)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "api_key", value: token)]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = isFavorite ? "POST" : "DELETE"
+        request.timeoutInterval = 15
+        addAuth(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Set favorite URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Set favorite status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        #endif
+
+        try validateEmbyResponse(response, body: data, context: "set favorite")
     }
 
     private func fetchItemsPage(
@@ -1046,8 +1124,89 @@ enum EmbyConnectionHelper {
             type: connection.type,
             apiPrefix: connection.type == .jellyfin ? "" : "emby/"
         )
+
+        if shouldTryStoredSession(connection: connection, config: config),
+           let token = EmbyCredentialStore.token,
+           let userId = EmbyCredentialStore.userId {
+            service.restoreSession(config: config, token: token, userId: userId)
+            do {
+                try await service.validateSession()
+                VanmoLogger.network.info("[\(connection.type.displayName)] Reused stored session for \(connection.name)")
+                return service
+            } catch let error as NetworkError {
+                await service.disconnect()
+                if case .authenticationFailed = error {
+                    VanmoLogger.network.info("[\(connection.type.displayName)] Stored session expired for \(connection.name), fallback to re-auth")
+                } else {
+                    throw error
+                }
+            } catch {
+                await service.disconnect()
+                throw error
+            }
+        }
+
         try await service.connect(config: config)
         return service
+    }
+
+    private static func shouldTryStoredSession(
+        connection: SavedConnection,
+        config: ConnectionConfig
+    ) -> Bool {
+        guard let storedBaseURL = EmbyCredentialStore.baseURL else {
+            return false
+        }
+
+        let expectedPrefix = connection.type == .jellyfin ? "" : "emby/"
+        guard EmbyCredentialStore.apiPrefix == expectedPrefix else {
+            return false
+        }
+
+        return normalizedBaseURLString(for: config) == normalizeBaseURLString(storedBaseURL)
+    }
+
+    private static func normalizedBaseURLString(for config: ConnectionConfig) -> String {
+        let host = config.host.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        let raw: String
+        if host.hasPrefix("http://") || host.hasPrefix("https://") {
+            raw = host
+        } else {
+            let scheme = config.port == 443 ? "https" : "http"
+            let portSuffix = (config.port == 80 || config.port == 443) ? "" : ":\(config.port)"
+            raw = "\(scheme)://\(host)\(portSuffix)"
+        }
+        return normalizeBaseURLString(raw)
+    }
+
+    private static func normalizeBaseURLString(_ raw: String) -> String {
+        raw.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")).lowercased()
+    }
+}
+
+enum EmbyFavoriteUpdater {
+    @MainActor
+    static func setFavorite(_ item: MediaItem, isFavorite: Bool) async throws {
+        guard let itemId = item.serverId else { return }
+        guard let baseURLString = EmbyCredentialStore.baseURL,
+              let token = EmbyCredentialStore.token,
+              let userId = EmbyCredentialStore.userId,
+              let baseURL = URL(string: baseURLString) else {
+            throw NetworkError.notConnected
+        }
+
+        let service = EmbyService(
+            type: EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby,
+            apiPrefix: EmbyCredentialStore.apiPrefix
+        )
+        let config = ConnectionConfig(
+            type: service.type,
+            host: baseURL.absoluteString,
+            username: nil,
+            password: nil
+        )
+        service.restoreSession(config: config, token: token, userId: userId)
+        try await service.setFavorite(itemId: itemId, isFavorite: isFavorite)
     }
 }
 
@@ -1057,6 +1216,7 @@ enum CollectionFolderItemsFetcher {
     static func fetchPage(
         connection: SavedConnection,
         parentId: String,
+        collectionType: EmbyCollectionType,
         startIndex: Int,
         pageSize: Int
     ) async throws -> ServerItemsPage {
@@ -1064,6 +1224,7 @@ enum CollectionFolderItemsFetcher {
         defer { Task { await service.disconnect() } }
         return try await service.fetchCollectionFolderItems(
             parentId: parentId,
+            collectionType: collectionType,
             startIndex: startIndex,
             pageSize: pageSize
         )
