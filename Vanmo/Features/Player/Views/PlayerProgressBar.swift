@@ -7,9 +7,14 @@ struct PlayerProgressBar: View {
     let onSeek: (Double) -> Void
 
     @State private var dragProgress: Double = 0
+    @State private var pendingSeekProgress: Double?
+    @State private var settleSeekTask: Task<Void, Never>?
 
     private var displayProgress: Double {
-        isSeeking ? dragProgress : progress
+        if isSeeking {
+            return dragProgress
+        }
+        return pendingSeekProgress ?? progress
     }
 
     var body: some View {
@@ -42,19 +47,40 @@ struct PlayerProgressBar: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
+                        settleSeekTask?.cancel()
+                        pendingSeekProgress = nil
                         isSeeking = true
                         let fraction = max(0, min(1, value.location.x / geometry.size.width))
                         dragProgress = fraction
                     }
                     .onEnded { value in
                         let fraction = max(0, min(1, value.location.x / geometry.size.width))
+                        dragProgress = fraction
+                        pendingSeekProgress = fraction
                         onSeek(fraction)
                         isSeeking = false
+                        settleSeekTask = Task {
+                            try? await Task.sleep(for: .milliseconds(450))
+                            guard !Task.isCancelled else { return }
+                            await MainActor.run {
+                                pendingSeekProgress = nil
+                            }
+                        }
                     }
             )
             .animation(.easeInOut(duration: 0.15), value: isSeeking)
         }
         .frame(height: 20)
+        .onChange(of: progress) { _, newProgress in
+            guard let pendingSeekProgress else { return }
+            if abs(newProgress - pendingSeekProgress) < 0.01 {
+                settleSeekTask?.cancel()
+                self.pendingSeekProgress = nil
+            }
+        }
+        .onDisappear {
+            settleSeekTask?.cancel()
+        }
     }
 }
 

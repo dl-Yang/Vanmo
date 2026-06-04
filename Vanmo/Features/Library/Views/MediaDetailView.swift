@@ -682,6 +682,9 @@ struct MediaDetailView: View {
         episodeItem.episodeNumber = episode.episodeNumber
         episodeItem.episodeTitle = episode.title
         episodeItem.posterURL = item.posterURL
+        episodeItem.backdropURL = item.backdropURL
+        episodeItem.serverId = episode.id
+        episodeItem.seriesId = item.serverId ?? item.seriesId
         appState.play(episodeItem)
     }
 

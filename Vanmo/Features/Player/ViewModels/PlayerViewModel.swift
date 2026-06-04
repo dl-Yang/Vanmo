@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import Combine
+import SwiftData
 
 @MainActor
 final class PlayerViewModel: ObservableObject {
@@ -15,6 +16,8 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var subtitleTracks: [SubtitleTrackInfo] = []
     @Published private(set) var chapters: [Chapter] = []
     @Published private(set) var currentSubtitleContent: SubtitleContent?
+    @Published private(set) var episodeGroups: [PlayerEpisodeSeason] = []
+    @Published private(set) var currentEpisodeID: String?
 
     @Published var config = PlayerConfig()
     @Published var controlsVisible = true
@@ -22,15 +25,26 @@ final class PlayerViewModel: ObservableObject {
     @Published var seekTime: TimeInterval = 0
     @Published var showTrackSelector = false
     @Published var showChapterList = false
+    @Published var showEpisodeSelector = false
+    @Published var selectedEpisodeSeason: Int?
     @Published var brightnessOverlay: Float?
     @Published var volumeOverlay: Float?
     @Published var seekOverlay: TimeInterval?
 
     let engine: PlayerEngine
-    private let item: MediaItem
+    private var item: MediaItem
     private var cancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
     private var prefetchToken: String?
+
+    var canSelectEpisode: Bool {
+        !episodeGroups.isEmpty
+    }
+
+    var selectedSeasonEpisodes: [PlayerEpisode] {
+        let season = selectedEpisodeSeason ?? episodeGroups.first?.seasonNumber
+        return episodeGroups.first { $0.seasonNumber == season }?.episodes ?? []
+    }
 
     init(item: MediaItem) {
         self.item = item
@@ -92,37 +106,11 @@ final class PlayerViewModel: ObservableObject {
 
     // MARK: - Lifecycle
 
-    func onAppear() async {
+    func onAppear(modelContext: ModelContext? = nil) async {
         VanmoLogger.player.info("[PlayerVM] onAppear, loading file: \(self.item.fileURL.lastPathComponent)")
         do {
-            prefetchToken = nil
-            let originalURL = item.fileURL
-            let loadURL: URL
-            if originalURL.isFileURL {
-                loadURL = originalURL
-            } else if let registration = await PrefetchProxy.shared.register(originalURL: originalURL) {
-                loadURL = registration.url
-                prefetchToken = registration.token
-                VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
-            } else {
-                loadURL = originalURL
-                VanmoLogger.player.info("[PlayerVM] prefetch unavailable, loading remote URL directly")
-            }
-
-            let startPosition: CMTime? = item.lastPlaybackPosition > 0
-                ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
-                : nil
-            VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
-            try await engine.load(url: loadURL, startPosition: startPosition)
-            VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
-            audioTracks = await engine.availableAudioTracks()
-            subtitleTracks = await engine.availableSubtitleTracks()
-            await applyPreferredSubtitleIfNeeded()
-            VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
-            loadChapters()
-            VanmoLogger.player.info("[PlayerVM] calling engine.play()")
-            engine.play()
-            VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
+            try await loadAndPlayCurrentItem()
+            await loadEpisodesIfNeeded(modelContext: modelContext)
             scheduleHideControls()
         } catch {
             VanmoLogger.player.error("[PlayerVM] load failed: \(error.localizedDescription)")
@@ -140,6 +128,55 @@ final class PlayerViewModel: ObservableObject {
                 await PrefetchProxy.shared.unregister(token: token)
             }
         }
+    }
+
+    private func loadAndPlayCurrentItem() async throws {
+        try await unregisterPrefetchIfNeeded()
+        resetPlaybackMetadata()
+
+        let originalURL = item.fileURL
+        let loadURL: URL
+        if originalURL.isFileURL {
+            loadURL = originalURL
+        } else if let registration = await PrefetchProxy.shared.register(originalURL: originalURL) {
+            loadURL = registration.url
+            prefetchToken = registration.token
+            VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
+        } else {
+            loadURL = originalURL
+            VanmoLogger.player.info("[PlayerVM] prefetch unavailable, loading remote URL directly")
+        }
+
+        let startPosition: CMTime? = item.lastPlaybackPosition > 0
+            ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
+            : nil
+        VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
+        try await engine.load(url: loadURL, startPosition: startPosition)
+        VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
+        audioTracks = await engine.availableAudioTracks()
+        subtitleTracks = await engine.availableSubtitleTracks()
+        await applyPreferredSubtitleIfNeeded()
+        VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
+        loadChapters()
+        VanmoLogger.player.info("[PlayerVM] calling engine.play()")
+        engine.play()
+        VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
+    }
+
+    private func resetPlaybackMetadata() {
+        currentTime = 0
+        duration = 0
+        bufferProgress = 0
+        audioTracks = []
+        subtitleTracks = []
+        chapters = []
+        currentSubtitleContent = nil
+    }
+
+    private func unregisterPrefetchIfNeeded() async throws {
+        guard let token = prefetchToken else { return }
+        prefetchToken = nil
+        await PrefetchProxy.shared.unregister(token: token)
     }
 
     // MARK: - Playback Control
@@ -183,8 +220,9 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func setRate(_ rate: Float) {
-        config.playbackRate = rate
-        engine.playbackRate = rate
+        let clampedRate = PlayerConfig.clampedRate(rate)
+        config.playbackRate = clampedRate
+        engine.playbackRate = clampedRate
     }
 
     func setScaleMode(_ mode: VideoScaleMode) {
@@ -286,6 +324,178 @@ final class PlayerViewModel: ObservableObject {
             .lowercased()
     }
 
+    // MARK: - Episodes
+
+    func playEpisode(_ episode: PlayerEpisode) async {
+        guard episode.id != currentEpisodeID else {
+            showEpisodeSelector = false
+            return
+        }
+
+        saveProgress()
+        engine.stop()
+        item = episode.mediaItem ?? makeMediaItem(from: episode)
+        currentEpisodeID = episode.id
+        showEpisodeSelector = false
+
+        do {
+            try await loadAndPlayCurrentItem()
+            showControlsBriefly()
+        } catch {
+            VanmoLogger.player.error("[PlayerVM] episode switch failed: \(error.localizedDescription)")
+            playbackState = .error(error.localizedDescription)
+        }
+    }
+
+    private func loadEpisodesIfNeeded(modelContext: ModelContext?) async {
+        guard isEpisodeSelectableItem else {
+            episodeGroups = []
+            selectedEpisodeSeason = nil
+            currentEpisodeID = nil
+            return
+        }
+
+        var episodes = loadLocalEpisodes(modelContext: modelContext)
+        if episodes.count <= 1 {
+            episodes = await loadRemoteEpisodes()
+        }
+
+        episodeGroups = groupedEpisodes(from: episodes)
+        selectedEpisodeSeason = item.seasonNumber ?? episodeGroups.first?.seasonNumber
+        currentEpisodeID = episodes.first { matchesCurrentItem($0) }?.id
+    }
+
+    private var isEpisodeSelectableItem: Bool {
+        item.mediaType == .tvEpisode || item.mediaType == .tvShow || item.showTitle != nil || item.seriesId != nil
+    }
+
+    private func loadLocalEpisodes(modelContext: ModelContext?) -> [PlayerEpisode] {
+        guard let modelContext,
+              let showTitle = normalizedShowTitle(for: item) else { return [] }
+
+        do {
+            let descriptor = FetchDescriptor<MediaItem>(
+                sortBy: [
+                    SortDescriptor(\.seasonNumber),
+                    SortDescriptor(\.episodeNumber),
+                    SortDescriptor(\.title),
+                ]
+            )
+            return try modelContext.fetch(descriptor)
+                .filter { candidate in
+                    guard candidate.mediaType == .tvEpisode,
+                          candidate.sourceConnectionId == item.sourceConnectionId,
+                          normalizedShowTitle(for: candidate) == showTitle,
+                          candidate.seasonNumber != nil,
+                          candidate.episodeNumber != nil else {
+                        return false
+                    }
+                    return true
+                }
+                .sorted(by: episodeSortPredicate)
+                .map(PlayerEpisode.init(mediaItem:))
+        } catch {
+            VanmoLogger.player.error("[PlayerVM] local episode fetch failed: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    private func loadRemoteEpisodes() async -> [PlayerEpisode] {
+        guard let seriesId = item.seriesId ?? (item.mediaType == .tvShow ? item.serverId : nil) else {
+            return []
+        }
+
+        do {
+            let episodes: [EpisodeInfo]
+            if isPlexEpisodeSource {
+                episodes = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesId)
+            } else {
+                episodes = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesId)
+            }
+            return episodes.map { PlayerEpisode(episodeInfo: $0, showTitle: item.showTitle ?? item.title) }
+        } catch {
+            VanmoLogger.player.error("[PlayerVM] remote episode fetch failed: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    private var isPlexEpisodeSource: Bool {
+        item.fileURL.query?.contains("X-Plex-Token") == true || item.fileURL.host == "plex-series"
+    }
+
+    private func groupedEpisodes(from episodes: [PlayerEpisode]) -> [PlayerEpisodeSeason] {
+        Dictionary(grouping: episodes, by: \.seasonNumber)
+            .map { season, episodes in
+                PlayerEpisodeSeason(
+                    seasonNumber: season,
+                    episodes: episodes.sorted(by: episodeSortPredicate)
+                )
+            }
+            .sorted { $0.seasonNumber < $1.seasonNumber }
+    }
+
+    private func makeMediaItem(from episode: PlayerEpisode) -> MediaItem {
+        let episodeItem = MediaItem(
+            title: episode.showTitle ?? episode.title,
+            fileURL: episode.fileURL,
+            mediaType: .tvEpisode,
+            duration: episode.duration
+        )
+        episodeItem.showTitle = episode.showTitle ?? item.showTitle
+        episodeItem.seasonNumber = episode.seasonNumber
+        episodeItem.episodeNumber = episode.episodeNumber
+        episodeItem.episodeTitle = episode.title
+        episodeItem.posterURL = item.posterURL
+        episodeItem.backdropURL = item.backdropURL
+        episodeItem.serverId = episode.serverId
+        episodeItem.seriesId = item.seriesId ?? (item.mediaType == .tvShow ? item.serverId : nil)
+        episodeItem.sourceConnectionId = item.sourceConnectionId
+        return episodeItem
+    }
+
+    private func matchesCurrentItem(_ episode: PlayerEpisode) -> Bool {
+        if let mediaItem = episode.mediaItem, mediaItem.id == item.id {
+            return true
+        }
+
+        return episode.fileURL == item.fileURL &&
+            episode.seasonNumber == item.seasonNumber &&
+            episode.episodeNumber == item.episodeNumber
+    }
+
+    private func normalizedShowTitle(for item: MediaItem) -> String? {
+        let rawTitle = item.showTitle ?? (item.mediaType == .tvShow ? item.title : nil)
+        guard let rawTitle else { return nil }
+        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func episodeSortPredicate(_ lhs: MediaItem, _ rhs: MediaItem) -> Bool {
+        let lhsSeason = lhs.seasonNumber ?? Int.max
+        let rhsSeason = rhs.seasonNumber ?? Int.max
+        if lhsSeason != rhsSeason {
+            return lhsSeason < rhsSeason
+        }
+
+        let lhsEpisode = lhs.episodeNumber ?? Int.max
+        let rhsEpisode = rhs.episodeNumber ?? Int.max
+        if lhsEpisode != rhsEpisode {
+            return lhsEpisode < rhsEpisode
+        }
+
+        return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+    }
+
+    private func episodeSortPredicate(_ lhs: PlayerEpisode, _ rhs: PlayerEpisode) -> Bool {
+        if lhs.seasonNumber != rhs.seasonNumber {
+            return lhs.seasonNumber < rhs.seasonNumber
+        }
+        if lhs.episodeNumber != rhs.episodeNumber {
+            return lhs.episodeNumber < rhs.episodeNumber
+        }
+        return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+    }
+
     // MARK: - Chapters
 
     func seekToChapter(_ chapter: Chapter) {
@@ -358,7 +568,7 @@ final class PlayerViewModel: ObservableObject {
 
     func handleLongPress(isActive: Bool) {
         if isActive {
-            engine.playbackRate = 2.0
+            engine.playbackRate = PlayerConfig.maximumRate
         } else {
             engine.playbackRate = config.playbackRate
         }
@@ -387,4 +597,61 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+}
+
+struct PlayerEpisodeSeason: Identifiable, Equatable {
+    let seasonNumber: Int
+    let episodes: [PlayerEpisode]
+
+    var id: Int { seasonNumber }
+}
+
+struct PlayerEpisode: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let showTitle: String?
+    let seasonNumber: Int
+    let episodeNumber: Int
+    let duration: TimeInterval
+    let fileURL: URL
+    let serverId: String?
+    let mediaItem: MediaItem?
+
+    static func == (lhs: PlayerEpisode, rhs: PlayerEpisode) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    init(mediaItem: MediaItem) {
+        let seasonNumber = mediaItem.seasonNumber ?? 0
+        let episodeNumber = mediaItem.episodeNumber ?? 0
+        self.id = "media-\(mediaItem.id.uuidString)"
+        self.title = mediaItem.episodeTitle ?? mediaItem.title
+        self.showTitle = mediaItem.showTitle
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
+        self.duration = mediaItem.duration
+        self.fileURL = mediaItem.fileURL
+        self.serverId = mediaItem.serverId
+        self.mediaItem = mediaItem
+    }
+
+    init(episodeInfo: EpisodeInfo, showTitle: String?) {
+        self.id = "remote-\(episodeInfo.id)"
+        self.title = episodeInfo.title
+        self.showTitle = showTitle
+        self.seasonNumber = episodeInfo.seasonNumber
+        self.episodeNumber = episodeInfo.episodeNumber
+        self.duration = episodeInfo.duration
+        self.fileURL = episodeInfo.streamURL
+        self.serverId = episodeInfo.id
+        self.mediaItem = nil
+    }
+
+    var displayTitle: String {
+        title.isEmpty ? "第 \(episodeNumber) 集" : title
+    }
+
+    var episodeCode: String {
+        "S\(String(format: "%02d", seasonNumber))E\(String(format: "%02d", episodeNumber))"
+    }
 }

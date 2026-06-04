@@ -1,8 +1,10 @@
 import SwiftUI
 import AVFoundation
+import SwiftData
 
 struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: PlayerViewModel
     @AppStorage("subtitle.fontSize") private var subtitleFontSize: Double = 18
     @State private var showSpeedPicker = false
@@ -55,14 +57,24 @@ struct PlayerView: View {
             }
         }
         .statusBarHidden(!viewModel.controlsVisible)
-        .task { await viewModel.onAppear() }
-        .onDisappear { viewModel.onDisappear() }
+        .onAppear {
+            AppOrientation.lockForPlayer()
+        }
+        .task { await viewModel.onAppear(modelContext: modelContext) }
+        .onDisappear {
+            viewModel.onDisappear()
+            AppOrientation.restoreDefault()
+        }
         .sheet(isPresented: $viewModel.showTrackSelector) {
             TrackSelectorView(viewModel: viewModel)
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $viewModel.showChapterList) {
             ChapterListView(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $viewModel.showEpisodeSelector) {
+            EpisodeSelectorView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
         }
         .onChange(of: viewModel.controlsVisible) { _, visible in
@@ -185,6 +197,16 @@ struct PlayerView: View {
             Spacer()
 
             HStack(spacing: 16) {
+                if viewModel.canSelectEpisode {
+                    Button {
+                        viewModel.showEpisodeSelector = true
+                    } label: {
+                        Image(systemName: "rectangle.stack")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
+
                 if !viewModel.chapters.isEmpty {
                     Button {
                         viewModel.showChapterList = true
@@ -508,6 +530,128 @@ private extension VideoScaleMode {
         case .stretch:
             return .resize
         }
+    }
+}
+
+// MARK: - Episode Selector View
+
+struct EpisodeSelectorView: View {
+    @ObservedObject var viewModel: PlayerViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                if viewModel.episodeGroups.count > 1 {
+                    seasonPicker
+                }
+
+                List {
+                    ForEach(viewModel.selectedSeasonEpisodes) { episode in
+                        Button {
+                            Task {
+                                await viewModel.playEpisode(episode)
+                                dismiss()
+                            }
+                        } label: {
+                            episodeRow(episode)
+                        }
+                        .tint(.primary)
+                    }
+                }
+                .listStyle(.plain)
+            }
+            .padding(.top, 12)
+            .navigationTitle("选集")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var seasonPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(viewModel.episodeGroups) { group in
+                    Button {
+                        withAnimation(.spring(response: 0.3)) {
+                            viewModel.selectedEpisodeSeason = group.seasonNumber
+                        }
+                    } label: {
+                        Text("第 \(group.seasonNumber) 季")
+                            .font(.subheadline)
+                            .fontWeight(isSelectedSeason(group.seasonNumber) ? .semibold : .regular)
+                            .foregroundStyle(isSelectedSeason(group.seasonNumber) ? Color.vanmoPrimary : .secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(
+                                isSelectedSeason(group.seasonNumber)
+                                    ? Color.vanmoPrimary.opacity(0.16)
+                                    : Color.vanmoSurface,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .scrollClipDisabled()
+    }
+
+    private func episodeRow(_ episode: PlayerEpisode) -> some View {
+        HStack(spacing: 12) {
+            VStack(spacing: 2) {
+                Text("E\(String(format: "%02d", episode.episodeNumber))")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                Text("S\(String(format: "%02d", episode.seasonNumber))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(isCurrentEpisode(episode) ? Color.vanmoPrimary : .primary)
+            .frame(width: 48, height: 48)
+            .background(
+                (isCurrentEpisode(episode) ? Color.vanmoPrimary.opacity(0.14) : Color.vanmoSurface),
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(episode.displayTitle)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Text(episode.episodeCode)
+                    if episode.duration > 0 {
+                        Text(episode.duration.shortDuration)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isCurrentEpisode(episode) {
+                Image(systemName: "play.fill")
+                    .font(.caption)
+                    .foregroundStyle(Color.vanmoPrimary)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func isSelectedSeason(_ season: Int) -> Bool {
+        (viewModel.selectedEpisodeSeason ?? viewModel.episodeGroups.first?.seasonNumber) == season
+    }
+
+    private func isCurrentEpisode(_ episode: PlayerEpisode) -> Bool {
+        viewModel.currentEpisodeID == episode.id
     }
 }
 

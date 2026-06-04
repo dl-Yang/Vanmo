@@ -59,7 +59,13 @@ struct PlayerConfig {
     var volume: Float = 1.0
     var isMuted: Bool = false
 
-    static let availableRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
+    static let minimumRate: Float = 0.5
+    static let maximumRate: Float = 2.0
+    static let availableRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+
+    static func clampedRate(_ rate: Float) -> Float {
+        max(minimumRate, min(maximumRate, rate))
+    }
 }
 
 enum AudioOutputMode: String, CaseIterable {
