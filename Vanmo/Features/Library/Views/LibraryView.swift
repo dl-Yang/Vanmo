@@ -9,7 +9,6 @@ struct LibraryView: View {
     @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
     @StateObject private var viewModel = LibraryViewModel()
 
-    @State private var showSecondFloor = false
     @State private var syncToastMessage: String?
 
     var body: some View {
@@ -40,10 +39,6 @@ struct LibraryView: View {
             await connectionsViewModel.loadSavedConnections()
             await viewModel.loadInitialSections(connections: connectionsViewModel.savedConnections)
         }
-        .refreshable {
-            await connectionsViewModel.loadSavedConnections()
-            await viewModel.refreshEmbyHome(connections: connectionsViewModel.savedConnections)
-        }
         .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in
             Task {
                 await connectionsViewModel.loadSavedConnections()
@@ -56,20 +51,6 @@ struct LibraryView: View {
                 await viewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
                 showSyncToast("数据同步完成")
             }
-        }
-        .fullScreenCover(isPresented: compactSecondFloorBinding) {
-            SecondFloorView(
-                isPresented: $showSecondFloor,
-                recentlyPlayed: viewModel.recentlyPlayed
-            )
-        }
-        .sheet(isPresented: regularSecondFloorBinding) {
-            SecondFloorView(
-                isPresented: $showSecondFloor,
-                recentlyPlayed: viewModel.recentlyPlayed
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -106,28 +87,6 @@ struct LibraryView: View {
 
     private func usesServerCollectionAPI(_ connection: SavedConnection) -> Bool {
         connection.type == .emby || connection.type == .jellyfin
-    }
-
-    private var compactSecondFloorBinding: Binding<Bool> {
-        Binding(
-            get: { showSecondFloor && !isRegularWidth },
-            set: { newValue in
-                if !newValue {
-                    showSecondFloor = false
-                }
-            }
-        )
-    }
-
-    private var regularSecondFloorBinding: Binding<Bool> {
-        Binding(
-            get: { showSecondFloor && isRegularWidth },
-            set: { newValue in
-                if !newValue {
-                    showSecondFloor = false
-                }
-            }
-        )
     }
 
     // MARK: - Collection Folder Grid
@@ -349,7 +308,7 @@ struct LibraryView: View {
         return item.mediaType.displayName
     }
 
-    // MARK: - Second Floor Entry
+    // MARK: - Continue Watching
 
     private var continueWatchingSection: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -359,60 +318,61 @@ struct LibraryView: View {
                         .font(.title3)
                         .fontWeight(.bold)
 
-                    Text("点卡片可继续播放，轻拉可进入二楼")
+                    Text("最近一次播放，点击继续观看")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 12)
-
-                Button {
-                    presentSecondFloor()
-                } label: {
-                    Label("二楼", systemImage: "sparkles")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(Color.vanmoSurface, in: Capsule())
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: isRegularWidth ? 16 : 12) {
-                    ForEach(viewModel.recentlyPlayed) { item in
-                        ContinueWatchingHeroCard(
-                            item: item,
-                            cardWidth: isRegularWidth ? 360 : 276
-                        ) {
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                            appState.play(item)
-                        }
+            if let latestItem = viewModel.recentlyPlayed.first {
+                VStack(spacing: 12) {
+                    ContinueWatchingHeroCard(
+                        item: latestItem,
+                        heroHeight: isRegularWidth ? 270 : 218
+                    ) {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                        appState.play(latestItem)
+                    }
+
+                    let historyItems = Array(viewModel.recentlyPlayed.dropFirst())
+                    if !historyItems.isEmpty {
+                        continueWatchingHistoryCard(historyItems)
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom, 4)
             }
-            .simultaneousGesture(secondFloorUnlockGesture)
         }
     }
 
-    private var secondFloorUnlockGesture: some Gesture {
-        DragGesture(minimumDistance: 24)
-            .onEnded { value in
-                guard value.translation.height > 96 else { return }
-                guard abs(value.translation.width) < 90 else { return }
-                presentSecondFloor()
-            }
-    }
-
-    private func presentSecondFloor() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        showSecondFloor = true
+    private func continueWatchingHistoryCard(_ items: [MediaItem]) -> some View {
+        FavoritesStackedCard(
+            entries: items.prefix(3).map {
+                FavoritesStackedCard.FavoriteEntry(
+                    title: $0.displayTitle,
+                    subtitle: $0.mediaType.displayName,
+                    posterURL: $0.backdropURL ?? $0.posterURL
+                )
+            },
+            totalCount: items.count,
+            movieCount: 0,
+            tvShowCount: 0,
+            title: "继续观看",
+            countUnit: "部历史",
+            badges: [
+                .init(text: "上次观看", icon: "clock.fill"),
+                .init(text: "历史记录", icon: "rectangle.stack.fill"),
+            ],
+            badgeIcon: "clock.fill",
+            badgeColors: [
+                Color.vanmoPrimary,
+                Color.blue.opacity(0.9),
+            ],
+            accessibilityLabel: "继续观看，还有 \(items.count) 部历史"
+        )
     }
 
     // MARK: - Favorites
@@ -545,7 +505,7 @@ private struct FolderPreviewPosterPlaceholder: View {
 
 private struct ContinueWatchingHeroCard: View {
     let item: MediaItem
-    let cardWidth: CGFloat
+    let heroHeight: CGFloat
     let onTap: () -> Void
 
     private var progress: Double {
@@ -568,9 +528,18 @@ private struct ContinueWatchingHeroCard: View {
                 )
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(item.displayTitle)
-                        .font(.subheadline)
+                    Label("继续播放", systemImage: "play.fill")
+                        .font(.caption)
                         .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.bottom, 2)
+
+                    Text(item.displayTitle)
+                        .font(.title2)
+                        .fontWeight(.bold)
                         .lineLimit(2)
                         .foregroundStyle(.white)
 
@@ -585,12 +554,14 @@ private struct ContinueWatchingHeroCard: View {
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.72))
                 }
-                .padding(12)
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: cardWidth, height: cardWidth * 0.56)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .modifier(HomeGlassCardStyle(cornerRadius: 16))
-            .contentShape(RoundedRectangle(cornerRadius: 16))
+            .frame(maxWidth: .infinity)
+            .frame(height: heroHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .modifier(HomeGlassCardStyle(cornerRadius: 24))
+            .contentShape(RoundedRectangle(cornerRadius: 24))
             .hoverEffect(.lift)
         }
         .buttonStyle(.plain)
@@ -611,6 +582,8 @@ private struct ContinueWatchingHeroCard: View {
             .fade(duration: 0.2)
             .resizable()
             .scaledToFill()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
     }
 }
 

@@ -8,10 +8,44 @@ struct FavoritesStackedCard: View {
         let posterURL: URL?
     }
 
+    struct BadgeEntry {
+        let text: String
+        let icon: String
+    }
+
     let entries: [FavoriteEntry]
     let totalCount: Int
-    let movieCount: Int
-    let tvShowCount: Int
+    let title: String
+    let countUnit: String
+    let badges: [BadgeEntry]
+    let badgeIcon: String
+    let badgeColors: [Color]
+    let accessibilityLabel: String
+
+    init(
+        entries: [FavoriteEntry],
+        totalCount: Int,
+        movieCount: Int,
+        tvShowCount: Int,
+        title: String = "我的收藏",
+        countUnit: String = "部作品",
+        badges: [BadgeEntry]? = nil,
+        badgeIcon: String = "heart.fill",
+        badgeColors: [Color] = [Color.pink, Color.red.opacity(0.9)],
+        accessibilityLabel: String? = nil
+    ) {
+        self.entries = entries
+        self.totalCount = totalCount
+        self.title = title
+        self.countUnit = countUnit
+        self.badges = badges ?? [
+            BadgeEntry(text: "\(movieCount) 电影", icon: "film.fill"),
+            BadgeEntry(text: "\(tvShowCount) 剧集", icon: "tv.fill"),
+        ]
+        self.badgeIcon = badgeIcon
+        self.badgeColors = badgeColors
+        self.accessibilityLabel = accessibilityLabel ?? "\(title)，共 \(totalCount) \(countUnit)"
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -19,7 +53,7 @@ struct FavoritesStackedCard: View {
                 .frame(width: 182, height: 150)
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("我的收藏")
+                Text(title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
@@ -30,15 +64,16 @@ struct FavoritesStackedCard: View {
                         .monospacedDigit()
                         .foregroundStyle(.primary)
 
-                    Text("部作品")
+                    Text(countUnit)
                         .font(.callout)
                         .fontWeight(.medium)
                         .foregroundStyle(.secondary)
                 }
 
                 HStack(spacing: 7) {
-                    countBadge("\(movieCount) 电影", icon: "film.fill")
-                    countBadge("\(tvShowCount) 剧集", icon: "tv.fill")
+                    ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
+                        countBadge(badge.text, icon: badge.icon)
+                    }
                 }
                 .padding(.top, 2)
             }
@@ -75,7 +110,7 @@ struct FavoritesStackedCard: View {
         .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 2)
         .shadow(color: .black.opacity(0.24), radius: 28, x: 0, y: 16)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("我的收藏，共 \(totalCount) 部")
+        .accessibilityLabel(accessibilityLabel)
     }
 
     @ViewBuilder
@@ -116,16 +151,13 @@ struct FavoritesStackedCard: View {
     }
 
     private var favoriteBadge: some View {
-        Image(systemName: "heart.fill")
+        Image(systemName: badgeIcon)
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: 30, height: 30)
             .background(
                 LinearGradient(
-                    colors: [
-                        Color.pink,
-                        Color.red.opacity(0.9),
-                    ],
+                    colors: badgeColors,
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
