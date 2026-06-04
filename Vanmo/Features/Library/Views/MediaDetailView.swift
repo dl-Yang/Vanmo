@@ -18,6 +18,7 @@ struct MediaDetailView: View {
     @State private var isUpdatingFavorite = false
     @State private var favoriteErrorMessage: String?
     @State private var selectedSeason: Int?
+    @State private var enrichedItem: ServerMediaItem?
 
     private let heroHeight: CGFloat = 540
     private let backdropHeight: CGFloat = 300
@@ -84,6 +85,9 @@ struct MediaDetailView: View {
             if item.mediaType == .tvShow {
                 await loadEpisodes()
             }
+        }
+        .task(id: item.serverId) {
+            await enrichItemDetailIfNeeded()
         }
         .alert("收藏失败", isPresented: favoriteErrorBinding) {
             Button("确定") {}
@@ -152,6 +156,89 @@ struct MediaDetailView: View {
             if !isPresented {
                 favoriteErrorMessage = nil
             }
+        }
+    }
+
+    private var displayBackdropURL: URL? {
+        enrichedItem?.backdropURL ?? item.backdropURL
+    }
+
+    private var displayOverview: String? {
+        let overview = enrichedItem?.overview ?? item.overview
+        guard let overview, !overview.isEmpty else { return nil }
+        return overview
+    }
+
+    private var displayGenres: [String] {
+        if let enrichedGenres = enrichedItem?.genres, !enrichedGenres.isEmpty {
+            return enrichedGenres
+        }
+        return item.genres
+    }
+
+    private var displayDirector: String? {
+        if let director = enrichedItem?.director, !director.isEmpty {
+            return director
+        }
+        return item.director
+    }
+
+    private var displayCast: [String] {
+        if let cast = enrichedItem?.cast, !cast.isEmpty {
+            return cast
+        }
+        return item.cast
+    }
+
+    private var shouldEnrichFromServer: Bool {
+        guard enrichedItem == nil,
+              let serverId = item.serverId,
+              !serverId.isEmpty,
+              item.sourceConnectionId == nil,
+              needsServerDetailFields,
+              isEmbyOriginItem,
+              EmbyCredentialStore.baseURL != nil,
+              EmbyCredentialStore.userId != nil,
+              EmbyCredentialStore.token != nil else {
+            return false
+        }
+        return true
+    }
+
+    /// 判断条目是否来自当前 Emby/Jellyfin 服务器：
+    /// 电影/分集的流地址 host 即服务器域名；电视剧/容器使用 `vanmo://series|emby-container|emby-item`。
+    private var isEmbyOriginItem: Bool {
+        if item.fileURL.scheme == "vanmo" {
+            switch item.fileURL.host?.lowercased() {
+            case "series", "emby-container", "emby-item":
+                return true
+            default:
+                return false
+            }
+        }
+        guard let baseHost = EmbyCredentialStore.baseURL.flatMap({ URL(string: $0)?.host?.lowercased() }),
+              let itemHost = item.fileURL.host?.lowercased() else {
+            return false
+        }
+        return baseHost == itemHost
+    }
+
+    private var needsServerDetailFields: Bool {
+        item.overview == nil ||
+            item.overview?.isEmpty == true ||
+            item.cast.isEmpty ||
+            item.director == nil ||
+            item.genres.isEmpty ||
+            item.backdropURL == nil
+    }
+
+    private func enrichItemDetailIfNeeded() async {
+        guard shouldEnrichFromServer, let serverId = item.serverId else { return }
+
+        do {
+            enrichedItem = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId)
+        } catch {
+            VanmoLogger.library.error("[MediaDetail] Failed to enrich item detail: \(error.localizedDescription)")
         }
     }
 
@@ -271,7 +358,7 @@ struct MediaDetailView: View {
         width: CGFloat,
         height: CGFloat
     ) -> some View {
-        if let backdropURL = item.backdropURL {
+        if let backdropURL = displayBackdropURL {
             KFImage(backdropURL)
                 .placeholder {
                     Rectangle()
@@ -624,7 +711,7 @@ struct MediaDetailView: View {
 
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if let overview = item.overview, !overview.isEmpty {
+            if let overview = displayOverview {
                 detailSection(title: "简介", icon: "text.alignleft") {
                     Text(overview)
                         .font(.subheadline)
@@ -635,13 +722,13 @@ struct MediaDetailView: View {
                 }
             }
 
-            if !item.genres.isEmpty {
+            if !displayGenres.isEmpty {
                 detailSection(title: "类型", icon: "tag") {
                     genreTags
                 }
             }
 
-            if item.director != nil || !item.cast.isEmpty {
+            if displayDirector != nil || !displayCast.isEmpty {
                 creditsSection
             }
 
@@ -658,7 +745,7 @@ struct MediaDetailView: View {
 
     private var genreTags: some View {
         FlowLayout(spacing: 8) {
-            ForEach(item.genres, id: \.self) { genre in
+            ForEach(displayGenres, id: \.self) { genre in
                 MediaDetailPill(text: genre, icon: nil, tint: Color.vanmoPrimary)
             }
         }
@@ -667,18 +754,18 @@ struct MediaDetailView: View {
     private var creditsSection: some View {
         detailSection(title: "演职员", icon: "person.2") {
             VStack(alignment: .leading, spacing: 12) {
-                if let director = item.director {
+                if let director = displayDirector {
                     infoRow("导演", value: director)
                 }
 
-                if !item.cast.isEmpty {
+                if !displayCast.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         infoRow(
                             "演员",
-                            value: item.cast.prefix(showAllCast ? item.cast.count : 5).joined(separator: "、")
+                            value: displayCast.prefix(showAllCast ? displayCast.count : 5).joined(separator: "、")
                         )
 
-                        if item.cast.count > 5 {
+                        if displayCast.count > 5 {
                             Button {
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     showAllCast.toggle()

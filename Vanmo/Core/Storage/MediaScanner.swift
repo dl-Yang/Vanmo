@@ -63,11 +63,12 @@ actor MediaScanner {
     func scanRemoteDirectory(
         service: RemoteFileService,
         path: String,
+        connectionId: UUID? = nil,
         in context: ModelContext,
         maxDepth: Int = 8,
         batchSize: Int = 200
     ) async throws -> [MediaItem] {
-        var existing = try await MainActor.run { try existingServerIds(in: context) }
+        var existing = try await MainActor.run { try existingServerItemMap(in: context) }
         var newItems: [MediaItem] = []
         var pendingInBatch = 0
 
@@ -97,7 +98,15 @@ actor MediaScanner {
                     continue
                 }
                 guard file.isVideo else { continue }
-                guard !existing.contains(file.path) else { continue }
+                if let existingItem = existing[file.path] {
+                    if existingItem.sourceConnectionId == nil, let connectionId {
+                        await MainActor.run {
+                            existingItem.sourceConnectionId = connectionId
+                        }
+                        pendingInBatch += 1
+                    }
+                    continue
+                }
 
                 let streamURL: URL
                 do {
@@ -122,13 +131,14 @@ actor MediaScanner {
                     item.showTitle = parsed.title
                 }
                 item.serverId = file.path
+                item.sourceConnectionId = connectionId
                 item.originalFileName = file.name
                 let ext = (file.name as NSString).pathExtension
                 item.container = ext.isEmpty ? nil : ext.lowercased()
 
                 await MainActor.run { context.insert(item) }
                 newItems.append(item)
-                existing.insert(file.path)
+                existing[file.path] = item
                 pendingInBatch += 1
 
                 if pendingInBatch >= batchSize {
@@ -149,6 +159,7 @@ actor MediaScanner {
     @MainActor
     func importServerMediaItems(
         _ serverItems: [ServerMediaItem],
+        connectionId: UUID? = nil,
         in context: ModelContext
     ) async throws -> [MediaItem] {
         let existingMap = try existingServerItemMap(in: context)
@@ -156,7 +167,7 @@ actor MediaScanner {
 
         for serverItem in serverItems {
             if let existing = existingMap[serverItem.serverId] {
-                apply(serverItem: serverItem, to: existing)
+                apply(serverItem: serverItem, connectionId: connectionId, to: existing)
             } else {
                 let item = MediaItem(
                     title: serverItem.title,
@@ -165,7 +176,7 @@ actor MediaScanner {
                     fileSize: serverItem.fileSize,
                     duration: serverItem.duration
                 )
-                apply(serverItem: serverItem, to: item)
+                apply(serverItem: serverItem, connectionId: connectionId, to: item)
                 context.insert(item)
                 newItems.append(item)
             }
@@ -179,7 +190,11 @@ actor MediaScanner {
     // MARK: - Private
 
     @MainActor
-    private func apply(serverItem: ServerMediaItem, to item: MediaItem) {
+    private func apply(
+        serverItem: ServerMediaItem,
+        connectionId: UUID?,
+        to item: MediaItem
+    ) {
         item.title = serverItem.title
         item.originalTitle = serverItem.originalTitle
         item.year = serverItem.year
@@ -201,6 +216,9 @@ actor MediaScanner {
         item.originCountry = serverItem.originCountry
         item.tmdbID = serverItem.tmdbID
         item.serverId = serverItem.serverId
+        if let connectionId {
+            item.sourceConnectionId = connectionId
+        }
         item.seriesId = serverItem.seriesId
         item.showTitle = serverItem.showTitle
         item.seasonNumber = serverItem.seasonNumber
@@ -228,13 +246,6 @@ actor MediaScanner {
         let descriptor = FetchDescriptor<MediaItem>()
         let items = try context.fetch(descriptor)
         return Set(items.map { $0.fileURL.absoluteString })
-    }
-
-    @MainActor
-    private func existingServerIds(in context: ModelContext) throws -> Set<String> {
-        let descriptor = FetchDescriptor<MediaItem>()
-        let items = try context.fetch(descriptor)
-        return Set(items.compactMap(\.serverId))
     }
 
     @MainActor

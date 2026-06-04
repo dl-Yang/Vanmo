@@ -88,6 +88,8 @@ struct LibraryView: View {
             if hasEmbyConnectionsConfigured {
                 collectionFolderSections
             }
+
+            scannedLibrarySections
         }
         .padding(.vertical)
     }
@@ -100,6 +102,10 @@ struct LibraryView: View {
 
     private var isRegularWidth: Bool {
         horizontalSizeClass == .regular
+    }
+
+    private func usesServerCollectionAPI(_ connection: SavedConnection) -> Bool {
+        connection.type == .emby || connection.type == .jellyfin
     }
 
     private var compactSecondFloorBinding: Binding<Bool> {
@@ -143,6 +149,16 @@ struct LibraryView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var scannedLibrarySections: some View {
+        ForEach(viewModel.orderedScannedConnections) { connection in
+            let folders = viewModel.homeVisibleScannedFolders(for: connection.id)
+            if !folders.isEmpty {
+                collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
             }
         }
     }
@@ -212,7 +228,7 @@ struct LibraryView: View {
                 Spacer(minLength: 8)
 
                 NavigationLink {
-                    CollectionFolderListView(folder: folder, connection: connection)
+                    folderDestination(folder: folder, connection: connection)
                 } label: {
                     HStack(spacing: 4) {
                         Text("查看全部")
@@ -232,12 +248,27 @@ struct LibraryView: View {
             }
             .padding(.horizontal)
 
-            folderPreviewContent(folder: folder)
+            folderPreviewContent(folder: folder, connection: connection)
         }
     }
 
     @ViewBuilder
-    private func folderPreviewContent(folder: CollectionFolder) -> some View {
+    private func folderDestination(
+        folder: CollectionFolder,
+        connection: SavedConnection
+    ) -> some View {
+        if usesServerCollectionAPI(connection) {
+            CollectionFolderListView(folder: folder, connection: connection)
+        } else {
+            ScannedLibraryListView(connection: connection, collectionType: folder.collectionType)
+        }
+    }
+
+    @ViewBuilder
+    private func folderPreviewContent(
+        folder: CollectionFolder,
+        connection: SavedConnection
+    ) -> some View {
         let previewItems = viewModel.previewItems(for: folder)
         let isLoaded = viewModel.isFolderPreviewLoaded(folder.id)
 
@@ -248,7 +279,7 @@ struct LibraryView: View {
                 LazyHStack(spacing: 12) {
                     ForEach(previewItems) { item in
                         NavigationLink {
-                            LibraryItemDestination(item: item)
+                            previewDestination(item: item, folder: folder, connection: connection)
                         } label: {
                             PosterCard(
                                 title: item.displayTitle,
@@ -267,6 +298,19 @@ struct LibraryView: View {
                 .padding(.bottom, 4)
             }
             .scrollClipDisabled()
+        }
+    }
+
+    @ViewBuilder
+    private func previewDestination(
+        item: MediaItem,
+        folder: CollectionFolder,
+        connection: SavedConnection
+    ) -> some View {
+        if !usesServerCollectionAPI(connection), folder.collectionType == .tvshows {
+            ScannedShowDetailView(connection: connection, showTitle: item.showTitle ?? item.title)
+        } else {
+            LibraryItemDestination(item: item)
         }
     }
 

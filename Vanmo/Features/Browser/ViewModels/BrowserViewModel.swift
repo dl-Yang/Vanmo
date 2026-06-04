@@ -147,7 +147,11 @@ final class ConnectionsViewModel: ObservableObject {
                 let syncStart = Date()
                 var totalImported = 0
                 for try await page in mediaServer.streamMediaItems(since: since, pageSize: 500) {
-                    let inserted = try await scanner.importServerMediaItems(page, in: context)
+                    let inserted = try await scanner.importServerMediaItems(
+                        page,
+                        connectionId: connection.id,
+                        in: context
+                    )
                     totalImported += inserted.count
                     let message = "已同步 \(totalImported) 项..."
                     loadingMessage = message
@@ -160,6 +164,7 @@ final class ConnectionsViewModel: ObservableObject {
                 _ = try await scanner.scanRemoteDirectory(
                     service: service,
                     path: scanPath,
+                    connectionId: connection.id,
                     in: context
                 )
             }

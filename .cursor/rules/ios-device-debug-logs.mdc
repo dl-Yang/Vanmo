@@ -1,17 +1,14 @@
 ---
 name: ios-device-debug-logs
-description: Guide iOS real-device Debug troubleshooting without remote log instrumentation. Use when debugging iOS apps on a physical device, adding diagnostic logs, investigating runtime behavior, or when the user mentions Cursor Debug mode, console logs, 真机调试, 调试日志, or 远程日志插桩.
+description: iOS 真机调试日志规范。排查、调试、加日志时一律使用本地 console 日志，不做远程日志插桩 / 遥测 / 埋点。
+alwaysApply: true
 ---
 
 # iOS 真机调试日志
 
 ## 核心规则
 
-**当我在 ios 真机调试运行时，cursor 中的 debug 模式不要再进行远程日志插桩，而是添加调试日志，让我从 console 中手动复制**
-
-## 使用场景
-
-当用户在 iOS 真机 Debug 运行中排查问题时，优先添加可在 Xcode Console 或 macOS Console.app 中看到的本地调试日志。
+**当我在 iOS 真机调试运行时，cursor 中的 debug 模式不要再进行远程日志插桩，而是添加调试日志，让我从 console 中手动复制。**
 
 不要为了收集诊断信息而加入远程日志插桩、遥测上报、网络日志上传、外部观测 SDK、代理服务或服务端收集链路，除非用户明确要求。
 

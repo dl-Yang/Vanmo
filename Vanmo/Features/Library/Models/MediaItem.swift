@@ -37,6 +37,7 @@ final class MediaItem {
 
     var serverId: String?
     var seriesId: String?
+    var sourceConnectionId: UUID?
 
     var audioTracks: [AudioTrackInfo]
     var subtitleTracks: [SubtitleTrackInfo]

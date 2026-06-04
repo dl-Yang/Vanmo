@@ -671,7 +671,7 @@ final class EmbyService: MediaServerService {
         return ServerItemsPage(items: mapped, totalRecordCount: totalCount)
     }
 
-    private static func makeJSONDecoder() -> JSONDecoder {
+    fileprivate static func makeJSONDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
@@ -1347,6 +1347,57 @@ enum EmbyChildItemsFetcher {
             EmbyItemMapper.map(item, baseURL: baseURL, apiPrefix: apiPrefix, token: token)
         }
         VanmoLogger.network.info("[MediaServer] Fetched \(mapped.count) children for parent \(parentId)")
+        return mapped
+    }
+}
+
+enum EmbyItemDetailFetcher {
+    private static let detailItemFields =
+        "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
+
+    static func fetchDetail(itemId: String) async throws -> ServerMediaItem {
+        guard let baseURLStr = EmbyCredentialStore.baseURL,
+              let token = EmbyCredentialStore.token,
+              let userId = EmbyCredentialStore.userId,
+              let baseURL = URL(string: baseURLStr) else {
+            throw NetworkError.notConnected
+        }
+        let apiPrefix = EmbyCredentialStore.apiPrefix
+
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items/\(itemId)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "Fields", value: detailItemFields),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        VanmoLogger.network.info("[MediaServer] Fetching item detail for \(itemId)")
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][MediaServer] Item detail URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][MediaServer] Item detail status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        VanmoLogger.network.debug("[Debug][MediaServer] Item detail body:\n\(EmbyDebugLog.describe(data: data))")
+        #endif
+
+        try validateEmbyResponse(response, body: data, context: "fetch item detail")
+
+        let detail = try EmbyService.makeJSONDecoder().decode(EmbyMediaDetail.self, from: data)
+        guard let mapped = EmbyItemMapper.map(detail, baseURL: baseURL, apiPrefix: apiPrefix, token: token) else {
+            throw NetworkError.transferFailed("无法解析媒体详情")
+        }
+
         return mapped
     }
 }
