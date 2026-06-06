@@ -97,17 +97,17 @@ struct MediaDetailView: View {
     }
 
     private var detailBackground: some View {
-        Color.vanmoBackground
+        Color.vanmoCinematicBackground
             .overlay(alignment: .top) {
                 LinearGradient(
                     colors: [
-                        dominantColor.opacity(0.28),
-                        Color.vanmoBackground.opacity(0.0),
+                        dominantColor.opacity(0.34),
+                        Color.vanmoCinematicBackground.opacity(0.0),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: backdropHeight)
+                .frame(height: backdropHeight + 120)
                 .ignoresSafeArea()
             }
     }
@@ -275,7 +275,7 @@ struct MediaDetailView: View {
     // MARK: - Header
 
     private var headerForeground: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 20) {
             Spacer(minLength: 0)
 
             HStack(alignment: .bottom, spacing: 16) {
@@ -287,8 +287,8 @@ struct MediaDetailView: View {
 
             playButton
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 24)
+        .padding(.horizontal, VanmoCinema.horizontalPadding)
+        .padding(.bottom, 26)
         .frame(height: heroHeight)
         .background {
             GeometryReader { proxy in
@@ -321,9 +321,9 @@ struct MediaDetailView: View {
 
             LinearGradient(
                 colors: [
-                    .black.opacity(0.22),
-                    .black.opacity(0.38),
-                    .black.opacity(0.88),
+                    .black.opacity(0.18),
+                    .black.opacity(0.42),
+                    Color.vanmoCinematicBackground.opacity(0.96),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -343,7 +343,7 @@ struct MediaDetailView: View {
                 LinearGradient(
                     colors: [
                         .clear,
-                        Color.vanmoBackground
+                        Color.vanmoCinematicBackground
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -390,21 +390,21 @@ struct MediaDetailView: View {
         KFImage(item.posterURL)
             .placeholder {
                 RoundedRectangle(cornerRadius: 18)
-                    .fill(Color.vanmoSurface)
+                    .fill(Color.vanmoCinematicSurfaceElevated)
                     .overlay {
                         Image(systemName: item.mediaType.icon)
                             .font(.largeTitle)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(.white.opacity(0.32))
                     }
             }
             .fade(duration: 0.25)
             .resizable()
             .scaledToFill()
             .frame(width: 122, height: 183)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius))
             .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.42), radius: 22, x: 0, y: 14)
     }
@@ -426,7 +426,7 @@ struct MediaDetailView: View {
     private var mediaInfoOverlay: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(item.title)
-                .font(.system(size: 30, weight: .bold))
+                .font(.system(size: 31, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(3)
                 .minimumScaleFactor(0.82)
@@ -475,16 +475,16 @@ struct MediaDetailView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)
-            .background(accentColor)
-            .foregroundStyle(playButtonForeground)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .background(Color.vanmoCinematicAccent)
+            .foregroundStyle(.black.opacity(0.86))
+            .clipShape(RoundedRectangle(cornerRadius: VanmoCinema.compactCardCornerRadius))
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                RoundedRectangle(cornerRadius: VanmoCinema.compactCardCornerRadius)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
             }
         }
         .disabled(item.mediaType == .tvShow && episodes.isEmpty)
-        .shadow(color: accentColor.opacity(0.28), radius: 18, x: 0, y: 10)
+        .shadow(color: Color.vanmoCinematicAccent.opacity(0.24), radius: 18, x: 0, y: 10)
         .shadow(color: .black.opacity(0.2), radius: 16, x: 0, y: 8)
     }
 
@@ -529,12 +529,13 @@ struct MediaDetailView: View {
                 Image(systemName: "list.bullet.rectangle")
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundStyle(Color.vanmoPrimary)
+                    .foregroundStyle(Color.vanmoCinematicAccent)
                     .frame(width: 26, height: 26)
-                    .background(Color.vanmoPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.vanmoCinematicAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
 
                 Text("剧集")
                     .font(.headline)
+                    .foregroundStyle(.white)
 
                 Spacer()
 
@@ -542,10 +543,10 @@ struct MediaDetailView: View {
                     Text("\(episodes.count) 集")
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.62))
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
-                        .background(Color.vanmoBackground, in: Capsule())
+                        .background(Color.vanmoCinematicBackground.opacity(0.78), in: Capsule())
                 }
             }
 
@@ -556,7 +557,7 @@ struct MediaDetailView: View {
                     Text("加载剧集...")
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.62))
                 }
                 .frame(maxWidth: .infinity, minHeight: 72)
             } else if episodes.isEmpty {
@@ -567,7 +568,7 @@ struct MediaDetailView: View {
 
                     Text("暂无剧集信息")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.62))
                 }
                 .frame(maxWidth: .infinity, minHeight: 96)
             } else {
@@ -583,12 +584,12 @@ struct MediaDetailView: View {
             }
         }
         .padding(16)
-        .background(Color.vanmoSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: 20))
+        .background(Color.vanmoCinematicSurface.opacity(0.88), in: RoundedRectangle(cornerRadius: VanmoCinema.cardCornerRadius))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: VanmoCinema.cardCornerRadius)
+                .strokeBorder(Color.vanmoCinematicBorder, lineWidth: 1)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, VanmoCinema.horizontalPadding)
     }
 
     private var seasonPicker: some View {
@@ -607,13 +608,13 @@ struct MediaDetailView: View {
                             .padding(.vertical, 8)
                             .background(
                                 (selectedSeason ?? seasonNumbers.first) == season
-                                    ? Color.vanmoPrimary.opacity(0.16)
-                                    : Color.vanmoBackground
+                                    ? Color.vanmoCinematicAccent.opacity(0.18)
+                                    : Color.vanmoCinematicBackground.opacity(0.72)
                             )
                             .foregroundStyle(
                                 (selectedSeason ?? seasonNumbers.first) == season
-                                    ? Color.vanmoPrimary
-                                    : .secondary
+                                    ? Color.vanmoCinematicAccent
+                                    : .white.opacity(0.62)
                             )
                             .clipShape(Capsule())
                     }
@@ -634,25 +635,26 @@ struct MediaDetailView: View {
                     Text("E\(String(format: "%02d", episode.episodeNumber))")
                         .font(.caption)
                         .fontWeight(.bold)
-                        .foregroundStyle(Color.vanmoPrimary)
+                        .foregroundStyle(Color.vanmoCinematicAccent)
 
                     Text("S\(String(format: "%02d", episode.seasonNumber))")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.52))
                 }
                 .frame(width: 46, height: 46)
-                .background(Color.vanmoPrimary.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                .background(Color.vanmoCinematicAccent.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : episode.title)
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .lineLimit(1)
+                        .foregroundStyle(.white)
 
                     if episode.duration > 0 {
                         Text(episode.duration.shortDuration)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.58))
                     }
                 }
 
@@ -660,12 +662,16 @@ struct MediaDetailView: View {
 
                 Image(systemName: "play.fill")
                     .font(.caption)
-                    .foregroundStyle(playButtonForeground)
+                    .foregroundStyle(.black.opacity(0.86))
                     .frame(width: 32, height: 32)
-                    .background(accentColor, in: Circle())
+                    .background(Color.vanmoCinematicAccent, in: Circle())
             }
             .padding(12)
-            .background(Color.vanmoBackground, in: RoundedRectangle(cornerRadius: 14))
+            .background(Color.vanmoCinematicBackground.opacity(0.74), in: RoundedRectangle(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Color.vanmoCinematicBorder, lineWidth: 1)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -718,7 +724,7 @@ struct MediaDetailView: View {
                 detailSection(title: "简介", icon: "text.alignleft") {
                     Text(overview)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.70))
                         .lineSpacing(3)
                         .lineLimit(6)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -743,13 +749,13 @@ struct MediaDetailView: View {
                 trackInfoSection
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, VanmoCinema.horizontalPadding)
     }
 
     private var genreTags: some View {
         FlowLayout(spacing: 8) {
             ForEach(displayGenres, id: \.self) { genre in
-                MediaDetailPill(text: genre, icon: nil, tint: Color.vanmoPrimary)
+                MediaDetailPill(text: genre, icon: nil, tint: Color.vanmoCinematicAccent)
             }
         }
     }
@@ -777,7 +783,7 @@ struct MediaDetailView: View {
                                 Text(showAllCast ? "收起" : "显示全部")
                                     .font(.caption)
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(Color.vanmoPrimary)
+                                    .foregroundStyle(Color.vanmoCinematicAccent)
                             }
                             .buttonStyle(.plain)
                         }
@@ -849,24 +855,25 @@ struct MediaDetailView: View {
                 Image(systemName: icon)
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundStyle(Color.vanmoPrimary)
+                    .foregroundStyle(Color.vanmoCinematicAccent)
                     .frame(width: 24, height: 24)
-                    .background(Color.vanmoPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.vanmoCinematicAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
 
                 Text(title)
                     .font(.headline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
             }
 
             content()
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.vanmoSurface.opacity(0.86), in: RoundedRectangle(cornerRadius: 20))
+        .background(Color.vanmoCinematicSurface.opacity(0.88), in: RoundedRectangle(cornerRadius: VanmoCinema.cardCornerRadius))
         .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: VanmoCinema.cardCornerRadius)
+                .strokeBorder(Color.vanmoCinematicBorder, lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.18), radius: 14, x: 0, y: 8)
     }
 
     private func infoRow(_ label: String, value: String) -> some View {
@@ -874,12 +881,12 @@ struct MediaDetailView: View {
             Text(label)
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.52))
                 .frame(width: 62, alignment: .leading)
 
             Text(value)
                 .font(.subheadline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white.opacity(0.82))
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -907,10 +914,10 @@ private struct MediaDetailPill: View {
         .foregroundStyle(tint)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(tint.opacity(0.14), in: Capsule())
+        .background(tint.opacity(0.16), in: Capsule())
         .overlay {
             Capsule()
-                .strokeBorder(tint.opacity(0.12), lineWidth: 1)
+                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
         }
     }
 }

@@ -29,16 +29,25 @@ struct PosterCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             posterImage
-            titleOverlay
+
+            titleBlock
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(6)
+        .background(
+            RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius + 6)
+                .fill(Color.vanmoCinematicSurface.opacity(0.72))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius + 6)
+                .strokeBorder(Color.vanmoCinematicBorder, lineWidth: 1)
+        }
         .shadow(
-            color: showShadow ? .black.opacity(0.25) : .clear,
-            radius: showShadow ? 8 : 0,
+            color: showShadow ? VanmoCinema.cardShadowColor : .clear,
+            radius: showShadow ? VanmoCinema.cardShadowRadius : 0,
             x: 0,
-            y: showShadow ? 4 : 0
+            y: showShadow ? VanmoCinema.cardShadowYOffset : 0
         )
     }
 
@@ -59,20 +68,27 @@ struct PosterCard: View {
                 .overlay(alignment: .topTrailing) {
                     if let rating, rating > 0 {
                         RatingBadge(rating)
-                            .padding(6)
+                            .padding(7)
                     }
                 }
                 .overlay(alignment: .bottomLeading) {
                     if let originCountry, !originCountry.isEmpty {
                         Text(originCountry)
                             .font(.system(size: 9, weight: .medium))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                            .padding(6)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(.black.opacity(0.54), in: Capsule())
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                            }
+                            .padding(7)
                     }
                 }
+
+            LinearGradient.cinematicPosterOverlay
+                .allowsHitTesting(false)
 
             if let progress, progress > 0, progress < 1.0 {
                 progressBar(progress)
@@ -80,16 +96,37 @@ struct PosterCard: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(2 / 3, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius)
+                .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+        }
         .clipped()
     }
 
     private var placeholderView: some View {
-        Rectangle()
-            .fill(Color.vanmoSurface)
+        RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.vanmoCinematicSurfaceElevated,
+                        Color.vanmoCinematicSurface,
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .overlay {
-                Image(systemName: "film")
-                    .font(.largeTitle)
-                    .foregroundStyle(.tertiary)
+                VStack(spacing: 10) {
+                    Image(systemName: "film.stack")
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.36))
+
+                    Text("Vanmo")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white.opacity(0.28))
+                }
             }
     }
 
@@ -98,37 +135,36 @@ struct PosterCard: View {
             VStack {
                 Spacer()
                 ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .frame(height: 3)
-                    Rectangle()
-                        .fill(Color.vanmoPrimary)
-                        .frame(width: geometry.size.width * value, height: 3)
+                    Capsule()
+                        .fill(.white.opacity(0.22))
+                        .frame(height: 4)
+                    Capsule()
+                        .fill(Color.vanmoCinematicAccent)
+                        .frame(width: geometry.size.width * value, height: 4)
                 }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
             }
         }
     }
 
-    private var titleOverlay: some View {
+    private var titleBlock: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.caption)
-                .fontWeight(.medium)
+                .fontWeight(.semibold)
                 .lineLimit(2)
-                .foregroundStyle(.primary)
+                .foregroundStyle(.white.opacity(0.94))
 
             if let subtitle {
                 Text(subtitle)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.58))
                     .lineLimit(1)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: 44)
-        .background(.ultraThinMaterial)
+        .frame(height: 42, alignment: .topLeading)
     }
 }
 
