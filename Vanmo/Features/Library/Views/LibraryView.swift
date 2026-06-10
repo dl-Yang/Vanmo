@@ -13,9 +13,6 @@ struct LibraryView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            cinematicBackground
-                .ignoresSafeArea()
-
             if let syncToastMessage {
                 LibrarySyncToast(message: syncToastMessage)
                     .padding(.top, 12)
@@ -33,11 +30,10 @@ struct LibraryView: View {
                     libraryContent
                 }
             }
+            .background(Color.vanmoBackground)
 
         }
         .navigationTitle("首页")
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Color.vanmoCinematicBackground.opacity(0.72), for: .navigationBar)
         .task {
             viewModel.setModelContext(modelContext)
             await connectionsViewModel.loadSavedConnections()
@@ -58,26 +54,10 @@ struct LibraryView: View {
         }
     }
 
-    private var cinematicBackground: some View {
-        Color.vanmoCinematicBackground
-            .overlay(alignment: .top) {
-                RadialGradient(
-                    colors: [
-                        Color.vanmoPrimary.opacity(0.22),
-                        Color.vanmoCinematicBackground.opacity(0.0),
-                    ],
-                    center: .topLeading,
-                    startRadius: 40,
-                    endRadius: 360
-                )
-                .frame(height: 420)
-            }
-    }
-
     // MARK: - Library Content
 
     private var libraryContent: some View {
-        LazyVStack(alignment: .leading, spacing: VanmoCinema.sectionSpacing) {
+        LazyVStack(alignment: .leading, spacing: 28) {
             if !viewModel.recentlyPlayed.isEmpty {
                 continueWatchingSection
             }
@@ -92,8 +72,7 @@ struct LibraryView: View {
 
             scannedLibrarySections
         }
-        .padding(.top, 10)
-        .padding(.bottom, 28)
+        .padding(.vertical)
     }
 
     private var hasEmbyConnectionsConfigured: Bool {
@@ -127,8 +106,8 @@ struct LibraryView: View {
             if let error = viewModel.embyHomeError, viewModel.serverCollectionFolders.isEmpty {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.62))
-                    .padding(.horizontal, VanmoCinema.horizontalPadding)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
             }
         }
     }
@@ -161,15 +140,11 @@ struct LibraryView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.vanmoCinematicSurfaceElevated)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(Color.vanmoCinematicBorder, lineWidth: 1)
-                    }
+                    .fill(Color.vanmoSurface)
 
                 Image(systemName: "rectangle.stack.fill")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.vanmoCinematicAccent)
+                    .foregroundStyle(Color.vanmoPrimary)
             }
             .frame(width: 42, height: 42)
 
@@ -177,12 +152,12 @@ struct LibraryView: View {
                 Text(serverName)
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 Text("\(folderCount) 个媒体库")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.58))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 12)
@@ -190,12 +165,12 @@ struct LibraryView: View {
             Text("\(folderCount)")
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.white.opacity(0.66))
+                .foregroundStyle(.secondary)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 6)
-                .background(Color.vanmoCinematicSurfaceElevated.opacity(0.78), in: Capsule())
+                .background(Color.vanmoSurface, in: Capsule())
         }
-        .padding(.horizontal, VanmoCinema.horizontalPadding)
+        .padding(.horizontal)
     }
 
     private func folderRow(folder: CollectionFolder, connection: SavedConnection) -> some View {
@@ -204,7 +179,7 @@ struct LibraryView: View {
                 Text(folder.name)
                     .font(.headline)
                     .fontWeight(.bold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
 
                 folderTypePill(folder.collectionType)
@@ -223,14 +198,14 @@ struct LibraryView: View {
                             .font(.caption2)
                             .fontWeight(.bold)
                     }
-                    .foregroundStyle(.white.opacity(0.68))
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(Color.vanmoCinematicSurfaceElevated.opacity(0.78), in: Capsule())
+                    .background(Color.vanmoSurface, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, VanmoCinema.horizontalPadding)
+            .padding(.horizontal)
 
             folderPreviewContent(folder: folder, connection: connection)
         }
@@ -278,7 +253,7 @@ struct LibraryView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, VanmoCinema.horizontalPadding)
+                .padding(.horizontal)
                 .padding(.bottom, 4)
             }
             .scrollClipDisabled()
@@ -305,7 +280,7 @@ struct LibraryView: View {
                     FolderPreviewPosterPlaceholder()
                 }
             }
-                .padding(.horizontal, VanmoCinema.horizontalPadding)
+            .padding(.horizontal)
             .padding(.bottom, 4)
         }
         .scrollClipDisabled()
@@ -323,11 +298,7 @@ struct LibraryView: View {
         .foregroundStyle(Color.vanmoPrimary)
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(Color.vanmoPrimary.opacity(0.18), in: Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(Color.vanmoPrimary.opacity(0.18), lineWidth: 1)
-        }
+        .background(Color.vanmoPrimary.opacity(0.12), in: Capsule())
     }
 
     private func folderPreviewSubtitle(_ item: MediaItem) -> String? {
@@ -341,11 +312,20 @@ struct LibraryView: View {
 
     private var continueWatchingSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HomeSectionHeader(
-                title: "继续观看",
-                subtitle: "从上次离开的地方继续",
-                symbol: "play.rectangle.fill"
-            )
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("继续观看")
+                        .font(.title3)
+                        .fontWeight(.bold)
+
+                    Text("最近一次播放，点击继续观看")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+            }
+            .padding(.horizontal)
 
             if let latestItem = viewModel.recentlyPlayed.first {
                 VStack(spacing: 12) {
@@ -363,7 +343,7 @@ struct LibraryView: View {
                         continueWatchingHistoryCard(historyItems)
                     }
                 }
-                .padding(.horizontal, VanmoCinema.horizontalPadding)
+                .padding(.horizontal)
             }
         }
     }
@@ -427,7 +407,7 @@ struct LibraryView: View {
                 Text(message)
                     .font(.caption2)
                     .fontWeight(.medium)
-                    .foregroundStyle(.white.opacity(0.62))
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: 140, alignment: .leading)
@@ -448,46 +428,14 @@ struct LibraryView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 18) {
-            ZStack {
-                Circle()
-                    .fill(Color.vanmoCinematicSurfaceElevated)
-                    .frame(width: 76, height: 76)
-
-                Image(systemName: "film.stack")
-                    .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(Color.vanmoCinematicAccent)
-            }
-
-            VStack(spacing: 8) {
-                Text("准备好搭建你的影院")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-
-                Text("连接网络共享或添加本地文件，Vanmo 会把海报、进度和详情整理成媒体库。")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.62))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-            }
-
-            Button {
-                appState.selectedTab = .connections
-            } label: {
-                Label("添加媒体源", systemImage: "plus")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 12)
-                    .background(Color.vanmoCinematicAccent, in: Capsule())
-                    .foregroundStyle(.black.opacity(0.86))
-            }
-            .buttonStyle(.plain)
+        EmptyStateView(
+            icon: "film.stack",
+            title: "媒体库为空",
+            message: "连接网络共享或添加本地文件以开始浏览你的媒体"
+        ) {
+            appState.selectedTab = .connections
         }
-        .padding(.horizontal, 34)
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 520)
+        .frame(minHeight: 500)
     }
 
     private func showSyncToast(_ message: String) {
@@ -523,70 +471,34 @@ private struct HomeGlassCardStyle: ViewModifier {
                         lineWidth: 1
                     )
             }
-            .shadow(color: VanmoCinema.cardShadowColor, radius: 22, x: 0, y: 14)
-    }
-}
-
-private struct HomeSectionHeader: View {
-    let title: String
-    let subtitle: String
-    let symbol: String
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color.vanmoCinematicAccent)
-                .frame(width: 30, height: 30)
-                .background(Color.vanmoCinematicAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Color.vanmoCinematicAccent.opacity(0.18), lineWidth: 1)
-                }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.58))
-            }
-
-            Spacer(minLength: 12)
-        }
-        .padding(.horizontal, VanmoCinema.horizontalPadding)
+            .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.24), radius: 16, x: 0, y: 10)
     }
 }
 
 private struct FolderPreviewPosterPlaceholder: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: VanmoCinema.posterCornerRadius)
-                .fill(Color.vanmoCinematicSurfaceElevated)
+        VStack(alignment: .leading, spacing: 0) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.vanmoSurface)
                 .aspectRatio(2 / 3, contentMode: .fit)
 
             VStack(alignment: .leading, spacing: 6) {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.16))
+                    .fill(Color.vanmoSurface)
                     .frame(height: 10)
 
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.10))
+                    .fill(Color.vanmoSurface.opacity(0.72))
                     .frame(width: 58, height: 8)
             }
             .padding(.horizontal, 6)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 42)
+            .frame(height: 44)
+            .background(Color.vanmoSurface.opacity(0.58))
         }
-        .padding(6)
-        .background(Color.vanmoCinematicSurface.opacity(0.68), in: RoundedRectangle(cornerRadius: 22))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .strokeBorder(Color.vanmoCinematicBorder, lineWidth: 1)
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .frame(width: 112)
     }
 }
@@ -608,59 +520,48 @@ private struct ContinueWatchingHeroCard: View {
                 LinearGradient(
                     colors: [
                         .clear,
-                        .black.opacity(0.64),
-                        Color.vanmoCinematicBackground.opacity(0.96),
+                        .black.opacity(0.72),
+                        .black.opacity(0.9),
                     ],
                     startPoint: .center,
                     endPoint: .bottom
                 )
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     Label("继续播放", systemImage: "play.fill")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 11)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 7)
-                        .background(Color.vanmoCinematicAccent.opacity(0.92), in: Capsule())
-                        .foregroundStyle(.black.opacity(0.86))
+                        .background(.ultraThinMaterial, in: Capsule())
                         .padding(.bottom, 2)
 
                     Text(item.displayTitle)
-                        .font(.system(size: 27, weight: .bold, design: .rounded))
+                        .font(.title2)
+                        .fontWeight(.bold)
                         .lineLimit(2)
                         .foregroundStyle(.white)
 
-                    VStack(alignment: .leading, spacing: 7) {
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(.white.opacity(0.20))
-                                Capsule()
-                                    .fill(Color.vanmoCinematicAccent)
-                                    .frame(width: geometry.size.width * progress)
-                            }
-                        }
-                        .frame(height: 5)
+                    ProgressView(value: progress)
+                        .tint(Color.vanmoPrimary)
 
-                        HStack(spacing: 8) {
-                            Text(item.lastPlaybackPosition.shortDuration)
-                            Text("·")
-                            Text("共 \(item.duration.shortDuration)")
-                        }
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white.opacity(0.72))
+                    HStack(spacing: 8) {
+                        Text(item.lastPlaybackPosition.shortDuration)
+                        Text("·")
+                        Text("共 \(item.duration.shortDuration)")
                     }
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.72))
                 }
-                .padding(20)
+                .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity)
             .frame(height: heroHeight)
-            .clipShape(RoundedRectangle(cornerRadius: VanmoCinema.cardCornerRadius))
-            .modifier(HomeGlassCardStyle(cornerRadius: VanmoCinema.cardCornerRadius))
-            .contentShape(RoundedRectangle(cornerRadius: VanmoCinema.cardCornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .modifier(HomeGlassCardStyle(cornerRadius: 24))
+            .contentShape(RoundedRectangle(cornerRadius: 24))
             .hoverEffect(.lift)
         }
         .buttonStyle(.plain)
@@ -672,10 +573,10 @@ private struct ContinueWatchingHeroCard: View {
         KFImage(item.backdropURL ?? item.posterURL)
             .placeholder {
                 ZStack {
-                    Color.vanmoCinematicSurfaceElevated
+                    Color.vanmoSurface
                     Image(systemName: item.mediaType.icon)
                         .font(.title2)
-                        .foregroundStyle(.white.opacity(0.36))
+                        .foregroundStyle(.secondary)
                 }
             }
             .fade(duration: 0.2)
@@ -691,22 +592,22 @@ private struct CollectionFolderLoadingSection: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.vanmoCinematicSurfaceElevated)
+                    .fill(Color.vanmoSurface)
                     .frame(width: 42, height: 42)
 
                 VStack(alignment: .leading, spacing: 7) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(.white.opacity(0.16))
+                        .fill(Color.vanmoSurface)
                         .frame(width: 120, height: 14)
 
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(.white.opacity(0.10))
+                        .fill(Color.vanmoSurface.opacity(0.72))
                         .frame(width: 86, height: 10)
                 }
 
                 Spacer()
             }
-            .padding(.horizontal, VanmoCinema.horizontalPadding)
+            .padding(.horizontal)
 
             ForEach(0..<3, id: \.self) { _ in
                 CollectionFolderLoadingRow()
@@ -721,20 +622,20 @@ private struct CollectionFolderLoadingRow: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.16))
+                    .fill(Color.vanmoSurface)
                     .frame(width: 120, height: 16)
 
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(.white.opacity(0.10))
+                    .fill(Color.vanmoSurface.opacity(0.72))
                     .frame(width: 56, height: 22)
 
                 Spacer()
 
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(.white.opacity(0.10))
+                    .fill(Color.vanmoSurface.opacity(0.72))
                     .frame(width: 72, height: 28)
             }
-            .padding(.horizontal, VanmoCinema.horizontalPadding)
+            .padding(.horizontal)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -790,23 +691,23 @@ private struct LibrarySyncToast: View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.body)
-                .foregroundStyle(Color.vanmoCinematicAccent)
+                .foregroundStyle(Color.vanmoPrimary)
                 .symbolEffect(.bounce, value: message)
 
             Text(message)
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundStyle(.white)
+                .foregroundStyle(.primary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color.vanmoCinematicSurfaceElevated.opacity(0.92), in: Capsule())
+        .background(.ultraThinMaterial, in: Capsule())
         .overlay {
             Capsule()
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.vanmoCinematicAccent.opacity(0.28),
+                            Color.vanmoPrimary.opacity(0.28),
                             .white.opacity(0.08),
                         ],
                         startPoint: .topLeading,
@@ -815,7 +716,7 @@ private struct LibrarySyncToast: View {
                     lineWidth: 1
                 )
         }
-        .shadow(color: Color.vanmoCinematicAccent.opacity(0.1), radius: 12, y: 5)
+        .shadow(color: Color.vanmoPrimary.opacity(0.1), radius: 12, y: 5)
         .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
     }
 }
@@ -826,15 +727,15 @@ private struct SectionPlaceholderCard: View {
     var body: some View {
         VStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.vanmoCinematicSurfaceElevated)
+                .fill(Color.vanmoSurface)
                 .aspectRatio(2 / 3, contentMode: .fit)
 
             VStack(alignment: .leading, spacing: 6) {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.16))
+                    .fill(Color.vanmoSurface)
                     .frame(height: 10)
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.10))
+                    .fill(Color.vanmoSurface.opacity(0.75))
                     .frame(width: 48, height: 8)
             }
             .padding(.horizontal, 6)
@@ -853,18 +754,18 @@ private struct SectionPlaceholderRow: View {
     var body: some View {
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.vanmoCinematicSurfaceElevated)
+                .fill(Color.vanmoSurface)
                 .frame(width: 60, height: 90)
 
             VStack(alignment: .leading, spacing: 10) {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.16))
+                    .fill(Color.vanmoSurface)
                     .frame(height: 12)
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.12))
+                    .fill(Color.vanmoSurface.opacity(0.8))
                     .frame(width: 140, height: 10)
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(.white.opacity(0.08))
+                    .fill(Color.vanmoSurface.opacity(0.65))
                     .frame(width: 88, height: 10)
             }
 

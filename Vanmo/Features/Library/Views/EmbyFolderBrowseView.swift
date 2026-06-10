@@ -13,8 +13,7 @@ struct EmbyFolderBrowseView: View {
     var body: some View {
         Group {
             if isLoading {
-                ProgressView("加载中...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                LoadingView("加载中...")
             } else if let errorMessage {
                 EmptyStateView(
                     icon: "exclamationmark.triangle",

@@ -37,7 +37,7 @@ enum AppTab: Int, CaseIterable {
     var title: String {
         switch self {
         case .library: return "媒体库"
-        case .connections: return "连接"
+        case .connections: return "文件"
         case .search: return "搜索"
         case .settings: return "设置"
         }

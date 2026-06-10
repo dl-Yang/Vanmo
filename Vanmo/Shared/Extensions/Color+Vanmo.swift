@@ -162,21 +162,6 @@ extension Color {
 
     /// 半透明遮罩
     static let vanmoOverlay = Color.black.opacity(0.6)
-
-    /// 媒体浏览页的电影感深色背景。独立于浅色主题，避免海报页在浅色主题下失去沉浸感。
-    static let vanmoCinematicBackground = Color(hex: "#05060A")!
-
-    /// 电影感卡片表面层。
-    static let vanmoCinematicSurface = Color(hex: "#141821")!
-
-    /// 电影感卡片的次级表面层。
-    static let vanmoCinematicSurfaceElevated = Color(hex: "#1D2330")!
-
-    /// 深色界面中用于播放、进度和选中态的高可见度强调色。
-    static let vanmoCinematicAccent = Color(hex: "#22C55E")!
-
-    /// 深色卡片上的细描边。
-    static let vanmoCinematicBorder = Color.white.opacity(0.10)
 }
 
 // MARK: - 渐变
@@ -193,39 +178,4 @@ extension LinearGradient {
         startPoint: .top,
         endPoint: .bottom
     )
-
-    static let cinematicPosterOverlay = LinearGradient(
-        colors: [
-            .clear,
-            .black.opacity(0.18),
-            .black.opacity(0.88),
-        ],
-        startPoint: .top,
-        endPoint: .bottom
-    )
-
-    static let cinematicBackdropOverlay = LinearGradient(
-        colors: [
-            .black.opacity(0.18),
-            .black.opacity(0.36),
-            Color.vanmoCinematicBackground,
-        ],
-        startPoint: .top,
-        endPoint: .bottom
-    )
-}
-
-// MARK: - 电影感布局令牌
-
-enum VanmoCinema {
-    static let posterCornerRadius: CGFloat = 16
-    static let cardCornerRadius: CGFloat = 22
-    static let compactCardCornerRadius: CGFloat = 14
-    static let horizontalPadding: CGFloat = 18
-    static let sectionSpacing: CGFloat = 32
-    static let railSpacing: CGFloat = 14
-
-    static let cardShadowColor = Color.black.opacity(0.38)
-    static let cardShadowRadius: CGFloat = 18
-    static let cardShadowYOffset: CGFloat = 12
 }
