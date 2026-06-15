@@ -1,0 +1,1122 @@
+{
+  "nodes": [
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "type": "file",
+      "name": "HTTPProtocolHandler.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "summary": "解析本地预缓存代理接收的 HTTP 请求、Range 头和 stream token，并构造 206/400/404 响应头。它是 PrefetchProxy 与 PrefetchSession 之间的 HTTP 协议适配层。",
+      "tags": [
+        "prefetch",
+        "http",
+        "range",
+        "streaming"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:HTTPRangeSpec",
+      "type": "class",
+      "name": "HTTPRangeSpec",
+      "filePath": "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "lineRange": [
+        4,
+        10
+      ],
+      "summary": "描述 HTTP Range 头的闭区间、起点到末尾和尾部 N 字节三种语义。",
+      "tags": [
+        "http",
+        "range",
+        "data-model"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:HTTPProtocolHandler",
+      "type": "class",
+      "name": "HTTPProtocolHandler",
+      "filePath": "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "lineRange": [
+        12,
+        112
+      ],
+      "summary": "提供本地代理 HTTP 请求解析、Range 解析、stream token 提取和响应头构造工具。",
+      "tags": [
+        "http",
+        "prefetch",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:parseRequest",
+      "type": "function",
+      "name": "parseRequest",
+      "filePath": "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "lineRange": [
+        20,
+        41
+      ],
+      "summary": "解析原始 HTTP header 数据为方法、路径和小写 header 字典。",
+      "tags": [
+        "http",
+        "parser",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:parseRangeHeader",
+      "type": "function",
+      "name": "parseRangeHeader",
+      "filePath": "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "lineRange": [
+        44,
+        62
+      ],
+      "summary": "解析 bytes Range 头并区分闭区间、起点范围和尾部范围。",
+      "tags": [
+        "http",
+        "range",
+        "parser"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:build206",
+      "type": "function",
+      "name": "build206",
+      "filePath": "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "lineRange": [
+        72,
+        93
+      ],
+      "summary": "构造播放器可识别的 206 Partial Content 响应头。",
+      "tags": [
+        "http",
+        "range",
+        "response"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/PrefetchConfig.swift",
+      "type": "file",
+      "name": "PrefetchConfig.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchConfig.swift",
+      "summary": "集中定义本地 HTTP 预缓存代理的 chunk 大小、预读窗口、内存缓存上限、并发数和路径前缀。用于让预缓存相关组件共享同一套会话级参数。",
+      "tags": [
+        "prefetch",
+        "configuration",
+        "streaming"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/PrefetchConfig.swift:PrefetchConfig",
+      "type": "class",
+      "name": "PrefetchConfig",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchConfig.swift",
+      "lineRange": [
+        4,
+        27
+      ],
+      "summary": "集中暴露预缓存代理的 chunk、预读、缓存、并发和路径常量。",
+      "tags": [
+        "configuration",
+        "prefetch",
+        "constants"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/PrefetchError.swift",
+      "type": "file",
+      "name": "PrefetchError.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchError.swift",
+      "summary": "定义预缓存代理在请求解析、上游响应、文件大小探测和连接生命周期中的本地化错误。为代理、会话和回源下载提供统一错误语义。",
+      "tags": [
+        "prefetch",
+        "error-handling",
+        "streaming"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/PrefetchError.swift:PrefetchError",
+      "type": "class",
+      "name": "PrefetchError",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchError.swift",
+      "lineRange": [
+        3,
+        23
+      ],
+      "summary": "枚举预缓存流程中可本地化展示或记录的错误分支。",
+      "tags": [
+        "error-handling",
+        "prefetch",
+        "localized-error"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "type": "file",
+      "name": "PrefetchProxy.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "summary": "实现单例 actor 形式的本地 TCP HTTP 代理，将远程媒体 URL 注册为 127.0.0.1 stream token 并处理播放器的 GET 请求。它负责监听端口、会话表和 NWConnection 收发桥接。",
+      "tags": [
+        "prefetch",
+        "networking",
+        "actor",
+        "streaming"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:PrefetchRegistration",
+      "type": "class",
+      "name": "PrefetchRegistration",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "lineRange": [
+        4,
+        7
+      ],
+      "summary": "保存本地代理注册后返回给播放器的代理 URL 与 session token。",
+      "tags": [
+        "prefetch",
+        "data-model",
+        "registration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:PrefetchProxy",
+      "type": "class",
+      "name": "PrefetchProxy",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "lineRange": [
+        10,
+        244
+      ],
+      "summary": "actor 单例负责启动本地 TCP listener、注册预缓存会话并响应播放器 HTTP GET。",
+      "tags": [
+        "actor",
+        "prefetch",
+        "networking"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:register",
+      "type": "function",
+      "name": "register",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "lineRange": [
+        23,
+        52
+      ],
+      "summary": "启动监听器、创建预缓存会话并返回本地 stream URL。",
+      "tags": [
+        "prefetch",
+        "registration",
+        "networking"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:startListenerIfNeeded",
+      "type": "function",
+      "name": "startListenerIfNeeded",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "lineRange": [
+        62,
+        83
+      ],
+      "summary": "复用已绑定端口或串行化本地 listener 启动任务。",
+      "tags": [
+        "listener",
+        "concurrency",
+        "networking"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:performStartListener",
+      "type": "function",
+      "name": "performStartListener",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "lineRange": [
+        85,
+        144
+      ],
+      "summary": "创建 NWListener、处理 ready/failed 状态并接收入站连接。",
+      "tags": [
+        "listener",
+        "networking",
+        "continuation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:handleIncoming",
+      "type": "function",
+      "name": "handleIncoming",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "lineRange": [
+        153,
+        197
+      ],
+      "summary": "读取播放器请求、校验 token、生成响应并流式发送 body chunk。",
+      "tags": [
+        "http",
+        "streaming",
+        "networking"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:readHTTPHeader",
+      "type": "function",
+      "name": "readHTTPHeader",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "lineRange": [
+        201,
+        219
+      ],
+      "summary": "从 NWConnection 读取请求头直到 header 终止符或超出大小限制。",
+      "tags": [
+        "networking",
+        "http",
+        "parser"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "type": "file",
+      "name": "PrefetchSession.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "summary": "管理单个远程媒体资源的预缓存会话，解析请求 Range、共享 chunk 下载 Task，并以 AsyncThrowingStream 向本地代理输出数据。它协调 RangeCache、RemoteFetcher 和全局 FetchLimiter。",
+      "tags": [
+        "prefetch",
+        "streaming",
+        "cache",
+        "concurrency"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:PrefetchSession",
+      "type": "class",
+      "name": "PrefetchSession",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "lineRange": [
+        4,
+        257
+      ],
+      "summary": "封装单个媒体资源的 Range 响应生成、共享下载任务和 body stream 生命周期。",
+      "tags": [
+        "prefetch",
+        "streaming",
+        "concurrency"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:cleanup",
+      "type": "function",
+      "name": "cleanup",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "lineRange": [
+        32,
+        42
+      ],
+      "summary": "取消预缓存会话的缓存、共享下载任务和活跃 body stream。",
+      "tags": [
+        "cleanup",
+        "concurrency",
+        "prefetch"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:sharedDownload",
+      "type": "function",
+      "name": "sharedDownload",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "lineRange": [
+        47,
+        93
+      ],
+      "summary": "为同一 chunk 复用下载 Task，限制并发并将结果写入缓存。",
+      "tags": [
+        "concurrency",
+        "prefetch",
+        "cache"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:makeResponse",
+      "type": "function",
+      "name": "makeResponse",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "lineRange": [
+        96,
+        122
+      ],
+      "summary": "解析请求 Range 并返回 206 响应头与正文异步流。",
+      "tags": [
+        "http",
+        "range",
+        "streaming"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:resolveRange",
+      "type": "function",
+      "name": "resolveRange",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "lineRange": [
+        126,
+        165
+      ],
+      "summary": "将 HTTP Range 语义约束到资源总长度并处理未知大小。",
+      "tags": [
+        "range",
+        "validation",
+        "prefetch"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:bodyStream",
+      "type": "function",
+      "name": "bodyStream",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "lineRange": [
+        169,
+        256
+      ],
+      "summary": "按 chunk pipeline 读取缓存或回源数据并向播放器逐段 yield。",
+      "tags": [
+        "streaming",
+        "cache",
+        "concurrency"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
+      "type": "file",
+      "name": "PrefetchTemporaryStore.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
+      "summary": "管理预缓存会话的 temporaryDirectory 根目录，并在 App 启动时清理崩溃遗留的 session 目录。它隔离预缓存磁盘临时文件的路径规则。",
+      "tags": [
+        "prefetch",
+        "temporary-storage",
+        "cleanup"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift:PrefetchTemporaryStore",
+      "type": "class",
+      "name": "PrefetchTemporaryStore",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
+      "lineRange": [
+        4,
+        33
+      ],
+      "summary": "管理预缓存临时目录和孤儿 session 目录清理。",
+      "tags": [
+        "temporary-storage",
+        "prefetch",
+        "cleanup"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift:cleanupOrphans",
+      "type": "function",
+      "name": "cleanupOrphans",
+      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
+      "lineRange": [
+        11,
+        28
+      ],
+      "summary": "清理 temporaryDirectory 中残留的预缓存 session 目录。",
+      "tags": [
+        "cleanup",
+        "temporary-storage",
+        "prefetch"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "type": "file",
+      "name": "RangeCache.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "summary": "实现按 chunk 索引组织的内存加磁盘 Range 缓存，使用 IndexSet 精确记录部分写入并按 LRU 溢写完整 chunk。它保证播放器读取不会误命中未完整写入的数据。",
+      "tags": [
+        "prefetch",
+        "cache",
+        "range",
+        "lru"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/RangeCache.swift:RangeCache",
+      "type": "class",
+      "name": "RangeCache",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        9,
+        226
+      ],
+      "summary": "维护 chunk 粒度的 Range 缓存，跟踪部分写入并按 LRU 将完整 chunk 溢写到磁盘。",
+      "tags": [
+        "cache",
+        "range",
+        "lru"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:hasEntire",
+      "type": "function",
+      "name": "hasEntire",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        40,
+        57
+      ],
+      "summary": "检查目标字节范围是否已被完整缓存。",
+      "tags": [
+        "cache",
+        "range",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:readEntire",
+      "type": "function",
+      "name": "readEntire",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        60,
+        86
+      ],
+      "summary": "在命中完整缓存时读取跨 chunk 字节范围。",
+      "tags": [
+        "cache",
+        "range",
+        "read"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:write",
+      "type": "function",
+      "name": "write",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        89,
+        129
+      ],
+      "summary": "将连续字节写入对应 chunk 并维护部分写入索引和完整 chunk 状态。",
+      "tags": [
+        "cache",
+        "write",
+        "range"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:removeAll",
+      "type": "function",
+      "name": "removeAll",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        131,
+        141
+      ],
+      "summary": "清空内存索引并删除 session 对应磁盘缓存目录。",
+      "tags": [
+        "cache",
+        "cleanup",
+        "storage"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:loadChunkFromDiskNoLRULocked",
+      "type": "function",
+      "name": "loadChunkFromDiskNoLRULocked",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        164,
+        178
+      ],
+      "summary": "从磁盘恢复完整 chunk 并同步内存缓存状态。",
+      "tags": [
+        "cache",
+        "disk",
+        "storage"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:installChunkLocked",
+      "type": "function",
+      "name": "installChunkLocked",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        184,
+        201
+      ],
+      "summary": "安装 chunk 到内存、更新 LRU 并在完整时持久化到磁盘。",
+      "tags": [
+        "cache",
+        "lru",
+        "storage"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:spillIfNeededLocked",
+      "type": "function",
+      "name": "spillIfNeededLocked",
+      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "lineRange": [
+        210,
+        225
+      ],
+      "summary": "在内存超限时仅淘汰已完整持久化的 LRU chunk。",
+      "tags": [
+        "cache",
+        "lru",
+        "memory"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "type": "file",
+      "name": "RemoteFetcher.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "summary": "封装 HTTP(S) Range 回源下载，剥离 URL 内嵌凭据转为 Basic Auth，并通过 HEAD 与小 Range 多策略探测资源总长度。它是预缓存会话访问上游媒体文件的网络层。",
+      "tags": [
+        "prefetch",
+        "networking",
+        "range",
+        "authentication"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:RemoteFetcher",
+      "type": "class",
+      "name": "RemoteFetcher",
+      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "lineRange": [
+        4,
+        147
+      ],
+      "summary": "执行上游 HTTP Range 请求并处理凭据、总长度探测和 Content-Range 解析。",
+      "tags": [
+        "networking",
+        "range",
+        "prefetch"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:stripCredentials",
+      "type": "function",
+      "name": "stripCredentials",
+      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "lineRange": [
+        16,
+        30
+      ],
+      "summary": "从 URL 中移除用户名密码并生成 Basic Auth header。",
+      "tags": [
+        "authentication",
+        "url",
+        "networking"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:probeTotalSize",
+      "type": "function",
+      "name": "probeTotalSize",
+      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "lineRange": [
+        55,
+        93
+      ],
+      "summary": "通过 HEAD 和多个小 Range 策略探测远程资源总长度。",
+      "tags": [
+        "networking",
+        "range",
+        "probe"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:probeWithRange",
+      "type": "function",
+      "name": "probeWithRange",
+      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "lineRange": [
+        95,
+        116
+      ],
+      "summary": "发送小范围 Range 请求并从响应推断资源总长度。",
+      "tags": [
+        "networking",
+        "range",
+        "probe"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:data",
+      "type": "function",
+      "name": "data",
+      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "lineRange": [
+        121,
+        127
+      ],
+      "summary": "一次性请求指定闭区间字节，避免逐字节 AsyncBytes 的 CPU 开销。",
+      "tags": [
+        "networking",
+        "range",
+        "download"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:parseContentRangeSlice",
+      "type": "function",
+      "name": "parseContentRangeSlice",
+      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "lineRange": [
+        137,
+        146
+      ],
+      "summary": "从 Content-Range 头中解析实际返回的字节闭区间。",
+      "tags": [
+        "http",
+        "range",
+        "parser"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Storage/MediaScanner.swift",
+      "type": "file",
+      "name": "MediaScanner.swift",
+      "filePath": "Vanmo/Core/Storage/MediaScanner.swift",
+      "summary": "负责扫描本地目录和远程服务目录，将视频文件或服务器媒体条目转换为 SwiftData 的 MediaItem。它处理增量去重、文件名解析、分批保存和服务器元数据同步。",
+      "tags": [
+        "media-library",
+        "scanner",
+        "swiftdata",
+        "import"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Swift 代码使用 Swift Concurrency、SwiftData 或 SwiftUI 等 iOS 17 项目常见模式。"
+    },
+    {
+      "id": "class:Vanmo/Core/Storage/MediaScanner.swift:MediaScanner",
+      "type": "class",
+      "name": "MediaScanner",
+      "filePath": "Vanmo/Core/Storage/MediaScanner.swift",
+      "lineRange": [
+        5,
+        273
+      ],
+      "summary": "actor 扫描本地/远程媒体来源并向 SwiftData 导入或更新 MediaItem。",
+      "tags": [
+        "scanner",
+        "swiftdata",
+        "media-library"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Storage/MediaScanner.swift:scanLocalDirectory",
+      "type": "function",
+      "name": "scanLocalDirectory",
+      "filePath": "Vanmo/Core/Storage/MediaScanner.swift",
+      "lineRange": [
+        13,
+        61
+      ],
+      "summary": "递归扫描本地视频文件、解析文件名并插入新的 MediaItem。",
+      "tags": [
+        "scanner",
+        "local-files",
+        "swiftdata"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Storage/MediaScanner.swift:scanRemoteDirectory",
+      "type": "function",
+      "name": "scanRemoteDirectory",
+      "filePath": "Vanmo/Core/Storage/MediaScanner.swift",
+      "lineRange": [
+        63,
+        157
+      ],
+      "summary": "广度遍历远程目录、批量导入视频文件并增量保存 SwiftData。",
+      "tags": [
+        "scanner",
+        "remote-files",
+        "swiftdata"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Storage/MediaScanner.swift:importServerMediaItems",
+      "type": "function",
+      "name": "importServerMediaItems",
+      "filePath": "Vanmo/Core/Storage/MediaScanner.swift",
+      "lineRange": [
+        160,
+        188
+      ],
+      "summary": "将服务器媒体条目合并到 SwiftData，更新已有项或插入新项。",
+      "tags": [
+        "import",
+        "server-media",
+        "swiftdata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Storage/MediaScanner.swift:apply",
+      "type": "function",
+      "name": "apply",
+      "filePath": "Vanmo/Core/Storage/MediaScanner.swift",
+      "lineRange": [
+        193,
+        242
+      ],
+      "summary": "把 ServerMediaItem 的元数据、播放进度和收藏状态应用到 MediaItem。",
+      "tags": [
+        "mapping",
+        "metadata",
+        "swiftdata"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:HTTPRangeSpec",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:HTTPProtocolHandler",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:parseRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:parseRangeHeader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift:build206",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchConfig.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/PrefetchConfig.swift:PrefetchConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchError.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/PrefetchError.swift:PrefetchError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:PrefetchRegistration",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:PrefetchProxy",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:register",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:startListenerIfNeeded",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:performStartListener",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:handleIncoming",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift:readHTTPHeader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:PrefetchSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:cleanup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:sharedDownload",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:makeResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:resolveRange",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchSession.swift:bodyStream",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift:PrefetchTemporaryStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift:cleanupOrphans",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/RangeCache.swift:RangeCache",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:hasEntire",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:readEntire",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:write",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:removeAll",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:loadChunkFromDiskNoLRULocked",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:installChunkLocked",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RangeCache.swift:spillIfNeededLocked",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:RemoteFetcher",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:stripCredentials",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:probeTotalSize",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:probeWithRange",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:data",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "target": "function:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift:parseContentRangeSlice",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Storage/MediaScanner.swift",
+      "target": "class:Vanmo/Core/Storage/MediaScanner.swift:MediaScanner",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Storage/MediaScanner.swift",
+      "target": "function:Vanmo/Core/Storage/MediaScanner.swift:scanLocalDirectory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Storage/MediaScanner.swift",
+      "target": "function:Vanmo/Core/Storage/MediaScanner.swift:scanRemoteDirectory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Storage/MediaScanner.swift",
+      "target": "function:Vanmo/Core/Storage/MediaScanner.swift:importServerMediaItems",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Storage/MediaScanner.swift",
+      "target": "function:Vanmo/Core/Storage/MediaScanner.swift:apply",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    }
+  ]
+}

@@ -1,0 +1,1442 @@
+{
+  "nodes": [
+    {
+      "id": "file:scripts/build-ffmpeg-ios.sh",
+      "type": "file",
+      "name": "build-ffmpeg-ios.sh",
+      "filePath": "scripts/build-ffmpeg-ios.sh",
+      "summary": "自动下载并交叉编译 FFmpeg 7.1 的 iOS device 与 simulator 静态库，并把 headers 与 lib 输出到 Vanmo Frameworks 目录。",
+      "tags": [
+        "build-system",
+        "ffmpeg",
+        "ios"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/build-ffmpeg-ios.sh:download_source",
+      "type": "function",
+      "name": "download_source",
+      "filePath": "scripts/build-ffmpeg-ios.sh",
+      "lineRange": [
+        23,
+        36
+      ],
+      "summary": "download_source 封装 FFmpeg iOS 构建脚本中的一个主要阶段。",
+      "tags": [
+        "build-system",
+        "ffmpeg",
+        "ios"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/build-ffmpeg-ios.sh:build_arch",
+      "type": "function",
+      "name": "build_arch",
+      "filePath": "scripts/build-ffmpeg-ios.sh",
+      "lineRange": [
+        38,
+        112
+      ],
+      "summary": "build_arch 封装 FFmpeg iOS 构建脚本中的一个主要阶段。",
+      "tags": [
+        "build-system",
+        "ffmpeg",
+        "ios"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/build-ffmpeg-ios.sh:install_output",
+      "type": "function",
+      "name": "install_output",
+      "filePath": "scripts/build-ffmpeg-ios.sh",
+      "lineRange": [
+        114,
+        141
+      ],
+      "summary": "install_output 封装 FFmpeg iOS 构建脚本中的一个主要阶段。",
+      "tags": [
+        "build-system",
+        "ffmpeg",
+        "ios"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "type": "file",
+      "name": "WebDAVService.swift",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "summary": "实现 WebDAV 连接、PROPFIND 目录解析、认证头、路径编码、流 URL 与下载。",
+      "tags": [
+        "network",
+        "remote-service",
+        "streaming"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Swift 结构由源文件补充提取，因为内置结构提取器对本批次 Swift 文件只返回基础指标。"
+    },
+    {
+      "id": "class:Vanmo/Core/Network/WebDAVService.swift:WebDAVService",
+      "type": "class",
+      "name": "WebDAVService",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        13,
+        407
+      ],
+      "summary": "WebDAVService 类型承载对应服务能力，封装连接、请求或媒体数据转换逻辑。",
+      "tags": [
+        "data-model",
+        "network",
+        "service"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.connect",
+      "type": "function",
+      "name": "WebDAVService.connect",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        25,
+        69
+      ],
+      "summary": "WebDAVService.connect 管理远程服务连接生命周期或会话校验。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.listDirectory",
+      "type": "function",
+      "name": "WebDAVService.listDirectory",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        77,
+        111
+      ],
+      "summary": "WebDAVService.listDirectory 提供远程文件浏览、串流地址生成或下载能力。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.streamURL",
+      "type": "function",
+      "name": "WebDAVService.streamURL",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        113,
+        130
+      ],
+      "summary": "WebDAVService.streamURL 提供远程文件浏览、串流地址生成或下载能力。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.download",
+      "type": "function",
+      "name": "WebDAVService.download",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        132,
+        161
+      ],
+      "summary": "WebDAVService.download 提供远程文件浏览、串流地址生成或下载能力。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.makeBaseURL",
+      "type": "function",
+      "name": "WebDAVService.makeBaseURL",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        167,
+        201
+      ],
+      "summary": "WebDAVService.makeBaseURL 封装 WebDAVService.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.appending",
+      "type": "function",
+      "name": "WebDAVService.appending",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        204,
+        217
+      ],
+      "summary": "WebDAVService.appending 封装 WebDAVService.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.makePropfindRequest",
+      "type": "function",
+      "name": "WebDAVService.makePropfindRequest",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        238,
+        248
+      ],
+      "summary": "WebDAVService.makePropfindRequest 封装 WebDAVService.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.parseMultistatus",
+      "type": "function",
+      "name": "WebDAVService.parseMultistatus",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        278,
+        348
+      ],
+      "summary": "WebDAVService.parseMultistatus 解析或映射输入数据，生成媒体、元数据或路径相关结果。",
+      "tags": [
+        "utility",
+        "network",
+        "service",
+        "parsing"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.collectResponses",
+      "type": "function",
+      "name": "WebDAVService.collectResponses",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        350,
+        363
+      ],
+      "summary": "WebDAVService.collectResponses 封装 WebDAVService.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.pickProp",
+      "type": "function",
+      "name": "WebDAVService.pickProp",
+      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
+      "lineRange": [
+        365,
+        378
+      ],
+      "summary": "WebDAVService.pickProp 封装 WebDAVService.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "network",
+        "service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "type": "file",
+      "name": "KSPlayerEngine.swift",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "summary": "基于 KSPlayer/FFmpeg 实现 PlayerEngine，处理加载、播放控制、轨道选择、字幕文本更新和播放状态回调。",
+      "tags": [
+        "player",
+        "media-playback",
+        "engine"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Swift 结构由源文件补充提取，因为内置结构提取器对本批次 Swift 文件只返回基础指标。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine",
+      "type": "class",
+      "name": "KSPlayerEngine",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        7,
+        373
+      ],
+      "summary": "KSPlayerEngine 实现播放器引擎相关能力，负责媒体加载、播放控制或引擎抽象。",
+      "tags": [
+        "data-model",
+        "player"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.load",
+      "type": "function",
+      "name": "KSPlayerEngine.load",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        77,
+        114
+      ],
+      "summary": "KSPlayerEngine.load 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.seek",
+      "type": "function",
+      "name": "KSPlayerEngine.seek",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        128,
+        146
+      ],
+      "summary": "KSPlayerEngine.seek 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.stop",
+      "type": "function",
+      "name": "KSPlayerEngine.stop",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        148,
+        160
+      ],
+      "summary": "KSPlayerEngine.stop 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.selectSubtitleTrack",
+      "type": "function",
+      "name": "KSPlayerEngine.selectSubtitleTrack",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        173,
+        197
+      ],
+      "summary": "KSPlayerEngine.selectSubtitleTrack 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.availableAudioTracks",
+      "type": "function",
+      "name": "KSPlayerEngine.availableAudioTracks",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        199,
+        211
+      ],
+      "summary": "KSPlayerEngine.availableAudioTracks 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.parseTrackDescription",
+      "type": "function",
+      "name": "KSPlayerEngine.parseTrackDescription",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        213,
+        257
+      ],
+      "summary": "KSPlayerEngine.parseTrackDescription 解析或映射输入数据，生成媒体、元数据或路径相关结果。",
+      "tags": [
+        "utility",
+        "player",
+        "parsing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.availableSubtitleTracks",
+      "type": "function",
+      "name": "KSPlayerEngine.availableSubtitleTracks",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        259,
+        271
+      ],
+      "summary": "KSPlayerEngine.availableSubtitleTracks 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.setupAudioSession",
+      "type": "function",
+      "name": "KSPlayerEngine.setupAudioSession",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        282,
+        299
+      ],
+      "summary": "KSPlayerEngine.setupAudioSession 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.configureAudioOptions",
+      "type": "function",
+      "name": "KSPlayerEngine.configureAudioOptions",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        301,
+        321
+      ],
+      "summary": "KSPlayerEngine.configureAudioOptions 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.updateSubtitleText",
+      "type": "function",
+      "name": "KSPlayerEngine.updateSubtitleText",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        343,
+        367
+      ],
+      "summary": "KSPlayerEngine.updateSubtitleText 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:changeLoadState",
+      "type": "function",
+      "name": "changeLoadState",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        388,
+        410
+      ],
+      "summary": "changeLoadState 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/KSPlayerEngine.swift:finish",
+      "type": "function",
+      "name": "finish",
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "lineRange": [
+        420,
+        430
+      ],
+      "summary": "finish 封装 KSPlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "type": "file",
+      "name": "PlayerEngine.swift",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "summary": "定义播放器抽象协议、字幕内容、原生 AVPlayerEngine 实现和播放器错误类型。",
+      "tags": [
+        "player",
+        "media-playback",
+        "engine"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Swift 结构由源文件补充提取，因为内置结构提取器对本批次 Swift 文件只返回基础指标。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine",
+      "type": "class",
+      "name": "PlayerEngine",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        17,
+        40
+      ],
+      "summary": "PlayerEngine 实现播放器引擎相关能力，负责媒体加载、播放控制或引擎抽象。",
+      "tags": [
+        "data-model",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine",
+      "type": "class",
+      "name": "AVPlayerEngine",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        56,
+        340
+      ],
+      "summary": "AVPlayerEngine 实现播放器引擎相关能力，负责媒体加载、播放控制或引擎抽象。",
+      "tags": [
+        "data-model",
+        "player"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.load",
+      "type": "function",
+      "name": "PlayerEngine.load",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        28,
+        39
+      ],
+      "summary": "PlayerEngine.load 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.play",
+      "type": "function",
+      "name": "PlayerEngine.play",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        29,
+        39
+      ],
+      "summary": "PlayerEngine.play 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.pause",
+      "type": "function",
+      "name": "PlayerEngine.pause",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        30,
+        39
+      ],
+      "summary": "PlayerEngine.pause 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.load",
+      "type": "function",
+      "name": "AVPlayerEngine.load",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        100,
+        130
+      ],
+      "summary": "AVPlayerEngine.load 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.stop",
+      "type": "function",
+      "name": "AVPlayerEngine.stop",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        149,
+        165
+      ],
+      "summary": "AVPlayerEngine.stop 处理播放器加载和播放控制。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.selectSubtitleTrack",
+      "type": "function",
+      "name": "AVPlayerEngine.selectSubtitleTrack",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        178,
+        190
+      ],
+      "summary": "AVPlayerEngine.selectSubtitleTrack 封装 PlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.availableAudioTracks",
+      "type": "function",
+      "name": "AVPlayerEngine.availableAudioTracks",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        192,
+        205
+      ],
+      "summary": "AVPlayerEngine.availableAudioTracks 封装 PlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.availableSubtitleTracks",
+      "type": "function",
+      "name": "AVPlayerEngine.availableSubtitleTracks",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        207,
+        220
+      ],
+      "summary": "AVPlayerEngine.availableSubtitleTracks 封装 PlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.assetURL",
+      "type": "function",
+      "name": "AVPlayerEngine.assetURL",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        224,
+        241
+      ],
+      "summary": "AVPlayerEngine.assetURL 封装 PlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.setupObservers",
+      "type": "function",
+      "name": "AVPlayerEngine.setupObservers",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        254,
+        322
+      ],
+      "summary": "AVPlayerEngine.setupObservers 封装 PlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.waitForReady",
+      "type": "function",
+      "name": "AVPlayerEngine.waitForReady",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        324,
+        339
+      ],
+      "summary": "AVPlayerEngine.waitForReady 封装 PlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngine.swift:legibleOutput",
+      "type": "function",
+      "name": "legibleOutput",
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "lineRange": [
+        345,
+        356
+      ],
+      "summary": "legibleOutput 封装 PlayerEngine.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/PlayerEngineFactory.swift",
+      "type": "file",
+      "name": "PlayerEngineFactory.swift",
+      "filePath": "Vanmo/Core/Player/PlayerEngineFactory.swift",
+      "summary": "按媒体扩展名选择原生 AVPlayerEngine 或 KSPlayer/FFmpeg 引擎，并记录选择日志。",
+      "tags": [
+        "player",
+        "media-playback",
+        "engine"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Swift 结构由源文件补充提取，因为内置结构提取器对本批次 Swift 文件只返回基础指标。"
+    },
+    {
+      "id": "function:Vanmo/Core/Player/PlayerEngineFactory.swift:PlayerEngineFactory.engine",
+      "type": "function",
+      "name": "PlayerEngineFactory.engine",
+      "filePath": "Vanmo/Core/Player/PlayerEngineFactory.swift",
+      "lineRange": [
+        25,
+        38
+      ],
+      "summary": "PlayerEngineFactory.engine 封装 PlayerEngineFactory.swift 中一段可复用的核心逻辑。",
+      "tags": [
+        "utility",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/PlayerState.swift",
+      "type": "file",
+      "name": "PlayerState.swift",
+      "filePath": "Vanmo/Core/Player/PlayerState.swift",
+      "summary": "定义播放状态、画面缩放、播放配置、音频输出模式和章节显示等播放器领域状态模型。",
+      "tags": [
+        "player",
+        "media-playback",
+        "engine"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Swift 结构由源文件补充提取，因为内置结构提取器对本批次 Swift 文件只返回基础指标。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/PlayerState.swift:VideoScaleMode",
+      "type": "class",
+      "name": "VideoScaleMode",
+      "filePath": "Vanmo/Core/Player/PlayerState.swift",
+      "lineRange": [
+        22,
+        50
+      ],
+      "summary": "VideoScaleMode 定义播放器领域状态或显示配置。",
+      "tags": [
+        "data-model",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/PlayerState.swift:AudioOutputMode",
+      "type": "class",
+      "name": "AudioOutputMode",
+      "filePath": "Vanmo/Core/Player/PlayerState.swift",
+      "lineRange": [
+        71,
+        96
+      ],
+      "summary": "AudioOutputMode 定义播放器领域状态或显示配置。",
+      "tags": [
+        "data-model",
+        "player"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
+      "type": "file",
+      "name": "FetchLimiter.swift",
+      "filePath": "Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
+      "summary": "用 actor 控制预取回源并发数，通过 continuation 队列限制同时抓取请求。",
+      "tags": [
+        "player",
+        "media-playback",
+        "engine"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Swift 结构由源文件补充提取，因为内置结构提取器对本批次 Swift 文件只返回基础指标。"
+    },
+    {
+      "id": "class:Vanmo/Core/Player/Prefetch/FetchLimiter.swift:FetchLimiter",
+      "type": "class",
+      "name": "FetchLimiter",
+      "filePath": "Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
+      "lineRange": [
+        4,
+        26
+      ],
+      "summary": "FetchLimiter 是 FetchLimiter.swift 中的 Swift actor，承担该文件的核心领域建模职责。",
+      "tags": [
+        "data-model",
+        "player",
+        "service"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:scripts/build-ffmpeg-ios.sh",
+      "target": "function:scripts/build-ffmpeg-ios.sh:download_source",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/build-ffmpeg-ios.sh",
+      "target": "function:scripts/build-ffmpeg-ios.sh:build_arch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/build-ffmpeg-ios.sh",
+      "target": "function:scripts/build-ffmpeg-ios.sh:install_output",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "class:Vanmo/Core/Network/WebDAVService.swift:WebDAVService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "class:Vanmo/Core/Network/WebDAVService.swift:WebDAVService",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.connect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.connect",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.listDirectory",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.listDirectory",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.streamURL",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.streamURL",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.download",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.download",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.makeBaseURL",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.makeBaseURL",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.appending",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.appending",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.makePropfindRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.makePropfindRequest",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.parseMultistatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.parseMultistatus",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.collectResponses",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.collectResponses",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.pickProp",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Network/WebDAVService.swift",
+      "target": "function:Vanmo/Core/Network/WebDAVService.swift:WebDAVService.pickProp",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "class:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "class:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.load",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.load",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.seek",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.seek",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.stop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.stop",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.selectSubtitleTrack",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.selectSubtitleTrack",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.availableAudioTracks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.availableAudioTracks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.parseTrackDescription",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.parseTrackDescription",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.availableSubtitleTracks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.availableSubtitleTracks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.setupAudioSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.setupAudioSession",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.configureAudioOptions",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.configureAudioOptions",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.updateSubtitleText",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:KSPlayerEngine.updateSubtitleText",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:changeLoadState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:changeLoadState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:finish",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/KSPlayerEngine.swift:finish",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "class:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "class:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "class:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "class:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.load",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.load",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.play",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.play",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.pause",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:PlayerEngine.pause",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.load",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.load",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.stop",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.stop",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.selectSubtitleTrack",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.selectSubtitleTrack",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.availableAudioTracks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.availableAudioTracks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.availableSubtitleTracks",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.availableSubtitleTracks",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.assetURL",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.assetURL",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.setupObservers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.setupObservers",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.waitForReady",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:AVPlayerEngine.waitForReady",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:legibleOutput",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngine.swift:legibleOutput",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerEngineFactory.swift",
+      "target": "function:Vanmo/Core/Player/PlayerEngineFactory.swift:PlayerEngineFactory.engine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerState.swift",
+      "target": "class:Vanmo/Core/Player/PlayerState.swift:VideoScaleMode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerState.swift",
+      "target": "class:Vanmo/Core/Player/PlayerState.swift:VideoScaleMode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerState.swift",
+      "target": "class:Vanmo/Core/Player/PlayerState.swift:AudioOutputMode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/PlayerState.swift",
+      "target": "class:Vanmo/Core/Player/PlayerState.swift:AudioOutputMode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/FetchLimiter.swift:FetchLimiter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
+      "target": "class:Vanmo/Core/Player/Prefetch/FetchLimiter.swift:FetchLimiter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

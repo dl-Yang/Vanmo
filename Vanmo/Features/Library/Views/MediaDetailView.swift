@@ -5,6 +5,7 @@ import Kingfisher
 struct MediaDetailView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     let item: MediaItem
 
     @State private var dominantColor: Color = .black.opacity(0.0)
@@ -34,9 +35,26 @@ struct MediaDetailView: View {
         .ignoresSafeArea(edges: .top)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .frame(width: 42, height: 42)
+                        .background(Color.white.opacity(0.12), in: Circle())
+                        .overlay {
+                            Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .opacity(activeSheet == nil ? 1 : 0)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 favoriteButton
             }
@@ -77,26 +95,16 @@ struct MediaDetailView: View {
 
                 heroBackdropImage(width: proxy.size.width, height: proxy.size.height)
 
-//                LinearGradient(
-//                    colors: [
-//                        .black.opacity(0.72),
-//                        .black.opacity(0.24),
-//                        .black.opacity(0.56),
-//                        .black.opacity(0.94),
-//                    ],
-//                    startPoint: .top,
-//                    endPoint: .bottom
-//                )
-//
-//                LinearGradient(
-//                    colors: [
-//                        .black.opacity(0.34),
-//                        .clear,
-//                        dominantColor.opacity(0.34),
-//                    ],
-//                    startPoint: .leading,
-//                    endPoint: .trailing
-//                )
+                LinearGradient(
+                    stops: [
+                        .init(color: Color(red: 10/255, green: 10/255, blue: 11/255).opacity(0.35), location: 0.0),
+                        .init(color: Color(red: 10/255, green: 10/255, blue: 11/255).opacity(0.1), location: 0.45),
+                        .init(color: Color(red: 10/255, green: 10/255, blue: 11/255).opacity(0.85), location: 0.80),
+                        .init(color: Color(red: 10/255, green: 10/255, blue: 11/255), location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             }
         }
         .ignoresSafeArea()
@@ -109,13 +117,13 @@ struct MediaDetailView: View {
             }
         } label: {
             Image(systemName: item.isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(item.isFavorite ? .red : .white)
-                .frame(width: 34, height: 34)
-                .background(.ultraThinMaterial, in: Circle())
+                .frame(width: 42, height: 42)
+                .background(Color.white.opacity(0.12), in: Circle())
                 .overlay {
                     Circle()
-                        .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                        .strokeBorder(.white.opacity(0.2), lineWidth: 1)
                 }
                 .shadow(color: .black.opacity(0.22), radius: 10, x: 0, y: 5)
         }
@@ -250,31 +258,366 @@ struct MediaDetailView: View {
 
     // MARK: - Header
 
+    @ViewBuilder
     private var foregroundContent: some View {
-        VStack(spacing: 0) {
-            heroHeader
+        if item.mediaType == .tvShow {
+            tvShowContent
+        } else {
+            movieContent
+        }
+    }
 
-            VStack(spacing: 14) {
-                playButton
-
-                if item.mediaType == .tvShow {
-                    currentEpisodeProgress
+    private var tvShowContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Title Section
+            VStack(alignment: .leading, spacing: 8) {
+                if let director = displayDirector {
+                    Text(director.uppercased())
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
-
-                buttonActionList
-
-                if item.mediaType == .tvShow {
-                    episodeBrowser
-                    synopsisSection(title: "本集简介")
-                    castSection(title: "演职人员")
-                } else {
-                    synopsisSection(title: "简介")
-                    castSection(title: "演职人员")
+                
+                Text("\(item.showTitle ?? item.title) · 第 \(selectedSeason ?? seasonNumbers.first ?? 1) 季")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(red: 158.0/255.0, green: 158.0/255.0, blue: 168.0/255.0))
+                
+                Text("\(item.year.map { "\($0) · " } ?? "")\(seasonNumbers.count) 季" + (displayGenres.isEmpty ? "" : " · " + displayGenres.prefix(2).joined(separator: " · ")))
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color(red: 158.0/255.0, green: 158.0/255.0, blue: 168.0/255.0))
+                
+                if let rating = item.rating {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 12))
+                        Text(String(format: "%.1f", rating))
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundStyle(Color(red: 245.0/255.0, green: 194.0/255.0, blue: 75.0/255.0))
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, item.mediaType == .tvShow ? 44 : 34)
+            .padding(.bottom, 14)
+
+            // Overview
+            Text(displayOverview ?? "暂无简介")
+                .font(.system(size: 13))
+                .lineSpacing(5)
+                .foregroundStyle(Color(red: 158.0/255.0, green: 158.0/255.0, blue: 168.0/255.0))
+                .lineLimit(4)
+                .onTapGesture {
+                    activeSheet = .synopsis
+                }
+                .padding(.bottom, 22)
+
+            // Actions
+            HStack(spacing: 12) {
+                Button {
+                    if let ep = nextEpisodeToPlay {
+                        playEpisode(ep)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 17, weight: .black))
+                        Text(nextEpisodeToPlay != nil ? "继续观看 S\(nextEpisodeToPlay!.seasonNumber)·E\(nextEpisodeToPlay!.episodeNumber)" : "播放")
+                            .font(.system(size: 15, weight: .bold))
+                    }
+                    .foregroundStyle(Color(red: 31.0/255.0, green: 23.0/255.0, blue: 23.0/255.0))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color(red: 243.0/255.0, green: 235.0/255.0, blue: 227.0/255.0))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+
+                movieCircleButton(icon: "icon_download", isSystem: false) { }
+                movieCircleButton(icon: "ellipsis") { }
+            }
+            .padding(.bottom, 24)
+
+            // Season Picker
+            if seasonNumbers.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(seasonNumbers, id: \.self) { season in
+                            let isSelected = (selectedSeason ?? seasonNumbers.first) == season
+                            Button {
+                                selectedSeason = season
+                            } label: {
+                                Text("第 \(season) 季")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(isSelected ? Color(red: 31.0/255.0, green: 23.0/255.0, blue: 23.0/255.0) : .white)
+                                    .padding(.horizontal, 16)
+                                    .frame(height: 33)
+                                    .background(isSelected ? Color(red: 243.0/255.0, green: 235.0/255.0, blue: 227.0/255.0) : Color.white.opacity(0.08), in: Capsule())
+                                    .overlay {
+                                        if !isSelected {
+                                            Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 1)
+                                        }
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .scrollClipDisabled()
+                .padding(.bottom, 24)
+            } else {
+                Spacer().frame(height: 24)
+            }
+
+            // Episodes List
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("剧集")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Text("共 \(currentSeasonEpisodes.count) 集")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 158.0/255.0, green: 158.0/255.0, blue: 168.0/255.0))
+                }
+                .padding(.bottom, 4)
+
+                if isLoadingEpisodes {
+                    HStack {
+                        Spacer()
+                        ProgressView().tint(.white)
+                        Spacer()
+                    }
+                    .frame(height: 100)
+                } else if currentSeasonEpisodes.isEmpty {
+                    HStack {
+                        Spacer()
+                        Text("暂无剧集信息")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color(red: 158.0/255.0, green: 158.0/255.0, blue: 168.0/255.0))
+                        Spacer()
+                    }
+                    .frame(height: 100)
+                } else {
+                    ForEach(currentSeasonEpisodes) { episode in
+                        tvEpisodeRow(episode)
+                    }
+                }
+            }
         }
+        .padding(.horizontal, 20)
+        .padding(.top, 246)
+        .padding(.bottom, 44)
+    }
+
+    private func tvEpisodeRow(_ episode: EpisodeInfo) -> some View {
+        let isCurrent = episode.id == nextEpisodeToPlay?.id
+        return Button {
+            playEpisode(episode)
+        } label: {
+            HStack(alignment: .top, spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(episodeThumbnailGradient(isCurrent: isCurrent))
+                        .frame(width: 128, height: 72)
+                    
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 30, height: 30)
+                        .background(Color.black.opacity(0.45), in: Circle())
+                        .overlay {
+                            Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1)
+                        }
+                    
+                    if isCurrent {
+                        VStack {
+                            Spacer()
+                            ZStack(alignment: .leading) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.25))
+                                    .frame(height: 3)
+                                Rectangle()
+                                    .fill(Color(red: 243.0/255.0, green: 235.0/255.0, blue: 227.0/255.0))
+                                    .frame(width: 77, height: 3)
+                            }
+                        }
+                    }
+                }
+                .frame(width: 128, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 4) {
+                        Text("第 \(episode.episodeNumber) 集")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.white)
+                        if isCurrent {
+                            Text("· 观看中")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(red: 243.0/255.0, green: 235.0/255.0, blue: 227.0/255.0))
+                        }
+                    }
+                    
+                    Text("\(episode.title.isEmpty ? "E\(episodeCode(episode.episodeNumber))" : episode.title) · \(episode.duration > 0 ? episode.duration.shortDuration : "-- 分钟")")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 158.0/255.0, green: 158.0/255.0, blue: 168.0/255.0))
+                        .lineLimit(1)
+                    
+                    Text(episode.overview ?? "暂无简介")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(red: 107.0/255.0, green: 107.0/255.0, blue: 117.0/255.0))
+                        .lineLimit(1)
+                }
+                .padding(.top, 2)
+                
+                Spacer(minLength: 0)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 8)
+    }
+
+    private var movieContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                if let director = displayDirector {
+                    Text(director.uppercased())
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                Text(item.displayTitle)
+                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .kerning(-0.72)
+                    .foregroundStyle(.white.opacity(0.95))
+                    .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
+            }
+            
+            HStack(spacing: 8) {
+                if let year = item.year {
+                    movieMetadataPill(text: "\(year)")
+                }
+                if item.duration > 0 {
+                    movieMetadataPill(icon: "clock", text: item.duration.shortDuration)
+                }
+                if let rating = item.rating {
+                    movieMetadataPill(icon: "star.fill", text: String(format: "%.1f", rating), textStyle: AnyShapeStyle(.white.opacity(0.95)))
+                }
+            }
+
+            Text(displayOverview ?? "暂无简介")
+                .font(.system(size: 12))
+                .lineSpacing(4)
+                .foregroundStyle(.white.opacity(0.62))
+                .lineLimit(4)
+                .onTapGesture {
+                    activeSheet = .synopsis
+                }
+
+            HStack(spacing: 12) {
+                Button {
+                    appState.play(item)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 16, weight: .black))
+                        Text("播放")
+                            .font(.system(size: 15, weight: .bold))
+                    }
+                    .foregroundStyle(Color(red: 31/255, green: 23/255, blue: 23/255))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .background(Color(red: 243/255, green: 235/255, blue: 227/255))
+                    .clipShape(Capsule())
+                    .shadow(color: Color(red: 243/255, green: 235/255, blue: 227/255).opacity(0.4), radius: 18, x: 0, y: 6)
+                }
+                .buttonStyle(.plain)
+
+                movieCircleButton(icon: "icon_download", isSystem: false) { }
+
+                movieCircleButton(icon: "ellipsis") { }
+            }
+
+            if !displayGenres.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(displayGenres, id: \.self) { genre in
+                            Text(genre)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 6)
+                                .overlay {
+                                    Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1)
+                                }
+                        }
+                    }
+                }
+                .scrollClipDisabled()
+            }
+
+            if !displayCast.isEmpty {
+                Text("主演  " + displayCast.prefix(3).joined(separator: "  /  "))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .onTapGesture {
+                        activeSheet = .cast
+                    }
+            }
+            
+            // Related recommendations text placeholder
+            VStack(alignment: .leading, spacing: 12) {
+                Text("相关推荐")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.top, 6)
+            }
+            .opacity(0) // Hidden as we don't have recommendations yet, but keeps layout consistent
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 338)
+        .padding(.bottom, 34)
+    }
+
+    private func movieMetadataPill(icon: String? = nil, text: String, textStyle: AnyShapeStyle = AnyShapeStyle(.white.opacity(0.85))) -> some View {
+        HStack(spacing: 5) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(textStyle)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(.white.opacity(0.1), in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(.white.opacity(0.14), lineWidth: 1)
+        }
+    }
+
+    private func movieCircleButton(icon: String, isSystem: Bool = true, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Group {
+                if isSystem {
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .semibold))
+                } else {
+                    Image(icon)
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                }
+            }
+            .foregroundStyle(.white.opacity(0.9))
+            .frame(width: 52, height: 52)
+            .background(.white.opacity(0.1), in: Circle())
+            .overlay {
+                Circle()
+                    .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var heroHeader: some View {

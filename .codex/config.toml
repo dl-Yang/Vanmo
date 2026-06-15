@@ -1,6 +1,6 @@
 # ~/.codex/config.toml
 
-[mcp.servers.figma]
+[mcp_servers.figma]
 url = "https://mcp.figma.com/mcp"
 
 [mcp_servers.Refero]

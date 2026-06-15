@@ -1,0 +1,35 @@
+{
+  "projectRoot": "/Users/yingu/Vanmo",
+  "batchFiles": [
+    {
+      "path": "ExportOptions.plist",
+      "language": "xml",
+      "sizeLines": 20,
+      "fileCategory": "config"
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "sizeLines": 112,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "build_ipa.sh",
+      "language": "shell",
+      "sizeLines": 72,
+      "fileCategory": "script"
+    },
+    {
+      "path": "project.yml",
+      "language": "yaml",
+      "sizeLines": 82,
+      "fileCategory": "config"
+    }
+  ],
+  "batchImportData": {
+    "ExportOptions.plist": [],
+    "README.md": [],
+    "build_ipa.sh": [],
+    "project.yml": []
+  }
+}

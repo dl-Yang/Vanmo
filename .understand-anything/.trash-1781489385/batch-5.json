@@ -1,0 +1,1484 @@
+{
+  "nodes": [
+    {
+      "id": "config:Vanmo/Resources/loadingSpinner.json",
+      "type": "config",
+      "name": "loadingSpinner.json",
+      "filePath": "Vanmo/Resources/loadingSpinner.json",
+      "summary": "定义名为 loadingSpinner 的 Lottie 动画资源，提供 200x200 的循环描边加载指示器。该资源由共享加载组件按名称加载，用于统一应用内等待状态的视觉反馈。",
+      "tags": [
+        "configuration",
+        "animation",
+        "lottie",
+        "loading"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Lottie JSON 使用 trim path 在 30 帧内完成 360 度旋转。"
+    },
+    {
+      "id": "file:Vanmo/Shared/Components/BackdropHeader.swift",
+      "type": "file",
+      "name": "BackdropHeader.swift",
+      "filePath": "Vanmo/Shared/Components/BackdropHeader.swift",
+      "summary": "提供可复用的 SwiftUI 背景头图组件，使用 Kingfisher 加载远程 backdrop 并叠加底部渐变遮罩。常用于媒体详情页顶部营造沉浸式视觉层次。",
+      "tags": [
+        "component",
+        "swiftui",
+        "image-loading",
+        "header"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Components/EmptyStateView.swift",
+      "type": "file",
+      "name": "EmptyStateView.swift",
+      "filePath": "Vanmo/Shared/Components/EmptyStateView.swift",
+      "summary": "提供空状态占位视图，组合 SF Symbol、标题、说明文案和可选操作按钮。它用于媒体库或列表无内容时给用户明确的下一步引导。",
+      "tags": [
+        "component",
+        "swiftui",
+        "empty-state",
+        "action"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "type": "file",
+      "name": "LoadingIndicatorView.swift",
+      "filePath": "Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "summary": "封装应用级加载指示器，优先播放 loadingSpinner Lottie 动画，未集成 Lottie 时回退到系统 ProgressView。该组件保证加载状态在不同依赖配置下都可运行。",
+      "tags": [
+        "component",
+        "swiftui",
+        "loading",
+        "lottie"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Components/LoadingView.swift",
+      "type": "file",
+      "name": "LoadingView.swift",
+      "filePath": "Vanmo/Shared/Components/LoadingView.swift",
+      "summary": "提供居中的加载状态容器，组合 LoadingIndicatorView 与可配置提示文案。适合页面级异步加载场景复用。",
+      "tags": [
+        "component",
+        "swiftui",
+        "loading",
+        "state-view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Components/PosterCard.swift",
+      "type": "file",
+      "name": "PosterCard.swift",
+      "filePath": "Vanmo/Shared/Components/PosterCard.swift",
+      "summary": "实现媒体海报卡片，负责远程封面、评分角标、国家标签、观看进度条与标题信息展示。它是媒体库网格和横向推荐列表中的核心复用卡片。",
+      "tags": [
+        "component",
+        "swiftui",
+        "poster",
+        "media-card"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Shared/Components/RatingBadge.swift",
+      "type": "file",
+      "name": "RatingBadge.swift",
+      "filePath": "Vanmo/Shared/Components/RatingBadge.swift",
+      "summary": "提供胶囊形评分角标，按评分比例切换绿色、橙色或红色前景和浅色背景。用于海报卡片等媒体展示组件突出用户评分或服务端评分。",
+      "tags": [
+        "component",
+        "swiftui",
+        "rating",
+        "badge"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "type": "file",
+      "name": "Color+Vanmo.swift",
+      "filePath": "Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "summary": "集中定义 Vanmo 的主题颜色、十六进制颜色初始化、当前主题读取以及全局渐变。该文件为 SwiftUI 页面和共享组件提供统一的品牌色、背景色、表面色和海报遮罩。",
+      "tags": [
+        "theme",
+        "swiftui",
+        "color",
+        "design-token"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "通过 ColorTheme 枚举结合 UserDefaults 实现系统主题与自定义撞色主题切换。"
+    },
+    {
+      "id": "file:Vanmo/Shared/Extensions/Int64+FileSize.swift",
+      "type": "file",
+      "name": "Int64+FileSize.swift",
+      "filePath": "Vanmo/Shared/Extensions/Int64+FileSize.swift",
+      "summary": "扩展 Int64 以输出本地化文件大小字符串，并修正 ByteCountFormatter 对零值的英文显示。用于媒体文件大小展示。",
+      "tags": [
+        "extension",
+        "formatting",
+        "file-size",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+      "type": "file",
+      "name": "TimeInterval+Formatting.swift",
+      "filePath": "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+      "summary": "扩展 TimeInterval 以提供播放时长和短格式时长字符串。用于播放器进度、媒体详情和列表中的时间展示。",
+      "tags": [
+        "extension",
+        "formatting",
+        "duration",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "type": "file",
+      "name": "URL+Extensions.swift",
+      "filePath": "Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "summary": "扩展 URL 识别视频文件、字幕文件并读取本地文件大小字符串。用于本地扫描和文件浏览时快速分类媒体资源。",
+      "tags": [
+        "extension",
+        "file-detection",
+        "media",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Extensions/View+Extensions.swift",
+      "type": "file",
+      "name": "View+Extensions.swift",
+      "filePath": "Vanmo/Shared/Extensions/View+Extensions.swift",
+      "summary": "提供 SwiftUI View 的卡片样式、海报样式、条件变换和延迟隐藏辅助方法。该文件承载共享界面修饰逻辑，减少页面组件重复代码。",
+      "tags": [
+        "extension",
+        "swiftui",
+        "view-modifier",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "type": "file",
+      "name": "RemoteFileService.swift",
+      "filePath": "Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "summary": "定义远程文件服务和媒体服务器服务的公共协议，以及跨协议共享的连接配置与服务端媒体条目模型。它为 SMB、WebDAV、Plex、Emby、Jellyfin 等连接实现提供统一抽象。",
+      "tags": [
+        "protocol",
+        "networking",
+        "media-service",
+        "data-model"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Shared/Utilities/CountryMapper.swift",
+      "type": "file",
+      "name": "CountryMapper.swift",
+      "filePath": "Vanmo/Shared/Utilities/CountryMapper.swift",
+      "summary": "提供国家或地区代码到中文显示名的轻量映射，并基于首个国家代码生成地区分组。用于媒体元数据中的产地展示和分组。",
+      "tags": [
+        "utility",
+        "metadata",
+        "localization",
+        "mapping"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "type": "file",
+      "name": "DominantColorExtractor.swift",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "summary": "从远程海报图片提取适合作为背景和强调色的主色，并缓存结果以减少重复计算。它使用 Kingfisher 获取图片、采样像素并按 HSB 权重筛选适配播放器详情页的视觉色彩。",
+      "tags": [
+        "utility",
+        "image-processing",
+        "color-extraction",
+        "cache"
+      ],
+      "complexity": "complex",
+      "languageNotes": "颜色算法使用低分辨率采样、色相分桶、饱和度和亮度评分来生成背景色与低饱和强调色。"
+    },
+    {
+      "id": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "type": "file",
+      "name": "KeychainManager.swift",
+      "filePath": "Vanmo/Shared/Utilities/KeychainManager.swift",
+      "summary": "封装 iOS Keychain 的保存、读取和删除操作，并提供字符串存取便利方法。它以单例形式为连接密码等敏感凭据提供本地安全存储能力。",
+      "tags": [
+        "utility",
+        "security",
+        "keychain",
+        "persistence"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Shared/Utilities/Logger.swift",
+      "type": "file",
+      "name": "Logger.swift",
+      "filePath": "Vanmo/Shared/Utilities/Logger.swift",
+      "summary": "集中定义 Vanmo 各功能域的 os.Logger 分类，包括播放器、网络、媒体库、元数据、字幕、存储和预取。用于统一本地调试与系统日志输出。",
+      "tags": [
+        "utility",
+        "logging",
+        "diagnostics",
+        "oslog"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Vanmo-Bridging-Header.h",
+      "type": "file",
+      "name": "Vanmo-Bridging-Header.h",
+      "filePath": "Vanmo/Vanmo-Bridging-Header.h",
+      "summary": "提供 Objective-C/Swift 桥接头的占位定义，目前没有暴露任何 C 或 Objective-C 头文件。保留该文件可为未来接入底层播放器或 FFmpeg 相关接口预留桥接入口。",
+      "tags": [
+        "interop",
+        "bridging-header",
+        "objective-c",
+        "swift"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Vanmo.entitlements",
+      "type": "file",
+      "name": "Vanmo.entitlements",
+      "filePath": "Vanmo/Vanmo.entitlements",
+      "summary": "声明应用沙盒和网络客户端权限，使 Vanmo 能在沙盒环境中发起网络连接。该权限配置支撑媒体源访问、远程服务浏览和在线元数据请求。",
+      "tags": [
+        "entitlements",
+        "security",
+        "sandbox",
+        "networking"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Components/BackdropHeader.swift:BackdropHeader",
+      "type": "class",
+      "name": "BackdropHeader",
+      "filePath": "Vanmo/Shared/Components/BackdropHeader.swift",
+      "lineRange": [
+        4,
+        30
+      ],
+      "summary": "可复用的 SwiftUI 头图视图，加载远程背景图并覆盖统一的底部渐变。",
+      "tags": [
+        "component",
+        "swiftui",
+        "image-loading"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Components/EmptyStateView.swift:EmptyStateView",
+      "type": "class",
+      "name": "EmptyStateView",
+      "filePath": "Vanmo/Shared/Components/EmptyStateView.swift",
+      "lineRange": [
+        3,
+        55
+      ],
+      "summary": "空状态 SwiftUI 视图，展示图标、标题、说明和可选操作按钮。",
+      "tags": [
+        "component",
+        "swiftui",
+        "empty-state"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Shared/Components/LoadingIndicatorView.swift:LoadingIndicatorView",
+      "type": "class",
+      "name": "LoadingIndicatorView",
+      "filePath": "Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "lineRange": [
+        9,
+        26
+      ],
+      "summary": "加载指示器视图，在 Lottie 动画和系统 ProgressView 之间按编译条件切换。",
+      "tags": [
+        "component",
+        "swiftui",
+        "loading"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Components/LoadingView.swift:LoadingView",
+      "type": "class",
+      "name": "LoadingView",
+      "filePath": "Vanmo/Shared/Components/LoadingView.swift",
+      "lineRange": [
+        3,
+        19
+      ],
+      "summary": "页面级加载容器，组合加载动画和提示文案。",
+      "tags": [
+        "component",
+        "swiftui",
+        "loading"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Components/PosterCard.swift:PosterCard",
+      "type": "class",
+      "name": "PosterCard",
+      "filePath": "Vanmo/Shared/Components/PosterCard.swift",
+      "lineRange": [
+        4,
+        133
+      ],
+      "summary": "媒体海报卡片视图，整合封面图、评分、产地、进度和标题覆盖层。",
+      "tags": [
+        "component",
+        "swiftui",
+        "media-card"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Shared/Components/RatingBadge.swift:RatingBadge",
+      "type": "class",
+      "name": "RatingBadge",
+      "filePath": "Vanmo/Shared/Components/RatingBadge.swift",
+      "lineRange": [
+        3,
+        33
+      ],
+      "summary": "评分胶囊角标，根据评分阈值选择对应颜色。",
+      "tags": [
+        "component",
+        "swiftui",
+        "rating"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Extensions/Color+Vanmo.swift:ColorTheme",
+      "type": "class",
+      "name": "ColorTheme",
+      "filePath": "Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "lineRange": [
+        25,
+        146
+      ],
+      "summary": "定义系统主题和三套自定义撞色主题，并提供颜色、展示名和外观模式配置。",
+      "tags": [
+        "theme",
+        "color",
+        "settings"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Shared/Extensions/View+Extensions.swift:CardModifier",
+      "type": "class",
+      "name": "CardModifier",
+      "filePath": "Vanmo/Shared/Extensions/View+Extensions.swift",
+      "lineRange": [
+        34,
+        41
+      ],
+      "summary": "封装半透明材质背景、圆角和阴影的通用卡片修饰器。",
+      "tags": [
+        "view-modifier",
+        "swiftui",
+        "styling"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:RemoteFileService",
+      "type": "class",
+      "name": "RemoteFileService",
+      "filePath": "Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "lineRange": [
+        3,
+        16
+      ],
+      "summary": "定义远程文件连接、目录列举、流地址生成和下载的统一协议。",
+      "tags": [
+        "protocol",
+        "networking",
+        "remote-files"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:MediaServerService",
+      "type": "class",
+      "name": "MediaServerService",
+      "filePath": "Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "lineRange": [
+        18,
+        23
+      ],
+      "summary": "扩展远程文件服务以异步流式输出媒体服务器条目。",
+      "tags": [
+        "protocol",
+        "media-service",
+        "streaming"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:ServerMediaItem",
+      "type": "class",
+      "name": "ServerMediaItem",
+      "filePath": "Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "lineRange": [
+        25,
+        117
+      ],
+      "summary": "描述来自媒体服务器的影片或剧集条目，包含元数据、流地址、播放记录和收藏状态。",
+      "tags": [
+        "data-model",
+        "media",
+        "server-item"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:ConnectionConfig",
+      "type": "class",
+      "name": "ConnectionConfig",
+      "filePath": "Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "lineRange": [
+        119,
+        156
+      ],
+      "summary": "承载连接类型、主机、端口、凭据、路径和本地文件夹 bookmark 数据。",
+      "tags": [
+        "data-model",
+        "connection",
+        "configuration"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Utilities/CountryMapper.swift:CountryMapper",
+      "type": "class",
+      "name": "CountryMapper",
+      "filePath": "Vanmo/Shared/Utilities/CountryMapper.swift",
+      "lineRange": [
+        3,
+        23
+      ],
+      "summary": "维护国家地区代码到中文名称的映射，并提供地区分组辅助方法。",
+      "tags": [
+        "utility",
+        "metadata",
+        "localization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Utilities/DominantColorExtractor.swift:DominantColorExtractor",
+      "type": "class",
+      "name": "DominantColorExtractor",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        4,
+        282
+      ],
+      "summary": "负责海报图片颜色提取、缓存和前景强调色合成的静态工具命名空间。",
+      "tags": [
+        "utility",
+        "image-processing",
+        "color-extraction"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainManager",
+      "type": "class",
+      "name": "KeychainManager",
+      "filePath": "Vanmo/Shared/Utilities/KeychainManager.swift",
+      "lineRange": [
+        4,
+        71
+      ],
+      "summary": "以单例封装 Keychain 通用密码项的保存、读取和删除操作。",
+      "tags": [
+        "utility",
+        "security",
+        "keychain"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainError",
+      "type": "class",
+      "name": "KeychainError",
+      "filePath": "Vanmo/Shared/Utilities/KeychainManager.swift",
+      "lineRange": [
+        73,
+        87
+      ],
+      "summary": "描述 Keychain 保存、读取、删除和字符串编码失败的本地化错误。",
+      "tags": [
+        "error-handling",
+        "security",
+        "keychain"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Shared/Utilities/Logger.swift:VanmoLogger",
+      "type": "class",
+      "name": "VanmoLogger",
+      "filePath": "Vanmo/Shared/Utilities/Logger.swift",
+      "lineRange": [
+        3,
+        11
+      ],
+      "summary": "集中暴露应用各功能域的 os.Logger 实例。",
+      "tags": [
+        "logging",
+        "diagnostics",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Components/PosterCard.swift:progressBar",
+      "type": "function",
+      "name": "progressBar",
+      "filePath": "Vanmo/Shared/Components/PosterCard.swift",
+      "lineRange": [
+        96,
+        110
+      ],
+      "summary": "根据海报卡片宽度绘制底部观看进度条。",
+      "tags": [
+        "component",
+        "progress",
+        "swiftui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/Color+Vanmo.swift:init(hex:)",
+      "type": "function",
+      "name": "init(hex:)",
+      "filePath": "Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "lineRange": [
+        6,
+        18
+      ],
+      "summary": "解析 3 位或 6 位十六进制颜色字符串并初始化 SwiftUI Color。",
+      "tags": [
+        "utility",
+        "color",
+        "parsing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/Int64+FileSize.swift:formattedFileSize",
+      "type": "function",
+      "name": "formattedFileSize",
+      "filePath": "Vanmo/Shared/Extensions/Int64+FileSize.swift",
+      "lineRange": [
+        4,
+        13
+      ],
+      "summary": "使用 ByteCountFormatter 将字节数格式化为文件大小文本，并处理零值显示。",
+      "tags": [
+        "formatting",
+        "file-size",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift:formattedDuration",
+      "type": "function",
+      "name": "formattedDuration",
+      "filePath": "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+      "lineRange": [
+        4,
+        15
+      ],
+      "summary": "将秒数格式化为播放器常用的 mm:ss 或 h:mm:ss 字符串。",
+      "tags": [
+        "formatting",
+        "duration",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift:shortDuration",
+      "type": "function",
+      "name": "shortDuration",
+      "filePath": "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+      "lineRange": [
+        17,
+        25
+      ],
+      "summary": "将秒数转换为小时和分钟组成的短时长文本。",
+      "tags": [
+        "formatting",
+        "duration",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/URL+Extensions.swift:isVideoFile",
+      "type": "function",
+      "name": "isVideoFile",
+      "filePath": "Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "lineRange": [
+        5,
+        11
+      ],
+      "summary": "基于扩展名判断 URL 是否指向常见视频文件。",
+      "tags": [
+        "file-detection",
+        "video",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/URL+Extensions.swift:isSubtitleFile",
+      "type": "function",
+      "name": "isSubtitleFile",
+      "filePath": "Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "lineRange": [
+        13,
+        18
+      ],
+      "summary": "基于扩展名判断 URL 是否指向常见字幕文件。",
+      "tags": [
+        "file-detection",
+        "subtitle",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/URL+Extensions.swift:fileSizeString",
+      "type": "function",
+      "name": "fileSizeString",
+      "filePath": "Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "lineRange": [
+        20,
+        26
+      ],
+      "summary": "读取本地文件属性并返回文件大小字符串。",
+      "tags": [
+        "formatting",
+        "file-size",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Extensions/View+Extensions.swift:hideAfterDelay",
+      "type": "function",
+      "name": "hideAfterDelay",
+      "filePath": "Vanmo/Shared/Extensions/View+Extensions.swift",
+      "lineRange": [
+        23,
+        31
+      ],
+      "summary": "在视图出现后延迟触发动画隐藏状态。",
+      "tags": [
+        "swiftui",
+        "animation",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedColor",
+      "type": "function",
+      "name": "cachedColor",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        15,
+        27
+      ],
+      "summary": "从缓存或远程海报中取得适合背景使用的主色。",
+      "tags": [
+        "cache",
+        "color-extraction",
+        "async"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedAccentColor",
+      "type": "function",
+      "name": "cachedAccentColor",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        31,
+        43
+      ],
+      "summary": "从缓存或远程海报中取得低饱和度高亮强调色。",
+      "tags": [
+        "cache",
+        "color-extraction",
+        "async"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractDominantColor",
+      "type": "function",
+      "name": "extractDominantColor",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        45,
+        58
+      ],
+      "summary": "从图片像素池筛选色彩丰富的候选色并生成背景色。",
+      "tags": [
+        "image-processing",
+        "palette",
+        "color-extraction"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractAccentColor",
+      "type": "function",
+      "name": "extractAccentColor",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        60,
+        72
+      ],
+      "summary": "优先选择低饱和高亮像素并合成强调色。",
+      "tags": [
+        "image-processing",
+        "palette",
+        "accent-color"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:retrieveImage",
+      "type": "function",
+      "name": "retrieveImage",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        84,
+        95
+      ],
+      "summary": "通过 Kingfisher 异步获取图片并桥接回 Swift Concurrency。",
+      "tags": [
+        "image-loading",
+        "async",
+        "kingfisher"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractPixelHSB",
+      "type": "function",
+      "name": "extractPixelHSB",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        105,
+        135
+      ],
+      "summary": "将图片缩放采样到像素缓冲区并转换为 HSB 像素数组。",
+      "tags": [
+        "image-processing",
+        "pixel-sampling",
+        "color-space"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:selectBestHue",
+      "type": "function",
+      "name": "selectBestHue",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        139,
+        193
+      ],
+      "summary": "按色相分桶、饱和度、亮度和占比评分选择最佳主色候选。",
+      "tags": [
+        "algorithm",
+        "palette",
+        "color-scoring"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:weightedAccent",
+      "type": "function",
+      "name": "weightedAccent",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        207,
+        230
+      ],
+      "summary": "按亮度和低饱和度权重合成适合前景按钮的强调色。",
+      "tags": [
+        "algorithm",
+        "accent-color",
+        "color-scoring"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:averageFallback",
+      "type": "function",
+      "name": "averageFallback",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        234,
+        251
+      ],
+      "summary": "在缺少优质色彩候选时对所有像素进行平均回退。",
+      "tags": [
+        "fallback",
+        "palette",
+        "color-extraction"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:rgbToHSB",
+      "type": "function",
+      "name": "rgbToHSB",
+      "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "lineRange": [
+        255,
+        277
+      ],
+      "summary": "将 RGB 分量转换为 HSBPixel 供后续评分算法使用。",
+      "tags": [
+        "color-space",
+        "conversion",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/KeychainManager.swift:save(_:for:)",
+      "type": "function",
+      "name": "save(_:for:)",
+      "filePath": "Vanmo/Shared/Utilities/KeychainManager.swift",
+      "lineRange": [
+        11,
+        27
+      ],
+      "summary": "删除旧 Keychain 项后写入新的二进制凭据数据。",
+      "tags": [
+        "keychain",
+        "persistence",
+        "security"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/KeychainManager.swift:load(for:)",
+      "type": "function",
+      "name": "load(for:)",
+      "filePath": "Vanmo/Shared/Utilities/KeychainManager.swift",
+      "lineRange": [
+        36,
+        53
+      ],
+      "summary": "从 Keychain 查询指定 key 的数据并区分未找到和系统错误。",
+      "tags": [
+        "keychain",
+        "persistence",
+        "security"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Shared/Utilities/KeychainManager.swift:delete(for:)",
+      "type": "function",
+      "name": "delete(for:)",
+      "filePath": "Vanmo/Shared/Utilities/KeychainManager.swift",
+      "lineRange": [
+        60,
+        70
+      ],
+      "summary": "删除指定 Keychain 项并容忍目标不存在的情况。",
+      "tags": [
+        "keychain",
+        "persistence",
+        "security"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:Vanmo/Shared/Components/BackdropHeader.swift",
+      "target": "class:Vanmo/Shared/Components/BackdropHeader.swift:BackdropHeader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/BackdropHeader.swift",
+      "target": "class:Vanmo/Shared/Components/BackdropHeader.swift:BackdropHeader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/EmptyStateView.swift",
+      "target": "class:Vanmo/Shared/Components/EmptyStateView.swift:EmptyStateView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/EmptyStateView.swift",
+      "target": "class:Vanmo/Shared/Components/EmptyStateView.swift:EmptyStateView",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "target": "class:Vanmo/Shared/Components/LoadingIndicatorView.swift:LoadingIndicatorView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "target": "class:Vanmo/Shared/Components/LoadingIndicatorView.swift:LoadingIndicatorView",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/LoadingView.swift",
+      "target": "class:Vanmo/Shared/Components/LoadingView.swift:LoadingView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/LoadingView.swift",
+      "target": "class:Vanmo/Shared/Components/LoadingView.swift:LoadingView",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/PosterCard.swift",
+      "target": "class:Vanmo/Shared/Components/PosterCard.swift:PosterCard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/PosterCard.swift",
+      "target": "class:Vanmo/Shared/Components/PosterCard.swift:PosterCard",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/RatingBadge.swift",
+      "target": "class:Vanmo/Shared/Components/RatingBadge.swift:RatingBadge",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/RatingBadge.swift",
+      "target": "class:Vanmo/Shared/Components/RatingBadge.swift:RatingBadge",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "target": "class:Vanmo/Shared/Extensions/Color+Vanmo.swift:ColorTheme",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "target": "class:Vanmo/Shared/Extensions/Color+Vanmo.swift:ColorTheme",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/View+Extensions.swift",
+      "target": "class:Vanmo/Shared/Extensions/View+Extensions.swift:CardModifier",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/View+Extensions.swift",
+      "target": "class:Vanmo/Shared/Extensions/View+Extensions.swift:CardModifier",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:RemoteFileService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:RemoteFileService",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:MediaServerService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:MediaServerService",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:ServerMediaItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:ServerMediaItem",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:ConnectionConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
+      "target": "class:Vanmo/Shared/Protocols/RemoteFileService.swift:ConnectionConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/CountryMapper.swift",
+      "target": "class:Vanmo/Shared/Utilities/CountryMapper.swift:CountryMapper",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/CountryMapper.swift",
+      "target": "class:Vanmo/Shared/Utilities/CountryMapper.swift:CountryMapper",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "class:Vanmo/Shared/Utilities/DominantColorExtractor.swift:DominantColorExtractor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "class:Vanmo/Shared/Utilities/DominantColorExtractor.swift:DominantColorExtractor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "target": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "target": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainManager",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "target": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "target": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainError",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/Logger.swift",
+      "target": "class:Vanmo/Shared/Utilities/Logger.swift:VanmoLogger",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/Logger.swift",
+      "target": "class:Vanmo/Shared/Utilities/Logger.swift:VanmoLogger",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/PosterCard.swift",
+      "target": "function:Vanmo/Shared/Components/PosterCard.swift:progressBar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "target": "function:Vanmo/Shared/Extensions/Color+Vanmo.swift:init(hex:)",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/Int64+FileSize.swift",
+      "target": "function:Vanmo/Shared/Extensions/Int64+FileSize.swift:formattedFileSize",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+      "target": "function:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift:formattedDuration",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+      "target": "function:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift:shortDuration",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "target": "function:Vanmo/Shared/Extensions/URL+Extensions.swift:isVideoFile",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "target": "function:Vanmo/Shared/Extensions/URL+Extensions.swift:isSubtitleFile",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "target": "function:Vanmo/Shared/Extensions/URL+Extensions.swift:fileSizeString",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/View+Extensions.swift",
+      "target": "function:Vanmo/Shared/Extensions/View+Extensions.swift:hideAfterDelay",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedColor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedAccentColor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractDominantColor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractAccentColor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:retrieveImage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractPixelHSB",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:selectBestHue",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:weightedAccent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:averageFallback",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:rgbToHSB",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "target": "function:Vanmo/Shared/Utilities/KeychainManager.swift:save(_:for:)",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "target": "function:Vanmo/Shared/Utilities/KeychainManager.swift:load(for:)",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "target": "function:Vanmo/Shared/Utilities/KeychainManager.swift:delete(for:)",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/BackdropHeader.swift",
+      "target": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/EmptyStateView.swift",
+      "target": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "target": "config:Vanmo/Resources/loadingSpinner.json",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "target": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/LoadingView.swift",
+      "target": "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/PosterCard.swift",
+      "target": "file:Vanmo/Shared/Components/RatingBadge.swift",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Components/PosterCard.swift",
+      "target": "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Extensions/View+Extensions.swift",
+      "target": "class:Vanmo/Shared/Extensions/View+Extensions.swift:CardModifier",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:retrieveImage",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:retrieveImage",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractDominantColor",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedAccentColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:retrieveImage",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:cachedAccentColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractAccentColor",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractDominantColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractPixelHSB",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractDominantColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:selectBestHue",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractDominantColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:averageFallback",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractAccentColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractPixelHSB",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractAccentColor",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:weightedAccent",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:extractPixelHSB",
+      "target": "function:Vanmo/Shared/Utilities/DominantColorExtractor.swift:rgbToHSB",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/KeychainManager.swift:save(_:for:)",
+      "target": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainError",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/KeychainManager.swift:load(for:)",
+      "target": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainError",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:Vanmo/Shared/Utilities/KeychainManager.swift:delete(for:)",
+      "target": "class:Vanmo/Shared/Utilities/KeychainManager.swift:KeychainError",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

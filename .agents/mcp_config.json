@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "better-icons": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "better-icons"
+      ]
+    }
+    "lottiefiles-creator":{
+      "command": "npx",
+      "args": [
+        "-y",
+        "@lottiefiles/creator-mcp@latest"
+      ]
+    }
+  }
+}

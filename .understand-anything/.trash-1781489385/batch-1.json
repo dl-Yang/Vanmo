@@ -1,0 +1,93 @@
+{
+  "nodes": [
+    {
+      "id": "config:ExportOptions.plist",
+      "type": "config",
+      "name": "ExportOptions.plist",
+      "filePath": "ExportOptions.plist",
+      "summary": "定义 iOS IPA 导出选项，使用 development 导出方式、自动签名、指定 teamID，并关闭 bitcode 编译。该配置被打包脚本传给 xcodebuild -exportArchive 控制归档产物导出。",
+      "tags": [
+        "configuration",
+        "ios-export",
+        "code-signing",
+        "build-system"
+      ],
+      "complexity": "simple",
+      "languageNotes": "plist 使用 Apple XML property list 格式表达 xcodebuild 导出参数。"
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "项目总览文档，说明 Vanmo 的媒体播放、媒体库、网络串流、字幕、元数据和搜索能力，并给出技术栈、目录结构与 XcodeGen 开发流程。它是新开发者理解应用范围和启动项目的入口。",
+      "tags": [
+        "documentation",
+        "entry-point",
+        "overview",
+        "developer-guide"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:build_ipa.sh",
+      "type": "file",
+      "name": "build_ipa.sh",
+      "filePath": "build_ipa.sh",
+      "summary": "自动化 Release 打包脚本，依次清理 Xcode 项目、生成 iOS archive、使用 ExportOptions.plist 导出 IPA，并输出产物路径、大小和第三方分发提示。脚本采用严格 shell 选项确保命令失败时立即中断。",
+      "tags": [
+        "build-system",
+        "ios-packaging",
+        "automation",
+        "script"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "脚本是顺序式 Bash 流程，没有显式函数定义；关键失败点通过目录和 IPA 文件存在性检查处理。"
+    },
+    {
+      "id": "config:project.yml",
+      "type": "config",
+      "name": "project.yml",
+      "filePath": "project.yml",
+      "summary": "XcodeGen 项目配置，定义 Vanmo iOS 应用目标、Swift 版本、部署版本、资源、entitlements、SWXMLHash 依赖以及 FFmpeg 相关编译和链接设置。它是生成 Vanmo.xcodeproj 与归档 scheme 的源配置。",
+      "tags": [
+        "configuration",
+        "xcodegen",
+        "ios-project",
+        "build-system"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "YAML 顶层 sections 将项目元数据、全局构建设置、Swift Package、target 和 scheme 分开描述。"
+    }
+  ],
+  "edges": [
+    {
+      "source": "config:ExportOptions.plist",
+      "target": "file:build_ipa.sh",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:build_ipa.sh",
+      "target": "config:ExportOptions.plist",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:README.md",
+      "target": "config:project.yml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:project.yml",
+      "target": "file:build_ipa.sh",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+[
+  {
+    "id": "layer:app-entry-state",
+    "name": "应用入口与状态层",
+    "description": "承载 Vanmo 的 @main App、根 ContentView 和全局 ObservableObject 状态装配，负责启动 SwiftUI 应用并连接顶层导航。",
+    "nodeIds": [
+      "file:Vanmo/App/AppState.swift",
+      "file:Vanmo/App/ContentView.swift",
+      "file:Vanmo/App/VanmoApp.swift"
+    ]
+  },
+  {
+    "id": "layer:playback-core",
+    "name": "播放核心层",
+    "description": "封装 AVFoundation、KSPlayer/FFmpeg 播放引擎、预取代理、播放状态和字幕解析等媒体播放核心能力。",
+    "nodeIds": [
+      "file:Vanmo/Core/Player/KSPlayerEngine.swift",
+      "file:Vanmo/Core/Player/PlayerEngine.swift",
+      "file:Vanmo/Core/Player/PlayerEngineFactory.swift",
+      "file:Vanmo/Core/Player/PlayerState.swift",
+      "file:Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
+      "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
+      "file:Vanmo/Core/Player/Prefetch/PrefetchConfig.swift",
+      "file:Vanmo/Core/Player/Prefetch/PrefetchError.swift",
+      "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
+      "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
+      "file:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
+      "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
+      "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
+      "file:Vanmo/Core/Subtitle/SRTParser.swift",
+      "file:Vanmo/Core/Subtitle/SubtitleManager.swift",
+      "file:Vanmo/Core/Subtitle/SubtitleOverlayView.swift",
+      "file:Vanmo/Core/Subtitle/SubtitleParser.swift",
+      "file:Vanmo/Core/Subtitle/VTTParser.swift"
+    ]
+  },
+  {
+    "id": "layer:network-media-source",
+    "name": "网络与媒体源层",
+    "description": "实现本地文件夹、SMB、WebDAV、Plex、Emby 和 Jellyfin 等媒体源协议，并提供连接管理与浏览入口。",
+    "nodeIds": [
+      "file:Vanmo/Core/Network/WebDAVService.swift",
+      "file:Vanmo/Core/Network/EmbyService.swift",
+      "file:Vanmo/Core/Network/JellyfinService.swift",
+      "file:Vanmo/Core/Network/LocalFolderService.swift",
+      "file:Vanmo/Core/Network/NetworkError.swift",
+      "file:Vanmo/Core/Network/PlexService.swift",
+      "file:Vanmo/Core/Network/ServiceFactory.swift",
+      "file:Vanmo/Core/Network/SMBService.swift",
+      "file:Vanmo/Features/Browser/Models/ConnectionModels.swift",
+      "file:Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift",
+      "file:Vanmo/Features/Browser/Views/AddConnectionView.swift",
+      "file:Vanmo/Features/Browser/Views/BrowserView.swift",
+      "file:Vanmo/Shared/Protocols/RemoteFileService.swift"
+    ]
+  },
+  {
+    "id": "layer:metadata-scanning",
+    "name": "元数据与媒体扫描层",
+    "description": "负责文件名解析、媒体扫描、TMDb 请求与 Decodable 模型映射，为资料库和展示界面提供影片元数据。",
+    "nodeIds": [
+      "file:Vanmo/Core/Metadata/TMDbModels.swift",
+      "file:Vanmo/Core/Metadata/TMDbService.swift",
+      "file:Vanmo/Core/Metadata/FileNameParser.swift",
+      "file:Vanmo/Core/Metadata/MetadataService.swift",
+      "file:Vanmo/Core/Storage/MediaScanner.swift"
+    ]
+  },
+  {
+    "id": "layer:library-feature",
+    "name": "媒体资料库功能层",
+    "description": "组织媒体资料库、收藏、筛选、搜索和设置等 SwiftUI 功能模块的模型、ViewModel 与页面。",
+    "nodeIds": [
+      "file:Vanmo/Features/Library/Models/CollectionFolder.swift",
+      "file:Vanmo/Features/Library/Models/HomeCollectionCache.swift",
+      "file:Vanmo/Features/Library/Models/LibraryFilters.swift",
+      "file:Vanmo/Features/Library/Models/MediaItem.swift",
+      "file:Vanmo/Features/Library/Models/PlaybackRecord.swift",
+      "file:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
+      "file:Vanmo/Features/Library/Views/CollectionFolderListView.swift",
+      "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "file:Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "file:Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
+      "file:Vanmo/Features/Search/Views/SearchView.swift",
+      "file:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
+      "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
+      "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
+      "file:Vanmo/Features/Library/Views/FilterChipsRow.swift",
+      "file:Vanmo/Features/Library/Views/FlowLayout.swift",
+      "file:Vanmo/Features/Library/Views/LibraryView.swift",
+      "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
+      "file:Vanmo/Features/Library/Views/MediaListRow.swift",
+      "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift"
+    ]
+  },
+  {
+    "id": "layer:playback-ui",
+    "name": "播放界面层",
+    "description": "承载 PlayerView、播放进度条、轨道选择器和 PlayerViewModel，负责把播放核心能力呈现为 SwiftUI 交互界面。",
+    "nodeIds": [
+      "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "file:Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "file:Vanmo/Features/Player/Views/PlayerView.swift",
+      "file:Vanmo/Features/Player/Views/TrackSelectorView.swift"
+    ]
+  },
+  {
+    "id": "layer:shared-components-utilities",
+    "name": "共享组件与工具层",
+    "description": "提供跨功能复用的 SwiftUI 组件、Extension、日志、Keychain、颜色提取和格式化等共享支撑代码。",
+    "nodeIds": [
+      "file:Vanmo/Shared/Components/BackdropHeader.swift",
+      "file:Vanmo/Shared/Components/EmptyStateView.swift",
+      "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
+      "file:Vanmo/Shared/Components/LoadingView.swift",
+      "file:Vanmo/Shared/Components/PosterCard.swift",
+      "file:Vanmo/Shared/Components/RatingBadge.swift",
+      "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
+      "file:Vanmo/Shared/Extensions/Int64+FileSize.swift",
+      "file:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+      "file:Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "file:Vanmo/Shared/Extensions/View+Extensions.swift",
+      "file:Vanmo/Shared/Utilities/CountryMapper.swift",
+      "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+      "file:Vanmo/Shared/Utilities/KeychainManager.swift",
+      "file:Vanmo/Shared/Utilities/Logger.swift"
+    ]
+  },
+  {
+    "id": "layer:resources-config",
+    "name": "资源与配置层",
+    "description": "包含 XcodeGen、Xcode project、Info.plist、entitlements、Assets.xcassets、Lottie JSON 和扫描忽略配置等应用资源与工程配置。",
+    "nodeIds": [
+      "config:ExportOptions.plist",
+      "config:project.yml",
+      "file:.cursorignore",
+      "file:.understand-anything/.understandignore",
+      "file:Vanmo.xcodeproj/project.pbxproj",
+      "file:Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme",
+      "config:Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+      "config:Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "config:Vanmo/Resources/Assets.xcassets/Contents.json",
+      "config:Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json",
+      "config:Vanmo/Resources/Info.plist",
+      "config:Vanmo/Resources/loadingSpinner.json",
+      "file:Vanmo/Vanmo-Bridging-Header.h",
+      "file:Vanmo/Vanmo.entitlements"
+    ]
+  },
+  {
+    "id": "layer:docs-build-scripts",
+    "name": "文档与构建脚本层",
+    "description": "覆盖 README 开发说明、IPA 打包脚本和 FFmpeg iOS 构建脚本，支持项目理解、归档和第三方库产物生成。",
+    "nodeIds": [
+      "document:README.md",
+      "file:build_ipa.sh",
+      "file:scripts/build-ffmpeg-ios.sh"
+    ]
+  }
+]

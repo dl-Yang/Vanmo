@@ -1,0 +1,315 @@
+{
+  "nodes": [
+    {
+      "id": "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "type": "file",
+      "name": "SettingsViewModel.swift",
+      "filePath": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "summary": "管理设置页的偏好状态、缓存统计和清理操作。它为设置界面提供可观察的配置与维护动作。",
+      "tags": [
+        "view-model",
+        "state-management",
+        "swiftui"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "SwiftUI 文件由源码声明补充结构，因为结构抽取脚本对 Swift 仅提供基础指标。"
+    },
+    {
+      "id": "function:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:calculateCacheSize",
+      "type": "function",
+      "name": "calculateCacheSize",
+      "filePath": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "lineRange": [
+        31,
+        56
+      ],
+      "summary": "calculateCacheSize 封装 当前文件 中一段显著的 SwiftUI 视图或业务逻辑。",
+      "tags": [
+        "swiftui",
+        "function",
+        "component"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:resetAllSettings",
+      "type": "function",
+      "name": "resetAllSettings",
+      "filePath": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "lineRange": [
+        68,
+        80
+      ],
+      "summary": "resetAllSettings 封装 当前文件 中一段显著的 SwiftUI 视图或业务逻辑。",
+      "tags": [
+        "swiftui",
+        "function",
+        "component"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "type": "file",
+      "name": "SettingsView.swift",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "summary": "构建应用设置页面，覆盖播放、字幕、缓存、网络和关于信息等配置区块。它是用户调整 Vanmo 行为的主界面。",
+      "tags": [
+        "settings",
+        "swiftui",
+        "feature-view"
+      ],
+      "complexity": "complex",
+      "languageNotes": "SwiftUI 文件由源码声明补充结构，因为结构抽取脚本对 Swift 仅提供基础指标。"
+    },
+    {
+      "id": "class:Vanmo/Features/Settings/Views/SettingsView.swift:SettingsView",
+      "type": "class",
+      "name": "SettingsView",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "lineRange": [
+        3,
+        197
+      ],
+      "summary": "SettingsView 定义该功能区域的 SwiftUI 视图结构，组织子视图、状态绑定和用户交互。",
+      "tags": [
+        "swiftui",
+        "component",
+        "ios-ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePickerGrid",
+      "type": "class",
+      "name": "ThemePickerGrid",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "lineRange": [
+        218,
+        270
+      ],
+      "summary": "ThemePickerGrid 是 SettingsView.swift 中的主要 Swift 类型，承载该文件的核心 UI 或状态逻辑。",
+      "tags": [
+        "swiftui",
+        "component",
+        "ios-ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePreviewCard",
+      "type": "class",
+      "name": "ThemePreviewCard",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "lineRange": [
+        273,
+        379
+      ],
+      "summary": "ThemePreviewCard 封装可复用卡片组件，负责媒体内容的视觉层次和交互呈现。",
+      "tags": [
+        "swiftui",
+        "component",
+        "ios-ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:Vanmo/Features/Settings/Views/SettingsView.swift:SettingsView.body",
+      "type": "function",
+      "name": "body",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "lineRange": [
+        6,
+        38
+      ],
+      "summary": "SettingsView 的主 SwiftUI body，组合页面层级、状态驱动内容和用户交互入口。",
+      "tags": [
+        "swiftui",
+        "component",
+        "layout"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Settings/Views/SettingsView.swift:SettingsView.subtitleSection",
+      "type": "function",
+      "name": "subtitleSection",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "lineRange": [
+        77,
+        101
+      ],
+      "summary": "subtitleSection 构建页面中的功能区块视图，封装该区块的布局和展示规则。",
+      "tags": [
+        "swiftui",
+        "component",
+        "layout"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePreviewCard.body",
+      "type": "function",
+      "name": "body",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "lineRange": [
+        277,
+        316
+      ],
+      "summary": "ThemePreviewCard 的主 SwiftUI body，组合页面层级、状态驱动内容和用户交互入口。",
+      "tags": [
+        "swiftui",
+        "component",
+        "layout"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePreviewCard.previewCanvas",
+      "type": "function",
+      "name": "previewCanvas",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "lineRange": [
+        319,
+        362
+      ],
+      "summary": "previewCanvas 封装 ThemePreviewCard 中一段显著的 SwiftUI 视图或业务逻辑。",
+      "tags": [
+        "swiftui",
+        "function",
+        "component"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+      "type": "config",
+      "name": "Contents.json",
+      "filePath": "Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+      "summary": "定义资产目录中的 AccentColor 颜色集合，提供应用主题强调色资源。该配置由 Xcode 资产系统读取。",
+      "tags": [
+        "configuration",
+        "asset-catalog",
+        "ios-resource"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "type": "config",
+      "name": "Contents.json",
+      "filePath": "Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "summary": "定义 AppIcon 图标集合的资产目录元数据，声明 iOS 应用图标资源槽位。该文件参与应用打包时的图标解析。",
+      "tags": [
+        "configuration",
+        "asset-catalog",
+        "ios-resource"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Vanmo/Resources/Assets.xcassets/Contents.json",
+      "type": "config",
+      "name": "Contents.json",
+      "filePath": "Vanmo/Resources/Assets.xcassets/Contents.json",
+      "summary": "定义根 Assets.xcassets 资产目录的基础元数据。它让 Xcode 识别并编译应用资源集合。",
+      "tags": [
+        "configuration",
+        "asset-catalog",
+        "ios-resource"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json",
+      "type": "config",
+      "name": "Contents.json",
+      "filePath": "Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json",
+      "summary": "定义 icon_download 图片集的资源清单，用于下载相关图标资产。该配置描述图片资源在资产目录中的组织方式。",
+      "tags": [
+        "configuration",
+        "asset-catalog",
+        "ios-resource"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Vanmo/Resources/Info.plist",
+      "type": "config",
+      "name": "Info.plist",
+      "filePath": "Vanmo/Resources/Info.plist",
+      "summary": "声明 iOS 应用包的运行时元数据和权限配置，包括 bundle 信息、场景和系统能力。它是应用安装与启动时读取的核心配置。",
+      "tags": [
+        "configuration",
+        "ios-app",
+        "bundle-metadata"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "target": "function:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:calculateCacheSize",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "target": "function:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:resetAllSettings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "class:Vanmo/Features/Settings/Views/SettingsView.swift:SettingsView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "class:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePickerGrid",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "class:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePreviewCard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "function:Vanmo/Features/Settings/Views/SettingsView.swift:SettingsView.body",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "function:Vanmo/Features/Settings/Views/SettingsView.swift:SettingsView.subtitleSection",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "function:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePreviewCard.body",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "function:Vanmo/Features/Settings/Views/SettingsView.swift:ThemePreviewCard.previewCanvas",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    }
+  ]
+}
