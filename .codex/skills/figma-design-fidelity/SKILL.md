@@ -11,7 +11,8 @@ description: Enforce that every UI change in the Vanmo iOS app strictly replicat
 ## Figma 设计源
 
 - 项目：**Vanmo**
-- 地址：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/TIDE?node-id=0-1&t=VPyaJ6BK9pikK3sh-1](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/TIDE?node-id=0-1&t=VPyaJ6BK9pikK3sh-1)
+- 页面 PageName：
+  - - `MediaDetail`: [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2)
 - `fileKey`：`miM6YTQAnerz6SgkkYZMjo`
 
 任何 UI 改动开始前，先把对应页面/组件的 Figma 节点定位出来（节点 URL 形如 `...?node-id=1-23`，调用工具时把 `node-id` 的 `-` 转成 `:`）。
@@ -112,7 +113,7 @@ iOS 落地路径：把 Iconify SVG 作为**矢量 imageset** 放进 `Vanmo/Resou
 }
 ```
 
-3. 在 SwiftUI 中调用并用项目 token 着色：
+1. 在 SwiftUI 中调用并用项目 token 着色：
 
 ```swift
 Image("IconName")
@@ -120,7 +121,7 @@ Image("IconName")
     .foregroundStyle(Color.vanmoPrimary) // 用 Color+Vanmo 中的 token
 ```
 
-4. 落地前先 `scan_project_icons`（或查看 `Assets.xcassets`）确认未重复；命名与设计稿图标语义一致（如 `playFilled`、`downloadOutline`）。
+1. 落地前先 `scan_project_icons`（或查看 `Assets.xcassets`）确认未重复；命名与设计稿图标语义一致（如 `playFilled`、`downloadOutline`）。
 
 > 真机调试若图标显示异常，按 `ios-device-debug-logs` 规则，在本地加 `Image` 相关调试 `print` 让我从 Xcode Console 复制，不要引入远程日志。
 
@@ -179,8 +180,8 @@ LottieView(animation: .named("loadingSpinner"))
     .frame(width: 80, height: 80)
 ```
 
-4. 命名与设计稿动效语义一致（如 `loadingSpinner`、`favoriteBurst`、`emptyBox`）；落地前确认 `Resources/` 下未重复。
-5. 依赖尚未加好时，用 `#if canImport(Lottie)` 守卫封装组件，未集成时回退到系统等价控件（如 `ProgressView`），保证项目始终可编译：
+1. 命名与设计稿动效语义一致（如 `loadingSpinner`、`favoriteBurst`、`emptyBox`）；落地前确认 `Resources/` 下未重复。
+2. 依赖尚未加好时，用 `#if canImport(Lottie)` 守卫封装组件，未集成时回退到系统等价控件（如 `ProgressView`），保证项目始终可编译：
 
 ```swift
 #if canImport(Lottie)

@@ -1,30 +1,4 @@
 {
-  "version": "1.0.0",
-  "project": {
-    "name": "Vanmo",
-    "languages": [
-      "c",
-      "entitlements",
-      "json",
-      "markdown",
-      "pbxproj",
-      "shell",
-      "swift",
-      "unknown",
-      "xcscheme",
-      "xml",
-      "yaml"
-    ],
-    "frameworks": [
-      "SwiftUI",
-      "AVFoundation",
-      "XCTest",
-      "Xcode"
-    ],
-    "description": "Vanmo 是一个 Swift/SwiftUI iOS 媒体播放应用，围绕本地与网络媒体源、播放内核、资料库和应用状态管理组织代码。",
-    "analyzedAt": "2026-06-15T06:14:25.230Z",
-    "gitCommitHash": "1c18734d98602fb1201ca0f6ce1a82d36331794f"
-  },
   "nodes": [
     {
       "id": "config:ExportOptions.plist",
@@ -14719,1189 +14693,910 @@
       "target": "class:Vanmo/Features/Player/Views/PlayerView.swift:AVPlayerVideoLayer",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "function:Vanmo/Features/Player/Views/PlayerView.swift:makeUIView",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "function:Vanmo/Features/Player/Views/PlayerView.swift:updateUIView",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "class:Vanmo/Features/Player/Views/PlayerView.swift:PlayerUIView",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "class:Vanmo/Features/Player/Views/PlayerView.swift:var",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "function:Vanmo/Features/Player/Views/PlayerView.swift:episodeRow",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "function:Vanmo/Features/Player/Views/PlayerView.swift:isSelectedSeason",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "function:Vanmo/Features/Player/Views/PlayerView.swift:isCurrentEpisode",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
       "target": "function:Vanmo/Features/Player/Views/PlayerView.swift:isCurrentChapter",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
       "target": "class:Vanmo/Features/Search/ViewModels/SearchViewModel.swift:SearchViewModel",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
       "target": "function:Vanmo/Features/Search/ViewModels/SearchViewModel.swift:setModelContext",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
       "target": "class:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:SettingsViewModel",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
       "target": "function:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:clearCache",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
       "target": "function:Vanmo/Features/Settings/Views/SettingsView.swift:cell",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
       "target": "class:Vanmo/Features/Settings/Views/SettingsView.swift:AppearanceSettingsView",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
       "target": "class:Vanmo/Features/Settings/Views/SettingsView.swift:ThemeSwatch",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:movieSubtitle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:loadItems",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:makeShowSummaries",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:normalizedShowTitle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:episodeSortPredicate",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
       "target": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedShowSummary",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:loadEpisodes",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:normalizedShowTitle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:episodeSortPredicate",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
       "target": "function:Vanmo/Features/Library/Views/SecondFloorView.swift:dismiss",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
       "target": "function:Vanmo/Features/Library/Views/SecondFloorView.swift:extractDominantColor",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerViewModel",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:onAppear",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:onDisappear",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:resetPlaybackMetadata",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:unregisterPrefetchIfNeeded",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:togglePlayPause",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:seek",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:skipForward",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:skipBackward",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setRate",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setScaleMode",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:selectAudioTrack",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:selectSubtitleTrack",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:preferredSubtitleIndex",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:languageAliases",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:normalizedLanguageCode",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:playEpisode",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadEpisodesIfNeeded",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadRemoteEpisodes",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:groupedEpisodes",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:makeMediaItem",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:matchesCurrentItem",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:normalizedShowTitle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:episodeSortPredicate",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:seekToChapter",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadChapters",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:toggleControls",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:showControlsBriefly",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:scheduleHideControls",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleBrightnessChange",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleVolumeChange",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleSeekGesture",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:commitSeekGesture",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleLongPress",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:saveProgress",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:dismissOverlay",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
       "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerEpisodeSeason",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
       "target": "function:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift:childContextMenu",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
       "target": "function:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift:loadChildren",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
       "target": "class:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift:LibraryItemDestination",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:metadataBadge",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "class:Vanmo/Features/Library/Views/FavoritesListView.swift:FavoritesListViewModel",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:setModelContext",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:loadInitialPage",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:reload",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:loadNextPageIfNeeded",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:loadNextPage",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:unfavorite",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:replaceItems",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:appendItems",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "class:Vanmo/Features/Library/Views/FavoritesListView.swift:FavoritesBatchResult",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesListView.swift:matches",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "class:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:FavoriteEntry",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "class:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:BadgeEntry",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "class:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:StackCardLayout",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:cardLayout",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:stackCardStyle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:countBadge",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "class:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:FavoritesCardButtonStyle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "function:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:makeBody",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
       "target": "class:Vanmo/Features/Library/Views/FavoritesStackedCard.swift:Style",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FilterChipsRow.swift",
       "target": "function:Vanmo/Features/Library/Views/FilterChipsRow.swift:isSelected",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FilterChipsRow.swift",
       "target": "function:Vanmo/Features/Library/Views/FilterChipsRow.swift:toggle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FlowLayout.swift",
       "target": "function:Vanmo/Features/Library/Views/FlowLayout.swift:sizeThatFits",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FlowLayout.swift",
       "target": "function:Vanmo/Features/Library/Views/FlowLayout.swift:placeSubviews",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FlowLayout.swift",
       "target": "function:Vanmo/Features/Library/Views/FlowLayout.swift:rows",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FlowLayout.swift",
       "target": "class:Vanmo/Features/Library/Views/FlowLayout.swift:FlowRow",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/FlowLayout.swift",
       "target": "class:Vanmo/Features/Library/Views/FlowLayout.swift:FlowItem",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:usesServerCollectionAPI",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:collectionFolderSection",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:serverSectionHeader",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:folderRow",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:folderDestination",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:folderPreviewContent",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:previewDestination",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:folderTypePill",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:folderPreviewSubtitle",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:continueWatchingHistoryCard",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:librarySyncStatusOverlay",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:showSyncToast",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
       "target": "function:Vanmo/Features/Library/Views/LibraryView.swift:body",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "class:Vanmo/Features/Library/Views/MediaDetailView.swift:MediaDetailView",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:panelDrag",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:topNavBar",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:fixedPosterBackground",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:heroBackdropImage",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:mediaInfoPanel",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:panelHeader",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:tagView",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:panelActions",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:castAvatar",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:detailsSection",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:detailRow",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:circleAction",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:tvEpisodeRow",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:enrichItemDetailIfNeeded",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:setFavorite",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:updateStoredFavoriteState",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:playEpisode",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:loadEpisodes",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:initial",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:highResolutionPosterURL",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
+      "weight": 1.0
     },
     {
       "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
       "target": "function:Vanmo/Features/Library/Views/MediaDetailView.swift:modalOverlay",
       "type": "contains",
       "direction": "forward",
-      "weight": 1
-    }
-  ],
-  "layers": [
-    {
-      "id": "layer:app-entry-state",
-      "name": "应用入口与状态层",
-      "description": "承载 Vanmo 的 @main App、根 ContentView 和全局 ObservableObject 状态装配，负责启动 SwiftUI 应用并连接顶层导航。",
-      "nodeIds": [
-        "file:Vanmo/App/AppState.swift",
-        "file:Vanmo/App/ContentView.swift",
-        "file:Vanmo/App/VanmoApp.swift"
-      ]
-    },
-    {
-      "id": "layer:playback-core",
-      "name": "播放核心层",
-      "description": "封装 AVFoundation、KSPlayer/FFmpeg 播放引擎、预取代理、播放状态和字幕解析等媒体播放核心能力。",
-      "nodeIds": [
-        "file:Vanmo/Core/Player/KSPlayerEngine.swift",
-        "file:Vanmo/Core/Player/PlayerEngine.swift",
-        "file:Vanmo/Core/Player/PlayerEngineFactory.swift",
-        "file:Vanmo/Core/Player/PlayerState.swift",
-        "file:Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
-        "file:Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
-        "file:Vanmo/Core/Player/Prefetch/PrefetchConfig.swift",
-        "file:Vanmo/Core/Player/Prefetch/PrefetchError.swift",
-        "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
-        "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
-        "file:Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
-        "file:Vanmo/Core/Player/Prefetch/RangeCache.swift",
-        "file:Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
-        "file:Vanmo/Core/Subtitle/SRTParser.swift",
-        "file:Vanmo/Core/Subtitle/SubtitleManager.swift",
-        "file:Vanmo/Core/Subtitle/SubtitleOverlayView.swift",
-        "file:Vanmo/Core/Subtitle/SubtitleParser.swift",
-        "file:Vanmo/Core/Subtitle/VTTParser.swift"
-      ]
-    },
-    {
-      "id": "layer:network-media-source",
-      "name": "网络与媒体源层",
-      "description": "实现本地文件夹、SMB、WebDAV、Plex、Emby 和 Jellyfin 等媒体源协议，并提供连接管理与浏览入口。",
-      "nodeIds": [
-        "file:Vanmo/Core/Network/WebDAVService.swift",
-        "file:Vanmo/Core/Network/EmbyService.swift",
-        "file:Vanmo/Core/Network/JellyfinService.swift",
-        "file:Vanmo/Core/Network/LocalFolderService.swift",
-        "file:Vanmo/Core/Network/NetworkError.swift",
-        "file:Vanmo/Core/Network/PlexService.swift",
-        "file:Vanmo/Core/Network/ServiceFactory.swift",
-        "file:Vanmo/Core/Network/SMBService.swift",
-        "file:Vanmo/Features/Browser/Models/ConnectionModels.swift",
-        "file:Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift",
-        "file:Vanmo/Features/Browser/Views/AddConnectionView.swift",
-        "file:Vanmo/Features/Browser/Views/BrowserView.swift",
-        "file:Vanmo/Shared/Protocols/RemoteFileService.swift"
-      ]
-    },
-    {
-      "id": "layer:metadata-scanning",
-      "name": "元数据与媒体扫描层",
-      "description": "负责文件名解析、媒体扫描、TMDb 请求与 Decodable 模型映射，为资料库和展示界面提供影片元数据。",
-      "nodeIds": [
-        "file:Vanmo/Core/Metadata/TMDbModels.swift",
-        "file:Vanmo/Core/Metadata/TMDbService.swift",
-        "file:Vanmo/Core/Metadata/FileNameParser.swift",
-        "file:Vanmo/Core/Metadata/MetadataService.swift",
-        "file:Vanmo/Core/Storage/MediaScanner.swift"
-      ]
-    },
-    {
-      "id": "layer:library-feature",
-      "name": "媒体资料库功能层",
-      "description": "组织媒体资料库、收藏、筛选、搜索和设置等 SwiftUI 功能模块的模型、ViewModel 与页面。",
-      "nodeIds": [
-        "file:Vanmo/Features/Library/Models/CollectionFolder.swift",
-        "file:Vanmo/Features/Library/Models/HomeCollectionCache.swift",
-        "file:Vanmo/Features/Library/Models/LibraryFilters.swift",
-        "file:Vanmo/Features/Library/Models/MediaItem.swift",
-        "file:Vanmo/Features/Library/Models/PlaybackRecord.swift",
-        "file:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
-        "file:Vanmo/Features/Library/Views/CollectionFolderListView.swift",
-        "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
-        "file:Vanmo/Features/Settings/Views/SettingsView.swift",
-        "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
-        "file:Vanmo/Features/Library/Views/SecondFloorItemView.swift",
-        "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
-        "file:Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
-        "file:Vanmo/Features/Search/Views/SearchView.swift",
-        "file:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
-        "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
-        "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
-        "file:Vanmo/Features/Library/Views/FilterChipsRow.swift",
-        "file:Vanmo/Features/Library/Views/FlowLayout.swift",
-        "file:Vanmo/Features/Library/Views/LibraryView.swift",
-        "file:Vanmo/Features/Library/Views/MediaListRow.swift",
-        "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
-        "file:Vanmo/Features/Library/Views/MediaDetailView.swift"
-      ]
-    },
-    {
-      "id": "layer:ui-components-utils",
-      "name": "通用组件与工具层",
-      "description": "提供基础 UI 组件、颜色主题扩展、播放器界面控制以及工具类（如 Keychain、Logger、色彩提取），支撑各功能模块。",
-      "nodeIds": [
-        "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
-        "file:Vanmo/Features/Player/Views/PlayerProgressBar.swift",
-        "file:Vanmo/Features/Player/Views/PlayerView.swift",
-        "file:Vanmo/Features/Player/Views/TrackSelectorView.swift",
-        "file:Vanmo/Shared/Components/BackdropHeader.swift",
-        "file:Vanmo/Shared/Components/EmptyStateView.swift",
-        "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
-        "file:Vanmo/Shared/Components/LoadingView.swift",
-        "file:Vanmo/Shared/Components/PosterCard.swift",
-        "file:Vanmo/Shared/Components/RatingBadge.swift",
-        "file:Vanmo/Shared/Extensions/Color+Vanmo.swift",
-        "file:Vanmo/Shared/Extensions/Int64+FileSize.swift",
-        "file:Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
-        "file:Vanmo/Shared/Extensions/URL+Extensions.swift",
-        "file:Vanmo/Shared/Extensions/View+Extensions.swift",
-        "file:Vanmo/Shared/Utilities/CountryMapper.swift",
-        "file:Vanmo/Shared/Utilities/DominantColorExtractor.swift",
-        "file:Vanmo/Shared/Utilities/KeychainManager.swift",
-        "file:Vanmo/Shared/Utilities/Logger.swift"
-      ]
-    },
-    {
-      "id": "layer:resources-config",
-      "name": "资源与配置层",
-      "description": "包含 XcodeGen、Xcode project、Info.plist、entitlements、Assets.xcassets、Lottie JSON 和扫描忽略配置等应用资源与工程配置。",
-      "nodeIds": [
-        "config:ExportOptions.plist",
-        "config:project.yml",
-        "file:.cursorignore",
-        "file:Vanmo.xcodeproj/project.pbxproj",
-        "file:Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme",
-        "config:Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
-        "config:Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
-        "config:Vanmo/Resources/Assets.xcassets/Contents.json",
-        "config:Vanmo/Resources/Info.plist",
-        "config:Vanmo/Resources/loadingSpinner.json",
-        "file:Vanmo/Vanmo-Bridging-Header.h",
-        "file:Vanmo/Vanmo.entitlements",
-        "config:.cursorignore",
-        "config:.understand-anything/.understandignore",
-        "config:Vanmo.xcodeproj/project.pbxproj",
-        "config:Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme",
-        "config:Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json"
-      ]
-    },
-    {
-      "id": "layer:docs-build-scripts",
-      "name": "文档与构建脚本层",
-      "description": "覆盖 README 开发说明、IPA 打包脚本和 FFmpeg iOS 构建脚本，支持项目理解、归档和第三方库产物生成。",
-      "nodeIds": [
-        "document:README.md",
-        "file:build_ipa.sh",
-        "file:scripts/build-ffmpeg-ios.sh"
-      ]
-    }
-  ],
-  "tour": [
-    {
-      "order": 1,
-      "title": "项目总览",
-      "description": "通过 README 了解 Vanmo 的项目概览、功能特性和整体技术栈。文档中详述了媒体播放、网络串流和 XcodeGen 开发流程，为您后续理解代码库架构提供全局视角和路线图。",
-      "nodeIds": [
-        "document:README.md"
-      ]
-    },
-    {
-      "order": 2,
-      "title": "应用入口与状态配置",
-      "description": "应用的主入口负责配置生命周期并注入全局状态 AppState。在这里，根视图 ContentView 建立起主选项卡导航，统领全局路由与各功能模块，串联起整个应用的骨架。",
-      "nodeIds": [
-        "file:Vanmo/App/VanmoApp.swift",
-        "file:Vanmo/App/ContentView.swift",
-        "file:Vanmo/App/AppState.swift"
-      ],
-      "languageLesson": "SwiftUI 应用使用 @main 标记入口点，通过 StateObject 和 EnvironmentObject 等属性包装器实现全局依赖注入与响应式的状态共享。"
-    },
-    {
-      "order": 3,
-      "title": "项目工程与资源配置",
-      "description": "应用通过 XcodeGen 的 project.yml 动态生成工程文件，集中管理 Swift 版本、依赖及沙盒网络权限。同时，主题颜色等设计语言在系统扩展中统一定义，提供了高度一致的开发体验。",
-      "nodeIds": [
-        "config:project.yml",
-        "file:Vanmo.xcodeproj/project.pbxproj",
-        "file:Vanmo/Vanmo.entitlements",
-        "file:Vanmo/Shared/Extensions/Color+Vanmo.swift"
-      ],
-      "languageLesson": "使用 XcodeGen 可通过易于阅读的 YAML 文件声明式管理 iOS 项目结构，从而避免在团队协作中出现棘手的 Xcode pbxproj 文件 Git 冲突。"
-    },
-    {
-      "order": 4,
-      "title": "共享组件与通用工具",
-      "description": "架构底部抽象了一系列跨模块复用的核心 UI 组件，比如媒体海报卡片 PosterCard 和统一的加载指示器。除此之外，KeychainManager 等工具类保障了诸如密码存取等底层功能的安全性。",
-      "nodeIds": [
-        "file:Vanmo/Shared/Components/PosterCard.swift",
-        "file:Vanmo/Shared/Components/LoadingIndicatorView.swift",
-        "file:Vanmo/Shared/Utilities/KeychainManager.swift"
-      ]
-    },
-    {
-      "order": 5,
-      "title": "媒体数据核心模型",
-      "description": "MediaItem 是整个应用流转的核心数据抽象，它将本地和远程服务器提取到的各类视频源进行标准化表达。另外，PlaybackRecord 记录用户收看历史和进度，为下次无缝续播提供数据支持。",
-      "nodeIds": [
-        "file:Vanmo/Features/Library/Models/MediaItem.swift",
-        "file:Vanmo/Features/Library/Models/PlaybackRecord.swift"
-      ],
-      "languageLesson": "SwiftData 提供了极其轻量且声明式的对象持久化方式，其与 SwiftUI 天然融合，使复杂数据模型的本地数据库映射与 UI 刷新更趋极简。"
-    },
-    {
-      "order": 6,
-      "title": "网络与远程媒体服务",
-      "description": "该层建立 RemoteFileService 抽象以统一对各异媒体源的连接访问。像 PlexService 和 EmbyService 这种底层实现负责处理不同的认证、服务器浏览逻辑，输出统一的媒体模型数据供上层消费。",
-      "nodeIds": [
-        "file:Vanmo/Shared/Protocols/RemoteFileService.swift",
-        "file:Vanmo/Core/Network/EmbyService.swift",
-        "file:Vanmo/Core/Network/PlexService.swift",
-        "file:Vanmo/Core/Network/ServiceFactory.swift"
-      ],
-      "languageLesson": "面向协议编程 (POP) 设计模式使各种协议能插件式地接入，配合工厂模式 (ServiceFactory) 轻松按需实例化目标服务实现。"
-    },
-    {
-      "order": 7,
-      "title": "元数据与字幕扫描解析",
-      "description": "MediaScanner 负责扫库以提取视频的剧集等信息，并结合 MetadataService 调用 TMDb 的能力丰富影片详情和封面。同时，字幕管理模块加载 SRT/VTT 内容，负责精准同步播放器的时间轴。",
-      "nodeIds": [
-        "file:Vanmo/Core/Storage/MediaScanner.swift",
-        "file:Vanmo/Core/Metadata/MetadataService.swift",
-        "file:Vanmo/Core/Subtitle/SubtitleManager.swift",
-        "file:Vanmo/Core/Subtitle/SRTParser.swift"
-      ]
-    },
-    {
-      "order": 8,
-      "title": "媒体资料库展示界面",
-      "description": "本模块负责与用户直接交互的精美页面构建。LibraryViewModel 驱动核心列表、目录及筛选过滤，而 MediaDetailView 则专注于沉浸式的单剧集展示并承接启动播放的入口逻辑。",
-      "nodeIds": [
-        "file:Vanmo/Features/Library/Views/LibraryView.swift",
-        "file:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
-        "file:Vanmo/Features/Library/Views/MediaDetailView.swift"
-      ],
-      "languageLesson": "MVVM 架构在 SwiftUI 中充分发力，ViewModel 处理抓取、缓存及筛选状态，实现视图与数据的高度解耦及响应式刷新。"
-    },
-    {
-      "order": 9,
-      "title": "播放器核心引擎",
-      "description": "播放模块被设计成了灵活的多引擎架构。它依赖 PlayerEngine 协议建立通用桥接，通过 KSPlayerEngine 满足多种视频格式硬解的需求，而 PlayerViewModel 则在此之上操纵复杂的状态机及播放操作。",
-      "nodeIds": [
-        "file:Vanmo/Core/Player/PlayerEngine.swift",
-        "file:Vanmo/Core/Player/KSPlayerEngine.swift",
-        "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
-        "file:Vanmo/Features/Player/Views/PlayerView.swift"
-      ]
-    },
-    {
-      "order": 10,
-      "title": "媒体流本地预取代理",
-      "description": "为保障在线观看的丝滑体验，播放架构内嵌了一个本地 HTTP 预读取服务。该代理对播放器进行流量劫持，负责网络流式 chunk 的调度、限制与本地缓存，实现了对上层几乎透明的边下边播机制。",
-      "nodeIds": [
-        "file:Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
-        "file:Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
-        "file:Vanmo/Core/Player/Prefetch/RangeCache.swift"
-      ],
-      "languageLesson": "依靠 Swift 现代的 Actor 机制设计单例服务，自然隔绝并发写入及状态访问的数据竞争，增强了网络及高速缓存 I/O 的线程安全性。"
-    },
-    {
-      "order": 11,
-      "title": "构建编译与持续交付",
-      "description": "项目在代码之外包含针对 FFmpeg 底层框架的专用编译配置和将源码提炼成产物的构建脚本。结合 ExportOptions 的签名设置，它们组成了自动化出包及交付链路闭环。",
-      "nodeIds": [
-        "file:scripts/build-ffmpeg-ios.sh",
-        "file:build_ipa.sh",
-        "config:ExportOptions.plist"
-      ],
-      "languageLesson": "自动化 Shell 脚本运用严格选项（如 set -e），确保在任何依赖或者证书配置出错时立刻中断整个打包进程，从而避免残缺的安装包流出。"
+      "weight": 1.0
     }
   ]
 }

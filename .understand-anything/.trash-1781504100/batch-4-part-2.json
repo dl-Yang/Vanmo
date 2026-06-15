@@ -1,0 +1,1585 @@
+{
+  "nodes": [
+    {
+      "id": "file:Vanmo/Features/Library/Views/MediaListRow.swift",
+      "type": "file",
+      "name": "MediaListRow.swift",
+      "filePath": "Vanmo/Features/Library/Views/MediaListRow.swift",
+      "summary": "提供 MediaListRow.swift 的核心实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "core"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "type": "file",
+      "name": "ScannedLibraryListView.swift",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "summary": "提供 ScannedLibraryListView.swift 的核心实现。",
+      "tags": [
+        "component",
+        "view",
+        "ui-element"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "type": "file",
+      "name": "ScannedShowDetailView.swift",
+      "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "summary": "提供 ScannedShowDetailView.swift 的核心实现。",
+      "tags": [
+        "component",
+        "view",
+        "ui-element"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "type": "file",
+      "name": "SecondFloorItemView.swift",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "summary": "提供 SecondFloorItemView.swift 的核心实现。",
+      "tags": [
+        "component",
+        "view",
+        "ui-element"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "type": "file",
+      "name": "SecondFloorView.swift",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "summary": "提供 SecondFloorView.swift 的核心实现。",
+      "tags": [
+        "component",
+        "view",
+        "ui-element"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "type": "file",
+      "name": "PlayerViewModel.swift",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "summary": "提供 PlayerViewModel.swift 的核心实现。",
+      "tags": [
+        "component",
+        "view",
+        "ui-element"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "type": "file",
+      "name": "PlayerProgressBar.swift",
+      "filePath": "Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "summary": "提供 PlayerProgressBar.swift 的核心实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "core"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/MediaListRow.swift:MediaListRow",
+      "type": "class",
+      "name": "MediaListRow",
+      "filePath": "Vanmo/Features/Library/Views/MediaListRow.swift",
+      "lineRange": [
+        4,
+        14
+      ],
+      "summary": "MediaListRow 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedLibraryListView",
+      "type": "class",
+      "name": "ScannedLibraryListView",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        4,
+        14
+      ],
+      "summary": "ScannedLibraryListView 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:movieSubtitle",
+      "type": "function",
+      "name": "movieSubtitle",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        154,
+        164
+      ],
+      "summary": "movieSubtitle 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:loadItems",
+      "type": "function",
+      "name": "loadItems",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        161,
+        171
+      ],
+      "summary": "loadItems 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:makeShowSummaries",
+      "type": "function",
+      "name": "makeShowSummaries",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        181,
+        191
+      ],
+      "summary": "makeShowSummaries 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:normalizedShowTitle",
+      "type": "function",
+      "name": "normalizedShowTitle",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        199,
+        209
+      ],
+      "summary": "normalizedShowTitle 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:episodeSortPredicate",
+      "type": "function",
+      "name": "episodeSortPredicate",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        205,
+        215
+      ],
+      "summary": "episodeSortPredicate 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedShowSummary",
+      "type": "class",
+      "name": "ScannedShowSummary",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        222,
+        232
+      ],
+      "summary": "ScannedShowSummary 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedLibraryLoadingView",
+      "type": "class",
+      "name": "ScannedLibraryLoadingView",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        231,
+        241
+      ],
+      "summary": "ScannedLibraryLoadingView 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedLibraryPosterPlaceholder",
+      "type": "class",
+      "name": "ScannedLibraryPosterPlaceholder",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "lineRange": [
+        266,
+        276
+      ],
+      "summary": "ScannedLibraryPosterPlaceholder 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:ScannedShowDetailView",
+      "type": "class",
+      "name": "ScannedShowDetailView",
+      "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "lineRange": [
+        4,
+        14
+      ],
+      "summary": "ScannedShowDetailView 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:loadEpisodes",
+      "type": "function",
+      "name": "loadEpisodes",
+      "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "lineRange": [
+        88,
+        98
+      ],
+      "summary": "loadEpisodes 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:normalizedShowTitle",
+      "type": "function",
+      "name": "normalizedShowTitle",
+      "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "lineRange": [
+        114,
+        124
+      ],
+      "summary": "normalizedShowTitle 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:episodeSortPredicate",
+      "type": "function",
+      "name": "episodeSortPredicate",
+      "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "lineRange": [
+        120,
+        130
+      ],
+      "summary": "episodeSortPredicate 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:ScannedShowLoadingView",
+      "type": "class",
+      "name": "ScannedShowLoadingView",
+      "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "lineRange": [
+        137,
+        147
+      ],
+      "summary": "ScannedShowLoadingView 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/SecondFloorItemView.swift:SecondFloorItemView",
+      "type": "class",
+      "name": "SecondFloorItemView",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "lineRange": [
+        4,
+        14
+      ],
+      "summary": "SecondFloorItemView 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/SecondFloorView.swift:SecondFloorView",
+      "type": "class",
+      "name": "SecondFloorView",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "lineRange": [
+        3,
+        13
+      ],
+      "summary": "SecondFloorView 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/SecondFloorView.swift:dismiss",
+      "type": "function",
+      "name": "dismiss",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "lineRange": [
+        163,
+        173
+      ],
+      "summary": "dismiss 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Library/Views/SecondFloorView.swift:extractDominantColor",
+      "type": "function",
+      "name": "extractDominantColor",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "lineRange": [
+        169,
+        179
+      ],
+      "summary": "extractDominantColor 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerViewModel",
+      "type": "class",
+      "name": "PlayerViewModel",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        7,
+        17
+      ],
+      "summary": "PlayerViewModel 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setupBindings",
+      "type": "function",
+      "name": "setupBindings",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        69,
+        79
+      ],
+      "summary": "setupBindings 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:onAppear",
+      "type": "function",
+      "name": "onAppear",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        109,
+        119
+      ],
+      "summary": "onAppear 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:onDisappear",
+      "type": "function",
+      "name": "onDisappear",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        121,
+        131
+      ],
+      "summary": "onDisappear 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadAndPlayCurrentItem",
+      "type": "function",
+      "name": "loadAndPlayCurrentItem",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        133,
+        143
+      ],
+      "summary": "loadAndPlayCurrentItem 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:resetPlaybackMetadata",
+      "type": "function",
+      "name": "resetPlaybackMetadata",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        166,
+        176
+      ],
+      "summary": "resetPlaybackMetadata 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:unregisterPrefetchIfNeeded",
+      "type": "function",
+      "name": "unregisterPrefetchIfNeeded",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        176,
+        186
+      ],
+      "summary": "unregisterPrefetchIfNeeded 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:togglePlayPause",
+      "type": "function",
+      "name": "togglePlayPause",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        184,
+        194
+      ],
+      "summary": "togglePlayPause 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:seek",
+      "type": "function",
+      "name": "seek",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        201,
+        211
+      ],
+      "summary": "seek 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:skipForward",
+      "type": "function",
+      "name": "skipForward",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        208,
+        218
+      ],
+      "summary": "skipForward 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:skipBackward",
+      "type": "function",
+      "name": "skipBackward",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        215,
+        225
+      ],
+      "summary": "skipBackward 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setRate",
+      "type": "function",
+      "name": "setRate",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        222,
+        232
+      ],
+      "summary": "setRate 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setScaleMode",
+      "type": "function",
+      "name": "setScaleMode",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        228,
+        238
+      ],
+      "summary": "setScaleMode 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:selectAudioTrack",
+      "type": "function",
+      "name": "selectAudioTrack",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        235,
+        245
+      ],
+      "summary": "selectAudioTrack 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:selectSubtitleTrack",
+      "type": "function",
+      "name": "selectSubtitleTrack",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        240,
+        250
+      ],
+      "summary": "selectSubtitleTrack 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:applyPreferredSubtitleIfNeeded",
+      "type": "function",
+      "name": "applyPreferredSubtitleIfNeeded",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        246,
+        256
+      ],
+      "summary": "applyPreferredSubtitleIfNeeded 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:preferredSubtitleIndex",
+      "type": "function",
+      "name": "preferredSubtitleIndex",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        272,
+        282
+      ],
+      "summary": "preferredSubtitleIndex 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:languageAliases",
+      "type": "function",
+      "name": "languageAliases",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        305,
+        315
+      ],
+      "summary": "languageAliases 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:normalizedLanguageCode",
+      "type": "function",
+      "name": "normalizedLanguageCode",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        320,
+        330
+      ],
+      "summary": "normalizedLanguageCode 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:playEpisode",
+      "type": "function",
+      "name": "playEpisode",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        329,
+        339
+      ],
+      "summary": "playEpisode 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadEpisodesIfNeeded",
+      "type": "function",
+      "name": "loadEpisodesIfNeeded",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        350,
+        360
+      ],
+      "summary": "loadEpisodesIfNeeded 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadLocalEpisodes",
+      "type": "function",
+      "name": "loadLocalEpisodes",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        372,
+        382
+      ],
+      "summary": "loadLocalEpisodes 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadRemoteEpisodes",
+      "type": "function",
+      "name": "loadRemoteEpisodes",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        403,
+        413
+      ],
+      "summary": "loadRemoteEpisodes 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:groupedEpisodes",
+      "type": "function",
+      "name": "groupedEpisodes",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        426,
+        436
+      ],
+      "summary": "groupedEpisodes 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:makeMediaItem",
+      "type": "function",
+      "name": "makeMediaItem",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        437,
+        447
+      ],
+      "summary": "makeMediaItem 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:matchesCurrentItem",
+      "type": "function",
+      "name": "matchesCurrentItem",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        456,
+        466
+      ],
+      "summary": "matchesCurrentItem 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:normalizedShowTitle",
+      "type": "function",
+      "name": "normalizedShowTitle",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        466,
+        476
+      ],
+      "summary": "normalizedShowTitle 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:episodeSortPredicate",
+      "type": "function",
+      "name": "episodeSortPredicate",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        473,
+        483
+      ],
+      "summary": "episodeSortPredicate 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:seekToChapter",
+      "type": "function",
+      "name": "seekToChapter",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        501,
+        511
+      ],
+      "summary": "seekToChapter 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadChapters",
+      "type": "function",
+      "name": "loadChapters",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        506,
+        516
+      ],
+      "summary": "loadChapters 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:toggleControls",
+      "type": "function",
+      "name": "toggleControls",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        514,
+        524
+      ],
+      "summary": "toggleControls 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:showControlsBriefly",
+      "type": "function",
+      "name": "showControlsBriefly",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        523,
+        533
+      ],
+      "summary": "showControlsBriefly 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:scheduleHideControls",
+      "type": "function",
+      "name": "scheduleHideControls",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        530,
+        540
+      ],
+      "summary": "scheduleHideControls 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleBrightnessChange",
+      "type": "function",
+      "name": "handleBrightnessChange",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        543,
+        553
+      ],
+      "summary": "handleBrightnessChange 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleVolumeChange",
+      "type": "function",
+      "name": "handleVolumeChange",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        552,
+        562
+      ],
+      "summary": "handleVolumeChange 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleSeekGesture",
+      "type": "function",
+      "name": "handleSeekGesture",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        558,
+        568
+      ],
+      "summary": "handleSeekGesture 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:commitSeekGesture",
+      "type": "function",
+      "name": "commitSeekGesture",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        564,
+        574
+      ],
+      "summary": "commitSeekGesture 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleLongPress",
+      "type": "function",
+      "name": "handleLongPress",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        569,
+        579
+      ],
+      "summary": "handleLongPress 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:saveProgress",
+      "type": "function",
+      "name": "saveProgress",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        584,
+        594
+      ],
+      "summary": "saveProgress 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:dismissOverlay",
+      "type": "function",
+      "name": "dismissOverlay",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        593,
+        603
+      ],
+      "summary": "dismissOverlay 的函数实现。",
+      "tags": [
+        "utility",
+        "helper",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerEpisodeSeason",
+      "type": "class",
+      "name": "PlayerEpisodeSeason",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        602,
+        612
+      ],
+      "summary": "PlayerEpisodeSeason 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerEpisode",
+      "type": "class",
+      "name": "PlayerEpisode",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [
+        609,
+        619
+      ],
+      "summary": "PlayerEpisode 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Player/Views/PlayerProgressBar.swift:PlayerProgressBar",
+      "type": "class",
+      "name": "PlayerProgressBar",
+      "filePath": "Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "lineRange": [
+        3,
+        13
+      ],
+      "summary": "PlayerProgressBar 的类实现。",
+      "tags": [
+        "component",
+        "ui-element",
+        "view"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:Vanmo/Features/Library/Views/MediaListRow.swift",
+      "target": "class:Vanmo/Features/Library/Views/MediaListRow.swift:MediaListRow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedLibraryListView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:movieSubtitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:loadItems",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:makeShowSummaries",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:normalizedShowTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:episodeSortPredicate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedShowSummary",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedLibraryLoadingView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "target": "class:Vanmo/Features/Library/Views/ScannedLibraryListView.swift:ScannedLibraryPosterPlaceholder",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "target": "class:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:ScannedShowDetailView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:loadEpisodes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:normalizedShowTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "target": "function:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:episodeSortPredicate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "target": "class:Vanmo/Features/Library/Views/ScannedShowDetailView.swift:ScannedShowLoadingView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "target": "class:Vanmo/Features/Library/Views/SecondFloorItemView.swift:SecondFloorItemView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "target": "class:Vanmo/Features/Library/Views/SecondFloorView.swift:SecondFloorView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "target": "function:Vanmo/Features/Library/Views/SecondFloorView.swift:dismiss",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "target": "function:Vanmo/Features/Library/Views/SecondFloorView.swift:extractDominantColor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerViewModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setupBindings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:onAppear",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:onDisappear",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadAndPlayCurrentItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:resetPlaybackMetadata",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:unregisterPrefetchIfNeeded",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:togglePlayPause",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:seek",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:skipForward",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:skipBackward",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setRate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:setScaleMode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:selectAudioTrack",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:selectSubtitleTrack",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:applyPreferredSubtitleIfNeeded",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:preferredSubtitleIndex",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:languageAliases",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:normalizedLanguageCode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:playEpisode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadEpisodesIfNeeded",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadLocalEpisodes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadRemoteEpisodes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:groupedEpisodes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:makeMediaItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:matchesCurrentItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:normalizedShowTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:episodeSortPredicate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:seekToChapter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:loadChapters",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:toggleControls",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:showControlsBriefly",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:scheduleHideControls",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleBrightnessChange",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleVolumeChange",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleSeekGesture",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:commitSeekGesture",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:handleLongPress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:saveProgress",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "function:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:dismissOverlay",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerEpisodeSeason",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerEpisode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "target": "class:Vanmo/Features/Player/Views/PlayerProgressBar.swift:PlayerProgressBar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    }
+  ]
+}

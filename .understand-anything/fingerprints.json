@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "gitCommitHash": "1c18734d98602fb1201ca0f6ce1a82d36331794f",
-  "generatedAt": "2026-06-15T02:09:44.859Z",
+  "generatedAt": "2026-06-15T06:14:51.736Z",
   "files": {
     ".cursorignore": {
       "filePath": ".cursorignore",
@@ -624,12 +624,12 @@
     },
     "Vanmo/Features/Library/Views/MediaDetailView.swift": {
       "filePath": "Vanmo/Features/Library/Views/MediaDetailView.swift",
-      "contentHash": "2034b26b7f95d9f6685b39bcc9a64aa01ddc9b7670bf222b4d1a2a622349f029",
+      "contentHash": "fac6bcd56af428492155685b4c5b36d86abad18bbe2c9f19f5046fc2abcac6e7",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 1442,
+      "totalLines": 920,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Views/MediaListRow.swift": {

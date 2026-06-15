@@ -1,0 +1,68 @@
+Analyze these files and produce GraphNode and GraphEdge objects.
+Project root: /Users/yingu/Vanmo
+Project: Vanmo
+Languages: c, entitlements, json, markdown, pbxproj, shell, swift, unknown, xcscheme, xml, yaml
+Batch: 1/2
+Skill directory (for bundled scripts): /Users/yingu/.understand-anything-plugin
+Output: write to /Users/yingu/Vanmo/.understand-anything/intermediate/batch-2.json (single-file mode) OR batch-2-part-<k>.json (split mode, per Step B of your output protocol).
+
+> **Language directive**: Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in **zh**. Maintain technical accuracy while using natural, native-level phrasing in the target language. Keep technical terms in English when no standard translation exists (e.g., "middleware", "hook", "barrel").
+
+Pre-resolved import data for this batch (use directly — do NOT re-resolve imports from source):
+{
+  ".cursorignore": [],
+  ".understand-anything/.understandignore": [],
+  "scripts/build-ffmpeg-ios.sh": [],
+  "Vanmo.xcodeproj/project.pbxproj": [],
+  "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme": [],
+  "Vanmo/App/AppState.swift": [],
+  "Vanmo/App/ContentView.swift": [],
+  "Vanmo/App/VanmoApp.swift": [],
+  "Vanmo/Core/Metadata/FileNameParser.swift": [],
+  "Vanmo/Core/Metadata/MetadataService.swift": [],
+  "Vanmo/Core/Metadata/TMDbModels.swift": [],
+  "Vanmo/Core/Metadata/TMDbService.swift": [],
+  "Vanmo/Core/Network/EmbyService.swift": [],
+  "Vanmo/Core/Network/JellyfinService.swift": [],
+  "Vanmo/Core/Network/LocalFolderService.swift": [],
+  "Vanmo/Core/Network/NetworkError.swift": [],
+  "Vanmo/Core/Network/PlexService.swift": [],
+  "Vanmo/Core/Network/ServiceFactory.swift": [],
+  "Vanmo/Core/Network/SMBService.swift": [],
+  "Vanmo/Core/Network/WebDAVService.swift": [],
+  "Vanmo/Core/Player/KSPlayerEngine.swift": [],
+  "Vanmo/Core/Player/PlayerEngine.swift": [],
+  "Vanmo/Core/Player/PlayerEngineFactory.swift": [],
+  "Vanmo/Core/Player/PlayerState.swift": [],
+  "Vanmo/Core/Player/Prefetch/FetchLimiter.swift": []
+}
+
+Cross-batch neighbors with their exported symbols (confidence boost for cross-batch edges):
+{}
+
+Files to analyze in this batch (every entry MUST be passed through to batchFiles with all four fields — path, language, sizeLines, fileCategory):
+1. .cursorignore (43 lines, language: unknown, fileCategory: code)
+2. .understand-anything/.understandignore (49 lines, language: unknown, fileCategory: code)
+3. scripts/build-ffmpeg-ios.sh (146 lines, language: shell, fileCategory: script)
+4. Vanmo.xcodeproj/project.pbxproj (1057 lines, language: pbxproj, fileCategory: code)
+5. Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme (91 lines, language: xcscheme, fileCategory: code)
+6. Vanmo/App/AppState.swift (54 lines, language: swift, fileCategory: code)
+7. Vanmo/App/ContentView.swift (68 lines, language: swift, fileCategory: code)
+8. Vanmo/App/VanmoApp.swift (84 lines, language: swift, fileCategory: code)
+9. Vanmo/Core/Metadata/FileNameParser.swift (127 lines, language: swift, fileCategory: code)
+10. Vanmo/Core/Metadata/MetadataService.swift (112 lines, language: swift, fileCategory: code)
+11. Vanmo/Core/Metadata/TMDbModels.swift (149 lines, language: swift, fileCategory: code)
+12. Vanmo/Core/Metadata/TMDbService.swift (151 lines, language: swift, fileCategory: code)
+13. Vanmo/Core/Network/EmbyService.swift (1479 lines, language: swift, fileCategory: code)
+14. Vanmo/Core/Network/JellyfinService.swift (54 lines, language: swift, fileCategory: code)
+15. Vanmo/Core/Network/LocalFolderService.swift (147 lines, language: swift, fileCategory: code)
+16. Vanmo/Core/Network/NetworkError.swift (23 lines, language: swift, fileCategory: code)
+17. Vanmo/Core/Network/PlexService.swift (711 lines, language: swift, fileCategory: code)
+18. Vanmo/Core/Network/ServiceFactory.swift (84 lines, language: swift, fileCategory: code)
+19. Vanmo/Core/Network/SMBService.swift (251 lines, language: swift, fileCategory: code)
+20. Vanmo/Core/Network/WebDAVService.swift (415 lines, language: swift, fileCategory: code)
+21. Vanmo/Core/Player/KSPlayerEngine.swift (431 lines, language: swift, fileCategory: code)
+22. Vanmo/Core/Player/PlayerEngine.swift (371 lines, language: swift, fileCategory: code)
+23. Vanmo/Core/Player/PlayerEngineFactory.swift (39 lines, language: swift, fileCategory: code)
+24. Vanmo/Core/Player/PlayerState.swift (115 lines, language: swift, fileCategory: code)
+25. Vanmo/Core/Player/Prefetch/FetchLimiter.swift (26 lines, language: swift, fileCategory: code)

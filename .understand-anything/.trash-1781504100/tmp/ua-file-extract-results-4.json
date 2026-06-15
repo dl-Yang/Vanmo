@@ -1,0 +1,279 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 156,
+      "nonEmptyLines": 137,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/FavoritesListView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 438,
+      "nonEmptyLines": 385,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 463,
+      "nonEmptyLines": 425,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/FilterChipsRow.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 154,
+      "nonEmptyLines": 137,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/FlowLayout.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 103,
+      "nonEmptyLines": 87,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/LibraryView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 788,
+      "nonEmptyLines": 695,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/MediaDetailView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 920,
+      "nonEmptyLines": 822,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/MediaListRow.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 100,
+      "nonEmptyLines": 88,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 306,
+      "nonEmptyLines": 272,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 185,
+      "nonEmptyLines": 162,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 108,
+      "nonEmptyLines": 94,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 194,
+      "nonEmptyLines": 169,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 657,
+      "nonEmptyLines": 564,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 96,
+      "nonEmptyLines": 88,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Player/Views/PlayerView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 706,
+      "nonEmptyLines": 631,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Player/Views/TrackSelectorView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 96,
+      "nonEmptyLines": 91,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 89,
+      "nonEmptyLines": 77,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Search/Views/SearchView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 198,
+      "nonEmptyLines": 176,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 81,
+      "nonEmptyLines": 67,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 439,
+      "nonEmptyLines": 391,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 38,
+      "nonEmptyLines": 38,
+      "sections": [
+        {
+          "heading": "colors",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "info",
+          "level": 1,
+          "line": 34
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": "Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 13,
+      "nonEmptyLines": 13,
+      "sections": [
+        {
+          "heading": "images",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "info",
+          "level": 1,
+          "line": 9
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": "Vanmo/Resources/Assets.xcassets/Contents.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "sections": [
+        {
+          "heading": "info",
+          "level": 1,
+          "line": 2
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 1
+      }
+    },
+    {
+      "path": "Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 16,
+      "nonEmptyLines": 16,
+      "sections": [
+        {
+          "heading": "images",
+          "level": 1,
+          "line": 2
+        },
+        {
+          "heading": "info",
+          "level": 1,
+          "line": 8
+        },
+        {
+          "heading": "properties",
+          "level": 1,
+          "line": 12
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 3
+      }
+    },
+    {
+      "path": "Vanmo/Resources/Info.plist",
+      "language": "xml",
+      "fileCategory": "config",
+      "totalLines": 71,
+      "nonEmptyLines": 71,
+      "metrics": {}
+    }
+  ]
+}
