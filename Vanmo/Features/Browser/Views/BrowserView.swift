@@ -6,28 +6,31 @@ struct ConnectionsView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ConnectionsViewModel
 
+    /// 当前正在浏览的连接 ID。nil = 显示连接列表根页（Files-Light）；
+    /// 非 nil = 进入该连接的文件 / 文件夹浏览页（Files-Folders(-Videos)-Light）。
+    @State private var enteredConnectionID: UUID?
+
     var body: some View {
-        content
-            .background(Color.vanmoBackground)
-            .overlay {
-                if viewModel.isLoading {
-                    LoadingView(viewModel.loadingMessage)
-                }
+        ZStack {
+            FilesDesign.background.ignoresSafeArea()
+
+            if enteredConnectionID == nil {
+                connectionsRoot
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            } else {
+                fileBrowser
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
-        .navigationTitle("文件")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    viewModel.showAddConnection = true
-                } label: {
-                    Image(systemName: "plus")
-                }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .overlay {
+            if viewModel.isLoading {
+                LoadingView(viewModel.loadingMessage)
             }
         }
         .task {
             viewModel.setModelContext(modelContext)
             await viewModel.loadSavedConnections()
-            await viewModel.loadSelectedConnectionRootIfNeeded()
         }
         .alert("错误", isPresented: $viewModel.showError) {
             Button("确定") {}
@@ -39,172 +42,188 @@ struct ConnectionsView: View {
         }
     }
 
-    // MARK: - Content
+    // MARK: - 根页：连接列表（Files-Light）
 
-    @ViewBuilder
-    private var content: some View {
-        if viewModel.savedConnections.isEmpty && !viewModel.isBrowsingFiles {
-            EmptyStateView(
-                icon: "folder.badge.plus",
-                title: "暂无文件来源",
-                message: "使用右上角按钮添加本地文件夹或服务器连接"
-            ) {
-                viewModel.showAddConnection = true
-            }
-        } else {
-            List {
-                connectionsSection
-
-                if viewModel.selectedConnection != nil {
-                    pathSection
-                    filesSection
+    private var connectionsRoot: some View {
+        VStack(spacing: 0) {
+            FilesHeader(title: "文件") {
+                FilesCircleButton(asset: nil, systemName: "plus", tint: FilesDesign.accent, background: FilesDesign.addButtonBackground) {
+                    viewModel.showAddConnection = true
                 }
-            }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
-            .refreshable {
-                await viewModel.refreshCurrentDirectory()
-            }
-        }
-    }
-
-    private var connectionsSection: some View {
-        Section("已连接协议") {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(viewModel.savedConnections) { connection in
-                        ConnectionChip(
-                            connection: connection,
-                            status: viewModel.connectionStatus(for: connection),
-                            isSelected: viewModel.selectedConnectionID == connection.id
-                        ) {
-                            Task { await viewModel.selectConnection(connection) }
-                        }
-                        .contextMenu {
-                            Button {
-                                Task { await viewModel.connectAndScan(connection) }
-                            } label: {
-                                Label("同步到媒体库", systemImage: "arrow.triangle.2.circlepath")
-                            }
-
-                            Button {
-                                Task { await viewModel.connectAndScan(connection, forceFullScan: true) }
-                            } label: {
-                                Label("全量重扫", systemImage: "arrow.clockwise")
-                            }
-
-                            Button(role: .destructive) {
-                                viewModel.deleteConnection(connection)
-                            } label: {
-                                Label("删除", systemImage: "trash")
-                            }
-                        }
+                Menu {
+                    Button {
+                        Task { await viewModel.loadSavedConnections() }
+                    } label: {
+                        Label("刷新", systemImage: "arrow.clockwise")
                     }
+                } label: {
+                    FilesMenuGlyph()
                 }
-                .padding(.vertical, 4)
             }
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
+            if viewModel.savedConnections.isEmpty {
+                EmptyStateView(
+                    icon: "folder.badge.plus",
+                    title: "暂无文件来源",
+                    message: "使用右上角按钮添加本地文件夹或服务器连接"
+                ) {
+                    viewModel.showAddConnection = true
+                }
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        FilesSectionHeader(title: "网络")
+                        VStack(spacing: 4) {
+                            ForEach(viewModel.savedConnections) { connection in
+                                connectionRow(connection)
+                            }
+                        }
+                        .padding(.top, 16)
+                    }
+                    .padding(16)
+                }
+            }
         }
     }
 
-    private var pathSection: some View {
-        Section {
-            HStack(spacing: 12) {
-                Button {
-                    Task { await viewModel.goBackDirectory() }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.headline)
-                }
-                .disabled(viewModel.pathStack.isEmpty)
+    private func connectionRow(_ connection: SavedConnection) -> some View {
+        let status = viewModel.connectionStatus(for: connection)
+        let isOffline = status == .failed
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(viewModel.selectedConnection?.name ?? "文件")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+        return Button {
+            enter(connection)
+        } label: {
+            ConnectionCard(connection: connection, status: status)
+        }
+        .buttonStyle(FilesRowButtonStyle())
+        .opacity(isOffline ? 0.5 : 1)
+        .contextMenu {
+            Button {
+                Task { await viewModel.connectAndScan(connection) }
+            } label: {
+                Label("同步到媒体库", systemImage: "arrow.triangle.2.circlepath")
+            }
+            Button {
+                Task { await viewModel.connectAndScan(connection, forceFullScan: true) }
+            } label: {
+                Label("全量重扫", systemImage: "arrow.clockwise")
+            }
+            Button(role: .destructive) {
+                viewModel.deleteConnection(connection)
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
+    }
 
-                    Text(viewModel.currentPath)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+    // MARK: - 浏览页：文件夹 / 视频列表（Files-Folders(-Videos)-Light）
 
-                Spacer()
-
+    private var fileBrowser: some View {
+        VStack(spacing: 0) {
+            FilesHeader(title: browserTitle, onBack: handleBack) {
                 Menu {
                     Button {
                         Task { await viewModel.refreshCurrentDirectory() }
                     } label: {
                         Label("刷新", systemImage: "arrow.clockwise")
                     }
-
                     Button {
                         Task { await viewModel.scanCurrentDirectory() }
                     } label: {
                         Label("同步当前目录", systemImage: "square.and.arrow.down")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    FilesMenuGlyph()
                 }
             }
-            .padding(.vertical, 4)
+
+            browserContent
         }
     }
 
     @ViewBuilder
-    private var filesSection: some View {
-        Section("文件") {
-            if viewModel.isBrowsingFiles {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text("正在加载目录...")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+    private var browserContent: some View {
+        if viewModel.isBrowsingFiles {
+            VStack(spacing: 10) {
+                ProgressView()
+                    .tint(FilesDesign.accent)
+                Text("正在加载目录...")
+                    .font(.subheadline)
+                    .foregroundStyle(FilesDesign.subtitle)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let message = viewModel.fileBrowserErrorMessage {
+            FilesMessageView(icon: "exclamationmark.triangle", title: "无法加载目录", message: message)
+        } else if viewModel.files.isEmpty {
+            FilesMessageView(icon: "folder", title: "文件夹为空", message: "此目录下没有可显示的文件")
+        } else {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 4) {
+                    ForEach(viewModel.files) { file in
+                        fileRow(file)
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 20)
-            } else if let message = viewModel.fileBrowserErrorMessage {
-                FileBrowserMessageRow(
-                    icon: "exclamationmark.triangle",
-                    title: "无法加载目录",
-                    message: message
-                )
-            } else if viewModel.files.isEmpty {
-                FileBrowserMessageRow(
-                    icon: "folder",
-                    title: "文件夹为空",
-                    message: "此目录下没有可显示的文件"
-                )
-            } else {
-                ForEach(viewModel.files) { file in
-                    Button {
-                        Task { await handleFileTap(file) }
-                    } label: {
-                        FileBrowserRow(file: file)
-                    }
-                    .tint(.primary)
-                    .contextMenu {
-                        if file.isDirectory {
-                            Button {
-                                Task { await viewModel.openDirectory(file) }
-                            } label: {
-                                Label("打开", systemImage: "folder")
-                            }
-                        }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .refreshable {
+                await viewModel.refreshCurrentDirectory()
+            }
+        }
+    }
 
-                        if file.isVideo {
-                            Button {
-                                Task { await play(file) }
-                            } label: {
-                                Label("播放", systemImage: "play.fill")
-                            }
-                        }
-                    }
+    private func fileRow(_ file: RemoteFile) -> some View {
+        Button {
+            Task { await handleFileTap(file) }
+        } label: {
+            FileCard(file: file)
+        }
+        .buttonStyle(FilesRowButtonStyle())
+        .contextMenu {
+            if file.isDirectory {
+                Button {
+                    Task { await viewModel.openDirectory(file) }
+                } label: {
+                    Label("打开", systemImage: "folder")
+                }
+            }
+            if file.isVideo {
+                Button {
+                    Task { await play(file) }
+                } label: {
+                    Label("播放", systemImage: "play.fill")
                 }
             }
         }
     }
+
+    // MARK: - 导航 & 标题
+
+    private var browserTitle: String {
+        guard let connection = viewModel.selectedConnection else { return "文件" }
+        if viewModel.pathStack.isEmpty { return connection.name }
+        let last = (viewModel.currentPath as NSString).lastPathComponent
+        return last.isEmpty || last == "/" ? connection.name : last
+    }
+
+    private func enter(_ connection: SavedConnection) {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            enteredConnectionID = connection.id
+        }
+        Task { await viewModel.selectConnection(connection) }
+    }
+
+    private func handleBack() {
+        if viewModel.pathStack.isEmpty {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                enteredConnectionID = nil
+            }
+        } else {
+            Task { await viewModel.goBackDirectory() }
+        }
+    }
+
+    // MARK: - 文件操作
 
     private func handleFileTap(_ file: RemoteFile) async {
         if file.isDirectory {
@@ -241,113 +260,292 @@ struct ConnectionsView: View {
     }
 }
 
-// MARK: - Connection Chip
+// MARK: - 设计 Token（Files 页 · Light / Dark 自适应）
 
-private struct ConnectionChip: View {
-    let connection: SavedConnection
-    let status: ConnectionStatus
-    let isSelected: Bool
+/// 严格取自 Figma `File` 页 Light / Dark 设计稿。动态色随有效 ColorScheme
+/// （受 App 主题 `.preferredColorScheme` 驱动）自动在浅 / 深色间切换。
+private enum FilesDesign {
+    static let background        = dyn("#F4F4F5", "#000000")          // 页面背景
+    static let headerBorder      = dyn("#E4E4E7", "#27272A")          // 头部底分割线（用时 0.5 透明）
+    static let title             = dyn("#18181B", "#FFFFFF")          // 主文字 / 返回箭头
+    static let sectionHeader     = dyn("#71717B", "#9F9FA9")          // “网络” 分组标题
+    static let subtitle          = dyn("#71717B", "#71717B")          // 协议 / 大小 / items 次级文字
+    static let accent            = Color.vanmoAccent                  // 强调蓝：+ / 连接 / 文件夹图标
+    static let addButtonBackground = Color.vanmoAccent.opacity(0.12)  // “+” 按钮底
+    static let iconBoxGray       = dyn("#E4E4E7", "#27272A")          // NAS / 视频图标底盒
+    static let folderBoxBackground = Color.vanmoAccent.opacity(0.08)  // 文件夹图标底盒
+    static let statusConnected   = dyn("#009966", "#00D492")          // 已连接绿
+    static let connectionDot     = dyn("#9F9FA9", "#52525C")          // 连接副标题分隔圆点
+    static let videoDot          = dyn("#D4D4D8", "#3F3F47")          // 视频信息分隔圆点
+    static let secondaryIcon     = dyn("#52525C", "#9F9FA9")          // 视频图标 / 顶部菜单字形
+    static let chevron           = dyn("#9F9FA9", "#52525C")          // 行尾箭头
+    static let pressedHighlight  = dyn("#E4E4E7", "#27272A", 0.6, 0.6) // 行按下高亮
+
+    /// 构造随明暗切换的动态颜色（可分别指定浅 / 深色透明度）。
+    static func dyn(_ light: String, _ dark: String, _ lightAlpha: Double = 1, _ darkAlpha: Double = 1) -> Color {
+        Color(uiColor: UIColor { trait in
+            let isDark = trait.userInterfaceStyle == .dark
+            let base = Color(hex: isDark ? dark : light) ?? .clear
+            return UIColor(base).withAlphaComponent(isDark ? darkAlpha : lightAlpha)
+        })
+    }
+}
+
+// MARK: - 顶部头部
+
+private struct FilesHeader<Trailing: View>: View {
+    let title: String
+    var onBack: (() -> Void)?
+    @ViewBuilder let trailing: () -> Trailing
+
+    init(title: String, onBack: (() -> Void)? = nil, @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.title = title
+        self.onBack = onBack
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let onBack {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(FilesDesign.title)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(title)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(FilesDesign.title)
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 8) {
+                trailing()
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+        .padding(.bottom, 17)
+        .background(
+            FilesDesign.background
+                .overlay(alignment: .bottom) {
+                    FilesDesign.headerBorder.opacity(0.5).frame(height: 1)
+                }
+        )
+    }
+}
+
+private struct FilesSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(FilesDesign.sectionHeader)
+            .padding(.horizontal, 8)
+    }
+}
+
+// MARK: - 头部按钮
+
+private struct FilesCircleButton: View {
+    let asset: String?
+    var systemName: String?
+    let tint: Color
+    var background: Color = .clear
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: connection.type.icon)
-                    .font(.subheadline)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(connection.name)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .lineLimit(1)
-
-                    Text(connection.type.displayName)
-                        .font(.caption2)
-                        .foregroundStyle(isSelected ? .white.opacity(0.82) : .secondary)
-                }
-
-                statusIndicator
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .foregroundStyle(isSelected ? .white : .primary)
-            .background(
-                isSelected ? Color.vanmoPrimary : Color.vanmoSurface,
-                in: Capsule()
-            )
+            iconImage
+                .frame(width: 20, height: 20)
+                .frame(width: 32, height: 32)
+                .background(background, in: Circle())
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private var statusIndicator: some View {
-        switch status {
-        case .idle:
-            Circle()
-                .fill(isSelected ? .white.opacity(0.55) : .gray.opacity(0.5))
-                .frame(width: 7, height: 7)
-        case .connecting:
-            ProgressView()
-                .controlSize(.small)
-        case .connected:
-            Circle()
-                .fill(.green)
-                .frame(width: 7, height: 7)
-        case .failed:
-            Circle()
-                .fill(.red)
-                .frame(width: 7, height: 7)
+    private var iconImage: some View {
+        if let asset {
+            Image(asset).renderingMode(.template).resizable().scaledToFit()
+                .foregroundStyle(tint)
+        } else if let systemName {
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(tint)
         }
     }
 }
 
-// MARK: - File Browser Row
+/// 头部右上角竖向三点菜单字形（对齐设计稿 lucide ellipsis-vertical）。
+private struct FilesMenuGlyph: View {
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 18, weight: .semibold))
+            .rotationEffect(.degrees(90))
+            .foregroundStyle(FilesDesign.secondaryIcon)
+            .frame(width: 32, height: 32)
+            .contentShape(Circle())
+    }
+}
 
-private struct FileBrowserRow: View {
+// MARK: - 连接行卡片
+
+private struct ConnectionCard: View {
+    let connection: SavedConnection
+    let status: ConnectionStatus
+
+    var body: some View {
+        HStack(spacing: 0) {
+            FilesIconBox(background: FilesDesign.iconBoxGray) {
+                Image(connection.type.filesIconAsset)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(FilesDesign.accent)
+            }
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(connection.name)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(FilesDesign.title)
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    Text(connection.type.displayName)
+                        .textCase(.uppercase)
+                        .foregroundStyle(FilesDesign.subtitle)
+
+                    Circle()
+                        .fill(FilesDesign.connectionDot)
+                        .frame(width: 4, height: 4)
+
+                    Text(statusText)
+                        .textCase(.uppercase)
+                        .foregroundStyle(statusColor)
+                }
+                .font(.system(size: 13, weight: .medium))
+                .padding(.top, 2)
+            }
+            .padding(.leading, 16)
+
+            Spacer(minLength: 8)
+
+            if status != .failed {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FilesDesign.chevron)
+                    .frame(width: 20, height: 20)
+            }
+        }
+        .padding(12)
+    }
+
+    private var statusText: String {
+        switch status {
+        case .idle:       return "未连接"
+        case .connecting: return "连接中"
+        case .connected:  return "已连接"
+        case .failed:     return "离线"
+        }
+    }
+
+    private var statusColor: Color {
+        status == .connected ? FilesDesign.statusConnected : FilesDesign.subtitle
+    }
+}
+
+// MARK: - 文件 / 文件夹行卡片
+
+private struct FileCard: View {
     let file: RemoteFile
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: file.type.icon)
-                .font(.title2)
-                .foregroundStyle(Color.vanmoPrimary)
-                .frame(width: 40)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(file.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+        HStack(spacing: 0) {
+            FilesIconBox(background: file.isDirectory ? FilesDesign.folderBoxBackground : FilesDesign.iconBoxGray) {
+                Image(file.isDirectory ? "FilesFolder" : "FilesFileVideo")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(file.isDirectory ? FilesDesign.accent : FilesDesign.secondaryIcon)
             }
 
-            Spacer()
+            VStack(alignment: .leading, spacing: 0) {
+                Text(file.name)
+                    .font(.system(size: file.isDirectory ? 15 : 14, weight: file.isDirectory ? .semibold : .medium))
+                    .foregroundStyle(FilesDesign.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                subtitle
+                    .padding(.top, file.isDirectory ? 2 : 4)
+            }
+            .padding(.leading, 16)
+
+            Spacer(minLength: 8)
 
             if file.isDirectory {
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(FilesDesign.chevron)
+                    .frame(width: 20, height: 20)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
     }
 
-    private var subtitle: String {
+    @ViewBuilder
+    private var subtitle: some View {
         if file.isDirectory {
-            return "文件夹"
+            Text("文件夹")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(FilesDesign.subtitle)
+        } else if file.size > 0 {
+            Text(file.size.formattedFileSize)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(FilesDesign.subtitle)
+        } else {
+            Text(file.type.filesDisplayName)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(FilesDesign.subtitle)
         }
-        if file.size > 0 {
-            return "\(file.type.displayName) · \(file.size.formattedFileSize)"
-        }
-        return file.type.displayName
     }
 }
 
-private struct FileBrowserMessageRow: View {
+// MARK: - 公共子组件
+
+private struct FilesIconBox<Content: View>: View {
+    let background: Color
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(width: 48, height: 48)
+            .background(background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+private struct FilesRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(configuration.isPressed ? FilesDesign.pressedHighlight : .clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct FilesMessageView: View {
     let icon: String
     let title: String
     let message: String
@@ -356,42 +554,43 @@ private struct FileBrowserMessageRow: View {
         VStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.title2)
-                .foregroundStyle(.tertiary)
-
+                .foregroundStyle(FilesDesign.connectionDot)
             Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(FilesDesign.title)
             Text(message)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(FilesDesign.subtitle)
                 .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 32)
+    }
+}
+
+// MARK: - 类型映射
+
+private extension ConnectionType {
+    /// Files 页连接图标（对齐设计稿 lucide：硬盘 / 服务器 / 文件夹）。
+    var filesIconAsset: String {
+        switch self {
+        case .localFolder:                 return "FilesFolder"
+        case .smb, .nfs:                   return "FilesHardDrive"
+        case .ftp, .sftp, .webdav, .dlna,
+             .plex, .emby, .jellyfin:      return "FilesServer"
+        }
     }
 }
 
 private extension RemoteFileType {
-    var displayName: String {
+    var filesDisplayName: String {
         switch self {
-        case .video: return "视频"
-        case .subtitle: return "字幕"
-        case .audio: return "音频"
-        case .image: return "图片"
+        case .video:     return "视频"
+        case .subtitle:  return "字幕"
+        case .audio:     return "音频"
+        case .image:     return "图片"
         case .directory: return "文件夹"
-        case .other: return "文件"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .video: return "film"
-        case .subtitle: return "captions.bubble"
-        case .audio: return "music.note"
-        case .image: return "photo"
-        case .directory: return "folder"
-        case .other: return "doc"
+        case .other:     return "文件"
         }
     }
 }
@@ -400,7 +599,16 @@ private extension RemoteFileType {
 
 typealias BrowserView = ConnectionsView
 
-#Preview {
+#Preview("Light") {
+    NavigationStack {
+        ConnectionsView()
+    }
+    .environmentObject(AppState())
+    .environmentObject(ConnectionsViewModel())
+    .preferredColorScheme(.light)
+}
+
+#Preview("Dark") {
     NavigationStack {
         ConnectionsView()
     }

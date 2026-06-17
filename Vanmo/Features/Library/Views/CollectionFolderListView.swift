@@ -116,6 +116,7 @@ struct CollectionFolderListView: View {
         } else if isLoadingMore {
             HStack(spacing: 10) {
                 ProgressView()
+                    .tint(Color.vanmoAccent)
 
                 Text("继续加载...")
                     .font(.caption)

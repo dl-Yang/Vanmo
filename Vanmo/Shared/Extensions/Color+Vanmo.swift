@@ -148,8 +148,11 @@ enum ColorTheme: String, CaseIterable, Identifiable {
 // MARK: - Vanmo 全局色
 
 extension Color {
-    /// 主品牌色，按当前主题动态变化
-    static var vanmoPrimary: Color { ColorTheme.current.primary }
+    /// 全局蓝色强调色：Navigation Tab / 播放钮 / 进度 / 服务器图标 / 类型药丸等统一使用。
+    static let vanmoAccent = Color(red: 0x14 / 255, green: 0x5C / 255, blue: 0xFF / 255)
+
+    /// 主品牌色统一使用蓝色强调色，背景与表面仍按当前主题动态变化。
+    static var vanmoPrimary: Color { vanmoAccent }
 
     /// 整体页面背景色，按当前主题动态变化
     static var vanmoBackground: Color { ColorTheme.current.background }

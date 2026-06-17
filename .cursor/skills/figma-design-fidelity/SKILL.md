@@ -12,7 +12,10 @@ description: Enforce that every UI change in the Vanmo iOS app strictly replicat
 
 - 项目：**Vanmo**
 - 页面 PageName：
-  - - `MediaDetail`: [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2)
+  - - `MediaDetail`(媒体详情): [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2)
+  - - `LibraryHome`（媒体库首页） : [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=295-6](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=295-6)
+  - - `File`（文件浏览）: [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=317-80](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=317-80)
+  - - `Favorites`(收藏列表):[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=322-192](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=322-192)
 - `fileKey`：`miM6YTQAnerz6SgkkYZMjo`
 
 任何 UI 改动开始前，先把对应页面/组件的 Figma 节点定位出来（节点 URL 形如 `...?node-id=1-23`，调用工具时把 `node-id` 的 `-` 转成 `:`）。

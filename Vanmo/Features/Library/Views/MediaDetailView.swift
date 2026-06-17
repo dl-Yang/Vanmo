@@ -29,7 +29,7 @@ struct MediaDetailView: View {
     /// 媒体信息布局占屏高比例（不超过 3/4）
     private let panelHeightRatio: CGFloat = 0.75
 
-    private let accentBlue = Color(red: 21/255, green: 93/255, blue: 252/255)
+    private let accentBlue = Color.vanmoAccent
     private let starYellow = Color(red: 245/255, green: 194/255, blue: 75/255)
 
     var body: some View {
@@ -75,6 +75,7 @@ struct MediaDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .task {
             let posterURL = displayPosterURL
             async let dominant = DominantColorExtractor.cachedColor(for: posterURL)
@@ -167,9 +168,9 @@ struct MediaDetailView: View {
 
             LinearGradient(
                 stops: [
-                    .init(color: Color.black.opacity(0.55), location: 0.0),
-                    .init(color: Color.black.opacity(0.15), location: 0.45),
-                    .init(color: Color.black.opacity(0.85), location: 1.0)
+                    .init(color: Color.black.opacity(0.35), location: 0.0),
+                    .init(color: Color.black.opacity(0.10), location: 0.45),
+                    .init(color: Color.black.opacity(0.55), location: 1.0)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -302,22 +303,30 @@ struct MediaDetailView: View {
         .background(panelGlassBackground)
     }
 
-    /// 媒体信息布局的毛玻璃背景（顶部圆角矩形 + 暗色玻璃质感 + 顶部高光边）
+    /// 媒体信息布局的液态玻璃背景（顶部圆角矩形 + Liquid Glass 质感 + 顶部高光边）
+    /// iOS 26+ 使用系统液态玻璃 `glassEffect`，更低版本回退到毛玻璃材质。
     private var panelGlassBackground: some View {
         let shape = UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
         let isDark = colorScheme == .dark
-        let bgColor = isDark ? Color(red: 9/255, green: 9/255, blue: 11/255).opacity(0.6) : Color.white.opacity(0.6)
+        let tintColor = isDark ? Color(red: 9/255, green: 9/255, blue: 11/255).opacity(0.2) : Color.white.opacity(0.2)
         let borderColor = isDark ? Color.white.opacity(0.1) : Color.white.opacity(0.2)
         let shadowColor = isDark ? Color.black.opacity(0.5) : Color.black.opacity(0.15)
-        
-        return shape
-            .fill(bgColor)
-            .background(.ultraThinMaterial, in: shape)
-            .overlay(
-                shape.strokeBorder(borderColor, lineWidth: 1)
-            )
-            .shadow(color: shadowColor, radius: 28, y: -8)
-            .ignoresSafeArea(edges: .bottom)
+
+        return Group {
+            if #available(iOS 26.0, *) {
+                Color.clear
+                    .glassEffect(.regular.tint(tintColor), in: shape)
+            } else {
+                shape
+                    .fill(tintColor)
+                    .background(.ultraThinMaterial, in: shape)
+            }
+        }
+        .overlay(
+            shape.strokeBorder(borderColor, lineWidth: 1)
+        )
+        .shadow(color: shadowColor, radius: 28, y: -8)
+        .ignoresSafeArea(edges: .bottom)
     }
 
     private var moviePanelContent: some View {
@@ -350,7 +359,7 @@ struct MediaDetailView: View {
     private func panelHeader(title: String) -> some View {
         VStack(alignment: .center, spacing: 10) {
             Text(title)
-                .font(.system(size: 24, weight: .bold))
+                .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
             
@@ -513,6 +522,7 @@ struct MediaDetailView: View {
 
             if isLoadingEpisodes {
                 ProgressView()
+                    .tint(Color.vanmoAccent)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
             } else if currentSeasonEpisodes.isEmpty {
@@ -602,9 +612,9 @@ struct MediaDetailView: View {
                         .fill(Color(.secondarySystemBackground))
                     Image(systemName: "play.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(.primary.opacity(0.8))
+                        .foregroundStyle(.white)
                         .frame(width: 28, height: 28)
-                        .background(Color.black.opacity(0.15), in: Circle())
+                        .background(Color.vanmoAccent, in: Circle())
                 }
                 .frame(width: 128, height: 72)
                 .clipShape(RoundedRectangle(cornerRadius: 14))

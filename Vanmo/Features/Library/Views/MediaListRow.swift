@@ -49,9 +49,10 @@ struct MediaListRow: View {
 
                 Text(item.mediaType.displayName)
                     .font(.caption2)
+                    .foregroundStyle(Color.vanmoAccent)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.vanmoSurface)
+                    .background(Color.vanmoAccent.opacity(0.12))
                     .clipShape(Capsule())
             }
 
