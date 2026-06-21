@@ -1,0 +1,9 @@
+{
+  "name": "caco",
+  "version": "0.1.0",
+  "description": "HarmonyOS NEXT migration workspace for Vanmo.",
+  "main": "",
+  "author": "Vanmo",
+  "license": "UNLICENSED",
+  "dependencies": {}
+}

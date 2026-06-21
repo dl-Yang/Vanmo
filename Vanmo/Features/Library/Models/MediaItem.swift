@@ -10,6 +10,7 @@ final class MediaItem {
     var overview: String?
     var posterURL: URL?
     var backdropURL: URL?
+    var logoURL: URL?
     var rating: Double?
     var mediaType: MediaType
     var fileURL: URL
@@ -177,6 +178,7 @@ extension ServerMediaItem {
         item.overview = overview
         item.posterURL = posterURL
         item.backdropURL = backdropURL
+        item.logoURL = logoURL
         item.rating = rating
         item.originalFileName = originalFileName
         item.container = container

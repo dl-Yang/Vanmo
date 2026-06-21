@@ -18,7 +18,7 @@
 - 按电影/剧集/收藏/未观看分类
 - 支持标题、年份、评分、添加日期排序
 - 继续观看、最近添加智能列表
-- 详情页展示海报、背景图、演员、文件信息
+- 详情页展示海报、背景图、Logo 标题、演职人员头像、单集封面
 
 ### 网络串流
 - SMB / FTP / SFTP / WebDAV 协议支持
@@ -33,13 +33,17 @@
 - CJK 编码自动检测
 
 ### 元数据
-- TMDb API 电影/剧集信息抓取
-- 智能文件名解析 (S01E02、年份、清晰度标签)
-- 自动匹配海报、评分、演员等信息
+- 媒体服务器元数据（Emby / Jellyfin / Plex）
+- 智能文件名解析 (S01E02、年份、清晰度标签)，用于本地/远程文件入库
+- **本地元数据缓存**：Logo、背景图、演职人员头像、电视剧单集封面落盘至 `Application Support/Vanmo/MetadataCache/`
+- **多来源单条刷新**：Emby / Jellyfin / Plex，详情页「更多 → 刷新」仅更新当前条目
+- **详情页增强展示**：标题先显示、Logo 加载后淡入替换；演职人员横向头像列表
+- **设置页管理**：自动从媒体服务器下载元数据（默认开启）、查看缓存大小、删除全部元数据缓存
+
+详见 [`doc/ai/metadata-cache.md`](doc/ai/metadata-cache.md)。
 
 ### 搜索
 - 本地媒体库全文搜索
-- TMDb 在线搜索
 
 ## 技术栈
 
@@ -64,7 +68,7 @@ Vanmo/
 │   ├── Network/          # 网络协议服务 (SMB, WebDAV, FTP)
 │   ├── Storage/          # 媒体扫描、图片缓存
 │   ├── Subtitle/         # 字幕解析与渲染
-│   └── Metadata/         # TMDb API、文件名解析
+│   └── Metadata/         # 元数据缓存、服务器刷新协调器
 ├── Features/             # 功能模块
 │   ├── Library/          # 媒体库
 │   ├── Player/           # 播放器界面
@@ -104,8 +108,17 @@ open Vanmo.xcodeproj
 ### 配置
 
 1. 在 Xcode 中设置 Development Team
-2. 获取 [TMDb API Key](https://www.themoviedb.org/settings/api) 并在设置中配置
+2. 连接 Emby / Jellyfin / Plex 媒体服务器，或添加本地/网络文件夹浏览播放
 3. 连接真机或模拟器运行
+
+## 文档
+
+| 文档 | 说明 |
+|------|------|
+| [`doc/ai/player-architecture.md`](doc/ai/player-architecture.md) | 双引擎播放器架构、Prefetch 预缓存 |
+| [`doc/ai/player-buffering.md`](doc/ai/player-buffering.md) | 网络播放缓冲调优与时序 |
+| [`doc/ai/metadata-cache.md`](doc/ai/metadata-cache.md) | 元数据缓存、单条刷新、Logo/演职人员/单集封面 |
+| [`doc/ai/swift-coding.md`](doc/ai/swift-coding.md) | Swift 编码约定 |
 
 ## 许可证
 

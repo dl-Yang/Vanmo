@@ -730,6 +730,12 @@ fileprivate enum EmbyItemMapper {
             nil
         }
 
+        let logoURL: URL? = if item.imageTags?.logo != nil {
+            URL(string: "\(base)/\(prefix)Items/\(item.id)/Images/Logo?maxHeight=300&quality=90&api_key=\(token)")
+        } else {
+            nil
+        }
+
         let streamURL: URL
         if mediaType == .tvShow {
             streamURL = URL(string: "vanmo://series/\(item.id)")!
@@ -746,7 +752,22 @@ fileprivate enum EmbyItemMapper {
         }
 
         let director = item.people?.first(where: { $0.type == "Director" })?.name
-        let cast = item.people?.filter { $0.type == "Actor" }.prefix(10).map(\.name) ?? []
+        let actorPeople = Array(item.people?.filter { $0.type == "Actor" }.prefix(10) ?? [])
+        let castMembers: [CastMemberInfo] = actorPeople.map { person in
+            let profileURL = embyPersonImageURL(
+                person: person,
+                base: base,
+                prefix: prefix,
+                token: token
+            )
+            return CastMemberInfo(
+                id: person.id ?? person.name,
+                name: person.name,
+                role: nil,
+                profileRemoteURL: profileURL
+            )
+        }
+        let cast = castMembers.map(\.name)
 
         let durationSeconds: TimeInterval = if let ticks = item.runTimeTicks {
             Double(ticks) / 10_000_000.0
@@ -799,9 +820,11 @@ fileprivate enum EmbyItemMapper {
             mediaType: mediaType,
             posterURL: posterURL,
             backdropURL: backdropURL,
+            logoURL: logoURL,
             genres: item.genres ?? [],
             director: director,
             cast: cast,
+            castMembers: castMembers,
             originCountry: item.productionLocations ?? [],
             tmdbID: tmdbID,
             streamURL: streamURL,
@@ -819,6 +842,29 @@ fileprivate enum EmbyItemMapper {
             lastPlaybackPosition: lastPlaybackPosition,
             isFavoriteOnServer: item.userData?.isFavorite ?? false
         )
+    }
+
+    private static func embyPersonImageURL(
+        person: EmbyPerson,
+        base: String,
+        prefix: String,
+        token: String
+    ) -> URL? {
+        guard let personId = person.id else { return nil }
+
+        var components = URLComponents(
+            string: "\(base)/\(prefix)Items/\(personId)/Images/Primary"
+        )!
+        var queryItems = [
+            URLQueryItem(name: "maxHeight", value: "300"),
+            URLQueryItem(name: "quality", value: "90"),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+        if let tag = person.primaryImageTag {
+            queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+        components.queryItems = queryItems
+        return components.url
     }
 }
 
@@ -1093,20 +1139,26 @@ private struct EmbyMediaSource: Decodable {
 }
 
 private struct EmbyPerson: Decodable {
+    let id: String?
     let name: String
     let type: String
+    let primaryImageTag: String?
 
     enum CodingKeys: String, CodingKey {
+        case id = "Id"
         case name = "Name"
         case type = "Type"
+        case primaryImageTag = "PrimaryImageTag"
     }
 }
 
 private struct EmbyImageTags: Decodable {
     let primary: String?
+    let logo: String?
 
     enum CodingKeys: String, CodingKey {
         case primary = "Primary"
+        case logo = "Logo"
     }
 }
 
@@ -1410,6 +1462,7 @@ struct EpisodeInfo: Identifiable {
     let duration: TimeInterval
     let overview: String?
     let streamURL: URL
+    let backdropURL: URL?
 }
 
 enum EmbyEpisodeFetcher {
@@ -1426,7 +1479,7 @@ enum EmbyEpisodeFetcher {
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
-            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks"),
+            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags"),
             URLQueryItem(name: "api_key", value: token),
         ]
 
@@ -1465,6 +1518,14 @@ enum EmbyEpisodeFetcher {
 
             let streamURL = URL(string: "\(baseURLStr)/\(apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(token)")!
 
+            let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
+                URL(string: "\(baseURLStr)/\(apiPrefix)Items/\(item.id)/Images/Backdrop?maxWidth=1280&quality=80&api_key=\(token)")
+            } else if item.imageTags?.primary != nil {
+                URL(string: "\(baseURLStr)/\(apiPrefix)Items/\(item.id)/Images/Primary?maxWidth=1280&quality=80&api_key=\(token)")
+            } else {
+                nil
+            }
+
             return EpisodeInfo(
                 id: item.id,
                 title: item.name,
@@ -1472,7 +1533,8 @@ enum EmbyEpisodeFetcher {
                 episodeNumber: episode,
                 duration: duration,
                 overview: item.overview,
-                streamURL: streamURL
+                streamURL: streamURL,
+                backdropURL: backdropURL
             )
         }
     }

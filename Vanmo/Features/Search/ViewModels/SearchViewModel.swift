@@ -6,10 +6,7 @@ import Combine
 final class SearchViewModel: ObservableObject {
     @Published var searchText = ""
     @Published private(set) var results: [MediaItem] = []
-    @Published private(set) var tmdbMovies: [TMDbMovie] = []
-    @Published private(set) var tmdbShows: [TMDbTVShow] = []
     @Published private(set) var isSearching = false
-    @Published var searchScope: SearchScope = .library
 
     private var modelContext: ModelContext?
     private var searchTask: Task<Void, Never>?
@@ -24,21 +21,13 @@ final class SearchViewModel: ObservableObject {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
             results = []
-            tmdbMovies = []
-            tmdbShows = []
             return
         }
 
         searchTask = Task {
             isSearching = true
             defer { isSearching = false }
-
-            switch searchScope {
-            case .library:
-                await searchLibrary(query)
-            case .online:
-                await searchOnline(query)
-            }
+            await searchLibrary(query)
         }
     }
 
@@ -57,33 +46,6 @@ final class SearchViewModel: ObservableObject {
             }
         } catch {
             results = []
-        }
-    }
-
-    private func searchOnline(_ query: String) async {
-        do {
-            async let movieResults = TMDbService.shared.searchMovie(query: query)
-            async let tvResults = TMDbService.shared.searchTV(query: query)
-
-            let (movies, shows) = try await (movieResults, tvResults)
-            guard !Task.isCancelled else { return }
-            tmdbMovies = movies
-            tmdbShows = shows
-        } catch {
-            guard !Task.isCancelled else { return }
-            tmdbMovies = []
-            tmdbShows = []
-        }
-    }
-}
-
-enum SearchScope: String, CaseIterable {
-    case library, online
-
-    var displayName: String {
-        switch self {
-        case .library: return "媒体库"
-        case .online: return "在线搜索"
         }
     }
 }

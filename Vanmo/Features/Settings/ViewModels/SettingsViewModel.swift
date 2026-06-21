@@ -15,11 +15,14 @@ final class SettingsViewModel: ObservableObject {
 
     @AppStorage("library.autoScan") var libraryAutoScan = true
     @AppStorage("library.showUnwatched") var showUnwatchedBadge = true
+    @AppStorage("metadata.autoDownload") var metadataAutoDownload = true
 
     @AppStorage(ColorTheme.storageKey) var theme: ColorTheme = .system
 
     @Published var cacheSize: String = "计算中..."
+    @Published var metadataCacheSize: String = "计算中..."
     @Published var showClearCacheAlert = false
+    @Published var showClearMetadataCacheAlert = false
     @Published var showResetAlert = false
 
     var appVersion: String {
@@ -55,6 +58,16 @@ final class SettingsViewModel: ObservableObject {
         cacheSize = totalSize.formattedFileSize
     }
 
+    func calculateMetadataCacheSize() async {
+        let size = (try? await MetadataCache.shared.diskSize()) ?? 0
+        metadataCacheSize = size.formattedFileSize
+    }
+
+    func clearMetadataCache() async {
+        try? await MetadataCache.shared.deleteAll()
+        await calculateMetadataCacheSize()
+    }
+
     func clearCache() async {
         let cachePath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
         guard let cachePath else { return }
@@ -76,6 +89,7 @@ final class SettingsViewModel: ObservableObject {
         subtitlePreferredLanguage = "zh"
         libraryAutoScan = true
         showUnwatchedBadge = true
+        metadataAutoDownload = true
         theme = .system
     }
 }

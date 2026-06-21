@@ -9,6 +9,7 @@ struct SettingsView: View {
             audioSection
             subtitleSection
             librarySection
+            metadataSection
             appearanceSection
             storageSection
             aboutSection
@@ -18,6 +19,7 @@ struct SettingsView: View {
         .navigationTitle("设置")
         .task {
             await viewModel.calculateCacheSize()
+            await viewModel.calculateMetadataCacheSize()
         }
         .alert("清除缓存", isPresented: $viewModel.showClearCacheAlert) {
             Button("取消", role: .cancel) {}
@@ -26,6 +28,14 @@ struct SettingsView: View {
             }
         } message: {
             Text("确定要清除所有缓存数据吗？这不会删除已下载的文件。")
+        }
+        .alert("删除元数据缓存", isPresented: $viewModel.showClearMetadataCacheAlert) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) {
+                Task { await viewModel.clearMetadataCache() }
+            }
+        } message: {
+            Text("确定要删除所有元数据缓存吗？已保存的媒体信息不会被删除，但 Logo、演职人员头像和单集封面等缓存图片将被移除。")
         }
         .alert("重置设置", isPresented: $viewModel.showResetAlert) {
             Button("取消", role: .cancel) {}
@@ -109,6 +119,28 @@ struct SettingsView: View {
         }
     }
 
+    private var metadataSection: some View {
+        Section {
+            Toggle("自动从媒体服务器下载元数据", isOn: $viewModel.metadataAutoDownload)
+
+            HStack {
+                Text("元数据缓存大小")
+                Spacer()
+                Text(viewModel.metadataCacheSize)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button("删除所有元数据缓存") {
+                viewModel.showClearMetadataCacheAlert = true
+            }
+            .foregroundStyle(.red)
+        } header: {
+            Label("元数据", systemImage: "photo.on.rectangle.angled")
+        } footer: {
+            Text("仅 Emby、Jellyfin、Plex 媒体条目支持元数据刷新。关闭自动下载后，仍可在详情页通过「更多 → 刷新」手动更新。")
+        }
+    }
+
     private var appearanceSection: some View {
         Section {
             NavigationLink(value: SettingsRoute.appearance) {
@@ -157,52 +189,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            tmdbAttributionRow
-
             Button("重置所有设置") {
                 viewModel.showResetAlert = true
             }
             .foregroundStyle(.red)
         } header: {
             Label("关于", systemImage: "info.circle")
-        }
-    }
-
-    private var tmdbAttributionRow: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AsyncImage(
-                url: URL(string: "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg")
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 16)
-                default:
-                    tmdbTextLogo
-                }
-            }
-
-            Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Link(destination: URL(string: "https://www.themoviedb.org")!) {
-                Text("themoviedb.org")
-                    .font(.caption)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var tmdbTextLogo: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "film")
-                .foregroundStyle(Color(red: 0.004, green: 0.816, blue: 0.710))
-            Text("TMDB")
-                .font(.system(.callout, design: .rounded, weight: .bold))
-                .foregroundStyle(Color(red: 0.004, green: 0.816, blue: 0.710))
         }
     }
 }

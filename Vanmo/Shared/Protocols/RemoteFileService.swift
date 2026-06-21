@@ -32,9 +32,11 @@ struct ServerMediaItem {
     let mediaType: MediaType
     let posterURL: URL?
     let backdropURL: URL?
+    let logoURL: URL?
     let genres: [String]
     let director: String?
     let cast: [String]
+    let castMembers: [CastMemberInfo]
     let originCountry: [String]
     let tmdbID: Int?
     let streamURL: URL
@@ -65,9 +67,11 @@ struct ServerMediaItem {
         mediaType: MediaType,
         posterURL: URL? = nil,
         backdropURL: URL? = nil,
+        logoURL: URL? = nil,
         genres: [String] = [],
         director: String? = nil,
         cast: [String] = [],
+        castMembers: [CastMemberInfo] = [],
         originCountry: [String] = [],
         tmdbID: Int? = nil,
         streamURL: URL,
@@ -94,9 +98,11 @@ struct ServerMediaItem {
         self.mediaType = mediaType
         self.posterURL = posterURL
         self.backdropURL = backdropURL
+        self.logoURL = logoURL
         self.genres = genres
         self.director = director
         self.cast = cast
+        self.castMembers = castMembers
         self.originCountry = originCountry
         self.tmdbID = tmdbID
         self.streamURL = streamURL

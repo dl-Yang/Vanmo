@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "0.1.0",
+  "description": "Main HarmonyOS entry module for Caco.",
+  "main": "index.ets",
+  "author": "Vanmo",
+  "license": "UNLICENSED",
+  "dependencies": {}
+}

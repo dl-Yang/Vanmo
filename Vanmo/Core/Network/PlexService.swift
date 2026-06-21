@@ -209,84 +209,11 @@ final class PlexService: MediaServerService {
         baseURL: URL,
         token: String
     ) -> ServerMediaItem? {
-        let mediaType: MediaType
-        switch meta.type {
-        case "movie": mediaType = .movie
-        case "show": mediaType = .tvShow
-        default: return nil
-        }
-
-        guard let ratingKey = meta.ratingKey else { return nil }
-
-        let posterURL: URL? = meta.thumb.flatMap { thumb in
-            URL(string: "\(baseURL.absoluteString)\(thumb)?X-Plex-Token=\(token)")
-        }
-        let backdropURL: URL? = meta.art.flatMap { art in
-            URL(string: "\(baseURL.absoluteString)\(art)?X-Plex-Token=\(token)")
-        }
-
-        let streamURL: URL
-        if mediaType == .tvShow {
-            streamURL = URL(string: "vanmo://plex-series/\(ratingKey)")!
-        } else {
-            guard let part = meta.media?.first?.part?.first,
-                  let partKey = part.key,
-                  let url = URL(string: "\(baseURL.absoluteString)\(partKey)?X-Plex-Token=\(token)") else {
-                return nil
-            }
-            streamURL = url
-        }
-
-        let durationSeconds: TimeInterval = if let ms = meta.duration {
-            Double(ms) / 1000.0
-        } else {
-            0
-        }
-
-        let primaryPart = meta.media?.first?.part?.first
-        let originalFileName = primaryPart?.file.flatMap(Self.extractFileName(from:))
-        let container = primaryPart?.container.flatMap { $0.isEmpty ? nil : $0 }
-        let fileSize = primaryPart?.size ?? 0
-
-        let directors = meta.director?.compactMap(\.tag).joined(separator: ", ")
-        let normalizedDirector = (directors?.isEmpty ?? true) ? nil : directors
-
-        let cast: [String] = meta.role?.compactMap(\.tag).prefix(10).map { $0 } ?? []
-        let genres: [String] = meta.genre?.compactMap(\.tag) ?? []
-        let countries: [String] = meta.country?.compactMap(\.tag) ?? []
-
-        let tmdbID = meta.guid.flatMap(Self.extractTMDB)
-
-        return ServerMediaItem(
-            serverId: ratingKey,
-            title: meta.title,
-            originalTitle: meta.originalTitle,
-            year: meta.year,
-            overview: meta.summary,
-            rating: meta.rating,
-            mediaType: mediaType,
-            posterURL: posterURL,
-            backdropURL: backdropURL,
-            genres: genres,
-            director: normalizedDirector,
-            cast: cast,
-            originCountry: countries,
-            tmdbID: tmdbID,
-            streamURL: streamURL,
-            fileSize: fileSize,
-            duration: durationSeconds,
-            originalFileName: originalFileName,
-            container: container,
-            showTitle: nil,
-            seasonNumber: nil,
-            episodeNumber: nil,
-            episodeTitle: nil,
-            seriesId: nil
-        )
+        mapPlexMetadataToServerItem(meta, baseURL: baseURL, token: token)
     }
 
     /// 从文件路径中提取文件名,兼容 Unix (`/`) 与 Windows (`\`) 分隔符。
-    private static func extractFileName(from path: String) -> String? {
+    fileprivate static func extractFileName(from path: String) -> String? {
         let separators = CharacterSet(charactersIn: "/\\")
         let parts = path.components(separatedBy: separators)
         return parts.last(where: { !$0.isEmpty })
@@ -297,7 +224,7 @@ final class PlexService: MediaServerService {
     /// - `plex://movie/<plex internal id>`（新版 metadata，TMDB 在 Guid[] 子节点中）
     /// 这里只解析旧版 agent 格式；新版需要请求 `?includeGuids=1` 才能拿到 TMDB ID，
     /// 当前实现暂不解析。
-    private static func extractTMDB(from guid: String) -> Int? {
+    fileprivate static func extractTMDB(from guid: String) -> Int? {
         guard guid.contains("themoviedb"),
               let range = guid.range(of: "themoviedb://") else { return nil }
         let afterPrefix = guid[range.upperBound...]
@@ -647,6 +574,125 @@ enum PlexCredentialStore {
     }
 }
 
+// MARK: - Item Detail Fetcher
+
+enum PlexItemDetailFetcher {
+    static func fetchDetail(ratingKey: String) async throws -> ServerMediaItem {
+        guard let baseURLStr = PlexCredentialStore.baseURL,
+              let token = PlexCredentialStore.token,
+              let baseURL = URL(string: baseURLStr) else {
+            throw NetworkError.notConnected
+        }
+
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("library/metadata/\(ratingKey)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: token)]
+
+        guard let url = components.url else { throw NetworkError.invalidURL }
+
+        VanmoLogger.network.info("[Plex] Fetching item detail for \(ratingKey)")
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(PlexCredentialStore.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validatePlexResponse(response, body: data, context: "fetch item detail")
+
+        let result = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
+        guard let meta = result.mediaContainer.metadata?.first,
+              let mapped = mapPlexMetadataToServerItem(meta, baseURL: baseURL, token: token) else {
+            throw NetworkError.transferFailed("无法解析媒体详情")
+        }
+
+        return mapped
+    }
+}
+
+fileprivate func mapPlexMetadataToServerItem(
+    _ meta: PlexMetadata,
+    baseURL: URL,
+    token: String
+) -> ServerMediaItem? {
+    let mediaType: MediaType
+    switch meta.type {
+    case "movie": mediaType = .movie
+    case "show": mediaType = .tvShow
+    default: return nil
+    }
+
+    guard let ratingKey = meta.ratingKey else { return nil }
+
+    let posterURL: URL? = meta.thumb.flatMap { thumb in
+        URL(string: "\(baseURL.absoluteString)\(thumb)?X-Plex-Token=\(token)")
+    }
+    let backdropURL: URL? = meta.art.flatMap { art in
+        URL(string: "\(baseURL.absoluteString)\(art)?X-Plex-Token=\(token)")
+    }
+
+    let streamURL: URL
+    if mediaType == .tvShow {
+        streamURL = URL(string: "vanmo://plex-series/\(ratingKey)")!
+    } else {
+        guard let part = meta.media?.first?.part?.first,
+              let partKey = part.key,
+              let url = URL(string: "\(baseURL.absoluteString)\(partKey)?X-Plex-Token=\(token)") else {
+            return nil
+        }
+        streamURL = url
+    }
+
+    let durationSeconds: TimeInterval = if let ms = meta.duration {
+        Double(ms) / 1000.0
+    } else {
+        0
+    }
+
+    let primaryPart = meta.media?.first?.part?.first
+    let originalFileName = primaryPart?.file.flatMap { PlexService.extractFileName(from: $0) }
+    let container = primaryPart?.container.flatMap { $0.isEmpty ? nil : $0 }
+    let fileSize = primaryPart?.size ?? 0
+
+    let directors = meta.director?.compactMap(\.tag).joined(separator: ", ")
+    let normalizedDirector = (directors?.isEmpty ?? true) ? nil : directors
+
+    let cast: [String] = meta.role?.compactMap(\.tag).prefix(10).map { $0 } ?? []
+    let genres: [String] = meta.genre?.compactMap(\.tag) ?? []
+    let countries: [String] = meta.country?.compactMap(\.tag) ?? []
+
+    let tmdbID = meta.guid.flatMap { PlexService.extractTMDB(from: $0) }
+
+    return ServerMediaItem(
+        serverId: ratingKey,
+        title: meta.title,
+        originalTitle: meta.originalTitle,
+        year: meta.year,
+        overview: meta.summary,
+        rating: meta.rating,
+        mediaType: mediaType,
+        posterURL: posterURL,
+        backdropURL: backdropURL,
+        genres: genres,
+        director: normalizedDirector,
+        cast: cast,
+        originCountry: countries,
+        tmdbID: tmdbID,
+        streamURL: streamURL,
+        fileSize: fileSize,
+        duration: durationSeconds,
+        originalFileName: originalFileName,
+        container: container,
+        showTitle: nil,
+        seasonNumber: nil,
+        episodeNumber: nil,
+        episodeTitle: nil,
+        seriesId: nil
+    )
+}
+
 // MARK: - Episode Fetcher
 
 /// 提供给 PlayerViewModel / MediaDetailView 在剧集播放时调用,按 series ratingKey
@@ -694,6 +740,10 @@ enum PlexEpisodeFetcher {
 
             let stream = URL(string: "\(baseURLStr)\(partKey)?X-Plex-Token=\(token)")!
 
+            let backdropURL: URL? = (meta.art ?? meta.thumb).flatMap { path in
+                URL(string: "\(baseURLStr)\(path)?X-Plex-Token=\(token)")
+            }
+
             return EpisodeInfo(
                 id: key,
                 title: meta.title,
@@ -701,7 +751,8 @@ enum PlexEpisodeFetcher {
                 episodeNumber: ep,
                 duration: duration,
                 overview: meta.summary,
-                streamURL: stream
+                streamURL: stream,
+                backdropURL: backdropURL
             )
         }
 

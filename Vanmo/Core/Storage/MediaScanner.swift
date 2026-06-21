@@ -201,6 +201,7 @@ actor MediaScanner {
         item.overview = serverItem.overview
         item.posterURL = serverItem.posterURL
         item.backdropURL = serverItem.backdropURL
+        item.logoURL = serverItem.logoURL
         item.rating = serverItem.rating
         item.mediaType = serverItem.mediaType
         item.fileURL = serverItem.streamURL

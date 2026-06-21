@@ -448,7 +448,7 @@ final class LibraryViewModel: ObservableObject {
         connections: [SavedConnection],
         in context: ModelContext
     ) throws {
-        let scannedConnections = connections.filter { $0.type != .emby && $0.type != .jellyfin }
+        let scannedConnections = connections.filter { $0.type == .plex }
         guard !scannedConnections.isEmpty else {
             scannedLibraryFolders = [:]
             scannedConnectionsById = [:]
