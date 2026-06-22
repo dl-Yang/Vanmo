@@ -35,8 +35,51 @@ final class ConnectionsViewModel: ObservableObject {
     /// 让 App 生命周期内 file:// URL 始终可读，避免播放时权限失效。
     private var activeLocalServices: [UUID: LocalFolderService] = [:]
 
+    private static let activeMediaServerKey = "activeMediaServerConnectionID"
+
+    init() {
+        if let raw = UserDefaults.standard.string(forKey: Self.activeMediaServerKey),
+           let id = UUID(uuidString: raw) {
+            activeMediaServerConnectionID = id
+        }
+    }
+
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
+    }
+
+    private func isMediaServer(_ type: ConnectionType) -> Bool {
+        type == .emby || type == .jellyfin || type == .plex
+    }
+
+    private func persistActiveMediaServerID() {
+        if let id = activeMediaServerConnectionID {
+            UserDefaults.standard.set(id.uuidString, forKey: Self.activeMediaServerKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.activeMediaServerKey)
+        }
+    }
+
+    /// 激活指定媒体服务器：若与旧激活服务器不同，则自动断开旧服务器的会话凭据，
+    /// 并清空首页 JSON 缓存，避免旧内容残留。新服务器的会话凭据已在 connect 时写入。
+    private func setActiveMediaServer(_ connection: SavedConnection) async {
+        let previousID = activeMediaServerConnectionID
+        activeMediaServerConnectionID = connection.id
+        persistActiveMediaServerID()
+
+        guard previousID != connection.id else { return }
+
+        // 新激活类型决定需要清理的另一类会话凭据（同类型由新连接 connect 时覆盖）。
+        switch connection.type {
+        case .plex:
+            EmbyCredentialStore.clear()
+        case .emby, .jellyfin:
+            PlexCredentialStore.clear()
+        default:
+            break
+        }
+        // 切换服务器后旧首页缓存失效，清空磁盘缓存；新内容会在刷新时重新写入。
+        await HomeCollectionCache.shared.clear()
     }
 
     func connectionStatus(for connection: SavedConnection) -> ConnectionStatus {
@@ -85,14 +128,23 @@ final class ConnectionsViewModel: ObservableObject {
         // 在 App 启动后无需用户重新进入"连接"页就能直接播放。
         await restoreLocalFolderAccess()
 
-        // savedConnections 已按 lastConnectedAt 倒序排列。
-        guard let last = savedConnections.first(where: { $0.lastConnectedAt != nil }) else {
+        // 优先重连上次激活的媒体服务器；否则回退到 lastConnectedAt 最近的连接。
+        let target: SavedConnection?
+        if let activeID = activeMediaServerConnectionID,
+           let active = savedConnections.first(where: { $0.id == activeID }) {
+            target = active
+        } else {
+            // savedConnections 已按 lastConnectedAt 倒序排列。
+            target = savedConnections.first(where: { $0.lastConnectedAt != nil })
+        }
+
+        guard let target else {
             VanmoLogger.network.info("[Connections] Auto-reconnect skipped: no previous connection")
             return
         }
 
-        VanmoLogger.network.info("[Connections] Auto-reconnect to \(last.name)")
-        await connectAndScan(last, showErrorAlert: false)
+        VanmoLogger.network.info("[Connections] Auto-reconnect to \(target.name)")
+        await connectAndScan(target, showErrorAlert: false)
     }
 
     /// 仅打开本地文件夹的 bookmark 并保持 access，不触发扫描。
@@ -152,6 +204,12 @@ final class ConnectionsViewModel: ObservableObject {
             connectionStatuses[connection.id] = .connected
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
+
+            // 媒体服务器（emby/jellyfin/plex）单激活：连接成功后切换为当前激活服务器，
+            // 自动断开旧服务器会话与首页缓存。文件型连接（本地/SMB 等）不受影响。
+            if isMediaServer(connection.type) {
+                await setActiveMediaServer(connection)
+            }
 
             loadingMessage = "扫描媒体文件..."
             librarySyncMessage = "正在同步数据..."
@@ -247,6 +305,9 @@ final class ConnectionsViewModel: ObservableObject {
         await loadSavedConnections()
         if let saved = savedConnections.first(where: { $0.id == connection.id }) {
             await selectConnection(saved)
+            // 添加连接后立即连接并扫描，触发 librarySyncCompletionID 递增，使首页主动刷新
+            // 显示该服务内容（修复首次添加后首页不刷新的问题）。
+            await connectAndScan(saved, showErrorAlert: false)
         }
     }
 

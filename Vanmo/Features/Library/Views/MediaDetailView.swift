@@ -378,26 +378,10 @@ struct MediaDetailView: View {
             title: title,
             fallbackLogoURL: item.logoURL,
             metaItems: collapsedMetaItems,
-            store: ratingStore,
+            ratingStore: ratingStore,
             logoStore: logoStore,
             starYellow: starYellow
         )
-    }
-
-    private func ratingRow(_ rating: Double) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "star.fill")
-                .foregroundStyle(starYellow)
-                .font(.system(size: 16))
-            Text(String(format: "%.1f", rating))
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-
-            Text("(450K Reviews)")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .animation(.easeInOut(duration: 0.25), value: rating)
     }
 
     private func tagView(_ text: String) -> some View {
@@ -1124,8 +1108,8 @@ private struct MediaDetailPanelHeader: View {
     let title: String
     let fallbackLogoURL: URL?
     let metaItems: [String]
-    @ObservedObject var store: MediaDetailRatingStore
-    @ObservedObject var logoStore: MediaDetailLogoStore
+    let ratingStore: MediaDetailRatingStore
+    let logoStore: MediaDetailLogoStore
     let starYellow: Color
 
     var body: some View {
@@ -1156,27 +1140,9 @@ private struct MediaDetailPanelHeader: View {
                 tagView("DOLBY")
             }
 
-            if let rating = store.rating {
-                ratingRow(rating)
-            }
+            MediaDetailRatingRow(store: ratingStore, starYellow: starYellow)
         }
         .frame(maxWidth: .infinity, alignment: .center)
-    }
-
-    private func ratingRow(_ rating: Double) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: "star.fill")
-                .foregroundStyle(starYellow)
-                .font(.system(size: 16))
-            Text(String(format: "%.1f", rating))
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
-
-            Text("(450K Reviews)")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
-        }
-        .animation(.easeInOut(duration: 0.25), value: rating)
     }
 
     private func tagView(_ text: String) -> some View {
@@ -1189,6 +1155,29 @@ private struct MediaDetailPanelHeader: View {
                 RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
             )
+    }
+}
+
+private struct MediaDetailRatingRow: View {
+    @ObservedObject var store: MediaDetailRatingStore
+    let starYellow: Color
+
+    var body: some View {
+        if let rating = store.rating {
+            HStack(spacing: 6) {
+                Image(systemName: "star.fill")
+                    .foregroundStyle(starYellow)
+                    .font(.system(size: 16))
+                Text(String(format: "%.1f", rating))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text("(450K Reviews)")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            .animation(.easeInOut(duration: 0.25), value: rating)
+        }
     }
 }
 
