@@ -4,7 +4,6 @@ actor MetadataRefreshCoordinator {
     static let shared = MetadataRefreshCoordinator()
 
     private let cache = MetadataCache.shared
-    private let metadataService = MetadataService.shared
 
     nonisolated static func supportsRefresh(for item: MediaItem) -> Bool {
         resolveSource(for: item) != .unsupported
@@ -14,20 +13,11 @@ actor MetadataRefreshCoordinator {
         let key = MetadataCacheKey.from(item)
 
         if !force, let cached = await cache.load(for: key) {
-            await apply(record: cached, to: item)
             return cached
         }
 
         let draft = try await buildDraft(for: item, key: key)
-        let saved = try await cache.save(draft)
-        await apply(record: saved, to: item)
-        return saved
-    }
-
-    @MainActor
-    private func apply(record: MetadataCacheRecord, to item: MediaItem) async {
-        let root = (try? await cache.rootDirectoryURL()) ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        await metadataService.applyCachedRecord(record, rootDirectory: root, to: item)
+        return try await cache.save(draft)
     }
 
     private func buildDraft(for item: MediaItem, key: MetadataCacheKey) async throws -> MetadataCacheRecord {

@@ -20,11 +20,9 @@ struct MediaDetailView: View {
     @State private var enrichedItem: ServerMediaItem?
     @State private var activeSheet: MediaDetailSheet?
     @State private var isHeroPosterLoaded = false
-    @State private var cachedMetadata: MetadataCacheRecord?
-    @State private var isRefreshingMetadata = false
-    @State private var refreshErrorMessage: String?
-    @State private var displayRating: Double?
-    @State private var displayCastMembers: [CastMemberDisplay] = []
+    @State private var ratingStore = MediaDetailRatingStore()
+    @State private var refreshStore = MediaDetailRefreshStore()
+    @State private var castStore = MediaDetailCastStore()
 
     /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
     private enum PanelState { case collapsed, expanded }
@@ -83,7 +81,7 @@ struct MediaDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .task {
-            displayRating = item.rating
+            ratingStore.updateRating(item.rating)
             let posterURL = displayPosterURL
             async let dominant = DominantColorExtractor.cachedColor(for: posterURL)
             async let accent = DominantColorExtractor.cachedAccentColor(for: posterURL)
@@ -111,11 +109,7 @@ struct MediaDetailView: View {
         } message: {
             Text(favoriteErrorMessage ?? "")
         }
-        .alert("刷新失败", isPresented: refreshErrorBinding) {
-            Button("确定") {}
-        } message: {
-            Text(refreshErrorMessage ?? "")
-        }
+        .modifier(MediaDetailRefreshErrorPresenter(store: refreshStore))
         .overlay {
             if let sheet = activeSheet {
                 modalOverlay(for: sheet)
@@ -376,38 +370,13 @@ struct MediaDetailView: View {
     // MARK: - 面板子区块
 
     private func panelHeader(title: String) -> some View {
-        VStack(alignment: .center, spacing: 10) {
-            MediaTitleLogoView(
-                title: title,
-                logoURL: displayLogoURL,
-                maxLogoHeight: 72
-            )
-            
-            if !collapsedMetaItems.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(Array(collapsedMetaItems.enumerated()), id: \.offset) { index, value in
-                        if index > 0 {
-                            Circle().fill(Color.secondary.opacity(0.5)).frame(width: 4, height: 4)
-                        }
-                        Text(value)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            // Tags like [TV-MA] [4K] [DOLBY] can be added here if model supports them in the future
-            HStack(spacing: 6) {
-                tagView("TV-MA")
-                tagView("4K")
-                tagView("DOLBY")
-            }
-
-            if let rating = displayRating {
-                ratingRow(rating)
-            }
-        }
-        .frame(maxWidth: .infinity)
+        MediaDetailPanelHeader(
+            title: title,
+            logoURL: displayLogoURL,
+            metaItems: collapsedMetaItems,
+            store: ratingStore,
+            starYellow: starYellow
+        )
     }
 
     private func ratingRow(_ rating: Double) -> some View {
@@ -439,39 +408,13 @@ struct MediaDetailView: View {
     }
 
     private func panelActions(play: @escaping () -> Void) -> some View {
-        HStack(spacing: 12) {
-            Button(action: play) {
-                HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 18, weight: .bold))
-                    Text("播放")
-                        .font(.system(size: 18, weight: .bold))
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(accentBlue)
-                .clipShape(Capsule())
-                .shadow(color: accentBlue.opacity(0.25), radius: 8, y: 6)
-            }
-            .buttonStyle(.plain)
-
-            circleAction(icon: "icon_download", isSystem: false) {}
-
-            Menu {
-                if supportsMetadataRefresh {
-                    Button {
-                        Task { await refreshMetadata(force: true) }
-                    } label: {
-                        Label("刷新", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(isRefreshingMetadata)
-                }
-            } label: {
-                circleActionLabel(icon: "ellipsis")
-            }
-            .disabled(isRefreshingMetadata || !supportsMetadataRefresh)
-        }
+        MediaDetailPanelActions(
+            accentBlue: accentBlue,
+            store: refreshStore,
+            supportsMetadataRefresh: supportsMetadataRefresh,
+            play: play,
+            refresh: { Task { await refreshMetadata(force: true) } }
+        )
     }
 
     private func circleActionLabel(icon: String, isSystem: Bool = true) -> some View {
@@ -516,66 +459,18 @@ struct MediaDetailView: View {
 
     @ViewBuilder
     private var castSection: some View {
-        if !resolvedCastMembers.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("主演")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.primary)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(resolvedCastMembers) { member in
-                            castAvatar(member)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                }
-                .padding(.horizontal, -24)
-            }
-        }
+        MediaDetailCastSection(
+            store: castStore,
+            fallbackNames: displayCast
+        )
     }
 
     private var resolvedCastMembers: [CastMemberDisplay] {
-        if !displayCastMembers.isEmpty {
-            return displayCastMembers
+        if !castStore.members.isEmpty {
+            return castStore.members
         }
         return displayCast.map { name in
             CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
-        }
-    }
-
-    private func castAvatar(_ member: CastMemberDisplay) -> some View {
-        VStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(Color(.secondarySystemBackground))
-
-                if let profileURL = member.profileURL {
-                    KFImage(profileURL)
-                        .placeholder {
-                            Text(initial(for: member.name))
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .foregroundStyle(.secondary)
-                        }
-                        .fade(duration: 0.2)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                        .id(profileURL)
-                } else {
-                    Text(initial(for: member.name))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(width: 80, height: 80)
-
-            Text(member.name)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .frame(width: 80)
         }
     }
 
@@ -764,49 +659,38 @@ struct MediaDetailView: View {
         item.logoURL
     }
 
-    private var refreshErrorBinding: Binding<Bool> {
-        Binding {
-            refreshErrorMessage != nil
-        } set: { isPresented in
-            if !isPresented { refreshErrorMessage = nil }
-        }
-    }
-
     private func loadCachedMetadataIfNeeded() async {
         let key = MetadataCacheKey.from(item)
         guard let record = await MetadataCache.shared.load(for: key) else { return }
         await applyRecordToUI(record)
     }
 
+    @MainActor
     private func refreshMetadata(force: Bool) async {
         guard supportsMetadataRefresh else { return }
-        guard !isRefreshingMetadata else { return }
+        guard !refreshStore.isRefreshingMetadata else { return }
 
-        isRefreshingMetadata = true
-        defer { isRefreshingMetadata = false }
+        refreshStore.beginRefreshing()
+        defer { refreshStore.finishRefreshing() }
 
         do {
             let record = try await MetadataRefreshCoordinator.shared.refresh(item, force: force)
             await applyRecordToUI(record)
-            try modelContext.save()
         } catch {
-            refreshErrorMessage = error.localizedDescription
+            refreshStore.failRefreshing(error.localizedDescription)
         }
     }
 
     @MainActor
     private func applyRecordToUI(_ record: MetadataCacheRecord) async {
-        cachedMetadata = record
-
         if let rating = record.rating {
-            displayRating = rating
+            ratingStore.updateRating(rating)
         }
 
         let root = (try? await MetadataCache.shared.rootDirectoryURL()) ?? URL(fileURLWithPath: NSTemporaryDirectory())
         let castDisplays = record.makeCastDisplays(rootDirectory: root)
-        displayCastMembers = castDisplays
+        castStore.update(castDisplays)
 
-        await MetadataService.shared.applyCachedRecord(record, rootDirectory: root, to: item)
         await mergeCachedEpisodesIfNeeded(from: record, rootDirectory: root)
     }
 
@@ -1143,6 +1027,291 @@ private enum MediaDetailSheet: Identifiable, Equatable {
         case .cast: return "cast"
         case .episodes: return "episodes"
         }
+    }
+}
+
+@MainActor
+private final class MediaDetailRatingStore: ObservableObject {
+    @Published private(set) var rating: Double?
+
+    func updateRating(_ newRating: Double?) {
+        guard rating != newRating else { return }
+        rating = newRating
+    }
+}
+
+@MainActor
+private final class MediaDetailRefreshStore: ObservableObject {
+    @Published private(set) var isRefreshingMetadata = false
+    @Published var refreshErrorMessage: String?
+
+    func beginRefreshing() {
+        guard !isRefreshingMetadata else { return }
+        isRefreshingMetadata = true
+    }
+
+    func finishRefreshing() {
+        guard isRefreshingMetadata else { return }
+        isRefreshingMetadata = false
+    }
+
+    func failRefreshing(_ message: String) {
+        refreshErrorMessage = message
+    }
+}
+
+@MainActor
+private final class MediaDetailCastStore: ObservableObject {
+    @Published private(set) var members: [CastMemberDisplay] = []
+
+    func update(_ newMembers: [CastMemberDisplay]) {
+        guard members != newMembers else { return }
+        members = newMembers
+    }
+}
+
+private struct MediaDetailRefreshErrorPresenter: ViewModifier {
+    @ObservedObject var store: MediaDetailRefreshStore
+
+    private var refreshErrorBinding: Binding<Bool> {
+        Binding {
+            store.refreshErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented { store.refreshErrorMessage = nil }
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .alert("刷新失败", isPresented: refreshErrorBinding) {
+                Button("确定") {}
+            } message: {
+                Text(store.refreshErrorMessage ?? "")
+            }
+    }
+}
+
+private struct MediaDetailPanelHeader: View {
+    let title: String
+    let logoURL: URL?
+    let metaItems: [String]
+    @ObservedObject var store: MediaDetailRatingStore
+    let starYellow: Color
+
+    var body: some View {
+        VStack(alignment: .center, spacing: 10) {
+            MediaTitleLogoView(
+                title: title,
+                logoURL: logoURL,
+                maxLogoHeight: 72
+            )
+
+            if !metaItems.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(Array(metaItems.enumerated()), id: \.offset) { index, value in
+                        if index > 0 {
+                            Circle().fill(Color.secondary.opacity(0.5)).frame(width: 4, height: 4)
+                        }
+                        Text(value)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            HStack(spacing: 6) {
+                tagView("TV-MA")
+                tagView("4K")
+                tagView("DOLBY")
+            }
+
+            if let rating = store.rating {
+                ratingRow(rating)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func ratingRow(_ rating: Double) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "star.fill")
+                .foregroundStyle(starYellow)
+                .font(.system(size: 16))
+            Text(String(format: "%.1f", rating))
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Text("(450K Reviews)")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .animation(.easeInOut(duration: 0.25), value: rating)
+    }
+
+    private func tagView(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
+            )
+    }
+}
+
+private struct MediaDetailPanelActions: View {
+    let accentBlue: Color
+    @ObservedObject var store: MediaDetailRefreshStore
+    let supportsMetadataRefresh: Bool
+    let play: () -> Void
+    let refresh: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: play) {
+                HStack(spacing: 8) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 18, weight: .bold))
+                    Text("播放")
+                        .font(.system(size: 18, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(accentBlue)
+                .clipShape(Capsule())
+                .shadow(color: accentBlue.opacity(0.25), radius: 8, y: 6)
+            }
+            .buttonStyle(.plain)
+
+            circleAction(icon: "icon_download", isSystem: false) {}
+
+            Menu {
+                if supportsMetadataRefresh {
+                    Button {
+                        refresh()
+                    } label: {
+                        Label("刷新", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(store.isRefreshingMetadata)
+                }
+            } label: {
+                circleActionLabel(icon: "ellipsis")
+            }
+            .disabled(store.isRefreshingMetadata || !supportsMetadataRefresh)
+        }
+    }
+
+    private func circleActionLabel(icon: String, isSystem: Bool = true) -> some View {
+        Group {
+            if isSystem {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+            } else {
+                Image(icon)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+            }
+        }
+        .foregroundStyle(.primary)
+        .frame(width: 56, height: 56)
+        .background(
+            Circle()
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            Circle()
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private func circleAction(icon: String, isSystem: Bool = true, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            circleActionLabel(icon: icon, isSystem: isSystem)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MediaDetailCastSection: View {
+    @ObservedObject var store: MediaDetailCastStore
+    let fallbackNames: [String]
+
+    private var members: [CastMemberDisplay] {
+        if !store.members.isEmpty {
+            return store.members
+        }
+        return fallbackNames.map { name in
+            CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
+        }
+    }
+
+    var body: some View {
+        let members = members
+
+        if !members.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("主演")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(members) { member in
+                            MediaDetailCastAvatar(member: member)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                }
+                .padding(.horizontal, -24)
+            }
+        }
+    }
+}
+
+private struct MediaDetailCastAvatar: View {
+    let member: CastMemberDisplay
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(Color(.secondarySystemBackground))
+
+                if let profileURL = member.profileURL {
+                    KFImage(profileURL)
+                        .placeholder {
+                            Text(initial(for: member.name))
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        .fade(duration: 0.2)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 80, height: 80)
+                        .clipShape(Circle())
+                } else {
+                    Text(initial(for: member.name))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 80, height: 80)
+
+            Text(member.name)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .frame(width: 80)
+        }
+    }
+
+    private func initial(for name: String) -> String {
+        String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased()
     }
 }
 
