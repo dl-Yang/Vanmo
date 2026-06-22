@@ -488,7 +488,9 @@ final class EmbyService: MediaServerService {
         parentId: String,
         collectionType: EmbyCollectionType,
         startIndex: Int = 0,
-        pageSize: Int = 50
+        pageSize: Int = 50,
+        sortBy: String = "SortName",
+        sortOrder: String = "Ascending"
     ) async throws -> ServerItemsPage {
         guard isConnected, let config, let token = accessToken, let userId else {
             throw NetworkError.notConnected
@@ -504,8 +506,8 @@ final class EmbyService: MediaServerService {
             URLQueryItem(name: "IncludeItemTypes", value: Self.includeItemTypes(for: collectionType)),
             URLQueryItem(name: "Recursive", value: "true"),
             URLQueryItem(name: "Fields", value: Self.liveItemFields),
-            URLQueryItem(name: "SortBy", value: "SortName"),
-            URLQueryItem(name: "SortOrder", value: "Ascending"),
+            URLQueryItem(name: "SortBy", value: sortBy),
+            URLQueryItem(name: "SortOrder", value: sortOrder),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
             URLQueryItem(name: "Limit", value: String(pageSize)),
             URLQueryItem(name: "api_key", value: token),

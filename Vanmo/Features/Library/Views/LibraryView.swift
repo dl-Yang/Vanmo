@@ -229,16 +229,31 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var continueWatchingSection: some View {
-        if let latestItem = viewModel.recentlyPlayed.first {
-            ContinueWatchingHeroCard(
-                item: latestItem,
-                heroHeight: isRegularWidth ? 220 : 184
-            ) {
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
-                appState.play(latestItem)
+        if !viewModel.recentlyPlayed.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("历史记录")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(HomeDesign.onSurface)
+                    .padding(.horizontal, 24)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 16) {
+                        ForEach(viewModel.recentlyPlayed) { item in
+                            Button {
+                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                generator.impactOccurred()
+                                appState.play(item)
+                            } label: {
+                                ContinueWatchingCard(item: item)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+                }
+                .scrollClipDisabled()
             }
-            .padding(.horizontal, 24)
         }
     }
 
@@ -753,132 +768,66 @@ private struct LibraryEmptyContentView: View {
     }
 }
 
-// MARK: - Continue Watching Hero Card
+// MARK: - Continue Watching Card
 
-private struct ContinueWatchingHeroCard: View {
+private struct ContinueWatchingCard: View {
     let item: MediaItem
-    let heroHeight: CGFloat
-    let onTap: () -> Void
-
+    
     private var progress: Double {
         min(max(item.playbackProgress, 0), 1)
     }
-
+    
     var body: some View {
-        Button(action: onTap) {
+        VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .bottomLeading) {
-                backdrop
-                    .opacity(0.7)
-
-                LinearGradient(
-                    stops: [
-                        .init(color: .black.opacity(0.02), location: 0),
-                        .init(color: .black.opacity(0.38), location: 0.52),
-                        .init(color: .black.opacity(0.88), location: 1),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Spacer(minLength: 12)
-
-                    Text("继续播放")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay {
-                            Capsule().stroke(.white.opacity(0.16), lineWidth: 1)
+                KFImage(item.backdropURL ?? item.posterURL)
+                    .placeholder {
+                        ZStack {
+                            HomeDesign.posterBase
+                            Image(systemName: item.mediaType.icon)
+                                .font(.title2)
+                                .foregroundStyle(.white.opacity(0.4))
                         }
-
-                    Spacer(minLength: 12)
-
-                    Text(item.displayTitle)
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .padding(.bottom, 14)
-
-                    ProgressTrack(progress: progress)
-                        .padding(.trailing, 54)
-                        .padding(.bottom, 10)
-
-                    Text("\(item.lastPlaybackPosition.shortDuration) · 共 \(item.duration.shortDuration)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .padding(.bottom, 8)
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: heroHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 28))
-            .overlay {
-                RoundedRectangle(cornerRadius: 28)
-                    .stroke(HomeDesign.cardStroke, lineWidth: 1)
-            }
-            .overlay(alignment: .bottomTrailing) {
-                playButton
-                    .padding(.trailing, 18)
-                    .padding(.bottom, 28)
-            }
-            .shadow(color: .black.opacity(0.32), radius: 34, x: 0, y: 18)
-            .contentShape(RoundedRectangle(cornerRadius: 28))
-            .hoverEffect(.lift)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(item.displayTitle)，继续播放")
-        .accessibilityValue("进度 \(Int(progress * 100))%")
-    }
-
-    private var playButton: some View {
-        Image(systemName: "play.fill")
-            .font(.system(size: 16, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 42, height: 42)
-            .background(HomeDesign.accent, in: Circle())
-            .shadow(color: HomeDesign.accent.opacity(0.44), radius: 12, x: 0, y: 8)
-    }
-
-    private var backdrop: some View {
-        KFImage(item.backdropURL ?? item.posterURL)
-            .placeholder {
-                ZStack {
-                    HomeDesign.posterBase
-                    Image(systemName: item.mediaType.icon)
-                        .font(.title2)
-                        .foregroundStyle(.white.opacity(0.4))
-                }
-            }
-            .fade(duration: 0.2)
-            .resizable()
-            .scaledToFill()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-    }
-}
-
-private struct ProgressTrack: View {
-    let progress: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(.white.opacity(0.2))
+                    }
+                    .fade(duration: 0.2)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 160, height: 90)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                
+                if progress > 0 {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(.white.opacity(0.3))
+                                .frame(height: 4)
+                            
+                            Capsule()
+                                .fill(HomeDesign.accent) // Usually light blue
+                                .frame(width: max(0, geo.size.width * progress), height: 4)
+                        }
+                    }
                     .frame(height: 4)
-
-                Capsule()
-                    .fill(HomeDesign.accent)
-                    .frame(width: max(0, geo.size.width * progress), height: 4)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
+                }
             }
+            .frame(width: 160, height: 90)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.displayTitle)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(HomeDesign.onSurface)
+                    .lineLimit(1)
+                
+                Text("\(item.lastPlaybackPosition.shortDuration) · 共 \(item.duration.shortDuration)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(HomeDesign.onSurface.opacity(0.7))
+                    .lineLimit(1)
+            }
+            .frame(width: 160, alignment: .leading)
         }
-        .frame(height: 4)
     }
 }
 
@@ -932,11 +881,10 @@ private struct HomeFavoritesCard: View {
         .frame(height: 112)
         .background(HomeDesign.favoritesCardFill, in: RoundedRectangle(cornerRadius: 26))
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26)
-                .stroke(HomeDesign.cardStroke, lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.24), radius: 28, x: 0, y: 14)
+//        .overlay {
+//            RoundedRectangle(cornerRadius: 26)
+//                .stroke(HomeDesign.cardStroke, lineWidth: 1)
+//        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("收藏，共 \(totalCount) 部")
     }

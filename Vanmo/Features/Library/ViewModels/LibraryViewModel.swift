@@ -71,7 +71,8 @@ final class LibraryViewModel: ObservableObject {
     }
 
     func previewItems(for folder: CollectionFolder) -> [MediaItem] {
-        folderPreviews[folder.id] ?? scannedFolderPreviews[folder.id] ?? []
+        let items = folderPreviews[folder.id] ?? scannedFolderPreviews[folder.id] ?? []
+        return sortedByNewestFirst(items)
     }
 
     /// 首页展示的媒体库：仅保留电影 / 电视剧类型，并隐藏确定为空的媒体库。
@@ -227,7 +228,9 @@ final class LibraryViewModel: ObservableObject {
                                 parentId: folder.id,
                                 collectionType: folder.collectionType,
                                 startIndex: 0,
-                                pageSize: folderPreviewPageSize
+                                pageSize: folderPreviewPageSize,
+                                sortBy: "DateCreated",
+                                sortOrder: "Descending"
                             )
                             previewsByFolder[folder.id] = page.items.map { $0.makeMediaItem() }
                             totalCountsByFolder[folder.id] = page.totalRecordCount
@@ -481,7 +484,7 @@ final class LibraryViewModel: ObservableObject {
                     connection: connection
                 )
                 folders.append(folder)
-                previewsByFolder[folder.id] = Array(movieItems.prefix(folderPreviewPageSize))
+                previewsByFolder[folder.id] = newestPreviewSlice(from: movieItems)
                 totalCountsByFolder[folder.id] = movieItems.count
             }
 
@@ -494,7 +497,7 @@ final class LibraryViewModel: ObservableObject {
                     connection: connection
                 )
                 folders.append(folder)
-                previewsByFolder[folder.id] = Array(showItems.prefix(folderPreviewPageSize))
+                previewsByFolder[folder.id] = newestPreviewSlice(from: showItems)
                 totalCountsByFolder[folder.id] = showItems.count
             }
 
@@ -538,8 +541,9 @@ final class LibraryViewModel: ObservableObject {
             normalizedShowTitle(for: item)
         }
 
-        return grouped.compactMap { showTitle, episodes in
+        return sortedByNewestFirst(grouped.compactMap { showTitle, episodes in
             guard let representative = episodes.sorted(by: episodeSortPredicate).first else { return nil }
+            let latestAddedAt = episodes.map(\.addedAt).max() ?? representative.addedAt
             let item = MediaItem(
                 title: showTitle,
                 fileURL: representative.fileURL,
@@ -553,9 +557,17 @@ final class LibraryViewModel: ObservableObject {
             item.rating = representative.rating
             item.showTitle = showTitle
             item.sourceConnectionId = representative.sourceConnectionId
+            item.addedAt = latestAddedAt
             return item
-        }
-        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        })
+    }
+
+    private func sortedByNewestFirst(_ items: [MediaItem]) -> [MediaItem] {
+        items.sorted { $0.addedAt > $1.addedAt }
+    }
+
+    private func newestPreviewSlice(from items: [MediaItem]) -> [MediaItem] {
+        Array(sortedByNewestFirst(items).prefix(folderPreviewPageSize))
     }
 
     private func normalizedShowTitle(for item: MediaItem) -> String {

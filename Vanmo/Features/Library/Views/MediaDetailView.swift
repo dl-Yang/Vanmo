@@ -23,6 +23,7 @@ struct MediaDetailView: View {
     @State private var ratingStore = MediaDetailRatingStore()
     @State private var refreshStore = MediaDetailRefreshStore()
     @State private var castStore = MediaDetailCastStore()
+    @State private var logoStore = MediaDetailLogoStore()
 
     /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
     private enum PanelState { case collapsed, expanded }
@@ -82,6 +83,7 @@ struct MediaDetailView: View {
         .toolbar(.hidden, for: .tabBar)
         .task {
             ratingStore.updateRating(item.rating)
+            logoStore.update(item.logoURL)
             let posterURL = displayPosterURL
             async let dominant = DominantColorExtractor.cachedColor(for: posterURL)
             async let accent = DominantColorExtractor.cachedAccentColor(for: posterURL)
@@ -231,9 +233,10 @@ struct MediaDetailView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                MediaTitleLogoView(
+                MediaDetailTitleLogoView(
                     title: collapsedTitle,
-                    logoURL: displayLogoURL,
+                    fallbackLogoURL: item.logoURL,
+                    store: logoStore,
                     collapsedStyle: true,
                     maxLogoHeight: 88
                 )
@@ -264,6 +267,7 @@ struct MediaDetailView: View {
                     .foregroundStyle(.white.opacity(0.9))
             }
             .padding(.bottom, 50)
+            .padding(.horizontal, 24)
         }
     }
 
@@ -372,9 +376,10 @@ struct MediaDetailView: View {
     private func panelHeader(title: String) -> some View {
         MediaDetailPanelHeader(
             title: title,
-            logoURL: displayLogoURL,
+            fallbackLogoURL: item.logoURL,
             metaItems: collapsedMetaItems,
             store: ratingStore,
+            logoStore: logoStore,
             starYellow: starYellow
         )
     }
@@ -655,10 +660,6 @@ struct MediaDetailView: View {
         item.mediaType == .tvShow ? (item.showTitle ?? item.title) : item.displayTitle
     }
 
-    private var displayLogoURL: URL? {
-        item.logoURL
-    }
-
     private func loadCachedMetadataIfNeeded() async {
         let key = MetadataCacheKey.from(item)
         guard let record = await MetadataCache.shared.load(for: key) else { return }
@@ -688,6 +689,7 @@ struct MediaDetailView: View {
         }
 
         let root = (try? await MetadataCache.shared.rootDirectoryURL()) ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        logoStore.update(record.resolvedLogoURL(rootDirectory: root))
         let castDisplays = record.makeCastDisplays(rootDirectory: root)
         castStore.update(castDisplays)
 
@@ -1070,6 +1072,16 @@ private final class MediaDetailCastStore: ObservableObject {
     }
 }
 
+@MainActor
+private final class MediaDetailLogoStore: ObservableObject {
+    @Published private(set) var logoURL: URL?
+
+    func update(_ newLogoURL: URL?) {
+        guard logoURL != newLogoURL else { return }
+        logoURL = newLogoURL
+    }
+}
+
 private struct MediaDetailRefreshErrorPresenter: ViewModifier {
     @ObservedObject var store: MediaDetailRefreshStore
 
@@ -1091,18 +1103,37 @@ private struct MediaDetailRefreshErrorPresenter: ViewModifier {
     }
 }
 
+private struct MediaDetailTitleLogoView: View {
+    let title: String
+    let fallbackLogoURL: URL?
+    @ObservedObject var store: MediaDetailLogoStore
+    var collapsedStyle = false
+    var maxLogoHeight: CGFloat = 72
+
+    var body: some View {
+        MediaTitleLogoView(
+            title: title,
+            logoURL: store.logoURL ?? fallbackLogoURL,
+            collapsedStyle: collapsedStyle,
+            maxLogoHeight: maxLogoHeight
+        )
+    }
+}
+
 private struct MediaDetailPanelHeader: View {
     let title: String
-    let logoURL: URL?
+    let fallbackLogoURL: URL?
     let metaItems: [String]
     @ObservedObject var store: MediaDetailRatingStore
+    @ObservedObject var logoStore: MediaDetailLogoStore
     let starYellow: Color
 
     var body: some View {
         VStack(alignment: .center, spacing: 10) {
-            MediaTitleLogoView(
+            MediaDetailTitleLogoView(
                 title: title,
-                logoURL: logoURL,
+                fallbackLogoURL: fallbackLogoURL,
+                store: logoStore,
                 maxLogoHeight: 72
             )
 
