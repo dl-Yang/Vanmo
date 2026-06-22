@@ -11,13 +11,14 @@ struct MediaTitleLogoView: View {
     @State private var isLogoLoaded = false
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .center) {
             Text(displayTitle)
                 .font(collapsedStyle ? .system(size: 36, weight: .black, design: .rounded) : titleFont)
                 .kerning(collapsedStyle ? -0.5 : 0)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(collapsedStyle ? .white : .primary)
                 .shadow(color: collapsedStyle ? .black.opacity(0.35) : .clear, radius: collapsedStyle ? 18 : 0, y: collapsedStyle ? 8 : 0)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .opacity(isLogoLoaded ? 0 : 1)
 
             if let logoURL {
@@ -33,7 +34,7 @@ struct MediaTitleLogoView: View {
                     .fade(duration: 0.35)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxHeight: maxLogoHeight)
+                    .frame(maxWidth: .infinity, maxHeight: maxLogoHeight, alignment: .center)
                     .opacity(isLogoLoaded ? 1 : 0)
             }
         }
