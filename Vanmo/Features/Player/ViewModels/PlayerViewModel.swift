@@ -20,6 +20,8 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var currentEpisodeID: String?
 
     @Published var config = PlayerConfig()
+    @Published var subtitleStyle = SubtitleStyle()
+    @Published var showSubtitleSettings = false
     @Published var controlsVisible = true
     @Published var isSeeking = false
     @Published var seekTime: TimeInterval = 0
@@ -58,6 +60,8 @@ final class PlayerViewModel: ObservableObject {
 
     init(item: MediaItem) {
         self.item = item
+        let storedFontSize = UserDefaults.standard.object(forKey: "subtitle.fontSize") as? Double ?? 18
+        self.subtitleStyle = SubtitleStyle(fontSize: storedFontSize)
         VanmoLogger.player.info("[PlayerVM] init, file: \(item.fileURL.lastPathComponent), URL: \(item.fileURL.absoluteString)")
         self.engine = PlayerEngineFactory.engine(for: item.fileURL)
         VanmoLogger.player.info("[PlayerVM] engine type: \(self.engine.engineType == .avFoundation ? "AVFoundation" : "KSPlayer")")
@@ -269,6 +273,15 @@ final class PlayerViewModel: ObservableObject {
         Task { await applySubtitleSelection(index) }
     }
 
+    /// 设置外挂字幕的时间偏移（正值表示字幕提前显示）。内嵌字幕由引擎渲染，暂不支持偏移。
+    func setSubtitleDelay(_ delay: TimeInterval) {
+        config.subtitleDelay = delay
+        Task {
+            await externalSubtitleManager.setDelay(delay)
+            updateExternalSubtitle(at: currentTime)
+        }
+    }
+
     private func applySubtitleSelection(_ index: Int?) async {
         guard let index else {
             activeExternalSubtitleID = nil
@@ -283,6 +296,7 @@ final class PlayerViewModel: ObservableObject {
             do {
                 await engine.selectSubtitleTrack(index: nil)
                 try await externalSubtitleManager.load(from: fileURL)
+                await externalSubtitleManager.setDelay(config.subtitleDelay)
                 activeExternalSubtitleID = track.id
                 updateExternalSubtitle(at: currentTime)
             } catch {

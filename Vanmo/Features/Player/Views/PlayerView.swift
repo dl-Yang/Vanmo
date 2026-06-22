@@ -8,7 +8,6 @@ struct PlayerView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: PlayerViewModel
     @StateObject private var pictureInPicture = PlayerPictureInPictureController()
-    @AppStorage("subtitle.fontSize") private var subtitleFontSize: Double = 18
     @State private var showSpeedPicker = false
     @State private var showScaleModePicker = false
     @State private var dragAxis: DragAxis?
@@ -31,7 +30,7 @@ struct PlayerView: View {
 
             SubtitleOverlayView(
                 content: viewModel.currentSubtitleContent,
-                style: SubtitleStyle(fontSize: subtitleFontSize)
+                style: viewModel.subtitleStyle
             )
             .allowsHitTesting(false)
             .ignoresSafeArea()
@@ -89,6 +88,16 @@ struct PlayerView: View {
         .sheet(isPresented: $viewModel.showEpisodeSelector) {
             EpisodeSelectorView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $viewModel.showSubtitleSettings) {
+            SubtitleSettingsView(
+                style: $viewModel.subtitleStyle,
+                delay: Binding(
+                    get: { viewModel.config.subtitleDelay },
+                    set: { viewModel.setSubtitleDelay($0) }
+                )
+            )
+            .presentationDetents([.medium, .large])
         }
         .onChange(of: viewModel.controlsVisible) { _, visible in
             if !visible {
@@ -264,6 +273,15 @@ struct PlayerView: View {
                         .font(.title3)
                         .foregroundStyle(.white)
                 }
+
+                Button {
+                    viewModel.showSubtitleSettings = true
+                } label: {
+                    Image(systemName: "textformat")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+                .accessibilityLabel("字幕设置")
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {

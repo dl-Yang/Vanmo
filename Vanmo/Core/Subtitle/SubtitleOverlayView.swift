@@ -6,32 +6,42 @@ struct SubtitleOverlayView: View {
 
     var body: some View {
         VStack {
-            Spacer()
-
-            if let content, !content.isEmpty {
-                Group {
-                    if let text = content.text, !text.isEmpty {
-                        Text(text)
-                            .font(.system(size: style.fontSize))
-                            .fontWeight(.medium)
-                            .foregroundStyle(style.textColor)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(style.backgroundColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                    } else if let uiImage = content.image {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: style.fontSize * 2)
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, style.bottomPadding)
-                .transition(.opacity)
-                .animation(.easeInOut(duration: 0.15), value: content.text)
+            if style.position == .top {
+                subtitleBody
+                    .padding(.top, style.bottomPadding)
+                Spacer()
+            } else {
+                Spacer()
+                subtitleBody
+                    .padding(.bottom, style.bottomPadding)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var subtitleBody: some View {
+        if let content, !content.isEmpty {
+            Group {
+                if let text = content.text, !text.isEmpty {
+                    Text(text)
+                        .font(.system(size: style.fontSize))
+                        .fontWeight(.medium)
+                        .foregroundStyle(style.textColor)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(style.backgroundColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else if let uiImage = content.image {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: style.fontSize * 2)
+                }
+            }
+            .padding(.horizontal, 24)
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.15), value: content.text)
         }
     }
 }
