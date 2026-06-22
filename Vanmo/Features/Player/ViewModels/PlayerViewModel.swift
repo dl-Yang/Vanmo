@@ -321,7 +321,7 @@ final class PlayerViewModel: ObservableObject {
 
         VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: auto-selecting index=\(preferredIndex) for '\(self.subtitlePreferredLanguage)'")
         config.selectedSubtitleTrack = preferredIndex
-        await engine.selectSubtitleTrack(index: preferredIndex)
+        await applySubtitleSelection(preferredIndex)
     }
 
     private func preferredSubtitleIndex(
