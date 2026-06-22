@@ -20,7 +20,9 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var currentEpisodeID: String?
 
     @Published var config = PlayerConfig()
-    @Published var subtitleStyle = SubtitleStyle()
+    @Published var subtitleStyle = SubtitleStyle() {
+        didSet { SubtitleStylePreferences.save(subtitleStyle) }
+    }
     @Published var showSubtitleSettings = false
     @Published var controlsVisible = true
     @Published var isSeeking = false
@@ -60,8 +62,7 @@ final class PlayerViewModel: ObservableObject {
 
     init(item: MediaItem) {
         self.item = item
-        let storedFontSize = UserDefaults.standard.object(forKey: "subtitle.fontSize") as? Double ?? 18
-        self.subtitleStyle = SubtitleStyle(fontSize: storedFontSize)
+        self.subtitleStyle = SubtitleStylePreferences.load()
         VanmoLogger.player.info("[PlayerVM] init, file: \(item.fileURL.lastPathComponent), URL: \(item.fileURL.absoluteString)")
         self.engine = PlayerEngineFactory.engine(for: item.fileURL)
         VanmoLogger.player.info("[PlayerVM] engine type: \(self.engine.engineType == .avFoundation ? "AVFoundation" : "KSPlayer")")
@@ -270,6 +271,7 @@ final class PlayerViewModel: ObservableObject {
     func selectSubtitleTrack(_ index: Int?) {
         VanmoLogger.player.info("[PlayerVM] selectSubtitleTrack: index=\(String(describing: index))")
         config.selectedSubtitleTrack = index
+        persistSubtitlePreference(for: index)
         Task { await applySubtitleSelection(index) }
     }
 
@@ -318,6 +320,21 @@ final class PlayerViewModel: ObservableObject {
             return
         }
 
+        switch resolveSavedSubtitleSelection() {
+        case .off:
+            VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: restoring saved selection (off)")
+            config.selectedSubtitleTrack = nil
+            await applySubtitleSelection(nil)
+            return
+        case .track(let savedIndex):
+            VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: restoring saved track index=\(savedIndex)")
+            config.selectedSubtitleTrack = savedIndex
+            await applySubtitleSelection(savedIndex)
+            return
+        case .none:
+            break
+        }
+
         if !subtitleAutoLoad {
             VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: auto-load disabled")
             config.selectedSubtitleTrack = nil
@@ -336,6 +353,53 @@ final class PlayerViewModel: ObservableObject {
         VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: auto-selecting index=\(preferredIndex) for '\(self.subtitlePreferredLanguage)'")
         config.selectedSubtitleTrack = preferredIndex
         await applySubtitleSelection(preferredIndex)
+    }
+
+    private enum SavedSubtitleSelection {
+        case off
+        case track(Int)
+    }
+
+    /// 将本条目持久化的字幕偏好解析为当前轨道列表中的有效选择。
+    private func resolveSavedSubtitleSelection() -> SavedSubtitleSelection? {
+        guard let preference = item.subtitlePreference else { return nil }
+
+        if preference == "off" { return .off }
+
+        if preference.hasPrefix("embedded:"),
+           let index = Int(preference.dropFirst("embedded:".count)),
+           subtitleTracks.contains(where: { $0.id == index && $0.isEmbedded }) {
+            return .track(index)
+        }
+
+        if preference.hasPrefix("external:") {
+            let fileName = String(preference.dropFirst("external:".count))
+            if let track = subtitleTracks.first(where: { !$0.isEmbedded && $0.fileURL?.lastPathComponent == fileName }) {
+                return .track(track.id)
+            }
+        }
+
+        return nil
+    }
+
+    /// 记录用户对本条目的字幕轨选择，以便下次播放恢复。语言自动匹配不写入。
+    private func persistSubtitlePreference(for index: Int?) {
+        let preference: String
+        if let index {
+            guard let track = subtitleTracks.first(where: { $0.id == index }) else { return }
+            if track.isEmbedded {
+                preference = "embedded:\(index)"
+            } else if let fileName = track.fileURL?.lastPathComponent {
+                preference = "external:\(fileName)"
+            } else {
+                return
+            }
+        } else {
+            preference = "off"
+        }
+
+        item.subtitlePreference = preference
+        try? item.modelContext?.save()
     }
 
     private func preferredSubtitleIndex(

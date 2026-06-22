@@ -105,8 +105,25 @@ struct SettingsView: View {
                 Text("日本語").tag("ja")
                 Text("한국어").tag("ko")
             }
+
+            ColorPicker("文字颜色", selection: Binding(
+                get: { viewModel.subtitleTextColor },
+                set: { viewModel.subtitleTextColor = $0 }
+            ))
+
+            ColorPicker("背景颜色", selection: Binding(
+                get: { viewModel.subtitleBackgroundColor },
+                set: { viewModel.subtitleBackgroundColor = $0 }
+            ), supportsOpacity: true)
+
+            Picker("字幕位置", selection: $viewModel.subtitlePositionRaw) {
+                Text("顶部").tag(SubtitleStyle.SubtitlePosition.top.rawValue)
+                Text("底部").tag(SubtitleStyle.SubtitlePosition.bottom.rawValue)
+            }
         } header: {
             Label("字幕", systemImage: "captions.bubble")
+        } footer: {
+            Text("字幕外观为全局默认值，进入播放器后仍可临时调整。")
         }
     }
 

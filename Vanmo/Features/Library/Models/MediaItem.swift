@@ -43,6 +43,10 @@ final class MediaItem {
     var audioTracks: [AudioTrackInfo]
     var subtitleTracks: [SubtitleTrackInfo]
 
+    /// 用户在播放器中为本条目选择的字幕轨偏好，跨会话恢复。
+    /// 取值：`nil` 未设置；`"off"` 显式关闭；`"embedded:<index>"` 内嵌轨；`"external:<fileName>"` 外挂轨。
+    var subtitlePreference: String?
+
     init(
         title: String,
         fileURL: URL,

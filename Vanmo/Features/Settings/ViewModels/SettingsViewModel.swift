@@ -12,6 +12,19 @@ final class SettingsViewModel: ObservableObject {
     @AppStorage("subtitle.autoLoad") var subtitleAutoLoad = true
     @AppStorage("subtitle.fontSize") var subtitleFontSize: Double = 18
     @AppStorage("subtitle.preferredLanguage") var subtitlePreferredLanguage = "zh"
+    @AppStorage(SubtitleStylePreferences.textColorKey) var subtitleTextColorHex = "#FFFFFFFF"
+    @AppStorage(SubtitleStylePreferences.backgroundColorKey) var subtitleBackgroundColorHex = "#00000099"
+    @AppStorage(SubtitleStylePreferences.positionKey) var subtitlePositionRaw = SubtitleStyle.SubtitlePosition.bottom.rawValue
+
+    var subtitleTextColor: Color {
+        get { Color(rgbaHex: subtitleTextColorHex) ?? .white }
+        set { subtitleTextColorHex = newValue.rgbaHex }
+    }
+
+    var subtitleBackgroundColor: Color {
+        get { Color(rgbaHex: subtitleBackgroundColorHex) ?? Color.black.opacity(0.6) }
+        set { subtitleBackgroundColorHex = newValue.rgbaHex }
+    }
 
     @AppStorage("library.autoScan") var libraryAutoScan = true
     @AppStorage("library.showUnwatched") var showUnwatchedBadge = true
@@ -87,6 +100,9 @@ final class SettingsViewModel: ObservableObject {
         subtitleAutoLoad = true
         subtitleFontSize = 18
         subtitlePreferredLanguage = "zh"
+        subtitleTextColorHex = "#FFFFFFFF"
+        subtitleBackgroundColorHex = "#00000099"
+        subtitlePositionRaw = SubtitleStyle.SubtitlePosition.bottom.rawValue
         libraryAutoScan = true
         showUnwatchedBadge = true
         metadataAutoDownload = true

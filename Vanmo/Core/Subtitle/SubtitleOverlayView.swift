@@ -53,8 +53,43 @@ struct SubtitleStyle {
     var bottomPadding: CGFloat = 40
     var position: SubtitlePosition = .bottom
 
-    enum SubtitlePosition {
+    enum SubtitlePosition: String {
         case top, bottom
+    }
+}
+
+/// 字幕样式的全局持久化（UserDefaults）。播放器与设置页共用同一组键。
+enum SubtitleStylePreferences {
+    static let fontSizeKey = "subtitle.fontSize"
+    static let textColorKey = "subtitle.textColorHex"
+    static let backgroundColorKey = "subtitle.backgroundColorHex"
+    static let positionKey = "subtitle.position"
+
+    static func load() -> SubtitleStyle {
+        let defaults = UserDefaults.standard
+        var style = SubtitleStyle()
+        if let fontSize = defaults.object(forKey: fontSizeKey) as? Double {
+            style.fontSize = fontSize
+        }
+        if let hex = defaults.string(forKey: textColorKey), let color = Color(rgbaHex: hex) {
+            style.textColor = color
+        }
+        if let hex = defaults.string(forKey: backgroundColorKey), let color = Color(rgbaHex: hex) {
+            style.backgroundColor = color
+        }
+        if let raw = defaults.string(forKey: positionKey),
+           let position = SubtitleStyle.SubtitlePosition(rawValue: raw) {
+            style.position = position
+        }
+        return style
+    }
+
+    static func save(_ style: SubtitleStyle) {
+        let defaults = UserDefaults.standard
+        defaults.set(Double(style.fontSize), forKey: fontSizeKey)
+        defaults.set(style.textColor.rgbaHex, forKey: textColorKey)
+        defaults.set(style.backgroundColor.rgbaHex, forKey: backgroundColorKey)
+        defaults.set(style.position.rawValue, forKey: positionKey)
     }
 }
 

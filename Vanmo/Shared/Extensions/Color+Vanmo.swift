@@ -16,6 +16,26 @@ extension Color {
         let b = Double(value & 0xFF) / 255
         self.init(red: r, green: g, blue: b)
     }
+
+    /// 从 8 位十六进制（#RRGGBBAA）创建颜色，支持透明度。用于字幕样式持久化。
+    init?(rgbaHex: String) {
+        var s = rgbaHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("#") { s.removeFirst() }
+        guard s.count == 8, let value = UInt64(s, radix: 16) else { return nil }
+        let r = Double((value >> 24) & 0xFF) / 255
+        let g = Double((value >> 16) & 0xFF) / 255
+        let b = Double((value >> 8) & 0xFF) / 255
+        let a = Double(value & 0xFF) / 255
+        self.init(.sRGB, red: r, green: g, blue: b, opacity: a)
+    }
+
+    /// 序列化为 8 位十六进制（#RRGGBBAA），保留透明度。
+    var rgbaHex: String {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a)
+        let channel: (CGFloat) -> Int = { max(0, min(255, Int(($0 * 255).rounded()))) }
+        return String(format: "#%02X%02X%02X%02X", channel(r), channel(g), channel(b), channel(a))
+    }
 }
 
 // MARK: - 配色主题
