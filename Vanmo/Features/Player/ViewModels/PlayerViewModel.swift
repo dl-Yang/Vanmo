@@ -40,6 +40,7 @@ final class PlayerViewModel: ObservableObject {
 
     let engine: PlayerEngine
     private var item: MediaItem
+    private var modelContext: ModelContext?
     private var cancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
     private var prefetchToken: String?
@@ -127,6 +128,7 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Lifecycle
 
     func onAppear(modelContext: ModelContext? = nil) async {
+        self.modelContext = modelContext
         VanmoLogger.player.info("[PlayerVM] onAppear, loading file: \(self.item.fileURL.lastPathComponent)")
         do {
             try await loadAndPlayCurrentItem()
@@ -179,7 +181,7 @@ final class PlayerViewModel: ObservableObject {
         VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
         audioTracks = await engine.availableAudioTracks()
         let embeddedSubtitleTracks = await engine.availableSubtitleTracks()
-        externalSubtitleTracks = Self.externalSubtitleTracks(for: originalURL)
+        externalSubtitleTracks = await discoverExternalSubtitleTracks(for: originalURL)
         subtitleTracks = embeddedSubtitleTracks + externalSubtitleTracks
         await applyPreferredSubtitleIfNeeded()
         VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
@@ -457,7 +459,14 @@ final class PlayerViewModel: ObservableObject {
             .lowercased()
     }
 
-    private static func externalSubtitleTracks(for videoURL: URL) -> [SubtitleTrackInfo] {
+    private func discoverExternalSubtitleTracks(for videoURL: URL) async -> [SubtitleTrackInfo] {
+        if videoURL.isFileURL {
+            return Self.localExternalSubtitleTracks(for: videoURL)
+        }
+        return await remoteExternalSubtitleTracks()
+    }
+
+    private static func localExternalSubtitleTracks(for videoURL: URL) -> [SubtitleTrackInfo] {
         guard videoURL.isFileURL else { return [] }
         return SubtitleManager.findSubtitleFiles(for: videoURL)
             .filter { url in
@@ -490,6 +499,90 @@ final class PlayerViewModel: ObservableObject {
         return nameParts.last { part in
             ["zh", "chs", "cht", "en", "ja", "ko"].contains(part)
         }
+    }
+
+    /// 远程视频的同目录外挂字幕发现：列出视频所在目录，筛出同名前缀的 .srt/.vtt，
+    /// 下载到本地缓存后以本地外挂轨形式暴露（复用现有选轨/加载路径）。
+    private func remoteExternalSubtitleTracks() async -> [SubtitleTrackInfo] {
+        guard let connectionId = item.sourceConnectionId,
+              let serverPath = item.serverId,
+              let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        guard let connection = try? modelContext.fetch(descriptor).first else { return [] }
+
+        let supportedTypes: Set<ConnectionType> = [.webdav, .alist, .fnos, .smb]
+        guard supportedTypes.contains(connection.type) else { return [] }
+
+        let videoBaseName = (serverPath as NSString).lastPathComponent
+        let videoStem = (videoBaseName as NSString).deletingPathExtension
+        guard !videoStem.isEmpty else { return [] }
+        let parentPath = (serverPath as NSString).deletingLastPathComponent
+
+        let service = RemoteServiceFactory.create(for: connection.type)
+        do {
+            let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+            let config = ConnectionConfig(from: connection, password: password)
+            try await service.connect(config: config)
+
+            let siblings = try await service.listDirectory(path: parentPath)
+            let matches = siblings.filter { file in
+                guard !file.isDirectory else { return false }
+                let stem = (file.name as NSString).deletingPathExtension
+                guard stem.hasPrefix(videoStem) else { return false }
+                switch SubtitleFormat.detect(from: URL(fileURLWithPath: file.name)) {
+                case .srt, .vtt: return true
+                default: return false
+                }
+            }
+
+            guard !matches.isEmpty else {
+                await service.disconnect()
+                return []
+            }
+
+            let cacheDir = try Self.remoteSubtitleCacheDirectory()
+            var tracks: [SubtitleTrackInfo] = []
+            for (index, file) in matches.enumerated() {
+                let localURL = cacheDir.appendingPathComponent("\(item.id.uuidString)-\(file.name)")
+                do {
+                    try await service.download(file: file, to: localURL, progress: { _ in })
+                } catch {
+                    VanmoLogger.subtitle.error("[PlayerVM] remote subtitle download failed: \(file.name) - \(error.localizedDescription)")
+                    continue
+                }
+                tracks.append(
+                    SubtitleTrackInfo(
+                        id: Self.externalSubtitleIDOffset + index,
+                        language: Self.languageCode(from: localURL),
+                        title: (file.name as NSString).deletingPathExtension,
+                        isEmbedded: false,
+                        fileURL: localURL
+                    )
+                )
+            }
+            await service.disconnect()
+            VanmoLogger.subtitle.info("[PlayerVM] discovered \(tracks.count) remote external subtitle(s)")
+            return tracks
+        } catch {
+            VanmoLogger.subtitle.error("[PlayerVM] remote subtitle discovery failed: \(error.localizedDescription)")
+            await service.disconnect()
+            return []
+        }
+    }
+
+    private static func remoteSubtitleCacheDirectory() throws -> URL {
+        let root = try FileManager.default.url(
+            for: .cachesDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let directory = root.appendingPathComponent("RemoteSubtitles", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
     // MARK: - Episodes
