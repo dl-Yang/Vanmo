@@ -65,6 +65,7 @@
 		A031F9406009F9517FD70024 /* CastMemberInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FC22FE1CED4FC57316A389B /* CastMemberInfo.swift */; };
 		A903761BE1480EB6C6597984 /* ScannedLibraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC98BD4B313AA01607BDF35 /* ScannedLibraryListView.swift */; };
 		A93455233C39CBB739BE385D /* PlayerCapabilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61DDDC6CDDA187AA96EB2A3B /* PlayerCapabilityProbe.swift */; };
+		D15C9A11000000000000B001 /* DiscPlaylistParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D15C9A11000000000000A001 /* DiscPlaylistParser.swift */; };
 		AF543267406C900CB862AB69 /* FolderBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C62F024193701A3ABB1B887 /* FolderBookmark.swift */; };
 		B0434F7B3AEC579CDD202B36 /* CountryMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5142357466F69E4FBA98C44 /* CountryMapper.swift */; };
 		B48821666D2F6E8595706BAF /* MetadataCacheKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6980490DB3D3A63E200844BA /* MetadataCacheKey.swift */; };
@@ -140,6 +141,7 @@
 		60CF418D9980D92E7E15716C /* SecondFloorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorView.swift; sourceTree = "<group>"; };
 		61585942DFE77AC7C9FD50CC /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		61DDDC6CDDA187AA96EB2A3B /* PlayerCapabilityProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCapabilityProbe.swift; sourceTree = "<group>"; };
+		D15C9A11000000000000A001 /* DiscPlaylistParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscPlaylistParser.swift; sourceTree = "<group>"; };
 		66AC850C1907C97654689F25 /* SearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewModel.swift; sourceTree = "<group>"; };
 		68ADF359717CDE03BB014EA2 /* SecondFloorItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorItemView.swift; sourceTree = "<group>"; };
 		68E11D6C42159C14B59AE87B /* CollectionFolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionFolderListView.swift; sourceTree = "<group>"; };
@@ -272,6 +274,7 @@
 				4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */,
 				CF351F2AF61293E876B9506A /* PlayerState.swift */,
 				9814B17DA901EBFF609E8477 /* Prefetch */,
+				D15C9A11000000000000C001 /* Disc */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -408,6 +411,14 @@
 				A40C7DCC2190D6425CCC05D2 /* RemoteFetcher.swift */,
 			);
 			path = Prefetch;
+			sourceTree = "<group>";
+		};
+		D15C9A11000000000000C001 /* Disc */ = {
+			isa = PBXGroup;
+			children = (
+				D15C9A11000000000000A001 /* DiscPlaylistParser.swift */,
+			);
+			path = Disc;
 			sourceTree = "<group>";
 		};
 		9C5E1BC07BD6523C7A02ACC6 /* Subtitle */ = {
@@ -767,6 +778,7 @@
 				4D4A7648906ED7B2CA43B310 /* OnlineSubtitleService.swift in Sources */,
 				2281344F0A25C3DC28C9AB47 /* PlaybackRecord.swift in Sources */,
 				A93455233C39CBB739BE385D /* PlayerCapabilityProbe.swift in Sources */,
+				D15C9A11000000000000B001 /* DiscPlaylistParser.swift in Sources */,
 				82345C9CA31F050453C59FB0 /* PlayerEngine.swift in Sources */,
 				14EA1A3581D94AF5E0C7B3B6 /* PlayerEngineFactory.swift in Sources */,
 				4D1FF76F2DBB43A073DBFCAF /* PlayerProgressBar.swift in Sources */,
