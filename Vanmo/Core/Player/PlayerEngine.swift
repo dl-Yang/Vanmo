@@ -103,13 +103,17 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         stateSubject.send(.loading)
 
         let (cleanURL, options) = Self.assetURL(from: url)
-        if PlayerCapabilityProbe.isHDRCandidate(url: cleanURL) {
-            VanmoLogger.player.info("[AVEngine] HDR candidate detected, using AVFoundation system rendering path")
-        }
         let asset = AVURLAsset(url: cleanURL, options: options)
         VanmoLogger.player.info("[AVEngine] AVURLAsset created, isPlayable check pending")
         let playerItem = AVPlayerItem(asset: asset)
         self.playerItem = playerItem
+
+        // HDR 输出：让系统按帧应用 HDR 动态元数据（HDR10+/Dolby Vision），
+        // 在支持 EDR 的屏幕上获得正确的高动态范围呈现。iOS 自动管理 SDR/HDR 切换。
+        playerItem.appliesPerFrameHDRDisplayMetadata = true
+        if PlayerCapabilityProbe.isHDRCandidate(url: cleanURL) {
+            VanmoLogger.player.info("[AVEngine] HDR candidate detected, per-frame HDR metadata enabled")
+        }
 
         let output = AVPlayerItemLegibleOutput()
         output.setDelegate(self, queue: .main)

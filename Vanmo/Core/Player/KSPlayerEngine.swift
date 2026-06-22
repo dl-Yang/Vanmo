@@ -90,6 +90,12 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         options.maxBufferDuration = 60
         options.formatContextOptions["buffer_size"] = 8 * 1024 * 1024
 
+        // 接通设置页「硬件解码优先」开关（VideoToolbox 硬解）。
+        // HDR 显示标准（preferredDisplayCriteria）由 KSPlayer 依据内容动态范围内部自动配置。
+        let hardwareDecode = UserDefaults.standard.object(forKey: "playback.hardwareDecoding") as? Bool ?? true
+        options.hardwareDecode = hardwareDecode
+        VanmoLogger.player.info("[KSEngine] hardwareDecode: \(hardwareDecode)")
+
         Self.configureAudioOptions(options)
 
         let mePlayer = await MainActor.run {
