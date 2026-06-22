@@ -11,14 +11,15 @@ import SWXMLHash
 /// 1. 若用户在 host 字段里写了 `http://` / `https://` 前缀，按其指定 scheme + host + port。
 /// 2. 否则按端口推断：443 → https，其余 → http。
 final class WebDAVService: RemoteFileService {
-    let type: ConnectionType = .webdav
+    let type: ConnectionType
     private(set) var isConnected = false
 
     private var config: ConnectionConfig?
     private var resolvedBaseURL: URL?
     private let session: URLSession
 
-    init(session: URLSession = .shared) {
+    init(type: ConnectionType = .webdav, session: URLSession = .shared) {
+        self.type = type
         self.session = session
     }
 

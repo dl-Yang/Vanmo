@@ -16,6 +16,7 @@ struct CollectionFolderListView: View {
     @State private var totalRecordCount = 0
     @State private var errorMessage: String?
     @State private var loadMoreErrorMessage: String?
+    @State private var hasLoadedOnce = false
 
     private let pageSize = 50
     private let gridColumns = [
@@ -65,6 +66,7 @@ struct CollectionFolderListView: View {
         .navigationTitle(folder.name)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: folder.id) {
+            guard !hasLoadedOnce else { return }
             await loadInitialPage()
         }
     }
@@ -188,6 +190,7 @@ struct CollectionFolderListView: View {
             startIndex = page.items.count
             totalRecordCount = page.totalRecordCount
             hasMore = startIndex < page.totalRecordCount
+            hasLoadedOnce = true
         } catch {
             errorMessage = error.localizedDescription
         }

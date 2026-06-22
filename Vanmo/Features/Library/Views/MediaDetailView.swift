@@ -844,15 +844,25 @@ struct MediaDetailView: View {
         Button {
             Task { await setFavorite(!item.isFavorite) }
         } label: {
-            Image(systemName: item.isFavorite ? "heart.fill" : "heart")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(item.isFavorite ? .red : .white.opacity(0.95))
-                .frame(width: 40, height: 40)
-                .background(Color.black.opacity(0.2), in: Circle())
+            ZStack {
+                if isUpdatingFavorite {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                        .scaleEffect(0.72)
+                } else {
+                    Image(systemName: item.isFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(item.isFavorite ? .red : .white.opacity(0.95))
+                }
+            }
+            .frame(width: 40, height: 40)
+            .background(Color.black.opacity(0.2), in: Circle())
         }
         .buttonStyle(.plain)
         .disabled(isUpdatingFavorite)
         .accessibilityLabel(item.isFavorite ? "取消收藏" : "收藏")
+        .accessibilityValue(isUpdatingFavorite ? "正在更新" : "")
     }
 
     private var favoriteErrorBinding: Binding<Bool> {

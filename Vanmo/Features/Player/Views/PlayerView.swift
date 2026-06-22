@@ -1,14 +1,23 @@
 import SwiftUI
 import AVFoundation
+import AVKit
 import SwiftData
 
 struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: PlayerViewModel
+    @StateObject private var pictureInPicture = PlayerPictureInPictureController()
     @AppStorage("subtitle.fontSize") private var subtitleFontSize: Double = 18
     @State private var showSpeedPicker = false
     @State private var showScaleModePicker = false
+    @State private var dragAxis: DragAxis?
+    @State private var lastVerticalTranslation: CGFloat = 0
+
+    private enum DragAxis {
+        case horizontal
+        case vertical
+    }
 
     init(item: MediaItem) {
         _viewModel = StateObject(wrappedValue: PlayerViewModel(item: item))
@@ -36,6 +45,10 @@ struct PlayerView: View {
 
             feedbackOverlays
 
+            if viewModel.isRateBoosting {
+                rateBoostIndicator
+            }
+
             if showSpeedPicker || showScaleModePicker {
                 Color.clear
                     .contentShape(Rectangle())
@@ -62,7 +75,7 @@ struct PlayerView: View {
         }
         .task { await viewModel.onAppear(modelContext: modelContext) }
         .onDisappear {
-            viewModel.onDisappear()
+            viewModel.onDisappear(keepingPlaybackActive: pictureInPicture.isActive)
             AppOrientation.restoreDefault()
         }
         .sheet(isPresented: $viewModel.showTrackSelector) {
@@ -90,7 +103,11 @@ struct PlayerView: View {
     @ViewBuilder
     private var videoLayer: some View {
         if let player = viewModel.avPlayer {
-            AVPlayerVideoLayer(player: player, scaleMode: viewModel.config.scaleMode)
+            AVPlayerVideoLayer(
+                player: player,
+                scaleMode: viewModel.config.scaleMode,
+                pictureInPicture: pictureInPicture
+            )
                 .ignoresSafeArea()
         } else if let ksView = viewModel.ksPlayerVideoView {
             KSPlayerVideoLayer(videoView: ksView, scaleMode: viewModel.config.scaleMode)
@@ -102,56 +119,67 @@ struct PlayerView: View {
 
     private var gestureLayer: some View {
         GeometryReader { geometry in
-            HStack(spacing: 0) {
-                Rectangle()
-                    .fill(.clear)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 10)
-                            .onChanged { value in
-                                let delta = -Float(value.translation.height / geometry.size.height)
-                                viewModel.handleBrightnessChange(delta * 0.01)
-                            }
-                    )
-
-                Rectangle()
-                    .fill(.clear)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) {
-                        viewModel.togglePlayPause()
-                    }
-                    .onTapGesture {
-                        viewModel.toggleControls()
-                    }
-                    .gesture(
-                        DragGesture(minimumDistance: 20)
-                            .onChanged { value in
-                                let delta = value.translation.width / geometry.size.width * 120
-                                viewModel.handleSeekGesture(Double(delta))
-                            }
-                            .onEnded { _ in
-                                viewModel.commitSeekGesture()
-                            }
-                    )
-                    .gesture(
-                        LongPressGesture(minimumDuration: 0.5)
-                            .onChanged { isPressing in
-                                viewModel.handleLongPress(isActive: isPressing)
-                            }
-                    )
-
-                Rectangle()
-                    .fill(.clear)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 10)
-                            .onChanged { value in
-                                let delta = -Float(value.translation.height / geometry.size.height)
-                                viewModel.handleVolumeChange(delta * 0.01)
-                            }
-                    )
-            }
+            Rectangle()
+                .fill(.clear)
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    viewModel.togglePlayPause()
+                }
+                .onTapGesture {
+                    viewModel.toggleControls()
+                }
+                .gesture(panGesture(in: geometry.size))
+                .simultaneousGesture(rateBoostGesture)
         }
+    }
+
+    private func panGesture(in size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                if dragAxis == nil {
+                    let horizontal = abs(value.translation.width)
+                    let vertical = abs(value.translation.height)
+                    dragAxis = horizontal > vertical ? .horizontal : .vertical
+                    lastVerticalTranslation = value.translation.height
+                }
+
+                switch dragAxis {
+                case .horizontal:
+                    let seconds = value.translation.width / size.width * 120
+                    viewModel.handleSeekGesture(Double(seconds))
+                case .vertical:
+                    let incremental = value.translation.height - lastVerticalTranslation
+                    lastVerticalTranslation = value.translation.height
+                    let delta = -Float(incremental / size.height)
+                    if value.startLocation.x < size.width / 2 {
+                        viewModel.handleBrightnessChange(delta)
+                    } else {
+                        viewModel.handleVolumeChange(delta)
+                    }
+                case .none:
+                    break
+                }
+            }
+            .onEnded { _ in
+                if dragAxis == .horizontal {
+                    viewModel.commitSeekGesture()
+                }
+                dragAxis = nil
+                lastVerticalTranslation = 0
+            }
+    }
+
+    private var rateBoostGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.4)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                if case .second(true, _) = value {
+                    viewModel.handleRateBoost(isActive: true)
+                }
+            }
+            .onEnded { _ in
+                viewModel.handleRateBoost(isActive: false)
+            }
     }
 
     // MARK: - Controls Overlay
@@ -197,6 +225,18 @@ struct PlayerView: View {
             Spacer()
 
             HStack(spacing: 16) {
+                if pictureInPicture.isSupported && viewModel.avPlayer != nil {
+                    Button {
+                        pictureInPicture.toggle()
+                    } label: {
+                        Image(systemName: pictureInPicture.isActive ? "pip.exit" : "pip.enter")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                    .disabled(!pictureInPicture.isPossible && !pictureInPicture.isActive)
+                    .accessibilityLabel(pictureInPicture.isActive ? "退出画中画" : "进入画中画")
+                }
+
                 if viewModel.canSelectEpisode {
                     Button {
                         viewModel.showEpisodeSelector = true
@@ -352,10 +392,59 @@ struct PlayerView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .transition(.scale.combined(with: .opacity))
             }
+
+            if viewModel.seekPreviewActive {
+                seekPreviewOverlay
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.brightnessOverlay)
         .animation(.easeInOut(duration: 0.2), value: viewModel.volumeOverlay)
         .animation(.easeInOut(duration: 0.2), value: viewModel.seekOverlay)
+        .animation(.easeInOut(duration: 0.15), value: viewModel.seekPreviewActive)
+    }
+
+    private var seekPreviewOverlay: some View {
+        VStack(spacing: 8) {
+            Image(systemName: viewModel.seekPreviewForward ? "forward.fill" : "backward.fill")
+                .font(.title3)
+            HStack(spacing: 4) {
+                Text(viewModel.seekTime.formattedDuration)
+                    .foregroundStyle(.white)
+                Text("/")
+                    .foregroundStyle(.white.opacity(0.5))
+                Text(viewModel.duration.formattedDuration)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            .font(.title3)
+            .fontWeight(.semibold)
+            .monospacedDigit()
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .transition(.scale.combined(with: .opacity))
+    }
+
+    private var rateBoostIndicator: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "forward.fill")
+                .font(.subheadline)
+            Text("\(PlayerConfig.maximumRate, specifier: "%.1f")x 倍速播放中")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .monospacedDigit()
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 44)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.2), value: viewModel.isRateBoosting)
     }
 
     // MARK: - Picker Panels
@@ -465,6 +554,7 @@ struct GaugeOverlay: View {
 struct AVPlayerVideoLayer: UIViewRepresentable {
     let player: AVPlayer
     let scaleMode: VideoScaleMode
+    @ObservedObject var pictureInPicture: PlayerPictureInPictureController
 
     func makeUIView(context: Context) -> PlayerUIView {
         PlayerUIView()
@@ -473,6 +563,7 @@ struct AVPlayerVideoLayer: UIViewRepresentable {
     func updateUIView(_ uiView: PlayerUIView, context: Context) {
         uiView.playerLayer.player = player
         uiView.playerLayer.videoGravity = scaleMode.avLayerVideoGravity
+        pictureInPicture.configure(with: uiView.playerLayer)
     }
 }
 
@@ -491,6 +582,75 @@ final class PlayerUIView: UIView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+}
+
+final class PlayerPictureInPictureController: NSObject, ObservableObject {
+    @Published private(set) var isActive = false
+    @Published private(set) var isPossible = false
+
+    private var controller: AVPictureInPictureController?
+    private var observedLayer: AVPlayerLayer?
+
+    var isSupported: Bool {
+        AVPictureInPictureController.isPictureInPictureSupported()
+    }
+
+    func configure(with playerLayer: AVPlayerLayer) {
+        guard isSupported else { return }
+        guard observedLayer !== playerLayer else {
+            refreshPossibleState()
+            return
+        }
+
+        observedLayer = playerLayer
+        controller = AVPictureInPictureController(
+            contentSource: AVPictureInPictureController.ContentSource(playerLayer: playerLayer)
+        )
+        controller?.delegate = self
+        controller?.canStartPictureInPictureAutomaticallyFromInline = true
+        refreshPossibleState()
+    }
+
+    func toggle() {
+        guard let controller else { return }
+        if controller.isPictureInPictureActive {
+            controller.stopPictureInPicture()
+        } else if controller.isPictureInPicturePossible {
+            controller.startPictureInPicture()
+        }
+        refreshPossibleState()
+    }
+
+    private func refreshPossibleState() {
+        isPossible = controller?.isPictureInPicturePossible == true
+        isActive = controller?.isPictureInPictureActive == true
+    }
+}
+
+extension PlayerPictureInPictureController: AVPictureInPictureControllerDelegate {
+    func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        isActive = true
+    }
+
+    func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        refreshPossibleState()
+    }
+
+    func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        failedToStartPictureInPictureWithError error: Error
+    ) {
+        VanmoLogger.player.error("[PiP] Failed to start: \(error.localizedDescription)")
+        refreshPossibleState()
+    }
+
+    func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        isActive = false
+    }
+
+    func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        refreshPossibleState()
     }
 }
 

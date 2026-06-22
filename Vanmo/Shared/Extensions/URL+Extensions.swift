@@ -5,7 +5,8 @@ extension URL {
     var isVideoFile: Bool {
         let videoExtensions: Set<String> = [
             "mkv", "mp4", "avi", "wmv", "mov", "flv", "rmvb",
-            "ts", "m2ts", "webm", "m4v", "mpg", "mpeg", "3gp", "ogv"
+            "ts", "m2ts", "webm", "m4v", "mpg", "mpeg", "3gp", "ogv",
+            "iso", "m3u", "m3u8"
         ]
         return videoExtensions.contains(pathExtension.lowercased())
     }

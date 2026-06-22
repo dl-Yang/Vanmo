@@ -59,7 +59,7 @@ struct SearchView: View {
         if viewModel.results.isEmpty {
             ContentUnavailableView.search(text: viewModel.searchText)
         } else {
-            Text("\(viewModel.results.count) 个结果")
+            Text(searchSummary)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -72,6 +72,13 @@ struct SearchView: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var searchSummary: String {
+        if viewModel.searchedSourceCount > 0 {
+            return "\(viewModel.results.count) 个结果 · 覆盖 \(viewModel.searchedSourceCount) 个来源"
+        }
+        return "\(viewModel.results.count) 个结果"
     }
 }
 

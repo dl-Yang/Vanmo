@@ -7,6 +7,9 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
     case ftp
     case sftp
     case webdav
+    case alist
+    case iptv
+    case fnos
     case nfs
     case dlna
     case plex
@@ -22,6 +25,9 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
         case .ftp: return "FTP"
         case .sftp: return "SFTP"
         case .webdav: return "WebDAV"
+        case .alist: return "AList 网盘"
+        case .iptv: return "IPTV"
+        case .fnos: return "飞牛 fnOS"
         case .nfs: return "NFS"
         case .dlna: return "DLNA"
         case .plex: return "Plex"
@@ -36,6 +42,9 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
         case .smb, .nfs: return "externaldrive.connected.to.line.below"
         case .ftp, .sftp: return "arrow.up.arrow.down.circle"
         case .webdav: return "globe"
+        case .alist: return "cloud"
+        case .iptv: return "tv"
+        case .fnos: return "externaldrive.badge.wifi"
         case .dlna: return "tv.and.mediabox"
         case .plex, .emby, .jellyfin: return "server.rack"
         }
@@ -48,6 +57,9 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
         case .ftp: return 21
         case .sftp: return 22
         case .webdav: return 80
+        case .alist: return 5244
+        case .iptv: return 0
+        case .fnos: return 5005
         case .nfs: return 2049
         case .dlna: return 0
         case .plex: return 32400
@@ -58,7 +70,7 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
 
     var requiresAuth: Bool {
         switch self {
-        case .localFolder, .dlna: return false
+        case .localFolder, .dlna, .iptv: return false
         default: return true
         }
     }

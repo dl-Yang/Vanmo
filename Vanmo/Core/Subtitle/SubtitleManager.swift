@@ -16,7 +16,7 @@ actor SubtitleManager {
         case .vtt:
             parser = VTTParser()
         case .ass:
-            parser = SRTParser() // Fallback; full ASS parser would be separate
+            throw SubtitleError.assRenderingUnavailable
         case .unknown:
             let detected = SubtitleFormat.detect(from: data)
             switch detected {

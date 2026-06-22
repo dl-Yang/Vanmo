@@ -22,6 +22,18 @@ packages:
   SWXMLHash:
     url: https://github.com/drmohundro/SWXMLHash.git
     majorVersion: 8.1.1
+  Kingfisher:
+    url: https://github.com/onevcat/Kingfisher.git
+    majorVersion: 8.8.1
+  KSPlayer:
+    url: https://github.com/kingslay/KSPlayer.git
+    majorVersion: 2.2.0
+  SMBClient:
+    url: https://github.com/kishikawakatsumi/SMBClient.git
+    minorVersion: 0.3.1
+  lottie-ios:
+    url: https://github.com/airbnb/lottie-ios.git
+    majorVersion: 4.6.0
 
 targets:
   Vanmo:
@@ -29,6 +41,11 @@ targets:
     platform: iOS
     dependencies:
       - package: SWXMLHash
+      - package: Kingfisher
+      - package: KSPlayer
+      - package: SMBClient
+      - package: lottie-ios
+        product: Lottie
     sources:
       - path: Vanmo
         excludes:
@@ -48,16 +65,7 @@ targets:
           - "$(inherited)"
         OTHER_SWIFT_FLAGS:
           - "-DFFMPEG_ENABLED"
-        HEADER_SEARCH_PATHS:
-          - "$(PROJECT_DIR)/Vanmo/Frameworks/FFmpeg/include"
-        LIBRARY_SEARCH_PATHS:
-          - "$(PROJECT_DIR)/Vanmo/Frameworks/FFmpeg/lib/$(PLATFORM_NAME)"
         OTHER_LDFLAGS:
-          - "-lavformat"
-          - "-lavcodec"
-          - "-lavutil"
-          - "-lswscale"
-          - "-lswresample"
           - "-lz"
           - "-lbz2"
           - "-liconv"
@@ -70,6 +78,14 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+    postBuildScripts:
+      - name: Fix KSPlayer Framework Plist
+        script: |
+          FRAMEWORK="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/libshaderc_combined.framework"
+          if [ -d "$FRAMEWORK" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.kintan.ksplayer.libshaderc-combined" "$FRAMEWORK/Info.plist" 2>/dev/null || true
+            /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none "$FRAMEWORK"
+          fi
 
 schemes:
   Vanmo:

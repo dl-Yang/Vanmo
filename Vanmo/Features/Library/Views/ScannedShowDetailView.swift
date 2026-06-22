@@ -10,6 +10,7 @@ struct ScannedShowDetailView: View {
 
     @State private var episodes: [MediaItem] = []
     @State private var isLoading = true
+    @State private var hasLoadedOnce = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -86,7 +87,9 @@ struct ScannedShowDetailView: View {
     }
 
     private func loadEpisodes() {
-        isLoading = true
+        if !hasLoadedOnce {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
@@ -104,6 +107,7 @@ struct ScannedShowDetailView: View {
                     normalizedShowTitle(for: item) == showTitle
                 }
                 .sorted(by: episodeSortPredicate)
+            hasLoadedOnce = true
         } catch {
             errorMessage = error.localizedDescription
         }

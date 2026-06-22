@@ -196,7 +196,8 @@ struct FavoritesListView: View {
     private func posterCell(for item: MediaItem) -> some View {
         let card = FavoritePosterCard(
             item: item,
-            isEditing: isEditing
+            isEditing: isEditing,
+            isUpdating: viewModel.isUpdatingFavorite(item)
         ) {
             await viewModel.unfavorite(item)
         }
@@ -220,6 +221,7 @@ struct FavoritesListView: View {
                 } label: {
                     Label("取消收藏", systemImage: "heart.slash")
                 }
+                .disabled(viewModel.isUpdatingFavorite(item))
             }
             .transition(.opacity.combined(with: .scale(scale: 0.96)))
             .onAppear {
@@ -274,6 +276,7 @@ struct FavoritesListView: View {
 private struct FavoritePosterCard: View {
     let item: MediaItem
     let isEditing: Bool
+    let isUpdating: Bool
     let unfavorite: () async -> Void
 
     var body: some View {
@@ -305,6 +308,7 @@ private struct FavoritePosterCard: View {
         .overlay(alignment: .topTrailing) { yearBadge }
         .overlay(alignment: .bottomLeading) { qualityBadge }
         .overlay(alignment: .topLeading) { deleteBadge }
+        .overlay { updatingOverlay }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 4)
     }
@@ -348,16 +352,34 @@ private struct FavoritePosterCard: View {
             Button {
                 Task { await unfavorite() }
             } label: {
-                Image(systemName: "minus")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(Color.red, in: Circle())
-                    .overlay { Circle().stroke(.white, lineWidth: 1.5) }
+                ZStack {
+                    if isUpdating {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(.white)
+                            .scaleEffect(0.6)
+                    } else {
+                        Image(systemName: "minus")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 26, height: 26)
+                .background(Color.red, in: Circle())
+                .overlay { Circle().stroke(.white, lineWidth: 1.5) }
             }
             .buttonStyle(.plain)
+            .disabled(isUpdating)
             .padding(6)
             .accessibilityLabel("取消收藏")
+        }
+    }
+
+    @ViewBuilder
+    private var updatingOverlay: some View {
+        if isUpdating {
+            Color.black.opacity(0.24)
+                .allowsHitTesting(false)
         }
     }
 
@@ -538,6 +560,7 @@ private final class FavoritesListViewModel: ObservableObject {
     private var dbOffset = 0
     private var modelContext: ModelContext?
     private var loadedItemIDs: Set<PersistentIdentifier> = []
+    @Published private var updatingItemIDs: Set<PersistentIdentifier> = []
 
     func setModelContext(_ context: ModelContext) {
         modelContext = context
@@ -590,6 +613,9 @@ private final class FavoritesListViewModel: ObservableObject {
     }
 
     func unfavorite(_ item: MediaItem) async {
+        guard updatingItemIDs.insert(item.persistentModelID).inserted else { return }
+        defer { updatingItemIDs.remove(item.persistentModelID) }
+
         do {
             try await EmbyFavoriteUpdater.setFavorite(item, isFavorite: false)
             item.isFavorite = false
@@ -605,6 +631,10 @@ private final class FavoritesListViewModel: ObservableObject {
             errorMessage = error.localizedDescription
             showError = true
         }
+    }
+
+    func isUpdatingFavorite(_ item: MediaItem) -> Bool {
+        updatingItemIDs.contains(item.persistentModelID)
     }
 
     private func fetchNextBatch(startDBOffset: Int) async throws -> FavoritesBatchResult {

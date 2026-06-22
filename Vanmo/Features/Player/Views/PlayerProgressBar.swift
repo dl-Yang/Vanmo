@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PlayerProgressBar: View {
     let progress: Double
@@ -9,6 +10,9 @@ struct PlayerProgressBar: View {
     @State private var dragProgress: Double = 0
     @State private var pendingSeekProgress: Double?
     @State private var settleSeekTask: Task<Void, Never>?
+    @State private var lastHapticStep: Int?
+
+    private let hapticStepCount = 20
 
     private var displayProgress: Double {
         if isSeeking {
@@ -52,6 +56,7 @@ struct PlayerProgressBar: View {
                         isSeeking = true
                         let fraction = max(0, min(1, value.location.x / geometry.size.width))
                         dragProgress = fraction
+                        triggerHapticIfNeeded(for: fraction)
                     }
                     .onEnded { value in
                         let fraction = max(0, min(1, value.location.x / geometry.size.width))
@@ -59,6 +64,8 @@ struct PlayerProgressBar: View {
                         pendingSeekProgress = fraction
                         onSeek(fraction)
                         isSeeking = false
+                        lastHapticStep = nil
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
                         settleSeekTask = Task {
                             try? await Task.sleep(for: .milliseconds(450))
                             guard !Task.isCancelled else { return }
@@ -81,6 +88,13 @@ struct PlayerProgressBar: View {
         .onDisappear {
             settleSeekTask?.cancel()
         }
+    }
+
+    private func triggerHapticIfNeeded(for fraction: Double) {
+        let step = Int((fraction * Double(hapticStepCount)).rounded())
+        guard step != lastHapticStep else { return }
+        lastHapticStep = step
+        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.55)
     }
 }
 

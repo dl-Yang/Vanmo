@@ -11,6 +11,7 @@ struct ScannedLibraryListView: View {
     @State private var movies: [MediaItem] = []
     @State private var shows: [ScannedShowSummary] = []
     @State private var isLoading = true
+    @State private var hasLoadedOnce = false
     @State private var errorMessage: String?
 
     private let gridColumns = [
@@ -159,6 +160,8 @@ struct ScannedLibraryListView: View {
     }
 
     private func loadItems() {
+        guard !hasLoadedOnce else { return }
+
         isLoading = true
         errorMessage = nil
 
@@ -171,6 +174,7 @@ struct ScannedLibraryListView: View {
 
             movies = items.filter { $0.mediaType == .movie }
             shows = makeShowSummaries(from: items)
+            hasLoadedOnce = true
         } catch {
             errorMessage = error.localizedDescription
         }

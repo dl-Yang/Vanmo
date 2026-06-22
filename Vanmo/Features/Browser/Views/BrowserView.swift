@@ -576,7 +576,7 @@ private extension ConnectionType {
         switch self {
         case .localFolder:                 return "FilesFolder"
         case .smb, .nfs:                   return "FilesHardDrive"
-        case .ftp, .sftp, .webdav, .dlna,
+        case .ftp, .sftp, .webdav, .alist, .iptv, .fnos, .dlna,
              .plex, .emby, .jellyfin:      return "FilesServer"
         }
     }

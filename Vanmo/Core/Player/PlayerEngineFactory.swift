@@ -3,6 +3,7 @@ import Foundation
 enum SupportedFormat {
     case native
     case ffmpeg
+    case discImage
 
     static let nativeExtensions: Set<String> = ["mp4", "mov", "m4v", "mp3", "m4a", "aac", "wav", "caf"]
 
@@ -11,8 +12,13 @@ enum SupportedFormat {
         "webm", "ogv", "3gp", "asf", "vob", "mpg", "mpeg"
     ]
 
+    static let discImageExtensions: Set<String> = ["iso"]
+
     static func detect(from url: URL) -> SupportedFormat {
         let ext = url.pathExtension.lowercased()
+        if discImageExtensions.contains(ext) || url.path.uppercased().contains("/BDMV/") {
+            return .discImage
+        }
         if nativeExtensions.contains(ext) {
             return .native
         }
@@ -25,7 +31,7 @@ enum PlayerEngineFactory {
     static func engine(for url: URL) -> PlayerEngine {
         let ext = url.pathExtension.lowercased()
         let format = SupportedFormat.detect(from: url)
-        VanmoLogger.player.info("[EngineFactory] URL: \(url.absoluteString), ext: \(ext), format: \(format == .native ? "native" : "ffmpeg")")
+        VanmoLogger.player.info("[EngineFactory] URL: \(url.absoluteString), ext: \(ext), format: \(format.logName)")
 
         switch format {
         case .native:
@@ -34,6 +40,19 @@ enum PlayerEngineFactory {
         case .ffmpeg:
             VanmoLogger.player.info("[EngineFactory] 选择 KSPlayerEngine (KSPlayer/FFmpeg)")
             return KSPlayerEngine()
+        case .discImage:
+            VanmoLogger.player.info("[EngineFactory] 检测到原盘/ISO 候选，先交给 KSPlayerEngine PoC")
+            return KSPlayerEngine()
+        }
+    }
+}
+
+private extension SupportedFormat {
+    var logName: String {
+        switch self {
+        case .native: return "native"
+        case .ffmpeg: return "ffmpeg"
+        case .discImage: return "discImage"
         }
     }
 }

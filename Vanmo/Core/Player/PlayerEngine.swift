@@ -103,6 +103,9 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         stateSubject.send(.loading)
 
         let (cleanURL, options) = Self.assetURL(from: url)
+        if PlayerCapabilityProbe.isHDRCandidate(url: cleanURL) {
+            VanmoLogger.player.info("[AVEngine] HDR candidate detected, using AVFoundation system rendering path")
+        }
         let asset = AVURLAsset(url: cleanURL, options: options)
         VanmoLogger.player.info("[AVEngine] AVURLAsset created, isPlayable check pending")
         let playerItem = AVPlayerItem(asset: asset)

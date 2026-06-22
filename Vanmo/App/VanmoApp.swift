@@ -18,6 +18,7 @@ struct VanmoApp: App {
             MediaItem.self,
             SavedConnection.self,
             PlaybackRecord.self,
+            FolderBookmark.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

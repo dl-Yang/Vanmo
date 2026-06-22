@@ -48,6 +48,7 @@ struct AddConnectionView: View {
             }
             .onAppear {
                 port = "\(selectedType.defaultPort)"
+                applyDefaults(for: selectedType)
             }
             .fileImporter(
                 isPresented: $showFolderPicker,
@@ -71,6 +72,7 @@ struct AddConnectionView: View {
             .pickerStyle(.menu)
             .onChange(of: selectedType) { _, newValue in
                 port = "\(newValue.defaultPort)"
+                applyDefaults(for: newValue)
                 if !newValue.isLocal {
                     folderURL = nil
                     folderBookmark = nil
@@ -122,22 +124,34 @@ struct AddConnectionView: View {
                 .textContentType(.name)
 
             TextField(
-                selectedType.isMediaServer
-                    ? "服务器地址（如 https://emby.example.com）"
-                    : "主机地址",
+                hostPlaceholder,
                 text: $host
             )
             .textContentType(.URL)
             .autocapitalization(.none)
             .keyboardType(.URL)
 
-            if !hostContainsScheme {
+            if !hostContainsScheme && selectedType != .iptv {
                 TextField("端口", text: $port)
                     .keyboardType(.numberPad)
             }
 
-            TextField("路径 (可选)", text: $path)
+            TextField(pathPlaceholder, text: $path)
                 .autocapitalization(.none)
+
+            if selectedType == .alist {
+                Text("AList 默认 WebDAV 路径通常为 /dav，可用于聚合阿里云盘、百度网盘、115、夸克等来源。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if selectedType == .iptv {
+                Text("可在主机地址或路径中填写完整 M3U/M3U8 播放列表 URL。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if selectedType == .fnos {
+                Text("fnOS 默认按 WebDAV 兼容方式连接；如使用 SMB，可选择 SMB 协议并填写同一台 NAS 地址。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -159,6 +173,20 @@ struct AddConnectionView: View {
         return trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
     }
 
+    private var hostPlaceholder: String {
+        if selectedType.isMediaServer {
+            return "服务器地址（如 https://emby.example.com）"
+        }
+        if selectedType == .iptv {
+            return "播放列表 URL 或主机地址"
+        }
+        return "主机地址"
+    }
+
+    private var pathPlaceholder: String {
+        selectedType == .iptv ? "播放列表路径或 URL" : "路径 (可选)"
+    }
+
     private var isValid: Bool {
         guard !name.isEmpty else { return false }
         if selectedType.isLocal {
@@ -176,6 +204,17 @@ struct AddConnectionView: View {
             return selectedType.defaultPort
         }
         return Int(port) ?? selectedType.defaultPort
+    }
+
+    private func applyDefaults(for type: ConnectionType) {
+        switch type {
+        case .alist, .fnos:
+            if path.isEmpty {
+                path = "/dav"
+            }
+        default:
+            break
+        }
     }
 
     private func handleFolderImport(_ result: Result<[URL], Error>) {

@@ -28,17 +28,19 @@ enum SubtitleError: LocalizedError {
     case invalidFormat
     case encodingDetectionFailed
     case parseError(String)
+    case assRenderingUnavailable
 
     var errorDescription: String? {
         switch self {
         case .invalidFormat: return "无效的字幕格式"
         case .encodingDetectionFailed: return "无法检测字幕编码"
         case .parseError(let msg): return "字幕解析错误: \(msg)"
+        case .assRenderingUnavailable: return "ASS/SSA 特效字幕需要专用渲染引擎"
         }
     }
 }
 
-enum SubtitleFormat {
+enum SubtitleFormat: Equatable {
     case srt
     case vtt
     case ass

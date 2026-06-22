@@ -30,12 +30,22 @@ final class PlayerViewModel: ObservableObject {
     @Published var brightnessOverlay: Float?
     @Published var volumeOverlay: Float?
     @Published var seekOverlay: TimeInterval?
+    @Published var isRateBoosting = false
+    @Published var seekPreviewActive = false
+    @Published var seekPreviewForward = true
 
     let engine: PlayerEngine
     private var item: MediaItem
     private var cancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
     private var prefetchToken: String?
+    private let externalSubtitleManager = SubtitleManager()
+    private var activeExternalSubtitleID: Int?
+    private var externalSubtitleTracks: [SubtitleTrackInfo] = []
+    private var seekBaseTime: TimeInterval?
+    private let rateBoostHaptic = UIImpactFeedbackGenerator(style: .medium)
+
+    private static let externalSubtitleIDOffset = 10_000
 
     var canSelectEpisode: Bool {
         !episodeGroups.isEmpty
@@ -79,7 +89,11 @@ final class PlayerViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .map { $0.seconds }
             .filter { $0.isFinite && !$0.isNaN }
-            .assign(to: &$currentTime)
+            .sink { [weak self] time in
+                self?.currentTime = time
+                self?.updateExternalSubtitle(at: time)
+            }
+            .store(in: &cancellables)
 
         engine.durationPublisher
             .receive(on: DispatchQueue.main)
@@ -99,6 +113,7 @@ final class PlayerViewModel: ObservableObject {
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] content in
+                guard self?.activeExternalSubtitleID == nil else { return }
                 self?.currentSubtitleContent = content
             }
             .store(in: &cancellables)
@@ -118,9 +133,13 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
-    func onDisappear() {
+    func onDisappear(keepingPlaybackActive: Bool = false) {
         VanmoLogger.player.info("[PlayerVM] onDisappear, saving progress at \(self.currentTime)s")
         saveProgress()
+        guard !keepingPlaybackActive else {
+            VanmoLogger.player.info("[PlayerVM] keeping playback alive for Picture in Picture")
+            return
+        }
         engine.stop()
         if let token = prefetchToken {
             prefetchToken = nil
@@ -154,7 +173,9 @@ final class PlayerViewModel: ObservableObject {
         try await engine.load(url: loadURL, startPosition: startPosition)
         VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
         audioTracks = await engine.availableAudioTracks()
-        subtitleTracks = await engine.availableSubtitleTracks()
+        let embeddedSubtitleTracks = await engine.availableSubtitleTracks()
+        externalSubtitleTracks = Self.externalSubtitleTracks(for: originalURL)
+        subtitleTracks = embeddedSubtitleTracks + externalSubtitleTracks
         await applyPreferredSubtitleIfNeeded()
         VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
         loadChapters()
@@ -171,6 +192,11 @@ final class PlayerViewModel: ObservableObject {
         subtitleTracks = []
         chapters = []
         currentSubtitleContent = nil
+        activeExternalSubtitleID = nil
+        externalSubtitleTracks = []
+        Task {
+            await externalSubtitleManager.clear()
+        }
     }
 
     private func unregisterPrefetchIfNeeded() async throws {
@@ -240,7 +266,36 @@ final class PlayerViewModel: ObservableObject {
     func selectSubtitleTrack(_ index: Int?) {
         VanmoLogger.player.info("[PlayerVM] selectSubtitleTrack: index=\(String(describing: index))")
         config.selectedSubtitleTrack = index
-        Task { await engine.selectSubtitleTrack(index: index) }
+        Task { await applySubtitleSelection(index) }
+    }
+
+    private func applySubtitleSelection(_ index: Int?) async {
+        guard let index else {
+            activeExternalSubtitleID = nil
+            currentSubtitleContent = nil
+            await externalSubtitleManager.clear()
+            await engine.selectSubtitleTrack(index: nil)
+            return
+        }
+
+        guard let track = subtitleTracks.first(where: { $0.id == index }) else { return }
+        if let fileURL = track.fileURL, !track.isEmbedded {
+            do {
+                await engine.selectSubtitleTrack(index: nil)
+                try await externalSubtitleManager.load(from: fileURL)
+                activeExternalSubtitleID = track.id
+                updateExternalSubtitle(at: currentTime)
+            } catch {
+                VanmoLogger.subtitle.error("[PlayerVM] Failed to load external subtitle: \(error.localizedDescription)")
+                activeExternalSubtitleID = nil
+                currentSubtitleContent = nil
+            }
+        } else {
+            activeExternalSubtitleID = nil
+            currentSubtitleContent = nil
+            await externalSubtitleManager.clear()
+            await engine.selectSubtitleTrack(index: index)
+        }
     }
 
     private func applyPreferredSubtitleIfNeeded() async {
@@ -322,6 +377,41 @@ final class PlayerViewModel: ObservableObject {
         return value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+    }
+
+    private static func externalSubtitleTracks(for videoURL: URL) -> [SubtitleTrackInfo] {
+        guard videoURL.isFileURL else { return [] }
+        return SubtitleManager.findSubtitleFiles(for: videoURL)
+            .filter { url in
+                switch SubtitleFormat.detect(from: url) {
+                case .srt, .vtt:
+                    return true
+                case .ass:
+                    VanmoLogger.subtitle.info("[PlayerVM] ASS/SSA subtitle found but deferred to rich renderer: \(url.lastPathComponent)")
+                    return false
+                case .unknown:
+                    return false
+                }
+            }
+            .enumerated()
+            .map { index, url in
+                SubtitleTrackInfo(
+                    id: externalSubtitleIDOffset + index,
+                    language: languageCode(from: url),
+                    title: url.deletingPathExtension().lastPathComponent,
+                    isEmbedded: false,
+                    fileURL: url
+                )
+            }
+    }
+
+    private static func languageCode(from subtitleURL: URL) -> String? {
+        let nameParts = subtitleURL.deletingPathExtension().lastPathComponent
+            .split(separator: ".")
+            .map { String($0).lowercased() }
+        return nameParts.last { part in
+            ["zh", "chs", "cht", "en", "ja", "ko"].contains(part)
+        }
     }
 
     // MARK: - Episodes
@@ -555,22 +645,54 @@ final class PlayerViewModel: ObservableObject {
         dismissOverlay(\.volumeOverlay)
     }
 
+    /// 横向拖动调整进度。`delta` 为相对拖动起点的累计偏移秒数。
     func handleSeekGesture(_ delta: TimeInterval) {
-        let target = currentTime + delta
-        seekTime = max(0, min(target, duration))
-        seekOverlay = delta
+        guard duration > 0 else { return }
+        if seekBaseTime == nil {
+            seekBaseTime = currentTime
+            seekPreviewActive = true
+        }
+        let base = seekBaseTime ?? currentTime
+        let target = max(0, min(base + delta, duration))
+        seekTime = target
+        seekPreviewForward = target >= base
     }
 
     func commitSeekGesture() {
+        guard seekPreviewActive else { return }
         seek(to: seekTime)
-        seekOverlay = nil
+        seekBaseTime = nil
+        seekPreviewActive = false
+        showControlsBriefly()
     }
 
-    func handleLongPress(isActive: Bool) {
+    /// 整体长按时将播放速度提升至最高倍速，松手恢复。
+    func handleRateBoost(isActive: Bool) {
         if isActive {
-            engine.playbackRate = PlayerConfig.maximumRate
+            guard !isRateBoosting else { return }
+            isRateBoosting = true
+            engine.playbackRate = PlayerConfig.clampedRate(PlayerConfig.maximumRate)
+            rateBoostHaptic.prepare()
+            rateBoostHaptic.impactOccurred()
         } else {
+            guard isRateBoosting else { return }
+            isRateBoosting = false
             engine.playbackRate = config.playbackRate
+        }
+    }
+
+    private func updateExternalSubtitle(at time: TimeInterval) {
+        guard activeExternalSubtitleID != nil else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            let cue = await externalSubtitleManager.cue(at: time)
+            await MainActor.run {
+                guard self.activeExternalSubtitleID != nil else { return }
+                let content = cue.map { SubtitleContent(text: $0.text) }
+                if content != self.currentSubtitleContent {
+                    self.currentSubtitleContent = content
+                }
+            }
         }
     }
 

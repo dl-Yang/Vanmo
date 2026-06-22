@@ -9,6 +9,12 @@ enum RemoteServiceFactory {
             return SMBService()
         case .webdav:
             return WebDAVService()
+        case .alist:
+            return WebDAVService(type: .alist)
+        case .iptv:
+            return IPTVService()
+        case .fnos:
+            return WebDAVService(type: .fnos)
         case .ftp, .sftp:
             return FTPService(useSFTP: type == .sftp)
         case .emby:

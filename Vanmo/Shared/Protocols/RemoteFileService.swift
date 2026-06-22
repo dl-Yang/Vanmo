@@ -15,6 +15,18 @@ protocol RemoteFileService: AnyObject {
     ) async throws
 }
 
+extension RemoteFileService {
+    func search(query: String, path: String = "/") async throws -> [RemoteFile] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedQuery.isEmpty else { return [] }
+
+        let files = try await listDirectory(path: path)
+        return files.filter { file in
+            file.name.lowercased().contains(normalizedQuery)
+        }
+    }
+}
+
 protocol MediaServerService: RemoteFileService {
     func streamMediaItems(
         since: Date?,
