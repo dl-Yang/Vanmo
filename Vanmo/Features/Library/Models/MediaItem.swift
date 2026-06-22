@@ -47,6 +47,9 @@ final class MediaItem {
     /// 取值：`nil` 未设置；`"off"` 显式关闭；`"embedded:<index>"` 内嵌轨；`"external:<fileName>"` 外挂轨。
     var subtitlePreference: String?
 
+    /// 视频动态范围（`DynamicRange.rawValue`），首播时读取真实元数据后写入。`nil` 表示尚未探测。
+    var dynamicRange: String?
+
     init(
         title: String,
         fileURL: URL,
@@ -89,6 +92,14 @@ final class MediaItem {
             return "\(showTitle) S\(String(format: "%02d", season))E\(String(format: "%02d", episode))"
         }
         return title
+    }
+
+    /// 已探测的真实动态范围；未探测时回退到文件名启发式。
+    var resolvedDynamicRange: DynamicRange {
+        if let dynamicRange, let range = DynamicRange(rawValue: dynamicRange) {
+            return range
+        }
+        return PlayerCapabilityProbe.isHDRCandidate(url: fileURL) ? .hdr : .sdr
     }
 }
 

@@ -519,7 +519,6 @@ private enum FavoritesDesign {
 private extension MediaItem {
     var qualityBadgeText: String? {
         let source = (originalFileName ?? originalTitle ?? title).uppercased()
-        guard !source.isEmpty else { return nil }
 
         var resolution: String?
         if source.contains("2160") || source.contains("4K") || source.contains("UHD") {
@@ -530,16 +529,13 @@ private extension MediaItem {
             resolution = "HD"
         }
 
-        let hasHDR = source.contains("HDR")
-            || source.contains("DOLBY VISION")
-            || source.contains("DOVI")
-            || source.contains(".DV.")
+        let hdrBadge = resolvedDynamicRange.compactBadge
 
-        switch (resolution, hasHDR) {
-        case let (res?, true): return "\(res) HDR"
-        case let (res?, false): return res
-        case (nil, true): return "HDR"
-        case (nil, false): return nil
+        switch (resolution, hdrBadge) {
+        case let (res?, badge?): return "\(res) \(badge)"
+        case let (res?, nil): return res
+        case let (nil, badge?): return badge
+        case (nil, nil): return nil
         }
     }
 }

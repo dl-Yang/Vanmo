@@ -185,6 +185,7 @@ final class PlayerViewModel: ObservableObject {
         subtitleTracks = embeddedSubtitleTracks + externalSubtitleTracks
         await applyPreferredSubtitleIfNeeded()
         VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
+        await updateDynamicRangeIfNeeded(for: originalURL)
         loadChapters()
         VanmoLogger.player.info("[PlayerVM] calling engine.play()")
         engine.play()
@@ -768,6 +769,16 @@ final class PlayerViewModel: ObservableObject {
         if let ksEngine = engine as? KSPlayerEngine {
             chapters = ksEngine.availableChapters
         }
+    }
+
+    /// 首播时读取本地视频真实 HDR 元数据并持久化，供详情/收藏角标使用。
+    /// 仅探测本地文件，避免对远程流发起额外网络解析。
+    private func updateDynamicRangeIfNeeded(for url: URL) async {
+        guard item.dynamicRange == nil, url.isFileURL else { return }
+        guard let range = await PlayerCapabilityProbe.detectDynamicRange(for: url) else { return }
+        item.dynamicRange = range.rawValue
+        try? item.modelContext?.save()
+        VanmoLogger.player.info("[PlayerVM] detected dynamic range: \(range.rawValue)")
     }
 
     // MARK: - Controls Visibility
