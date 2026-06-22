@@ -148,11 +148,10 @@ enum RemoteFileType {
 
     static func from(filename: String) -> RemoteFileType {
         let url = URL(fileURLWithPath: filename)
-        if url.isVideoFile { return .video }
-        if url.isSubtitleFile { return .subtitle }
-        let ext = url.pathExtension.lowercased()
-        if ["mp3", "flac", "aac", "wav", "ogg", "m4a"].contains(ext) { return .audio }
-        if ["jpg", "jpeg", "png", "gif", "bmp", "webp"].contains(ext) { return .image }
+        if MediaFormatProbe.isVideo(url) { return .video }
+        if MediaFormatProbe.isSubtitle(url) { return .subtitle }
+        if MediaFormatProbe.isAudio(url) { return .audio }
+        if MediaFormatProbe.isImage(url) { return .image }
         return .other
     }
 }

@@ -5,21 +5,13 @@ enum SupportedFormat {
     case ffmpeg
     case discImage
 
-    static let nativeExtensions: Set<String> = ["mp4", "mov", "m4v", "mp3", "m4a", "aac", "wav", "caf"]
-
-    static let ffmpegExtensions: Set<String> = [
-        "mkv", "avi", "wmv", "flv", "rmvb", "rm", "ts", "m2ts",
-        "webm", "ogv", "3gp", "asf", "vob", "mpg", "mpeg"
-    ]
-
-    static let discImageExtensions: Set<String> = ["iso"]
-
     static func detect(from url: URL) -> SupportedFormat {
-        let ext = url.pathExtension.lowercased()
-        if discImageExtensions.contains(ext) || url.path.uppercased().contains("/BDMV/") {
+        if MediaFormatProbe.isDiscImage(url) {
             return .discImage
         }
-        if nativeExtensions.contains(ext) {
+        let ext = url.pathExtension.lowercased()
+        if MediaFormatProbe.nativeVideoExtensions.contains(ext)
+            || MediaFormatProbe.nativeAudioExtensions.contains(ext) {
             return .native
         }
         return .ffmpeg

@@ -12,7 +12,6 @@ enum PlayerCapabilityProbe {
     }
 
     static func isDiscImage(url: URL) -> Bool {
-        let ext = url.pathExtension.lowercased()
-        return ext == "iso" || url.path.uppercased().contains("/BDMV/")
+        MediaFormatProbe.isDiscImage(url)
     }
 }
