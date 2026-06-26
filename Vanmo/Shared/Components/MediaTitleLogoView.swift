@@ -9,6 +9,7 @@ struct MediaTitleLogoView: View {
     var maxLogoHeight: CGFloat = 72
 
     @State private var isLogoLoaded = false
+    @State private var displayedLogoURL: URL?
 
     var body: some View {
         ZStack(alignment: .center) {
@@ -21,15 +22,18 @@ struct MediaTitleLogoView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .opacity(isLogoLoaded ? 0 : 1)
 
-            if let logoURL {
-                KFImage(logoURL)
+            if let currentLogoURL = displayedLogoURL ?? logoURL {
+                KFImage(currentLogoURL)
                     .onSuccess { _ in
+                        displayedLogoURL = currentLogoURL
                         withAnimation(.easeOut(duration: 0.35)) {
                             isLogoLoaded = true
                         }
                     }
                     .onFailure { _ in
-                        isLogoLoaded = false
+                        if displayedLogoURL == nil {
+                            isLogoLoaded = false
+                        }
                     }
                     .fade(duration: 0.35)
                     .resizable()
@@ -37,10 +41,33 @@ struct MediaTitleLogoView: View {
                     .frame(maxWidth: .infinity, maxHeight: maxLogoHeight, alignment: .center)
                     .opacity(isLogoLoaded ? 1 : 0)
             }
+
+            if let logoURL, logoURL != displayedLogoURL {
+                KFImage(logoURL)
+                    .onSuccess { _ in
+                        displayedLogoURL = logoURL
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            isLogoLoaded = true
+                        }
+                    }
+                    .onFailure { _ in
+                        if displayedLogoURL == nil {
+                            isLogoLoaded = false
+                        }
+                    }
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: maxLogoHeight, alignment: .center)
+                    .opacity(0.001)
+                    .accessibilityHidden(true)
+            }
         }
         .frame(maxWidth: .infinity)
-        .onChange(of: logoURL) { _, _ in
-            isLogoLoaded = false
+        .onChange(of: logoURL) { _, newLogoURL in
+            if newLogoURL == nil {
+                displayedLogoURL = nil
+                isLogoLoaded = false
+            }
         }
     }
 

@@ -24,6 +24,20 @@ actor MetadataRefreshCoordinator {
         return try await cache.save(draft)
     }
 
+    func prepareRefreshDraft(
+        _ item: MediaItem,
+        force: Bool,
+        connection: MediaServerConnectionSnapshot? = nil
+    ) async throws -> MetadataCacheRecord? {
+        let key = MetadataCacheKey.from(item)
+
+        if !force, await cache.load(for: key) != nil {
+            return nil
+        }
+
+        return try await buildDraft(for: item, key: key, connection: connection)
+    }
+
     private func buildDraft(
         for item: MediaItem,
         key: MetadataCacheKey,

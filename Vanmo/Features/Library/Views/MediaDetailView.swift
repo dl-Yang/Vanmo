@@ -472,12 +472,17 @@ struct MediaDetailView: View {
         defer { refreshStore.finishRefreshing() }
 
         do {
-            let record = try await MetadataRefreshCoordinator.shared.refresh(
+            if let draft = try await MetadataRefreshCoordinator.shared.prepareRefreshDraft(
                 item,
                 force: force,
                 connection: try? mediaServerConnectionSnapshot()
-            )
-            await applyRecordToUI(record)
+            ) {
+                await applyRecordToUI(draft)
+                let record = try await MetadataCache.shared.save(draft)
+                await applyRecordToUI(record)
+            } else if let record = await MetadataCache.shared.load(for: MetadataCacheKey.from(item)) {
+                await applyRecordToUI(record)
+            }
         } catch {
             refreshStore.failRefreshing(error.localizedDescription)
         }
@@ -490,8 +495,9 @@ struct MediaDetailView: View {
         }
 
         let root = (try? await MetadataCache.shared.rootDirectoryURL()) ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        logoStore.update(record.resolvedLogoURL(rootDirectory: root))
+        let resolvedLogoURL = record.resolvedLogoURL(rootDirectory: root)
         let castDisplays = record.makeCastDisplays(rootDirectory: root)
+        logoStore.update(resolvedLogoURL)
         castStore.update(castDisplays)
 
         await mergeCachedEpisodesIfNeeded(from: record, rootDirectory: root)
