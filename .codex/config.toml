@@ -2,18 +2,3 @@
 
 [mcp_servers.figma]
 url = "https://mcp.figma.com/mcp"
-
-[mcp_servers.Refero]
-url = "https://api.refero.design/mcp"
-bearer_token_env_var = "REFERO_MCP_TOKEN"
-
-[mcp_servers.Mobbin]
-url = "https://api.mobbin.com/mcp"
-
-[mcp_servers."better-icons"]
-command = "npx"
-args = ["-y", "better-icons"]
-
-[mcp_servers."lottiefiles-creator"]
-command = "npx"
-args = ["-y", "@lottiefiles/creator-mcp@latest"]

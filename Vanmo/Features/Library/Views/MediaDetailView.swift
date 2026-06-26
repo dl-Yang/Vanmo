@@ -12,18 +12,16 @@ struct MediaDetailView: View {
 
     @State private var dominantColor: Color = .black.opacity(0.0)
     @State private var accentColor: Color = Color(hue: 0, saturation: 0.05, brightness: 0.88)
-    @State private var episodes: [EpisodeInfo] = []
-    @State private var isLoadingEpisodes = false
     @State private var isUpdatingFavorite = false
     @State private var favoriteErrorMessage: String?
-    @State private var selectedSeason: Int?
-    @State private var enrichedItem: ServerMediaItem?
     @State private var activeSheet: MediaDetailSheet?
     @State private var isHeroPosterLoaded = false
     @State private var ratingStore = MediaDetailRatingStore()
     @State private var refreshStore = MediaDetailRefreshStore()
     @State private var castStore = MediaDetailCastStore()
     @State private var logoStore = MediaDetailLogoStore()
+    @State private var episodesStore = MediaDetailEpisodesStore()
+    @State private var enrichmentStore = MediaDetailEnrichmentStore()
 
     /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
     private enum PanelState { case collapsed, expanded }
@@ -241,16 +239,12 @@ struct MediaDetailView: View {
                     maxLogoHeight: 88
                 )
 
-                HStack(spacing: 8) {
-                    ForEach(Array(collapsedMetaItems.enumerated()), id: \.offset) { index, value in
-                        if index > 0 {
-                            Circle().fill(.white.opacity(0.5)).frame(width: 4, height: 4)
-                        }
-                        Text(value)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
-                }
+                MediaDetailMetaRow(
+                    enrichment: enrichmentStore,
+                    episodesStore: episodesStore,
+                    item: item,
+                    style: .collapsed
+                )
             }
             .padding(.bottom, 90)
 
@@ -269,20 +263,6 @@ struct MediaDetailView: View {
             .padding(.bottom, 50)
             .padding(.horizontal, 24)
         }
-    }
-
-    private var collapsedMetaItems: [String] {
-        var values: [String] = []
-        if let year = item.year { values.append("\(year)") }
-        if let genre = displayGenres.first { values.append(genre) }
-        if item.mediaType == .tvShow {
-            if !seasonNumbers.isEmpty {
-                values.append("\(seasonNumbers.count) 季")
-            }
-        } else if item.duration > 0 {
-            values.append(item.duration.shortDuration)
-        }
-        return values
     }
 
     // MARK: - 媒体信息面板
@@ -351,9 +331,9 @@ struct MediaDetailView: View {
             panelHeader(title: item.displayTitle)
             panelActions(play: { appState.play(item) })
 
-            synopsisSection
-            castSection
-            detailsSection(directorLabel: "导演")
+            MediaDetailSynopsisSection(store: enrichmentStore, item: item) { activeSheet = .synopsis }
+            MediaDetailCastSection(store: castStore, enrichment: enrichmentStore, item: item)
+            MediaDetailDetailsSection(store: enrichmentStore, item: item, directorLabel: "导演")
         }
     }
 
@@ -361,13 +341,13 @@ struct MediaDetailView: View {
         VStack(alignment: .leading, spacing: 32) {
             panelHeader(title: item.showTitle ?? item.title)
             panelActions(play: {
-                if let ep = nextEpisodeToPlay { playEpisode(ep) }
+                if let ep = episodesStore.nextEpisodeToPlay { playEpisode(ep) }
             })
 
-            synopsisSection
-            episodesSection
-            castSection
-            detailsSection(directorLabel: "主创")
+            MediaDetailSynopsisSection(store: enrichmentStore, item: item) { activeSheet = .synopsis }
+            MediaDetailEpisodesSection(store: episodesStore, accentColor: Color.vanmoAccent, onPlay: playEpisode)
+            MediaDetailCastSection(store: castStore, enrichment: enrichmentStore, item: item)
+            MediaDetailDetailsSection(store: enrichmentStore, item: item, directorLabel: "主创")
         }
     }
 
@@ -376,10 +356,11 @@ struct MediaDetailView: View {
     private func panelHeader(title: String) -> some View {
         MediaDetailPanelHeader(
             title: title,
-            fallbackLogoURL: item.logoURL,
-            metaItems: collapsedMetaItems,
+            item: item,
             ratingStore: ratingStore,
             logoStore: logoStore,
+            enrichment: enrichmentStore,
+            episodesStore: episodesStore,
             starYellow: starYellow
         )
     }
@@ -431,122 +412,6 @@ struct MediaDetailView: View {
         )
     }
 
-    private var synopsisSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("简介")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-            Text(displayOverview ?? "暂无简介")
-                .font(.system(size: 15))
-                .lineSpacing(4)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { activeSheet = .synopsis }
-        }
-    }
-
-    @ViewBuilder
-    private var castSection: some View {
-        MediaDetailCastSection(
-            store: castStore,
-            fallbackNames: displayCast
-        )
-    }
-
-    private var resolvedCastMembers: [CastMemberDisplay] {
-        if !castStore.members.isEmpty {
-            return castStore.members
-        }
-        return displayCast.map { name in
-            CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
-        }
-    }
-
-    @ViewBuilder
-    private var episodesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("剧集")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.primary)
-
-                if seasonNumbers.count > 1 {
-                    Spacer()
-                    Menu {
-                        ForEach(seasonNumbers, id: \.self) { season in
-                            Button("第 \(season) 季") { selectedSeason = season }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("第 \(selectedSeason ?? seasonNumbers.first ?? 1) 季")
-                                .font(.system(size: 14, weight: .semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color(.secondarySystemBackground), in: Capsule())
-                    }
-                }
-            }
-
-            if isLoadingEpisodes {
-                ProgressView()
-                    .tint(Color.vanmoAccent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-            } else if currentSeasonEpisodes.isEmpty {
-                Text("暂无剧集")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-            } else {
-                VStack(spacing: 16) {
-                    ForEach(currentSeasonEpisodes) { episode in
-                        tvEpisodeRow(episode)
-                            .id(episode.id)
-                    }
-                }
-            }
-        }
-    }
-
-    private func detailsSection(directorLabel: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("详情")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-                .padding(.bottom, 8)
-
-            if let director = displayDirector {
-                detailRow(title: directorLabel, value: director)
-            }
-            if !displayGenres.isEmpty {
-                detailRow(title: "类型", value: displayGenres.joined(separator: " / "))
-            }
-        }
-    }
-
-    private func detailRow(title: String, value: String) -> some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .top) {
-                Text(title)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 80, alignment: .leading)
-                Text(value)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .multilineTextAlignment(.trailing)
-            }
-            Divider()
-        }
-    }
-
     private func circleAction(icon: String, isSystem: Bool = true, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Group {
@@ -575,65 +440,13 @@ struct MediaDetailView: View {
         .buttonStyle(.plain)
     }
 
-    private func tvEpisodeRow(_ episode: EpisodeInfo) -> some View {
-        Button {
-            playEpisode(episode)
-        } label: {
-            HStack(alignment: .top, spacing: 16) {
-                ZStack {
-                    if let backdropURL = episode.backdropURL {
-                        KFImage(backdropURL)
-                            .placeholder { episodeThumbnailPlaceholder }
-                            .fade(duration: 0.2)
-                            .resizable()
-                            .scaledToFill()
-                            .id(backdropURL)
-                    } else {
-                        episodeThumbnailPlaceholder
-                    }
-
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(Color.vanmoAccent, in: Circle())
-                }
-                .frame(width: 128, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top) {
-                        Text("\(episode.episodeNumber). \(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : episode.title)")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(episode.duration > 0 ? episode.duration.shortDuration : "-- 分钟")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text(episode.overview ?? "暂无简介")
-                        .font(.system(size: 12))
-                        .lineSpacing(3)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                }
-                .padding(.top, 2)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var episodeThumbnailPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 14)
-            .fill(Color(.secondarySystemBackground))
-    }
-
     // MARK: - 状态逻辑
 
     private var supportsMetadataRefresh: Bool {
-        MetadataRefreshCoordinator.supportsRefresh(for: item)
+        if (try? mediaServerConnectionSnapshot()) != nil {
+            return true
+        }
+        return MetadataRefreshCoordinator.supportsRefresh(for: item)
     }
 
     private var metadataTaskID: String {
@@ -659,7 +472,11 @@ struct MediaDetailView: View {
         defer { refreshStore.finishRefreshing() }
 
         do {
-            let record = try await MetadataRefreshCoordinator.shared.refresh(item, force: force)
+            let record = try await MetadataRefreshCoordinator.shared.refresh(
+                item,
+                force: force,
+                connection: try? mediaServerConnectionSnapshot()
+            )
             await applyRecordToUI(record)
         } catch {
             refreshStore.failRefreshing(error.localizedDescription)
@@ -686,12 +503,12 @@ struct MediaDetailView: View {
 
         let cachedByID = Dictionary(uniqueKeysWithValues: record.episodes.map { ($0.id, $0) })
 
-        if episodes.isEmpty {
-            episodes = record.episodes.map { $0.makeEpisodeInfo(rootDirectory: rootDirectory) }
+        if episodesStore.episodes.isEmpty {
+            episodesStore.setEpisodes(record.episodes.map { $0.makeEpisodeInfo(rootDirectory: rootDirectory) })
             return
         }
 
-        episodes = episodes.map { episode in
+        episodesStore.setEpisodes(episodesStore.episodes.map { episode in
             guard let cached = cachedByID[episode.id] else { return episode }
             let cachedEpisode = cached.makeEpisodeInfo(rootDirectory: rootDirectory)
             guard episode.backdropURL == nil, let backdropURL = cachedEpisode.backdropURL else {
@@ -707,7 +524,7 @@ struct MediaDetailView: View {
                 streamURL: episode.streamURL,
                 backdropURL: backdropURL
             )
-        }
+        })
     }
 
     private var favoriteButton: some View {
@@ -744,49 +561,27 @@ struct MediaDetailView: View {
     }
 
     private var displayOverview: String? {
-        let overview = enrichedItem?.overview ?? item.overview
-        guard let overview, !overview.isEmpty else { return nil }
-        return overview
+        enrichmentStore.overview(fallback: item)
     }
 
     private var displayPosterURL: URL? {
         highResolutionPosterURL(from: item.posterURL)
     }
 
-    private var displayGenres: [String] {
-        if let enrichedGenres = enrichedItem?.genres, !enrichedGenres.isEmpty {
-            return enrichedGenres
-        }
-        return item.genres
-    }
-
-    private var displayDirector: String? {
-        if let director = enrichedItem?.director, !director.isEmpty {
-            return director
-        }
-        return item.director
-    }
-
-    private var displayCast: [String] {
-        if let cast = enrichedItem?.cast, !cast.isEmpty {
-            return cast
-        }
-        return item.cast
-    }
-
     private var shouldEnrichFromServer: Bool {
-        guard enrichedItem == nil,
+        guard enrichmentStore.enrichedItem == nil,
               let serverId = item.serverId,
               !serverId.isEmpty,
-              item.sourceConnectionId == nil,
-              needsServerDetailFields,
-              isEmbyOriginItem,
-              EmbyCredentialStore.baseURL != nil,
-              EmbyCredentialStore.userId != nil,
-              EmbyCredentialStore.token != nil else {
+              needsServerDetailFields else {
             return false
         }
-        return true
+        if let snapshot = try? mediaServerConnectionSnapshot() {
+            return snapshot.type == .emby || snapshot.type == .jellyfin
+        }
+        return isEmbyOriginItem &&
+            EmbyCredentialStore.baseURL != nil &&
+            EmbyCredentialStore.userId != nil &&
+            EmbyCredentialStore.token != nil
     }
 
     private var isEmbyOriginItem: Bool {
@@ -818,7 +613,11 @@ struct MediaDetailView: View {
         guard shouldEnrichFromServer, let serverId = item.serverId else { return }
 
         do {
-            enrichedItem = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId)
+            if let snapshot = try? mediaServerConnectionSnapshot() {
+                enrichmentStore.enrichedItem = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId, connection: snapshot)
+            } else {
+                enrichmentStore.enrichedItem = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId)
+            }
         } catch {
             VanmoLogger.library.error("[MediaDetail] Failed to enrich item detail: \(error.localizedDescription)")
         }
@@ -831,7 +630,11 @@ struct MediaDetailView: View {
         defer { isUpdatingFavorite = false }
 
         do {
-            try await EmbyFavoriteUpdater.setFavorite(item, isFavorite: isFavorite)
+            try await EmbyFavoriteUpdater.setFavorite(
+                item,
+                isFavorite: isFavorite,
+                connection: try? mediaServerConnectionSnapshot()
+            )
             item.isFavorite = isFavorite
             try updateStoredFavoriteState(isFavorite)
             try modelContext.save()
@@ -844,29 +647,16 @@ struct MediaDetailView: View {
     private func updateStoredFavoriteState(_ isFavorite: Bool) throws {
         guard let serverId = item.serverId else { return }
 
+        let sourceConnectionId = item.sourceConnectionId
         let descriptor = FetchDescriptor<MediaItem>(
             predicate: #Predicate<MediaItem> { mediaItem in
-                mediaItem.serverId == serverId
+                mediaItem.serverId == serverId &&
+                    mediaItem.sourceConnectionId == sourceConnectionId
             }
         )
         if let storedItem = try modelContext.fetch(descriptor).first {
             storedItem.isFavorite = isFavorite
         }
-    }
-
-    private var seasonNumbers: [Int] {
-        Array(Set(episodes.map(\.seasonNumber))).sorted()
-    }
-
-    private var currentSeasonEpisodes: [EpisodeInfo] {
-        let season = selectedSeason ?? seasonNumbers.first ?? 1
-        return episodes
-            .filter { $0.seasonNumber == season }
-            .sorted { $0.episodeNumber < $1.episodeNumber }
-    }
-
-    private var nextEpisodeToPlay: EpisodeInfo? {
-        episodes.sorted { ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber) }.first
     }
 
     private func playEpisode(_ episode: EpisodeInfo) {
@@ -884,27 +674,45 @@ struct MediaDetailView: View {
         episodeItem.backdropURL = item.backdropURL
         episodeItem.serverId = episode.id
         episodeItem.seriesId = item.serverId ?? item.seriesId
+        episodeItem.sourceConnectionId = item.sourceConnectionId
         appState.play(episodeItem)
     }
 
     private func loadEpisodes() async {
         guard let seriesServerId = item.serverId else { return }
 
-        isLoadingEpisodes = true
-        defer { isLoadingEpisodes = false }
+        episodesStore.isLoading = true
+        defer { episodesStore.isLoading = false }
 
         do {
+            let loaded: [EpisodeInfo]
             switch item.fileURL.host {
             case "plex-series":
-                episodes = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
+                if let snapshot = try? mediaServerConnectionSnapshot() {
+                    loaded = try await PlexEpisodeFetcher.fetchEpisodes(
+                        seriesRatingKey: seriesServerId,
+                        connection: snapshot
+                    )
+                } else {
+                    loaded = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
+                }
             default:
-                episodes = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
+                if let snapshot = try? mediaServerConnectionSnapshot() {
+                    loaded = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId, connection: snapshot)
+                } else {
+                    loaded = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
+                }
             }
+            episodesStore.setEpisodes(loaded)
             await mergeEpisodeBackdropsFromCache()
         } catch {
             VanmoLogger.library.error("[MediaServer] Failed to load episodes: \(error.localizedDescription)")
-            episodes = []
+            episodesStore.setEpisodes([])
         }
+    }
+
+    private func mediaServerConnectionSnapshot() throws -> MediaServerConnectionSnapshot? {
+        try MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
     }
 
     @MainActor
@@ -916,7 +724,7 @@ struct MediaDetailView: View {
         let root = (try? await MetadataCache.shared.rootDirectoryURL()) ?? URL(fileURLWithPath: NSTemporaryDirectory())
         let cachedByID = Dictionary(uniqueKeysWithValues: record.episodes.map { ($0.id, $0) })
 
-        episodes = episodes.map { episode in
+        episodesStore.setEpisodes(episodesStore.episodes.map { episode in
             guard episode.backdropURL == nil, let cached = cachedByID[episode.id] else {
                 return episode
             }
@@ -930,7 +738,7 @@ struct MediaDetailView: View {
                 streamURL: episode.streamURL,
                 backdropURL: cached.makeEpisodeInfo(rootDirectory: root).backdropURL
             )
-        }
+        })
     }
 
     private func initial(for name: String) -> String {
@@ -1066,6 +874,66 @@ private final class MediaDetailLogoStore: ObservableObject {
     }
 }
 
+@MainActor
+private final class MediaDetailEpisodesStore: ObservableObject {
+    @Published private(set) var episodes: [EpisodeInfo] = []
+    @Published var isLoading = false
+    @Published var selectedSeason: Int?
+
+    var seasonNumbers: [Int] {
+        Array(Set(episodes.map(\.seasonNumber))).sorted()
+    }
+
+    var currentSeasonEpisodes: [EpisodeInfo] {
+        let season = selectedSeason ?? seasonNumbers.first ?? 1
+        return episodes
+            .filter { $0.seasonNumber == season }
+            .sorted { $0.episodeNumber < $1.episodeNumber }
+    }
+
+    var nextEpisodeToPlay: EpisodeInfo? {
+        episodes
+            .sorted { ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber) }
+            .first
+    }
+
+    func setEpisodes(_ newEpisodes: [EpisodeInfo]) {
+        episodes = newEpisodes
+    }
+}
+
+@MainActor
+private final class MediaDetailEnrichmentStore: ObservableObject {
+    @Published var enrichedItem: ServerMediaItem?
+
+    func overview(fallback: MediaItem) -> String? {
+        let overview = enrichedItem?.overview ?? fallback.overview
+        guard let overview, !overview.isEmpty else { return nil }
+        return overview
+    }
+
+    func genres(fallback: MediaItem) -> [String] {
+        if let enrichedGenres = enrichedItem?.genres, !enrichedGenres.isEmpty {
+            return enrichedGenres
+        }
+        return fallback.genres
+    }
+
+    func director(fallback: MediaItem) -> String? {
+        if let director = enrichedItem?.director, !director.isEmpty {
+            return director
+        }
+        return fallback.director
+    }
+
+    func cast(fallback: MediaItem) -> [String] {
+        if let cast = enrichedItem?.cast, !cast.isEmpty {
+            return cast
+        }
+        return fallback.cast
+    }
+}
+
 private struct MediaDetailRefreshErrorPresenter: ViewModifier {
     @ObservedObject var store: MediaDetailRefreshStore
 
@@ -1106,33 +974,28 @@ private struct MediaDetailTitleLogoView: View {
 
 private struct MediaDetailPanelHeader: View {
     let title: String
-    let fallbackLogoURL: URL?
-    let metaItems: [String]
+    let item: MediaItem
     let ratingStore: MediaDetailRatingStore
     let logoStore: MediaDetailLogoStore
+    let enrichment: MediaDetailEnrichmentStore
+    let episodesStore: MediaDetailEpisodesStore
     let starYellow: Color
 
     var body: some View {
         VStack(alignment: .center, spacing: 10) {
             MediaDetailTitleLogoView(
                 title: title,
-                fallbackLogoURL: fallbackLogoURL,
+                fallbackLogoURL: item.logoURL,
                 store: logoStore,
                 maxLogoHeight: 72
             )
 
-            if !metaItems.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(Array(metaItems.enumerated()), id: \.offset) { index, value in
-                        if index > 0 {
-                            Circle().fill(Color.secondary.opacity(0.5)).frame(width: 4, height: 4)
-                        }
-                        Text(value)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+            MediaDetailMetaRow(
+                enrichment: enrichment,
+                episodesStore: episodesStore,
+                item: item,
+                style: .header
+            )
 
             HStack(spacing: 6) {
                 tagView("TV-MA")
@@ -1259,13 +1122,14 @@ private struct MediaDetailPanelActions: View {
 
 private struct MediaDetailCastSection: View {
     @ObservedObject var store: MediaDetailCastStore
-    let fallbackNames: [String]
+    @ObservedObject var enrichment: MediaDetailEnrichmentStore
+    let item: MediaItem
 
     private var members: [CastMemberDisplay] {
         if !store.members.isEmpty {
             return store.members
         }
-        return fallbackNames.map { name in
+        return enrichment.cast(fallback: item).map { name in
             CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
         }
     }
@@ -1335,6 +1199,224 @@ private struct MediaDetailCastAvatar: View {
     }
 }
 
+private struct MediaDetailMetaRow: View {
+    enum Style { case collapsed, header }
+
+    @ObservedObject var enrichment: MediaDetailEnrichmentStore
+    @ObservedObject var episodesStore: MediaDetailEpisodesStore
+    let item: MediaItem
+    let style: Style
+
+    private var values: [String] {
+        var values: [String] = []
+        if let year = item.year { values.append("\(year)") }
+        if let genre = enrichment.genres(fallback: item).first { values.append(genre) }
+        if item.mediaType == .tvShow {
+            if !episodesStore.seasonNumbers.isEmpty {
+                values.append("\(episodesStore.seasonNumbers.count) 季")
+            }
+        } else if item.duration > 0 {
+            values.append(item.duration.shortDuration)
+        }
+        return values
+    }
+
+    var body: some View {
+        let values = values
+        if !values.isEmpty {
+            HStack(spacing: style == .collapsed ? 8 : 6) {
+                ForEach(Array(values.enumerated()), id: \.offset) { index, value in
+                    if index > 0 {
+                        Circle()
+                            .fill(style == .collapsed ? Color.white.opacity(0.5) : Color.secondary.opacity(0.5))
+                            .frame(width: 4, height: 4)
+                    }
+                    Text(value)
+                        .font(.system(size: style == .collapsed ? 14 : 12,
+                                      weight: style == .collapsed ? .medium : .semibold))
+                        .foregroundStyle(style == .collapsed
+                            ? AnyShapeStyle(Color.white.opacity(0.85))
+                            : AnyShapeStyle(.secondary))
+                }
+            }
+        }
+    }
+}
+
+private struct MediaDetailSynopsisSection: View {
+    @ObservedObject var store: MediaDetailEnrichmentStore
+    let item: MediaItem
+    let onTap: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("简介")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.primary)
+            Text(store.overview(fallback: item) ?? "暂无简介")
+                .font(.system(size: 15))
+                .lineSpacing(4)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture { onTap() }
+        }
+    }
+}
+
+private struct MediaDetailDetailsSection: View {
+    @ObservedObject var store: MediaDetailEnrichmentStore
+    let item: MediaItem
+    let directorLabel: String
+
+    var body: some View {
+        let director = store.director(fallback: item)
+        let genres = store.genres(fallback: item)
+
+        VStack(alignment: .leading, spacing: 12) {
+            Text("详情")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.primary)
+                .padding(.bottom, 8)
+
+            if let director {
+                detailRow(title: directorLabel, value: director)
+            }
+            if !genres.isEmpty {
+                detailRow(title: "类型", value: genres.joined(separator: " / "))
+            }
+        }
+    }
+
+    private func detailRow(title: String, value: String) -> some View {
+        VStack(spacing: 12) {
+            HStack(alignment: .top) {
+                Text(title)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 80, alignment: .leading)
+                Text(value)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .multilineTextAlignment(.trailing)
+            }
+            Divider()
+        }
+    }
+}
+
+private struct MediaDetailEpisodesSection: View {
+    @ObservedObject var store: MediaDetailEpisodesStore
+    let accentColor: Color
+    let onPlay: (EpisodeInfo) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("剧集")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                if store.seasonNumbers.count > 1 {
+                    Spacer()
+                    Menu {
+                        ForEach(store.seasonNumbers, id: \.self) { season in
+                            Button("第 \(season) 季") { store.selectedSeason = season }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("第 \(store.selectedSeason ?? store.seasonNumbers.first ?? 1) 季")
+                                .font(.system(size: 14, weight: .semibold))
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color(.secondarySystemBackground), in: Capsule())
+                    }
+                }
+            }
+
+            if store.isLoading {
+                ProgressView()
+                    .tint(accentColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            } else if store.currentSeasonEpisodes.isEmpty {
+                Text("暂无剧集")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            } else {
+                VStack(spacing: 16) {
+                    ForEach(store.currentSeasonEpisodes) { episode in
+                        episodeRow(episode)
+                            .id(episode.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private func episodeRow(_ episode: EpisodeInfo) -> some View {
+        Button {
+            onPlay(episode)
+        } label: {
+            HStack(alignment: .top, spacing: 16) {
+                ZStack {
+                    if let backdropURL = episode.backdropURL {
+                        KFImage(backdropURL)
+                            .placeholder { thumbnailPlaceholder }
+                            .fade(duration: 0.2)
+                            .resizable()
+                            .scaledToFill()
+                            .id(backdropURL)
+                    } else {
+                        thumbnailPlaceholder
+                    }
+
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(accentColor, in: Circle())
+                }
+                .frame(width: 128, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top) {
+                        Text("\(episode.episodeNumber). \(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : episode.title)")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Spacer()
+                        Text(episode.duration > 0 ? episode.duration.shortDuration : "-- 分钟")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Text(episode.overview ?? "暂无简介")
+                        .font(.system(size: 12))
+                        .lineSpacing(3)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
+                .padding(.top, 2)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var thumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 14)
+            .fill(Color(.secondarySystemBackground))
+    }
+}
+
 #Preview {
     NavigationStack {
         MediaDetailView(item: MediaItem(
@@ -1348,3 +1430,16 @@ private struct MediaDetailCastAvatar: View {
     .environmentObject(AppState())
     .preferredColorScheme(.dark)
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

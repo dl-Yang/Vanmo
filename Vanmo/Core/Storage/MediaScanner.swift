@@ -68,7 +68,9 @@ actor MediaScanner {
         maxDepth: Int = 8,
         batchSize: Int = 200
     ) async throws -> [MediaItem] {
-        var existing = try await MainActor.run { try existingServerItemMap(in: context) }
+        var existing = try await MainActor.run {
+            try existingServerItemMap(connectionId: connectionId, in: context)
+        }
         var newItems: [MediaItem] = []
         var pendingInBatch = 0
 
@@ -98,7 +100,8 @@ actor MediaScanner {
                     continue
                 }
                 guard file.isVideo else { continue }
-                if let existingItem = existing[file.path] {
+                let key = serverItemKey(serverId: file.path, connectionId: connectionId)
+                if let existingItem = existing[key] {
                     if existingItem.sourceConnectionId == nil, let connectionId {
                         await MainActor.run {
                             existingItem.sourceConnectionId = connectionId
@@ -138,7 +141,7 @@ actor MediaScanner {
 
                 await MainActor.run { context.insert(item) }
                 newItems.append(item)
-                existing[file.path] = item
+                existing[key] = item
                 pendingInBatch += 1
 
                 if pendingInBatch >= batchSize {
@@ -162,11 +165,12 @@ actor MediaScanner {
         connectionId: UUID? = nil,
         in context: ModelContext
     ) async throws -> [MediaItem] {
-        let existingMap = try existingServerItemMap(in: context)
+        let existingMap = try existingServerItemMap(connectionId: connectionId, in: context)
         var newItems: [MediaItem] = []
 
         for serverItem in serverItems {
-            if let existing = existingMap[serverItem.serverId] {
+            let key = serverItemKey(serverId: serverItem.serverId, connectionId: connectionId)
+            if let existing = existingMap[key] {
                 apply(serverItem: serverItem, connectionId: connectionId, to: existing)
             } else {
                 let item = MediaItem(
@@ -250,16 +254,28 @@ actor MediaScanner {
     }
 
     @MainActor
-    private func existingServerItemMap(in context: ModelContext) throws -> [String: MediaItem] {
+    private func existingServerItemMap(
+        connectionId: UUID?,
+        in context: ModelContext
+    ) throws -> [String: MediaItem] {
         let descriptor = FetchDescriptor<MediaItem>()
         let items = try context.fetch(descriptor)
         var map: [String: MediaItem] = [:]
         for item in items {
             if let sid = item.serverId {
-                map[sid] = item
+                guard connectionId == nil || item.sourceConnectionId == connectionId else { continue }
+                let key = serverItemKey(serverId: sid, connectionId: item.sourceConnectionId)
+                map[key] = item
             }
         }
         return map
+    }
+
+    private nonisolated func serverItemKey(serverId: String, connectionId: UUID?) -> String {
+        if let connectionId {
+            return "\(connectionId.uuidString)::\(serverId)"
+        }
+        return serverId
     }
 
     private func videoDuration(for url: URL) async -> TimeInterval {

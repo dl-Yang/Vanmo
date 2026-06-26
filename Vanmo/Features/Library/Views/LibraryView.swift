@@ -123,9 +123,7 @@ struct LibraryView: View {
     }
 
     private var hasEmbyConnectionsConfigured: Bool {
-        connectionsViewModel.savedConnections.contains { connection in
-            connection.type == .emby || connection.type == .jellyfin
-        }
+        viewModel.hasConfiguredEmbyConnections || !viewModel.orderedEmbyConnections.isEmpty
     }
 
     private var isRegularWidth: Bool {
@@ -192,7 +190,6 @@ struct LibraryView: View {
         let connections = connectionsViewModel.savedConnections
         guard !connections.isEmpty else { return nil }
 
-        let isEmby = connections.contains { $0.type == .emby || $0.type == .jellyfin }
         let libraryCount = connections.reduce(0) { partial, connection in
             if usesServerCollectionAPI(connection) {
                 return partial + viewModel.homeVisibleFolders(for: connection.id).count
@@ -201,7 +198,8 @@ struct LibraryView: View {
             }
         }
 
-        let prefix = isEmby ? "Emby 已同步" : "已同步"
+        let sourceCount = connections.filter(\.type.isMediaServer).count
+        let prefix = sourceCount > 1 ? "\(sourceCount) 个媒体服务器已同步" : "已同步"
         let count = libraryCount > 0 ? libraryCount : connections.count
         let unit = libraryCount > 0 ? "个库" : "个源"
         return "\(prefix) · \(count) \(unit)"
@@ -282,17 +280,14 @@ struct LibraryView: View {
             CollectionFolderLoadingSection()
         } else {
             ForEach(viewModel.orderedEmbyConnections) { connection in
-                let folders = viewModel.homeVisibleFolders(for: connection.id)
-                if !folders.isEmpty {
-                    collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
+                if let errorMessage = serverErrorMessage(for: connection) {
+                    serverErrorSection(serverName: connection.name, message: errorMessage)
+                } else {
+                    let folders = viewModel.homeVisibleFolders(for: connection.id)
+                    if !folders.isEmpty {
+                        collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
+                    }
                 }
-            }
-
-            if let error = viewModel.embyHomeError, viewModel.serverCollectionFolders.isEmpty {
-                Text(error)
-                    .font(.system(size: 12))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.6))
-                    .padding(.horizontal, 24)
             }
         }
     }
@@ -300,9 +295,13 @@ struct LibraryView: View {
     @ViewBuilder
     private var scannedLibrarySections: some View {
         ForEach(viewModel.orderedScannedConnections) { connection in
-            let folders = viewModel.homeVisibleScannedFolders(for: connection.id)
-            if !folders.isEmpty {
-                collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
+            if let errorMessage = serverErrorMessage(for: connection) {
+                serverErrorSection(serverName: connection.name, message: errorMessage)
+            } else {
+                let folders = viewModel.homeVisibleScannedFolders(for: connection.id)
+                if !folders.isEmpty {
+                    collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
+                }
             }
         }
     }
@@ -319,6 +318,78 @@ struct LibraryView: View {
                 folderRow(folder: folder, connection: connection)
             }
         }
+    }
+
+    private func serverErrorMessage(for connection: SavedConnection) -> String? {
+        viewModel.serverConnectionErrors[connection.id] ?? connectionsViewModel.connectionErrorMessage(for: connection)
+    }
+
+    private func serverErrorSection(serverName: String, message: String) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            serverErrorHeader(serverName: serverName)
+
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.vanmoAccent)
+                    .frame(width: 28, height: 28)
+                    .background(Color.vanmoAccent.opacity(0.14), in: Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("连接服务器失败")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(HomeDesign.onSurface)
+
+                    Text(message)
+                        .font(.system(size: 12))
+                        .foregroundStyle(HomeDesign.onSurface.opacity(0.68))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(HomeDesign.syncPillFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(HomeDesign.cardStroke, lineWidth: 1)
+            }
+            .padding(.horizontal, 24)
+        }
+    }
+
+    private func serverErrorHeader(serverName: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.vanmoAccent.opacity(0.14))
+
+                Image(systemName: "server.rack")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.vanmoAccent)
+            }
+            .frame(width: 42, height: 42)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(serverName)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(HomeDesign.onSurface)
+                    .lineLimit(1)
+
+                Text("连接异常")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
+            }
+
+            Spacer(minLength: 12)
+
+            Text("失败")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.vanmoAccent)
+                .frame(minWidth: 42, minHeight: 28)
+                .background(Color.vanmoAccent.opacity(0.14), in: Capsule())
+        }
+        .padding(.horizontal, 24)
     }
 
     private func serverSectionHeader(serverName: String, folderCount: Int) -> some View {
@@ -403,7 +474,7 @@ struct LibraryView: View {
         connection: SavedConnection
     ) -> some View {
         let previewItems = viewModel.previewItems(for: folder)
-        let isLoaded = viewModel.isFolderPreviewLoaded(folder.id)
+        let isLoaded = viewModel.isFolderPreviewLoaded(folder)
 
         if !isLoaded {
             folderPreviewSkeletonRow

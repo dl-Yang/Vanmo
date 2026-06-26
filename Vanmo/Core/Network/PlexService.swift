@@ -58,6 +58,13 @@ final class PlexService: MediaServerService {
         resolvedBaseURL = nil
     }
 
+    func makeSessionContext() throws -> PlexSessionContext {
+        guard isConnected, let baseURL = resolvedBaseURL, let token else {
+            throw NetworkError.notConnected
+        }
+        return PlexSessionContext(baseURL: baseURL, token: token)
+    }
+
     func listDirectory(path: String) async throws -> [RemoteFile] {
         guard isConnected, let baseURL = resolvedBaseURL, let token else {
             throw NetworkError.notConnected
@@ -393,7 +400,13 @@ final class PlexService: MediaServerService {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         applyHeaders(to: &request)
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw error
+        }
         try validatePlexResponse(response, body: data, context: "GET \(endpoint)")
         return data
     }
@@ -404,6 +417,11 @@ final class PlexService: MediaServerService {
         components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: token)]
         return components.url ?? baseURL
     }
+}
+
+struct PlexSessionContext: Sendable {
+    let baseURL: URL
+    let token: String
 }
 
 // MARK: - Validation
@@ -577,6 +595,13 @@ enum PlexCredentialStore {
 // MARK: - Item Detail Fetcher
 
 enum PlexItemDetailFetcher {
+    static func fetchDetail(ratingKey: String, connection: MediaServerConnectionSnapshot) async throws -> ServerMediaItem {
+        let service = PlexService()
+        try await service.connect(config: connection.config)
+        defer { Task { await service.disconnect() } }
+        return try await fetchDetail(ratingKey: ratingKey, context: service.makeSessionContext())
+    }
+
     static func fetchDetail(ratingKey: String) async throws -> ServerMediaItem {
         guard let baseURLStr = PlexCredentialStore.baseURL,
               let token = PlexCredentialStore.token,
@@ -584,11 +609,18 @@ enum PlexItemDetailFetcher {
             throw NetworkError.notConnected
         }
 
+        return try await fetchDetail(
+            ratingKey: ratingKey,
+            context: PlexSessionContext(baseURL: baseURL, token: token)
+        )
+    }
+
+    private static func fetchDetail(ratingKey: String, context: PlexSessionContext) async throws -> ServerMediaItem {
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("library/metadata/\(ratingKey)"),
+            url: context.baseURL.appendingPathComponent("library/metadata/\(ratingKey)"),
             resolvingAgainstBaseURL: false
         )!
-        components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: token)]
+        components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: context.token)]
 
         guard let url = components.url else { throw NetworkError.invalidURL }
 
@@ -604,7 +636,7 @@ enum PlexItemDetailFetcher {
 
         let result = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
         guard let meta = result.mediaContainer.metadata?.first,
-              let mapped = mapPlexMetadataToServerItem(meta, baseURL: baseURL, token: token) else {
+              let mapped = mapPlexMetadataToServerItem(meta, baseURL: context.baseURL, token: context.token) else {
             throw NetworkError.transferFailed("无法解析媒体详情")
         }
 
@@ -698,6 +730,16 @@ fileprivate func mapPlexMetadataToServerItem(
 /// 提供给 PlayerViewModel / MediaDetailView 在剧集播放时调用,按 series ratingKey
 /// 拉取 Plex 服务器上的剧集列表。
 enum PlexEpisodeFetcher {
+    static func fetchEpisodes(
+        seriesRatingKey: String,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> [EpisodeInfo] {
+        let service = PlexService()
+        try await service.connect(config: connection.config)
+        defer { Task { await service.disconnect() } }
+        return try await fetchEpisodes(seriesRatingKey: seriesRatingKey, context: service.makeSessionContext())
+    }
+
     static func fetchEpisodes(seriesRatingKey: String) async throws -> [EpisodeInfo] {
         guard let baseURLStr = PlexCredentialStore.baseURL,
               let token = PlexCredentialStore.token,
@@ -705,11 +747,21 @@ enum PlexEpisodeFetcher {
             throw NetworkError.notConnected
         }
 
+        return try await fetchEpisodes(
+            seriesRatingKey: seriesRatingKey,
+            context: PlexSessionContext(baseURL: baseURL, token: token)
+        )
+    }
+
+    private static func fetchEpisodes(
+        seriesRatingKey: String,
+        context: PlexSessionContext
+    ) async throws -> [EpisodeInfo] {
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("library/metadata/\(seriesRatingKey)/grandchildren"),
+            url: context.baseURL.appendingPathComponent("library/metadata/\(seriesRatingKey)/grandchildren"),
             resolvingAgainstBaseURL: false
         )!
-        components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: token)]
+        components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: context.token)]
 
         guard let url = components.url else { throw NetworkError.invalidURL }
 
@@ -738,10 +790,11 @@ enum PlexEpisodeFetcher {
                 0
             }
 
-            let stream = URL(string: "\(baseURLStr)\(partKey)?X-Plex-Token=\(token)")!
+            let baseURLStr = context.baseURL.absoluteString
+            let stream = URL(string: "\(baseURLStr)\(partKey)?X-Plex-Token=\(context.token)")!
 
             let backdropURL: URL? = (meta.art ?? meta.thumb).flatMap { path in
-                URL(string: "\(baseURLStr)\(path)?X-Plex-Token=\(token)")
+                URL(string: "\(baseURLStr)\(path)?X-Plex-Token=\(context.token)")
             }
 
             return EpisodeInfo(

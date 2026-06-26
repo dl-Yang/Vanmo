@@ -16,6 +16,8 @@ final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var loadingMessage = "连接中..."
     @Published private(set) var librarySyncMessage: String?
     @Published private(set) var librarySyncCompletionID = 0
+    @Published private(set) var activeMediaServerConnectionID: UUID?
+    @Published private(set) var connectionErrorMessages: [UUID: String] = [:]
     @Published private(set) var selectedConnectionID: UUID?
     @Published private(set) var currentPath = "/"
     @Published private(set) var pathStack: [String] = []
@@ -60,30 +62,18 @@ final class ConnectionsViewModel: ObservableObject {
         }
     }
 
-    /// 激活指定媒体服务器：若与旧激活服务器不同，则自动断开旧服务器的会话凭据，
-    /// 并清空首页 JSON 缓存，避免旧内容残留。新服务器的会话凭据已在 connect 时写入。
-    private func setActiveMediaServer(_ connection: SavedConnection) async {
-        let previousID = activeMediaServerConnectionID
+    /// 兼容旧版本的最近媒体服务器记录；媒体库展示不再依赖单一 active server。
+    private func setActiveMediaServer(_ connection: SavedConnection) {
         activeMediaServerConnectionID = connection.id
         persistActiveMediaServerID()
-
-        guard previousID != connection.id else { return }
-
-        // 新激活类型决定需要清理的另一类会话凭据（同类型由新连接 connect 时覆盖）。
-        switch connection.type {
-        case .plex:
-            EmbyCredentialStore.clear()
-        case .emby, .jellyfin:
-            PlexCredentialStore.clear()
-        default:
-            break
-        }
-        // 切换服务器后旧首页缓存失效，清空磁盘缓存；新内容会在刷新时重新写入。
-        await HomeCollectionCache.shared.clear()
     }
 
     func connectionStatus(for connection: SavedConnection) -> ConnectionStatus {
         connectionStatuses[connection.id] ?? .idle
+    }
+
+    func connectionErrorMessage(for connection: SavedConnection) -> String? {
+        connectionErrorMessages[connection.id]
     }
 
     var selectedConnection: SavedConnection? {
@@ -98,6 +88,7 @@ final class ConnectionsViewModel: ObservableObject {
                 sortBy: [SortDescriptor(\.lastConnectedAt, order: .reverse)]
             )
             savedConnections = try context.fetch(descriptor)
+            await reconcileActiveMediaServer()
             reconcileSelectedConnection()
         } catch {
             errorMessage = error.localizedDescription
@@ -202,13 +193,13 @@ final class ConnectionsViewModel: ObservableObject {
             }
 
             connectionStatuses[connection.id] = .connected
+            connectionErrorMessages.removeValue(forKey: connection.id)
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
 
-            // 媒体服务器（emby/jellyfin/plex）单激活：连接成功后切换为当前激活服务器，
-            // 自动断开旧服务器会话与首页缓存。文件型连接（本地/SMB 等）不受影响。
+            // 记录最近同步的媒体服务器用于旧版本兼容；首页会聚合所有已保存媒体服务器。
             if isMediaServer(connection.type) {
-                await setActiveMediaServer(connection)
+                setActiveMediaServer(connection)
             }
 
             loadingMessage = "扫描媒体文件..."
@@ -265,16 +256,21 @@ final class ConnectionsViewModel: ObservableObject {
         } catch {
             VanmoLogger.network.error("[Connections] Connection failed: \(error.localizedDescription)")
             connectionStatuses[connection.id] = .failed
+            connectionErrorMessages[connection.id] = error.localizedDescription
             if showErrorAlert {
                 errorMessage = error.localizedDescription
                 showError = true
             }
             isLoading = false
             librarySyncMessage = nil
+            if connection.type.isMediaServer {
+                librarySyncCompletionID += 1
+            }
             return false
         }
     }
 
+    @discardableResult
     func saveConnection(
         name: String,
         type: ConnectionType,
@@ -284,7 +280,7 @@ final class ConnectionsViewModel: ObservableObject {
         password: String?,
         path: String?,
         bookmarkData: Data? = nil
-    ) async {
+    ) async -> Bool {
         let connection = SavedConnection(
             name: name,
             type: type,
@@ -307,12 +303,22 @@ final class ConnectionsViewModel: ObservableObject {
             await selectConnection(saved)
             // 添加连接后立即连接并扫描，触发 librarySyncCompletionID 递增，使首页主动刷新
             // 显示该服务内容（修复首次添加后首页不刷新的问题）。
-            await connectAndScan(saved, showErrorAlert: false)
+            return await connectAndScan(saved, showErrorAlert: true)
         }
+        return false
     }
 
     func deleteConnection(_ connection: SavedConnection) {
+        let connectionId = connection.id
+        let isMediaServerConnection = connection.type.isMediaServer
+
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
+
+        let deletedActiveMediaServer = activeMediaServerConnectionID == connection.id && isMediaServer(connection.type)
+        if deletedActiveMediaServer {
+            activeMediaServerConnectionID = nil
+            persistActiveMediaServerID()
+        }
 
         if let active = activeLocalServices.removeValue(forKey: connection.id) {
             Task { await active.disconnect() }
@@ -327,18 +333,42 @@ final class ConnectionsViewModel: ObservableObject {
             }
         }
 
+        deleteMediaItems(for: connectionId)
         modelContext?.delete(connection)
         try? modelContext?.save()
-        connectionStatuses.removeValue(forKey: connection.id)
-        let deletedSelectedConnection = selectedConnectionID == connection.id
+        connectionStatuses.removeValue(forKey: connectionId)
+        connectionErrorMessages.removeValue(forKey: connectionId)
+        let deletedSelectedConnection = selectedConnectionID == connectionId
         if deletedSelectedConnection {
             resetFileBrowser()
         }
         Task {
+            await HomeCollectionCache.shared.removeConnection(connectionId)
             await loadSavedConnections()
             if deletedSelectedConnection {
                 await loadSelectedConnectionRootIfNeeded()
             }
+            if isMediaServerConnection {
+                librarySyncCompletionID += 1
+            }
+        }
+    }
+
+    private func deleteMediaItems(for connectionId: UUID) {
+        guard let context = modelContext else { return }
+
+        do {
+            let descriptor = FetchDescriptor<MediaItem>(
+                predicate: #Predicate<MediaItem> { item in
+                    item.sourceConnectionId == connectionId
+                }
+            )
+            let items = try context.fetch(descriptor)
+            for item in items {
+                context.delete(item)
+            }
+        } catch {
+            VanmoLogger.library.error("[Connections] Delete cached media failed: \(error.localizedDescription)")
         }
     }
 
@@ -444,6 +474,15 @@ final class ConnectionsViewModel: ObservableObject {
         pathStack = []
         files = []
         fileBrowserErrorMessage = nil
+    }
+
+    private func reconcileActiveMediaServer() async {
+        guard let activeMediaServerConnectionID else { return }
+        guard savedConnections.contains(where: { $0.id == activeMediaServerConnectionID && isMediaServer($0.type) }) else {
+            self.activeMediaServerConnectionID = nil
+            persistActiveMediaServerID()
+            return
+        }
     }
 
     private func resetFileBrowser() {

@@ -6,7 +6,7 @@ activation: **/Network/**/*.swift, **/Browser/**/*.swift
 
 # 网络串流模块
 
-## 功能清单（参考 Infuse）
+## 功能清单
 
 ### 网络协议支持
 - [ ] SMB (Samba) — NAS/共享文件夹访问

@@ -9,6 +9,7 @@ struct AddConnectionView: View {
     @State private var selectedType: ConnectionType = .localFolder
     @State private var host = ""
     @State private var port = ""
+    @State private var useHTTPS = true
     @State private var username = ""
     @State private var password = ""
     @State private var path = ""
@@ -49,6 +50,7 @@ struct AddConnectionView: View {
             .onAppear {
                 port = "\(selectedType.defaultPort)"
                 applyDefaults(for: selectedType)
+                useHTTPS = inferredHTTPSFromHost(defaultValue: true)
             }
             .fileImporter(
                 isPresented: $showFolderPicker,
@@ -73,6 +75,7 @@ struct AddConnectionView: View {
             .onChange(of: selectedType) { _, newValue in
                 port = "\(newValue.defaultPort)"
                 applyDefaults(for: newValue)
+                useHTTPS = supportsHTTPS(for: newValue) ? inferredHTTPSFromHost(defaultValue: true) : false
                 if !newValue.isLocal {
                     folderURL = nil
                     folderBookmark = nil
@@ -130,11 +133,16 @@ struct AddConnectionView: View {
             .textContentType(.URL)
             .autocapitalization(.none)
             .keyboardType(.URL)
-
-            if !hostContainsScheme && selectedType != .iptv {
-                TextField("端口", text: $port)
-                    .keyboardType(.numberPad)
+            .onChange(of: host) { _, _ in
+                applyHostSchemeDefaults()
             }
+
+            if supportsHTTPS(for: selectedType) {
+                Toggle("HTTPS", isOn: $useHTTPS)
+            }
+
+            TextField("端口", text: $port)
+                .keyboardType(.numberPad)
 
             TextField(pathPlaceholder, text: $path)
                 .autocapitalization(.none)
@@ -168,11 +176,6 @@ struct AddConnectionView: View {
 
     // MARK: - Helpers
 
-    private var hostContainsScheme: Bool {
-        let trimmed = host.trimmingCharacters(in: .whitespaces).lowercased()
-        return trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://")
-    }
-
     private var hostPlaceholder: String {
         if selectedType.isMediaServer {
             return "服务器地址（如 https://emby.example.com）"
@@ -200,10 +203,94 @@ struct AddConnectionView: View {
     }
 
     private var resolvedPort: Int {
-        if hostContainsScheme {
-            return selectedType.defaultPort
-        }
         return Int(port) ?? selectedType.defaultPort
+    }
+
+    private var normalizedRemoteInput: (host: String, port: Int, path: String?) {
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard supportsHTTPS(for: selectedType) else {
+            return (
+                host: trimmedHost,
+                port: resolvedPort,
+                path: trimmedPath.isEmpty ? nil : trimmedPath
+            )
+        }
+
+        let components = urlComponents(from: trimmedHost)
+        let portValue = resolvedPort
+        let normalizedHost: String
+
+        if let urlHost = components?.host, !urlHost.isEmpty {
+            var normalizedComponents = URLComponents()
+            normalizedComponents.scheme = useHTTPS ? "https" : "http"
+            normalizedComponents.host = urlHost
+            if portValue > 0 {
+                normalizedComponents.port = portValue
+            }
+            if selectedType == .iptv {
+                normalizedComponents.path = components?.path ?? ""
+            }
+            normalizedHost = normalizedComponents.string ?? "\(useHTTPS ? "https" : "http")://\(urlHost)"
+        } else if trimmedHost.hasPrefix("http://") || trimmedHost.hasPrefix("https://") {
+            normalizedHost = trimmedHost
+        } else {
+            let scheme = useHTTPS ? "https" : "http"
+            let portSuffix = portValue > 0 ? ":\(portValue)" : ""
+            normalizedHost = "\(scheme)://\(trimmedHost)\(portSuffix)"
+        }
+
+        let urlPath = components?.path.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let resolvedPath = trimmedPath.isEmpty && selectedType != .iptv && !urlPath.isEmpty ? urlPath : trimmedPath
+
+        return (
+            host: normalizedHost,
+            port: portValue,
+            path: resolvedPath.isEmpty ? nil : resolvedPath
+        )
+    }
+
+    private func supportsHTTPS(for type: ConnectionType) -> Bool {
+        switch type {
+        case .webdav, .alist, .iptv, .fnos, .plex, .emby, .jellyfin:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func applyHostSchemeDefaults() {
+        guard supportsHTTPS(for: selectedType) else { return }
+        guard let components = urlComponents(from: host.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        if components.scheme?.lowercased() == "https" {
+            useHTTPS = true
+        } else if components.scheme?.lowercased() == "http" {
+            useHTTPS = false
+        }
+        if let componentPort = components.port {
+            port = "\(componentPort)"
+        }
+    }
+
+    private func inferredHTTPSFromHost(defaultValue: Bool) -> Bool {
+        guard supportsHTTPS(for: selectedType) else { return false }
+        let trimmed = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let scheme = urlComponents(from: trimmed)?.scheme?.lowercased() {
+            return scheme == "https"
+        }
+        if Int(port) == 443 {
+            return true
+        }
+        return defaultValue
+    }
+
+    private func urlComponents(from value: String) -> URLComponents? {
+        guard !value.isEmpty else { return nil }
+        if value.lowercased().hasPrefix("http://") || value.lowercased().hasPrefix("https://") {
+            return URLComponents(string: value)
+        }
+        return URLComponents(string: "https://\(value)")
     }
 
     private func applyDefaults(for type: ConnectionType) {
@@ -251,9 +338,10 @@ struct AddConnectionView: View {
 
     private func save() {
         Task {
+            let didConnect: Bool
             if selectedType.isLocal {
                 guard let folderURL, let folderBookmark else { return }
-                await viewModel.saveConnection(
+                didConnect = await viewModel.saveConnection(
                     name: name,
                     type: selectedType,
                     host: folderURL.path,
@@ -264,18 +352,21 @@ struct AddConnectionView: View {
                     bookmarkData: folderBookmark
                 )
             } else {
-                await viewModel.saveConnection(
+                let input = normalizedRemoteInput
+                didConnect = await viewModel.saveConnection(
                     name: name,
                     type: selectedType,
-                    host: host,
-                    port: resolvedPort,
+                    host: input.host,
+                    port: input.port,
                     username: username.isEmpty ? nil : username,
                     password: password.isEmpty ? nil : password,
-                    path: path.isEmpty ? nil : path,
+                    path: input.path,
                     bookmarkData: nil
                 )
             }
-            dismiss()
+            if didConnect {
+                dismiss()
+            }
         }
     }
 }

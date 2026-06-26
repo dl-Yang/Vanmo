@@ -27,7 +27,7 @@ struct RatingBadge: View {
     private var ratingColor: Color {
         let normalized = rating / maxRating
         if normalized >= 0.7 { return .green }
-        if normalized >= 0.4 { return .orange }
+        if normalized >= 0.4 { return .vanmoAccent }
         return .red
     }
 }

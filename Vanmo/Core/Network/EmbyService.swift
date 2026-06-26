@@ -118,6 +118,19 @@ final class EmbyService: MediaServerService {
         self.isConnected = true
     }
 
+    func makeSessionContext() throws -> EmbySessionContext {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+        return EmbySessionContext(
+            type: type,
+            baseURL: baseURL(for: config),
+            apiPrefix: apiPrefix,
+            token: token,
+            userId: userId
+        )
+    }
+
     /// 校验当前 access token 是否仍然有效。
     func validateSession() async throws {
         guard isConnected, let config, let token = accessToken, let userId else {
@@ -425,18 +438,18 @@ final class EmbyService: MediaServerService {
         }
     }
 
-    /// 拉取 `/Library/VirtualFolders`，仅保留 movies / tvshows / playlists。
+    /// 拉取当前用户可见的媒体库根目录，仅保留 movies / tvshows / playlists。
     func fetchVirtualFolders(
         connectionId: UUID,
         connectionName: String
     ) async throws -> [CollectionFolder] {
-        guard isConnected, let config, let token = accessToken else {
+        guard isConnected, let config, let token = accessToken, let userId else {
             throw NetworkError.notConnected
         }
 
         let base = baseURL(for: config)
         var components = URLComponents(
-            url: base.appendingPathComponent("\(apiPrefix)Library/VirtualFolders"),
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Views"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [URLQueryItem(name: "api_key", value: token)]
@@ -452,29 +465,28 @@ final class EmbyService: MediaServerService {
         let (data, response) = try await session.data(for: request)
 
         #if DEBUG
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] VirtualFolders URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] VirtualFolders status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] UserViews URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] UserViews status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
         #endif
 
-        try validateEmbyResponse(response, body: data, context: "fetch virtual folders")
+        try validateEmbyResponse(response, body: data, context: "fetch user views")
 
-        let folders = try Self.makeJSONDecoder().decode([EmbyVirtualFolder].self, from: data)
+        let result = try Self.makeJSONDecoder().decode(EmbyItemsResponse.self, from: data)
         let baseStr = base.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let prefix = apiPrefix.isEmpty ? "" : apiPrefix
 
-        return folders.compactMap { folder in
-            guard let collectionType = EmbyCollectionType(raw: folder.collectionType) else {
+        return result.items.compactMap { item in
+            guard let collectionType = EmbyCollectionType(raw: item.collectionType) else {
                 return nil
             }
 
-            let imageItemId = folder.primaryImageItemId ?? folder.id
             let posterURL = URL(
-                string: "\(baseStr)/\(prefix)Items/\(imageItemId)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)"
+                string: "\(baseStr)/\(prefix)Items/\(item.id)/Images/Primary?maxHeight=600&quality=90&api_key=\(token)"
             )
 
             return CollectionFolder(
-                id: folder.id,
-                name: folder.name,
+                id: item.id,
+                name: item.name,
                 collectionType: collectionType,
                 posterURL: posterURL,
                 serverConnectionId: connectionId,
@@ -705,6 +717,14 @@ final class EmbyService: MediaServerService {
         return formatter
     }()
 
+}
+
+struct EmbySessionContext: Sendable {
+    let type: ConnectionType
+    let baseURL: URL
+    let apiPrefix: String
+    let token: String
+    let userId: String
 }
 
 // MARK: - Item Mapping
@@ -1025,6 +1045,7 @@ private struct EmbyItem: Decodable {
     let id: String
     let name: String
     let type: String
+    let collectionType: String?
     let isFolder: Bool?
     let path: String?
     let size: Int64?
@@ -1033,6 +1054,7 @@ private struct EmbyItem: Decodable {
         case id = "Id"
         case name = "Name"
         case type = "Type"
+        case collectionType = "CollectionType"
         case isFolder = "IsFolder"
         case path = "Path"
         case size = "Size"
@@ -1167,6 +1189,19 @@ private struct EmbyImageTags: Decodable {
 // MARK: - Connection Helper
 
 enum EmbyConnectionHelper {
+    static func connect(_ connection: MediaServerConnectionSnapshot) async throws -> EmbyService {
+        guard connection.type == .emby || connection.type == .jellyfin else {
+            throw NetworkError.unsupportedProtocol
+        }
+
+        let service = EmbyService(
+            type: connection.type,
+            apiPrefix: connection.type == .jellyfin ? "" : "emby/"
+        )
+        try await service.connect(config: connection.config)
+        return service
+    }
+
     static func connect(_ connection: SavedConnection) async throws -> EmbyService {
         guard connection.type == .emby || connection.type == .jellyfin else {
             throw NetworkError.unsupportedProtocol
@@ -1240,8 +1275,19 @@ enum EmbyConnectionHelper {
 
 enum EmbyFavoriteUpdater {
     @MainActor
-    static func setFavorite(_ item: MediaItem, isFavorite: Bool) async throws {
+    static func setFavorite(
+        _ item: MediaItem,
+        isFavorite: Bool,
+        connection: MediaServerConnectionSnapshot? = nil
+    ) async throws {
         guard let itemId = item.serverId else { return }
+        if let connection {
+            let service = try await EmbyConnectionHelper.connect(connection)
+            defer { Task { await service.disconnect() } }
+            try await service.setFavorite(itemId: itemId, isFavorite: isFavorite)
+            return
+        }
+
         guard let baseURLString = EmbyCredentialStore.baseURL,
               let token = EmbyCredentialStore.token,
               let userId = EmbyCredentialStore.userId,
@@ -1355,6 +1401,15 @@ enum EmbyCredentialStore {
 // MARK: - Child Items (Folder / Season navigation)
 
 enum EmbyChildItemsFetcher {
+    static func fetchChildren(
+        parentId: String,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> [ServerMediaItem] {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await fetchChildren(parentId: parentId, context: service.makeSessionContext())
+    }
+
     static func fetchChildren(parentId: String) async throws -> [ServerMediaItem] {
         guard let baseURLStr = EmbyCredentialStore.baseURL,
               let token = EmbyCredentialStore.token,
@@ -1362,10 +1417,21 @@ enum EmbyChildItemsFetcher {
               let baseURL = URL(string: baseURLStr) else {
             throw NetworkError.notConnected
         }
-        let apiPrefix = EmbyCredentialStore.apiPrefix
+        return try await fetchChildren(
+            parentId: parentId,
+            context: EmbySessionContext(
+                type: EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby,
+                baseURL: baseURL,
+                apiPrefix: EmbyCredentialStore.apiPrefix,
+                token: token,
+                userId: userId
+            )
+        )
+    }
 
+    private static func fetchChildren(parentId: String, context: EmbySessionContext) async throws -> [ServerMediaItem] {
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items"),
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Users/\(context.userId)/Items"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
@@ -1373,7 +1439,7 @@ enum EmbyChildItemsFetcher {
             URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber"),
             URLQueryItem(name: "SortBy", value: "SortName"),
             URLQueryItem(name: "SortOrder", value: "Ascending"),
-            URLQueryItem(name: "api_key", value: token),
+            URLQueryItem(name: "api_key", value: context.token),
         ]
 
         guard let url = components.url else {
@@ -1384,7 +1450,7 @@ enum EmbyChildItemsFetcher {
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
-        request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
+        request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -1398,7 +1464,12 @@ enum EmbyChildItemsFetcher {
 
         let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
         let mapped = result.items.compactMap { item in
-            EmbyItemMapper.map(item, baseURL: baseURL, apiPrefix: apiPrefix, token: token)
+            EmbyItemMapper.map(
+                item,
+                baseURL: context.baseURL,
+                apiPrefix: context.apiPrefix,
+                token: context.token
+            )
         }
         VanmoLogger.network.info("[MediaServer] Fetched \(mapped.count) children for parent \(parentId)")
         return mapped
@@ -1409,6 +1480,12 @@ enum EmbyItemDetailFetcher {
     private static let detailItemFields =
         "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
 
+    static func fetchDetail(itemId: String, connection: MediaServerConnectionSnapshot) async throws -> ServerMediaItem {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await fetchDetail(itemId: itemId, context: service.makeSessionContext())
+    }
+
     static func fetchDetail(itemId: String) async throws -> ServerMediaItem {
         guard let baseURLStr = EmbyCredentialStore.baseURL,
               let token = EmbyCredentialStore.token,
@@ -1416,15 +1493,26 @@ enum EmbyItemDetailFetcher {
               let baseURL = URL(string: baseURLStr) else {
             throw NetworkError.notConnected
         }
-        let apiPrefix = EmbyCredentialStore.apiPrefix
+        return try await fetchDetail(
+            itemId: itemId,
+            context: EmbySessionContext(
+                type: EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby,
+                baseURL: baseURL,
+                apiPrefix: EmbyCredentialStore.apiPrefix,
+                token: token,
+                userId: userId
+            )
+        )
+    }
 
+    private static func fetchDetail(itemId: String, context: EmbySessionContext) async throws -> ServerMediaItem {
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items/\(itemId)"),
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Users/\(context.userId)/Items/\(itemId)"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
             URLQueryItem(name: "Fields", value: detailItemFields),
-            URLQueryItem(name: "api_key", value: token),
+            URLQueryItem(name: "api_key", value: context.token),
         ]
 
         guard let url = components.url else {
@@ -1435,7 +1523,7 @@ enum EmbyItemDetailFetcher {
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
-        request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
+        request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -1448,7 +1536,12 @@ enum EmbyItemDetailFetcher {
         try validateEmbyResponse(response, body: data, context: "fetch item detail")
 
         let detail = try EmbyService.makeJSONDecoder().decode(EmbyMediaDetail.self, from: data)
-        guard let mapped = EmbyItemMapper.map(detail, baseURL: baseURL, apiPrefix: apiPrefix, token: token) else {
+        guard let mapped = EmbyItemMapper.map(
+            detail,
+            baseURL: context.baseURL,
+            apiPrefix: context.apiPrefix,
+            token: context.token
+        ) else {
             throw NetworkError.transferFailed("无法解析媒体详情")
         }
 
@@ -1468,21 +1561,38 @@ struct EpisodeInfo: Identifiable {
 }
 
 enum EmbyEpisodeFetcher {
+    static func fetchEpisodes(seriesId: String, connection: MediaServerConnectionSnapshot) async throws -> [EpisodeInfo] {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await fetchEpisodes(seriesId: seriesId, context: service.makeSessionContext())
+    }
+
     static func fetchEpisodes(seriesId: String) async throws -> [EpisodeInfo] {
         guard let baseURLStr = EmbyCredentialStore.baseURL,
               let token = EmbyCredentialStore.token,
               let baseURL = URL(string: baseURLStr) else {
             throw NetworkError.notConnected
         }
-        let apiPrefix = EmbyCredentialStore.apiPrefix
+        return try await fetchEpisodes(
+            seriesId: seriesId,
+            context: EmbySessionContext(
+                type: EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby,
+                baseURL: baseURL,
+                apiPrefix: EmbyCredentialStore.apiPrefix,
+                token: token,
+                userId: EmbyCredentialStore.userId ?? ""
+            )
+        )
+    }
 
+    private static func fetchEpisodes(seriesId: String, context: EmbySessionContext) async throws -> [EpisodeInfo] {
         var components = URLComponents(
-            url: baseURL.appendingPathComponent("\(apiPrefix)Shows/\(seriesId)/Episodes"),
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Shows/\(seriesId)/Episodes"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
             URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags"),
-            URLQueryItem(name: "api_key", value: token),
+            URLQueryItem(name: "api_key", value: context.token),
         ]
 
         guard let url = components.url else {
@@ -1493,7 +1603,7 @@ enum EmbyEpisodeFetcher {
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
-        request.setValue(token, forHTTPHeaderField: "X-Emby-Token")
+        request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -1518,12 +1628,19 @@ enum EmbyEpisodeFetcher {
                 0
             }
 
-            let streamURL = URL(string: "\(baseURLStr)/\(apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(token)")!
+            let baseURLStr = context.baseURL.absoluteString
+            let streamURL = URL(
+                string: "\(baseURLStr)/\(context.apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(context.token)"
+            )!
 
             let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
-                URL(string: "\(baseURLStr)/\(apiPrefix)Items/\(item.id)/Images/Backdrop?maxWidth=1280&quality=80&api_key=\(token)")
+                URL(
+                    string: "\(baseURLStr)/\(context.apiPrefix)Items/\(item.id)/Images/Backdrop?maxWidth=1280&quality=80&api_key=\(context.token)"
+                )
             } else if item.imageTags?.primary != nil {
-                URL(string: "\(baseURLStr)/\(apiPrefix)Items/\(item.id)/Images/Primary?maxWidth=1280&quality=80&api_key=\(token)")
+                URL(
+                    string: "\(baseURLStr)/\(context.apiPrefix)Items/\(item.id)/Images/Primary?maxWidth=1280&quality=80&api_key=\(context.token)"
+                )
             } else {
                 nil
             }

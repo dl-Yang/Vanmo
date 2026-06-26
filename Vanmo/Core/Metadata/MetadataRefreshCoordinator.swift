@@ -9,25 +9,33 @@ actor MetadataRefreshCoordinator {
         resolveSource(for: item) != .unsupported
     }
 
-    func refresh(_ item: MediaItem, force: Bool) async throws -> MetadataCacheRecord {
+    func refresh(
+        _ item: MediaItem,
+        force: Bool,
+        connection: MediaServerConnectionSnapshot? = nil
+    ) async throws -> MetadataCacheRecord {
         let key = MetadataCacheKey.from(item)
 
         if !force, let cached = await cache.load(for: key) {
             return cached
         }
 
-        let draft = try await buildDraft(for: item, key: key)
+        let draft = try await buildDraft(for: item, key: key, connection: connection)
         return try await cache.save(draft)
     }
 
-    private func buildDraft(for item: MediaItem, key: MetadataCacheKey) async throws -> MetadataCacheRecord {
-        switch Self.resolveSource(for: item) {
+    private func buildDraft(
+        for item: MediaItem,
+        key: MetadataCacheKey,
+        connection: MediaServerConnectionSnapshot?
+    ) async throws -> MetadataCacheRecord {
+        switch Self.resolveSource(for: item, connection: connection) {
         case .embyLike:
-            return try await buildEmbyLikeDraft(for: item, key: key)
+            return try await buildEmbyLikeDraft(for: item, key: key, connection: connection)
         case .plexSeries:
-            return try await buildPlexSeriesDraft(for: item, key: key)
+            return try await buildPlexSeriesDraft(for: item, key: key, connection: connection)
         case .plexMovie:
-            return try await buildPlexMovieDraft(for: item, key: key)
+            return try await buildPlexMovieDraft(for: item, key: key, connection: connection)
         case .unsupported:
             throw MetadataRefreshError.unsupportedSource
         }
@@ -40,7 +48,21 @@ actor MetadataRefreshCoordinator {
         case unsupported
     }
 
-    private nonisolated static func resolveSource(for item: MediaItem) -> RefreshSource {
+    private nonisolated static func resolveSource(
+        for item: MediaItem,
+        connection: MediaServerConnectionSnapshot? = nil
+    ) -> RefreshSource {
+        if let connection, item.serverId?.isEmpty == false {
+            switch connection.type {
+            case .emby, .jellyfin:
+                return .embyLike
+            case .plex:
+                return item.mediaType == .tvShow || item.fileURL.host == "plex-series" ? .plexSeries : .plexMovie
+            default:
+                break
+            }
+        }
+
         switch item.fileURL.host?.lowercased() {
         case "plex-series":
             return .plexSeries
@@ -77,17 +99,32 @@ actor MetadataRefreshCoordinator {
         return baseHost == itemHost
     }
 
-    private func buildEmbyLikeDraft(for item: MediaItem, key: MetadataCacheKey) async throws -> MetadataCacheRecord {
+    private func buildEmbyLikeDraft(
+        for item: MediaItem,
+        key: MetadataCacheKey,
+        connection: MediaServerConnectionSnapshot?
+    ) async throws -> MetadataCacheRecord {
         guard let serverId = item.serverId, !serverId.isEmpty else {
             throw MetadataRefreshError.missingServerId
         }
 
-        let detail = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId)
-        let source: MetadataSource = EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby
+        let detail: ServerMediaItem
+        let source: MetadataSource
+        if let connection {
+            detail = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId, connection: connection)
+            source = connection.type == .jellyfin ? .jellyfin : .emby
+        } else {
+            detail = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId)
+            source = EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby
+        }
 
         var episodes: [CachedEpisodeInfo] = []
         if item.mediaType == .tvShow {
-            let fetched = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: serverId)
+            let fetched = if let connection {
+                try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: serverId, connection: connection)
+            } else {
+                try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: serverId)
+            }
             episodes = fetched.map(makeCachedEpisode)
         }
 
@@ -117,13 +154,24 @@ actor MetadataRefreshCoordinator {
         )
     }
 
-    private func buildPlexSeriesDraft(for item: MediaItem, key: MetadataCacheKey) async throws -> MetadataCacheRecord {
+    private func buildPlexSeriesDraft(
+        for item: MediaItem,
+        key: MetadataCacheKey,
+        connection: MediaServerConnectionSnapshot?
+    ) async throws -> MetadataCacheRecord {
         guard let serverId = item.serverId, !serverId.isEmpty else {
             throw MetadataRefreshError.missingServerId
         }
 
-        let detail = try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId)
-        let fetched = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: serverId)
+        let detail: ServerMediaItem
+        let fetched: [EpisodeInfo]
+        if let connection {
+            detail = try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId, connection: connection)
+            fetched = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: serverId, connection: connection)
+        } else {
+            detail = try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId)
+            fetched = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: serverId)
+        }
         let episodes = fetched.map(makeCachedEpisode)
         let castMembers = makeCastMembers(from: detail.cast)
 
@@ -151,12 +199,20 @@ actor MetadataRefreshCoordinator {
         )
     }
 
-    private func buildPlexMovieDraft(for item: MediaItem, key: MetadataCacheKey) async throws -> MetadataCacheRecord {
+    private func buildPlexMovieDraft(
+        for item: MediaItem,
+        key: MetadataCacheKey,
+        connection: MediaServerConnectionSnapshot?
+    ) async throws -> MetadataCacheRecord {
         guard let serverId = item.serverId, !serverId.isEmpty else {
             throw MetadataRefreshError.missingServerId
         }
 
-        let detail = try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId)
+        let detail = if let connection {
+            try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId, connection: connection)
+        } else {
+            try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId)
+        }
         let castMembers = makeCastMembers(from: detail.cast)
 
         return MetadataCacheRecord(

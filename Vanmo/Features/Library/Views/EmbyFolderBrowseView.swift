@@ -1,8 +1,10 @@
 import SwiftUI
+import SwiftData
 
 /// Emby/Jellyfin 容器条目（Folder / CollectionFolder / Season）的子级浏览页。
 struct EmbyFolderBrowseView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.modelContext) private var modelContext
 
     let container: MediaItem
 
@@ -29,7 +31,7 @@ struct EmbyFolderBrowseView: View {
             } else {
                 List(children, id: \.serverId) { child in
                     NavigationLink {
-                        LibraryItemDestination(item: child.makeMediaItem())
+                        LibraryItemDestination(item: makeChildItem(child))
                     } label: {
                         EmbyChildListRow(serverItem: child)
                     }
@@ -52,7 +54,7 @@ struct EmbyFolderBrowseView: View {
     private func childContextMenu(_ child: ServerMediaItem) -> some View {
         if child.mediaType == .movie || child.mediaType == .tvEpisode {
             Button {
-                appState.play(child.makeMediaItem())
+                appState.play(makeChildItem(child))
             } label: {
                 Label("播放", systemImage: "play.fill")
             }
@@ -70,13 +72,23 @@ struct EmbyFolderBrowseView: View {
         errorMessage = nil
 
         do {
-            children = try await EmbyChildItemsFetcher.fetchChildren(parentId: parentId)
+            if let snapshot = try? MediaServerConnectionResolver.snapshot(for: container, in: modelContext) {
+                children = try await EmbyChildItemsFetcher.fetchChildren(parentId: parentId, connection: snapshot)
+            } else {
+                children = try await EmbyChildItemsFetcher.fetchChildren(parentId: parentId)
+            }
         } catch {
             errorMessage = error.localizedDescription
             children = []
         }
 
         isLoading = false
+    }
+
+    private func makeChildItem(_ child: ServerMediaItem) -> MediaItem {
+        let item = child.makeMediaItem()
+        item.sourceConnectionId = container.sourceConnectionId
+        return item
     }
 }
 

@@ -186,7 +186,11 @@ struct CollectionFolderListView: View {
                 startIndex: 0,
                 pageSize: pageSize
             )
-            items = page.items.map { $0.makeMediaItem() }
+            items = page.items.map { serverItem in
+                let item = serverItem.makeMediaItem()
+                item.sourceConnectionId = connection.id
+                return item
+            }
             startIndex = page.items.count
             totalRecordCount = page.totalRecordCount
             hasMore = startIndex < page.totalRecordCount
@@ -220,7 +224,11 @@ struct CollectionFolderListView: View {
                 startIndex: startIndex,
                 pageSize: pageSize
             )
-            let newItems = page.items.map { $0.makeMediaItem() }
+            let newItems = page.items.map { serverItem in
+                let item = serverItem.makeMediaItem()
+                item.sourceConnectionId = connection.id
+                return item
+            }
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: newItems.filter { !existingIDs.contains($0.id) })
             startIndex += page.items.count

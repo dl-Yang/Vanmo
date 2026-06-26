@@ -16,6 +16,7 @@ final class LibraryViewModel: ObservableObject {
     @Published private(set) var hasConfiguredEmbyConnections = false
     @Published private(set) var isLoadingEmbyHome = false
     @Published private(set) var embyHomeError: String?
+    @Published private(set) var serverConnectionErrors: [UUID: String] = [:]
     @Published private(set) var scannedLibraryFolders: [UUID: [CollectionFolder]] = [:]
     @Published private(set) var scannedConnectionsById: [UUID: SavedConnection] = [:]
     @Published private(set) var scannedFolderPreviews: [String: [MediaItem]] = [:]
@@ -66,12 +67,14 @@ final class LibraryViewModel: ObservableObject {
         embyConnectionsById[folder.serverConnectionId] ?? scannedConnectionsById[folder.serverConnectionId]
     }
 
-    func isFolderPreviewLoaded(_ folderId: String) -> Bool {
-        folderPreviews.keys.contains(folderId) || scannedFolderPreviews.keys.contains(folderId)
+    func isFolderPreviewLoaded(_ folder: CollectionFolder) -> Bool {
+        let key = folderCacheKey(for: folder)
+        return folderPreviews.keys.contains(key) || scannedFolderPreviews.keys.contains(key)
     }
 
     func previewItems(for folder: CollectionFolder) -> [MediaItem] {
-        let items = folderPreviews[folder.id] ?? scannedFolderPreviews[folder.id] ?? []
+        let key = folderCacheKey(for: folder)
+        let items = folderPreviews[key] ?? scannedFolderPreviews[key] ?? []
         return sortedByNewestFirst(items)
     }
 
@@ -90,16 +93,17 @@ final class LibraryViewModel: ObservableObject {
             return false
         }
         // 已知总数为 0，或预览已加载但为空，视为空库并隐藏；尚未加载时先保留以展示骨架。
-        if let total = folderTotalCounts[folder.id] {
+        let key = folderCacheKey(for: folder)
+        if let total = folderTotalCounts[key] {
             return total > 0
         }
-        if let total = scannedFolderTotalCounts[folder.id] {
+        if let total = scannedFolderTotalCounts[key] {
             return total > 0
         }
-        if let preview = folderPreviews[folder.id] {
+        if let preview = folderPreviews[key] {
             return !preview.isEmpty
         }
-        if let preview = scannedFolderPreviews[folder.id] {
+        if let preview = scannedFolderPreviews[key] {
             return !preview.isEmpty
         }
         return true
@@ -120,7 +124,7 @@ final class LibraryViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            try await reloadHighlights(in: context)
+            try await reloadHighlights(in: context, connections: connections)
             try loadScannedLibraries(connections: connections, in: context)
             await restoreHomeCacheIfNeeded(connections: connections)
             updateLibraryEmptyState(connections: connections)
@@ -146,8 +150,12 @@ final class LibraryViewModel: ObservableObject {
         guard let context = modelContext else { return }
 
         do {
-            await refreshEmbyAndPersist(connections: connections, in: context, refreshFolderPreviews: true)
-            try await reloadHighlights(in: context)
+            await refreshEmbyAndPersist(
+                connections: connections,
+                in: context,
+                refreshFolderPreviews: true
+            )
+            try await reloadHighlights(in: context, connections: connections)
             try loadScannedLibraries(connections: connections, in: context)
             updateLibraryEmptyState(connections: connections)
         } catch {
@@ -159,9 +167,13 @@ final class LibraryViewModel: ObservableObject {
     /// 用户下拉刷新触发：强制重新拉取 live 数据并刷新 SwiftData。
     func refreshEmbyHome(connections: [SavedConnection]) async {
         guard let context = modelContext else { return }
-        await refreshEmbyAndPersist(connections: connections, in: context, refreshFolderPreviews: true)
+        await refreshEmbyAndPersist(
+            connections: connections,
+            in: context,
+            refreshFolderPreviews: true
+        )
         do {
-            try await reloadHighlights(in: context)
+            try await reloadHighlights(in: context, connections: connections)
             try loadScannedLibraries(connections: connections, in: context)
         } catch {
             errorMessage = error.localizedDescription
@@ -177,13 +189,14 @@ final class LibraryViewModel: ObservableObject {
         in context: ModelContext,
         refreshFolderPreviews: Bool = true
     ) async {
-        let embyConnections = connections.filter { $0.type == .emby || $0.type == .jellyfin }
+        let embyConnections = embyLikeConnections(from: connections)
         hasConfiguredEmbyConnections = !embyConnections.isEmpty
         guard !embyConnections.isEmpty else {
             serverCollectionFolders = [:]
             embyConnectionsById = [:]
             folderPreviews = [:]
             folderTotalCounts = [:]
+            serverConnectionErrors = [:]
             await homeCollectionCache.clear()
             return
         }
@@ -198,10 +211,8 @@ final class LibraryViewModel: ObservableObject {
 
         let activeConnectionIds = Set(embyConnections.map(\.id))
         var foldersByServer = serverCollectionFolders.filter { activeConnectionIds.contains($0.key) }
-        var connectionsById = embyConnectionsById.filter { activeConnectionIds.contains($0.key) }
-        var previewsByFolder = folderPreviews
-        var totalCountsByFolder = folderTotalCounts
-        var allLiveItems: [ServerMediaItem] = []
+        var connectionsById = Dictionary(uniqueKeysWithValues: embyConnections.map { ($0.id, $0) })
+        var errorsByServer = serverConnectionErrors.filter { activeConnectionIds.contains($0.key) }
         var firstError: String?
 
         for connection in embyConnections {
@@ -218,53 +229,118 @@ final class LibraryViewModel: ObservableObject {
 
                 connectionsById[connection.id] = connection
                 foldersByServer[connection.id] = folders
-                allLiveItems.append(contentsOf: resume)
-                allLiveItems.append(contentsOf: serverFavorites)
+                errorsByServer.removeValue(forKey: connection.id)
+
+                // 增量：先让该服务器的媒体库区块出现（骨架），预览随后逐个填充。
+                serverCollectionFolders[connection.id] = folders
+                embyConnectionsById[connection.id] = connection
+                serverConnectionErrors.removeValue(forKey: connection.id)
+
+                let liveItems = resume + serverFavorites
+                if !liveItems.isEmpty {
+                    do {
+                        let scanner = MediaScanner(modelContainer: context.container)
+                        _ = try await scanner.importServerMediaItems(
+                            liveItems,
+                            connectionId: connection.id,
+                            in: context
+                        )
+                    } catch {
+                        VanmoLogger.network.error(
+                            "[LibraryHome] persist live items failed for \(connection.name): \(error.localizedDescription)"
+                        )
+                    }
+                }
 
                 if refreshFolderPreviews {
-                    for folder in folders {
-                        do {
-                            let page = try await service.fetchCollectionFolderItems(
-                                parentId: folder.id,
-                                collectionType: folder.collectionType,
-                                startIndex: 0,
-                                pageSize: folderPreviewPageSize,
-                                sortBy: "DateCreated",
-                                sortOrder: "Descending"
-                            )
-                            previewsByFolder[folder.id] = page.items.map { $0.makeMediaItem() }
-                            totalCountsByFolder[folder.id] = page.totalRecordCount
-                        } catch {
-                            previewsByFolder[folder.id] = []
-                            VanmoLogger.network.error(
-                                "[LibraryHome] folder preview failed for \(folder.name): \(error.localizedDescription)"
-                            )
-                        }
-                    }
+                    await fetchFolderPreviewsConcurrently(
+                        folders: folders,
+                        connection: connection,
+                        service: service
+                    )
                 }
             } catch {
                 firstError = firstError ?? error.localizedDescription
+                connectionsById[connection.id] = connection
+                foldersByServer.removeValue(forKey: connection.id)
+                errorsByServer[connection.id] = error.localizedDescription
+                serverCollectionFolders.removeValue(forKey: connection.id)
+                embyConnectionsById[connection.id] = connection
+                serverConnectionErrors[connection.id] = error.localizedDescription
                 VanmoLogger.network.error("[LibraryHome] refresh failed for \(connection.name): \(error.localizedDescription)")
             }
         }
 
-        let activeFolderIds = Set(foldersByServer.values.flatMap { $0.map(\.id) })
-        previewsByFolder = previewsByFolder.filter { activeFolderIds.contains($0.key) }
-        totalCountsByFolder = totalCountsByFolder.filter { activeFolderIds.contains($0.key) }
+        let activeFolderKeys = Set(foldersByServer.values.flatMap { folders in
+            folders.map { folderCacheKey(for: $0) }
+        })
+        folderPreviews = folderPreviews.filter { activeFolderKeys.contains($0.key) }
+        folderTotalCounts = folderTotalCounts.filter { activeFolderKeys.contains($0.key) }
 
         serverCollectionFolders = foldersByServer
         embyConnectionsById = connectionsById
-        folderPreviews = previewsByFolder
-        folderTotalCounts = totalCountsByFolder
+        serverConnectionErrors = errorsByServer
         embyHomeError = firstError
         await persistHomeCache()
+    }
 
-        if !allLiveItems.isEmpty {
-            do {
-                let scanner = MediaScanner(modelContainer: context.container)
-                _ = try await scanner.importServerMediaItems(allLiveItems, in: context)
-            } catch {
-                VanmoLogger.network.error("[LibraryHome] persist live items failed: \(error.localizedDescription)")
+    /// 并发拉取媒体库文件夹预览（并发上限 6），每个文件夹完成即增量刷新 UI。
+    /// 网络请求在并发子任务中进行，返回 Sendable 的 `ServerItemsPage`；
+    /// `MediaItem`（SwiftData `@Model`）统一在 MainActor 上创建，避免跨线程。
+    private func fetchFolderPreviewsConcurrently(
+        folders: [CollectionFolder],
+        connection: SavedConnection,
+        service: EmbyService,
+        maxConcurrent: Int = 6
+    ) async {
+        let connectionId = connection.id
+        let pageSize = folderPreviewPageSize
+
+        await withTaskGroup(of: (String, String, ServerItemsPage?).self) { group in
+            var iterator = folders.makeIterator()
+
+            func submit(_ folder: CollectionFolder) {
+                let key = folderCacheKey(for: folder)
+                let folderId = folder.id
+                let folderName = folder.name
+                let collectionType = folder.collectionType
+                group.addTask {
+                    let page = try? await service.fetchCollectionFolderItems(
+                        parentId: folderId,
+                        collectionType: collectionType,
+                        startIndex: 0,
+                        pageSize: pageSize,
+                        sortBy: "DateCreated",
+                        sortOrder: "Descending"
+                    )
+                    return (key, folderName, page)
+                }
+            }
+
+            var inFlight = 0
+            while inFlight < maxConcurrent, let folder = iterator.next() {
+                submit(folder)
+                inFlight += 1
+            }
+
+            for await (key, folderName, page) in group {
+                inFlight -= 1
+                if let page {
+                    folderPreviews[key] = page.items.map { serverItem in
+                        let item = serverItem.makeMediaItem()
+                        item.sourceConnectionId = connectionId
+                        return item
+                    }
+                    folderTotalCounts[key] = page.totalRecordCount
+                } else {
+                    folderPreviews[key] = []
+                    VanmoLogger.network.error("[LibraryHome] folder preview failed for \(folderName)")
+                }
+
+                if let folder = iterator.next() {
+                    submit(folder)
+                    inFlight += 1
+                }
             }
         }
     }
@@ -272,7 +348,7 @@ final class LibraryViewModel: ObservableObject {
     // MARK: - Home Collection Cache
 
     private func restoreHomeCacheIfNeeded(connections: [SavedConnection]) async {
-        let embyConnections = connections.filter { $0.type == .emby || $0.type == .jellyfin }
+        let embyConnections = embyLikeConnections(from: connections)
         hasConfiguredEmbyConnections = !embyConnections.isEmpty
         guard !embyConnections.isEmpty else {
             await homeCollectionCache.clear()
@@ -306,9 +382,14 @@ final class LibraryViewModel: ObservableObject {
             restoredConnectionsById[connection.id] = connection
 
             for folderCache in connectionCache.folders {
-                restoredPreviewsByFolder[folderCache.id] = folderCache.preview.map(makePreviewItem)
+                let key = folderCacheKey(connectionId: connection.id, folderId: folderCache.id)
+                restoredPreviewsByFolder[key] = folderCache.preview.map { cache in
+                    let item = makePreviewItem(from: cache)
+                    item.sourceConnectionId = connection.id
+                    return item
+                }
                 if let totalCount = folderCache.totalCount {
-                    restoredTotalCountsByFolder[folderCache.id] = totalCount
+                    restoredTotalCountsByFolder[key] = totalCount
                 }
             }
         }
@@ -355,13 +436,14 @@ final class LibraryViewModel: ObservableObject {
             }
 
             let folderCaches = folders.map { folder in
-                HomeFolderCache(
+                let key = folderCacheKey(for: folder)
+                return HomeFolderCache(
                     id: folder.id,
                     name: folder.name,
                     collectionType: folder.collectionType,
                     posterURL: folder.posterURL,
-                    totalCount: folderTotalCounts[folder.id],
-                    preview: (folderPreviews[folder.id] ?? []).map(makePreviewCache)
+                    totalCount: folderTotalCounts[key],
+                    preview: (folderPreviews[key] ?? []).map(makePreviewCache)
                 )
             }
 
@@ -405,7 +487,7 @@ final class LibraryViewModel: ObservableObject {
                 refreshFolderPreviews: refreshFolderPreviews
             )
             do {
-                try await self.reloadHighlights(in: context)
+                try await self.reloadHighlights(in: context, connections: connections)
                 try self.loadScannedLibraries(connections: connections, in: context)
             } catch {
                 self.errorMessage = error.localizedDescription
@@ -451,7 +533,7 @@ final class LibraryViewModel: ObservableObject {
         connections: [SavedConnection],
         in context: ModelContext
     ) throws {
-        let scannedConnections = connections.filter { $0.type == .plex }
+        let scannedConnections = plexConnections(from: connections)
         guard !scannedConnections.isEmpty else {
             scannedLibraryFolders = [:]
             scannedConnectionsById = [:]
@@ -484,8 +566,9 @@ final class LibraryViewModel: ObservableObject {
                     connection: connection
                 )
                 folders.append(folder)
-                previewsByFolder[folder.id] = newestPreviewSlice(from: movieItems)
-                totalCountsByFolder[folder.id] = movieItems.count
+                let key = folderCacheKey(for: folder)
+                previewsByFolder[key] = newestPreviewSlice(from: movieItems)
+                totalCountsByFolder[key] = movieItems.count
             }
 
             let showItems = makeShowPreviewItems(from: items)
@@ -497,8 +580,9 @@ final class LibraryViewModel: ObservableObject {
                     connection: connection
                 )
                 folders.append(folder)
-                previewsByFolder[folder.id] = newestPreviewSlice(from: showItems)
-                totalCountsByFolder[folder.id] = showItems.count
+                let key = folderCacheKey(for: folder)
+                previewsByFolder[key] = newestPreviewSlice(from: showItems)
+                totalCountsByFolder[key] = showItems.count
             }
 
             guard !folders.isEmpty else { continue }
@@ -592,8 +676,14 @@ final class LibraryViewModel: ObservableObject {
         return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
     }
 
-    private func reloadHighlights(in context: ModelContext) async throws {
-        let snapshot = try await loadHighlightSnapshot(in: context)
+    private func reloadHighlights(
+        in context: ModelContext,
+        connections: [SavedConnection]
+    ) async throws {
+        let snapshot = try await loadHighlightSnapshot(
+            in: context,
+            connections: connections
+        )
         recentlyPlayed = snapshot.playedIds.compactMap { context.model(for: $0) as? MediaItem }
         favorites = snapshot.favoriteIds.compactMap { context.model(for: $0) as? MediaItem }
         totalFavoritesCount = snapshot.favoriteTotal
@@ -601,26 +691,41 @@ final class LibraryViewModel: ObservableObject {
         favoriteTVShowCount = snapshot.favoriteTVShowCount
     }
 
-    private func loadHighlightSnapshot(in context: ModelContext) async throws -> InitialSnapshot {
+    private func loadHighlightSnapshot(
+        in context: ModelContext,
+        connections: [SavedConnection]
+    ) async throws -> InitialSnapshot {
         let container = context.container
         let limit = highlightSectionLimit
+        let mediaServerConnectionIds = Set(connections.filter { $0.type.isMediaServer }.map(\.id))
+        let hiddenConnectionIds = Set(serverConnectionErrors.keys)
 
         return try await Task.detached(priority: .userInitiated) {
             let bgCtx = ModelContext(container)
+            func isVisibleHighlight(_ item: MediaItem) -> Bool {
+                if let sourceConnectionId = item.sourceConnectionId,
+                   hiddenConnectionIds.contains(sourceConnectionId) {
+                    return false
+                }
+                guard let sourceConnectionId = item.sourceConnectionId,
+                      mediaServerConnectionIds.contains(sourceConnectionId) else {
+                    return true
+                }
+                return true
+            }
 
             // 继续观看：lastPlayedAt 非空即视为可恢复播放，不再额外按 mediaType 过滤，
             // 让 Emby resume API 返回的 Episode 也能进入这个区。
-            var playedDescriptor = FetchDescriptor<MediaItem>(
+            let playedDescriptor = FetchDescriptor<MediaItem>(
                 predicate: Self.recentlyPlayedPredicate,
                 sortBy: [SortDescriptor(\.lastPlayedAt, order: .reverse)]
             )
-            playedDescriptor.fetchLimit = limit
-            let playedIds = try bgCtx.fetch(playedDescriptor).map(\.persistentModelID)
+            let playedItems = try bgCtx.fetch(playedDescriptor).filter(isVisibleHighlight)
 
-            let favoriteItems = try bgCtx.fetch(Self.favoriteDescriptor)
+            let favoriteItems = try bgCtx.fetch(Self.favoriteDescriptor).filter(isVisibleHighlight)
 
             return InitialSnapshot(
-                playedIds: playedIds,
+                playedIds: Array(playedItems.prefix(limit).map(\.persistentModelID)),
                 favoriteIds: Array(favoriteItems.prefix(limit).map(\.persistentModelID)),
                 favoriteTotal: favoriteItems.count,
                 favoriteMovieCount: favoriteItems.filter { $0.mediaType == .movie }.count,
@@ -656,13 +761,33 @@ final class LibraryViewModel: ObservableObject {
     private func updateLibraryEmptyState(connections: [SavedConnection]) {
         let hasCollectionFolders = serverCollectionFolders.values.contains { !$0.isEmpty }
         let hasScannedLibraryFolders = scannedLibraryFolders.values.contains { !$0.isEmpty }
-        let hasAnyConnection = !connections.isEmpty
+        let hasRelevantConnection = !connections.isEmpty
         isLibraryEmpty =
             recentlyPlayed.isEmpty &&
             favorites.isEmpty &&
             !hasCollectionFolders &&
             !hasScannedLibraryFolders &&
-            !hasAnyConnection
+            !hasRelevantConnection
+    }
+
+    private func embyLikeConnections(from connections: [SavedConnection]) -> [SavedConnection] {
+        return connections.filter { connection in
+            connection.type == .emby || connection.type == .jellyfin
+        }
+    }
+
+    private func plexConnections(from connections: [SavedConnection]) -> [SavedConnection] {
+        return connections.filter { connection in
+            connection.type == .plex
+        }
+    }
+
+    private nonisolated func folderCacheKey(for folder: CollectionFolder) -> String {
+        folderCacheKey(connectionId: folder.serverConnectionId, folderId: folder.id)
+    }
+
+    private nonisolated func folderCacheKey(connectionId: UUID, folderId: String) -> String {
+        "\(connectionId.uuidString)::\(folderId)"
     }
 
     private struct InitialSnapshot: Sendable {

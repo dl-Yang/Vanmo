@@ -15,6 +15,16 @@ build/
 Packages/
 Package.resolved
 
+# Other Config
+prompt/
+plan/
+.derivedData/
+.understand-anything/
+
+# Other agent
+.agents/
+.codex/
+
 # CocoaPods
 Pods/
 

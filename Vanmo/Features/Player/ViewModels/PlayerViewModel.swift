@@ -669,7 +669,16 @@ final class PlayerViewModel: ObservableObject {
 
         do {
             let episodes: [EpisodeInfo]
-            if isPlexEpisodeSource {
+            if let snapshot = try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext) {
+                if snapshot.type == .plex {
+                    episodes = try await PlexEpisodeFetcher.fetchEpisodes(
+                        seriesRatingKey: seriesId,
+                        connection: snapshot
+                    )
+                } else {
+                    episodes = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesId, connection: snapshot)
+                }
+            } else if isPlexEpisodeSource {
                 episodes = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesId)
             } else {
                 episodes = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesId)

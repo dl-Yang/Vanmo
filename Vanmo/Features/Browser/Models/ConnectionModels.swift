@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-enum ConnectionType: String, Codable, CaseIterable, Identifiable {
+enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
     case localFolder
     case smb
     case ftp
@@ -85,6 +85,62 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable {
     /// 本地协议无需主机/端口/账户，UI 与连接流程走专门分支。
     var isLocal: Bool {
         self == .localFolder
+    }
+}
+
+struct MediaServerConnectionSnapshot: Sendable {
+    let id: UUID
+    let name: String
+    let type: ConnectionType
+    let host: String
+    let port: Int
+    let username: String?
+    let password: String?
+    let path: String?
+
+    var config: ConnectionConfig {
+        ConnectionConfig(
+            type: type,
+            host: host,
+            port: port,
+            username: username,
+            password: password,
+            path: path
+        )
+    }
+
+    init(connection: SavedConnection, password: String?) {
+        self.id = connection.id
+        self.name = connection.name
+        self.type = connection.type
+        self.host = connection.host
+        self.port = connection.port
+        self.username = connection.username
+        self.password = password
+        self.path = connection.path
+    }
+}
+
+enum MediaServerConnectionResolver {
+    static func snapshot(
+        for item: MediaItem,
+        in context: ModelContext?
+    ) throws -> MediaServerConnectionSnapshot? {
+        guard let context,
+              let connectionId = item.sourceConnectionId else {
+            return nil
+        }
+
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        guard let connection = try context.fetch(descriptor).first,
+              connection.type.isMediaServer else {
+            return nil
+        }
+
+        let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+        return MediaServerConnectionSnapshot(connection: connection, password: password)
     }
 }
 
