@@ -191,6 +191,13 @@ struct RemoteFile: Identifiable, Hashable {
     let modifiedDate: Date?
     let type: RemoteFileType
 
+    /// IPTV 频道分组（来自 EXTINF 的 group-title），仅 IPTV 来源填充。
+    var groupTitle: String? = nil
+    /// IPTV 台标地址（来自 EXTINF 的 tvg-logo），仅 IPTV 来源填充。
+    var logoURL: URL? = nil
+    /// IPTV EPG 关联 ID（来自 EXTINF 的 tvg-id），仅 IPTV 来源填充。
+    var tvgId: String? = nil
+
     var isVideo: Bool { type == .video }
 }
 

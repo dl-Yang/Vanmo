@@ -5,6 +5,8 @@ final class IPTVService: RemoteFileService {
     private(set) var isConnected = false
 
     private var channels: [RemoteFile] = []
+    /// 播放列表头部声明的 EPG（XMLTV）源地址，来自 `#EXTM3U` 的 `url-tvg` / `x-tvg-url`。
+    private(set) var epgURL: URL?
     private let session: URLSession
 
     init(session: URLSession = .shared) {
@@ -22,7 +24,9 @@ final class IPTVService: RemoteFileService {
                !(200...299).contains(httpResponse.statusCode) {
                 throw NetworkError.connectionFailed("HTTP \(httpResponse.statusCode)")
             }
-            channels = try Self.parsePlaylist(data: data, baseURL: playlistURL)
+            let parsed = try Self.parsePlaylist(data: data, baseURL: playlistURL)
+            channels = parsed.channels
+            epgURL = parsed.epgURL
             isConnected = true
         } catch let error as NetworkError {
             throw error
@@ -34,6 +38,7 @@ final class IPTVService: RemoteFileService {
     func disconnect() async {
         isConnected = false
         channels = []
+        epgURL = nil
     }
 
     func listDirectory(path: String) async throws -> [RemoteFile] {
@@ -68,20 +73,32 @@ final class IPTVService: RemoteFileService {
         return components.url
     }
 
-    private static func parsePlaylist(data: Data, baseURL: URL) throws -> [RemoteFile] {
+    private static func parsePlaylist(data: Data, baseURL: URL) throws -> (channels: [RemoteFile], epgURL: URL?) {
         guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .unicode) else {
             throw NetworkError.transferFailed("无法读取 IPTV 播放列表")
         }
 
         var result: [RemoteFile] = []
+        var epgURL: URL?
         var pendingTitle: String?
+        var pendingAttributes: [String: String] = [:]
 
         for rawLine in text.components(separatedBy: .newlines) {
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !line.isEmpty else { continue }
 
+            if line.hasPrefix("#EXTM3U") {
+                let attrs = attributes(from: line)
+                if let tvg = attrs["url-tvg"] ?? attrs["x-tvg-url"],
+                   let url = URL(string: tvg.trimmingCharacters(in: .whitespaces)) {
+                    epgURL = url
+                }
+                continue
+            }
+
             if line.hasPrefix("#EXTINF") {
                 pendingTitle = title(fromExtinf: line)
+                pendingAttributes = attributes(from: line)
                 continue
             }
 
@@ -90,7 +107,11 @@ final class IPTVService: RemoteFileService {
                 continue
             }
 
-            let name = pendingTitle ?? streamURL.lastPathComponent.nonEmpty ?? "IPTV 频道 \(result.count + 1)"
+            let name = pendingTitle
+                ?? pendingAttributes["tvg-name"]
+                ?? streamURL.lastPathComponent.nonEmpty
+                ?? "IPTV 频道 \(result.count + 1)"
+            let logoURL = pendingAttributes["tvg-logo"].flatMap { URL(string: $0) }
             result.append(
                 RemoteFile(
                     name: name,
@@ -98,13 +119,17 @@ final class IPTVService: RemoteFileService {
                     size: 0,
                     isDirectory: false,
                     modifiedDate: nil,
-                    type: .video
+                    type: .video,
+                    groupTitle: pendingAttributes["group-title"]?.nonEmpty,
+                    logoURL: logoURL,
+                    tvgId: pendingAttributes["tvg-id"]?.nonEmpty
                 )
             )
             pendingTitle = nil
+            pendingAttributes = [:]
         }
 
-        return result
+        return (result, epgURL)
     }
 
     private static func title(fromExtinf line: String) -> String? {
@@ -112,6 +137,22 @@ final class IPTVService: RemoteFileService {
         let title = line[line.index(after: comma)...]
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return title.nonEmpty
+    }
+
+    /// 解析 EXTINF / EXTM3U 行中的 `key="value"` 属性对（键名小写）。
+    private static func attributes(from line: String) -> [String: String] {
+        guard let regex = try? NSRegularExpression(pattern: #"([\w-]+)=\"([^\"]*)\""#) else {
+            return [:]
+        }
+        let ns = line as NSString
+        let matches = regex.matches(in: line, range: NSRange(location: 0, length: ns.length))
+        var result: [String: String] = [:]
+        for match in matches where match.numberOfRanges == 3 {
+            let key = ns.substring(with: match.range(at: 1)).lowercased()
+            let value = ns.substring(with: match.range(at: 2))
+            result[key] = value
+        }
+        return result
     }
 }
 
