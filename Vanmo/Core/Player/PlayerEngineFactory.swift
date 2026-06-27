@@ -11,7 +11,9 @@ enum SupportedFormat {
         }
         let ext = url.pathExtension.lowercased()
         if MediaFormatProbe.nativeVideoExtensions.contains(ext)
-            || MediaFormatProbe.nativeAudioExtensions.contains(ext) {
+            || MediaFormatProbe.nativeAudioExtensions.contains(ext)
+            // HLS（m3u8/m3u）由 AVFoundation 原生处理，直播自适应码率与稳定性更好。
+            || MediaFormatProbe.playlistExtensions.contains(ext) {
             return .native
         }
         return .ffmpeg

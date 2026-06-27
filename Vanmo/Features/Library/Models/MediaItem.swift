@@ -50,6 +50,10 @@ final class MediaItem {
     /// 视频动态范围（`DynamicRange.rawValue`），首播时读取真实元数据后写入。`nil` 表示尚未探测。
     var dynamicRange: String?
 
+    /// 是否为直播流（IPTV 频道）。运行时标志，不持久化：直播无固定时长/进度，
+    /// 播放器据此隐藏进度条与续播、显示 LIVE 标识、断流后自动重连。
+    @Transient var isLiveStream: Bool = false
+
     init(
         title: String,
         fileURL: URL,

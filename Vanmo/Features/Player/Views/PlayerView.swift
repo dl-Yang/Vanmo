@@ -348,31 +348,53 @@ struct PlayerView: View {
         }
     }
 
+    @ViewBuilder
     private var bottomBar: some View {
-        VStack(spacing: 8) {
-            PlayerProgressBar(
-                progress: viewModel.progress,
-                bufferProgress: viewModel.bufferProgress,
-                isSeeking: $viewModel.isSeeking,
-                onSeek: { fraction in
-                    viewModel.seek(to: fraction * viewModel.duration)
-                }
-            )
-
+        if viewModel.isLiveStream {
             HStack {
-                Text(viewModel.currentTime.formattedDuration)
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.8))
-
+                liveBadge
                 Spacer()
+            }
+        } else {
+            VStack(spacing: 8) {
+                PlayerProgressBar(
+                    progress: viewModel.progress,
+                    bufferProgress: viewModel.bufferProgress,
+                    isSeeking: $viewModel.isSeeking,
+                    onSeek: { fraction in
+                        viewModel.seek(to: fraction * viewModel.duration)
+                    }
+                )
 
-                Text("-\((viewModel.duration - viewModel.currentTime).formattedDuration)")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.white.opacity(0.8))
+                HStack {
+                    Text(viewModel.currentTime.formattedDuration)
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.8))
+
+                    Spacer()
+
+                    Text("-\((viewModel.duration - viewModel.currentTime).formattedDuration)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.8))
+                }
             }
         }
+    }
+
+    private var liveBadge: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(Color.red)
+                .frame(width: 8, height: 8)
+            Text("LIVE")
+                .font(.caption.bold())
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.red.opacity(0.25), in: Capsule())
     }
 
     // MARK: - Feedback Overlays

@@ -290,17 +290,24 @@ struct ConnectionsView: View {
     private func play(_ file: RemoteFile) async {
         do {
             let url = try await viewModel.streamURL(for: file)
-            let parsed = FileNameParser.parse(file.name)
-            let item = MediaItem(
-                title: parsed.title,
-                fileURL: url,
-                mediaType: parsed.isTV ? .tvEpisode : .movie,
-                fileSize: file.size
-            )
-            item.year = parsed.year
-            item.seasonNumber = parsed.season
-            item.episodeNumber = parsed.episode
-            item.showTitle = parsed.isTV ? parsed.title : nil
+            let item: MediaItem
+            if isIPTVBrowsing {
+                // 直播频道：用频道原名作标题，不跑文件名解析（避免把频道名误判成季集）。
+                item = MediaItem(title: file.name, fileURL: url, mediaType: .movie, fileSize: file.size)
+                item.isLiveStream = true
+            } else {
+                let parsed = FileNameParser.parse(file.name)
+                item = MediaItem(
+                    title: parsed.title,
+                    fileURL: url,
+                    mediaType: parsed.isTV ? .tvEpisode : .movie,
+                    fileSize: file.size
+                )
+                item.year = parsed.year
+                item.seasonNumber = parsed.season
+                item.episodeNumber = parsed.episode
+                item.showTitle = parsed.isTV ? parsed.title : nil
+            }
             item.serverId = file.path
             item.sourceConnectionId = viewModel.selectedConnection?.id
             item.originalFileName = file.name

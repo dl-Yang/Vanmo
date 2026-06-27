@@ -44,6 +44,7 @@ final class PlayerViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
     private var prefetchToken: String?
+    private var liveRetryCount = 0
     private let externalSubtitleManager = SubtitleManager()
     private var activeExternalSubtitleID: Int?
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
@@ -88,6 +89,7 @@ final class PlayerViewModel: ObservableObject {
             .sink { [weak self] state in
                 VanmoLogger.player.info("[PlayerVM] state changed: \(String(describing: state))")
                 self?.playbackState = state
+                self?.handleLiveStreamStateIfNeeded(state)
             }
             .store(in: &cancellables)
 
@@ -887,6 +889,41 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Live Stream
+
+    /// 当前条目是否为直播流（IPTV）。直播无固定时长/进度，UI 据此隐藏进度条与续播。
+    var isLiveStream: Bool { item.isLiveStream }
+
+    private static let maxLiveRetries = 3
+
+    /// 直播流断流后自动重连：错误时延迟重试，成功播放后重置计数。
+    private func handleLiveStreamStateIfNeeded(_ state: PlaybackState) {
+        guard item.isLiveStream else { return }
+        switch state {
+        case .playing:
+            liveRetryCount = 0
+        case .error:
+            guard liveRetryCount < Self.maxLiveRetries else {
+                VanmoLogger.player.error("[PlayerVM] live stream retry exhausted (\(self.liveRetryCount))")
+                return
+            }
+            liveRetryCount += 1
+            let attempt = liveRetryCount
+            VanmoLogger.player.info("[PlayerVM] live stream error, retry \(attempt)/\(Self.maxLiveRetries)")
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(2))
+                guard let self, self.item.isLiveStream else { return }
+                do {
+                    try await self.loadAndPlayCurrentItem()
+                } catch {
+                    self.playbackState = .error(error.localizedDescription)
+                }
+            }
+        default:
+            break
+        }
+    }
+
     // MARK: - Progress
 
     var progress: Double {
@@ -895,6 +932,8 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func saveProgress() {
+        // 直播流没有可续播的进度，跳过以免污染续播记录。
+        guard !item.isLiveStream else { return }
         item.lastPlaybackPosition = currentTime
         item.lastPlayedAt = Date()
         if currentTime / max(duration, 1) > 0.9 {
