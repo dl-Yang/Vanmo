@@ -3,13 +3,13 @@
 ## P0：已完成 MVP，仍需产品化推进
 
 ### 1. 播放器核心体验
-- [ ] **外挂字幕链路完善**：当前已接入本地 SRT/VTT 轨道；继续完善字幕延迟、样式设置、字幕轨选择持久化，并为远程视频补充同目录外挂字幕发现策略。
-- [ ] **HDR / ISO / BDMV 探测产品化**：当前仅有 HDR 文件名候选探测与 ISO/BDMV 格式识别；继续读取真实 HDR 元数据、调优 AVFoundation EDR/HDR 输出，并设计原盘 playlist 解析。
+- [x] **外挂字幕链路完善**：已完成本地 SRT/VTT 轨道接入、字幕延迟、样式设置、字幕轨选择持久化，并为远程视频补充同目录外挂字幕发现策略；ASS/SSA 特效字幕仍放在 P1 独立推进。
+- [x] **HDR / ISO / BDMV 探测产品化**：已完成 HDR 文件名候选探测、真实 HDR 元数据读取、AVFoundation EDR/HDR 输出基础调优，以及 ISO/BDMV 格式识别与原盘 playlist 解析层设计；完整蓝光播放仍放在 P1 独立推进。
 
 ### 2. 媒体源与国内生态
-- [ ] **AList 网盘入口产品化**：当前以 WebDAV 兼容方式接入 AList；继续补充连接说明、错误提示、默认路径校验、取流兼容性和媒体库扫描回归。
-- [ ] **IPTV MVP 产品化**：当前已支持 M3U/M3U8 播放列表解析；继续支持频道分组、台标、EPG、播放列表刷新、失效频道提示和直播播放体验优化。
-- [ ] **fnOS 轻量适配完善**：当前按 WebDAV 兼容预设接入；继续补充 SMB/WebDAV 预设说明、默认端口/路径校验，并调研是否需要 fnOS 专属 API。
+- [x] **AList 网盘入口产品化**：已完成 WebDAV 兼容入口说明、AList/fnOS 路径前导斜杠规范化、404 路径错误指引、首页扫描媒体库回归，以及跨 host 302 取流时剥离 `Authorization` 的兼容与安全修复。
+- [ ] **IPTV MVP 产品化**：已完成 M3U/M3U8 播放列表解析、`group-title` / `tvg-logo` / `tvg-id` / `url-tvg` 元数据解析、频道分组与台标 UI、刷新强制重拉播放列表、空频道提示和直播播放体验优化（LIVE 标识、跳过续播、断流重试、HLS 走 AVFoundation）；当前仅在工作区未提交改动中落盘 XMLTV/EPG 解析层，仍需接入 ViewModel/UI 展示当前/下一节目，并继续补强失效频道提示或探测。
+- [ ] **fnOS 轻量适配完善**：当前按 WebDAV 兼容预设接入，并已有部分 AList/fnOS 路径规范化与 404 路径提示；继续补充 fnOS/SMB/WebDAV 预设说明、默认 HTTPS/端口/路径校验，并调研是否需要 fnOS 专属 API。
 
 ### 3. 媒体库与交互
 - [ ] **全局搜索增强**：当前搜索覆盖本地已同步媒体并做去重；继续接入 Emby/Plex live API、网盘远程搜索和按来源分组展示。
@@ -21,7 +21,7 @@
 - [ ] **ASS/SSA 特效字幕引擎**：接入 libass 或 KSPlayer 原生 ASS 渲染能力，支持样式、定位、描边、动画和复杂字幕特效；当前仅避免把 ASS/SSA 误当 SRT 解析。
 - [ ] **KSPlayer PiP 支持**：调研并实现 MKV/TS/AVI 等 KSPlayer 路径的 PiP，或提供明确的不可用提示与 AVFoundation fallback。
 - [ ] **硬件解码设置接入**：将设置页中的硬件解码开关真正传入 KSPlayer options，并验证不同格式下的稳定性。
-- [ ] **蓝光 ISO / 原盘播放**：新增 `Core/Player/Disc/` 解析层，支持 ISO/BDMV 目录识别、playlist 选择、章节/音轨/字幕映射和远程 Range 读取策略。
+- [ ] **蓝光 ISO / 原盘播放**：在已有 `Core/Player/Disc/` 占位解析层基础上实现真实 playlist 解析、章节/音轨/字幕映射、playlist 选择和远程 Range 读取策略。
 
 ### 2. 官方国内网盘
 - [ ] **阿里云盘官方接入**：实现 OAuth2、token 刷新、列目录、分页、取流 URL、错误处理和 Keychain 凭据存储。

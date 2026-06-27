@@ -161,3 +161,117 @@ private extension String {
         isEmpty ? nil : self
     }
 }
+
+// MARK: - EPG (XMLTV)
+
+/// 单条 EPG 节目。
+struct EPGProgram {
+    let start: Date
+    let stop: Date
+    let title: String
+}
+
+/// 频道节目单：按 tvg-id 关联 channelId，提供「正在播放 / 下一档」查询。
+struct EPGGuide {
+    /// channelId -> 按开始时间升序排序的节目列表。
+    let programsByChannel: [String: [EPGProgram]]
+
+    var isEmpty: Bool { programsByChannel.isEmpty }
+
+    func current(for channelId: String, at date: Date = Date()) -> EPGProgram? {
+        programsByChannel[channelId]?.first { $0.start <= date && date < $0.stop }
+    }
+
+    func next(for channelId: String, at date: Date = Date()) -> EPGProgram? {
+        programsByChannel[channelId]?.first { $0.start > date }
+    }
+}
+
+/// 轻量 XMLTV 解析器（SAX 流式），只提取 programme 的 channel/start/stop/title。
+final class XMLTVParser: NSObject, XMLParserDelegate {
+    private var programs: [String: [EPGProgram]] = [:]
+    private var channel: String?
+    private var start: Date?
+    private var stop: Date?
+    private var title = ""
+    private var capturingTitle = false
+    private var titleCaptured = false
+
+    private static let formatters: [DateFormatter] = {
+        ["yyyyMMddHHmmss Z", "yyyyMMddHHmmssZ", "yyyyMMddHHmmss"].map { format in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = format
+            return formatter
+        }
+    }()
+
+    /// 解析 XMLTV 数据，返回节目单；解析失败或无内容时返回空 guide。
+    func parse(data: Data) -> EPGGuide {
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        parser.parse()
+        let sorted = programs.mapValues { $0.sorted { $0.start < $1.start } }
+        return EPGGuide(programsByChannel: sorted)
+    }
+
+    private static func parseDate(_ value: String?) -> Date? {
+        guard let value = value?.trimmingCharacters(in: .whitespaces), !value.isEmpty else { return nil }
+        for formatter in formatters {
+            if let date = formatter.date(from: value) { return date }
+        }
+        return nil
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String]
+    ) {
+        switch elementName {
+        case "programme":
+            channel = attributeDict["channel"]
+            start = Self.parseDate(attributeDict["start"])
+            stop = Self.parseDate(attributeDict["stop"])
+            title = ""
+            capturingTitle = false
+            titleCaptured = false
+        case "title":
+            if !titleCaptured { capturingTitle = true }
+        default:
+            break
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if capturingTitle { title += string }
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?
+    ) {
+        switch elementName {
+        case "title":
+            if capturingTitle {
+                capturingTitle = false
+                titleCaptured = true
+            }
+        case "programme":
+            if let channel, let start, let stop {
+                let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                programs[channel, default: []].append(EPGProgram(start: start, stop: stop, title: trimmed))
+            }
+            channel = nil
+            start = nil
+            stop = nil
+            title = ""
+        default:
+            break
+        }
+    }
+}
