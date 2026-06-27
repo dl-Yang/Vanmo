@@ -148,7 +148,7 @@ struct AddConnectionView: View {
                 .autocapitalization(.none)
 
             if selectedType == .alist {
-                Text("AList 默认 WebDAV 路径通常为 /dav，可用于聚合阿里云盘、百度网盘、115、夸克等来源。")
+                Text("AList 默认端口 5244、WebDAV 路径为 /dav，是否启用 HTTPS 取决于实例配置。用户名/密码为 AList 账户，可聚合阿里云盘、百度网盘、115、夸克等来源；部分网盘的直链取流可能受限或限速。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if selectedType == .iptv {
@@ -247,8 +247,18 @@ struct AddConnectionView: View {
         return (
             host: normalizedHost,
             port: portValue,
-            path: resolvedPath.isEmpty ? nil : resolvedPath
+            path: normalizedRemotePath(resolvedPath)
         )
+    }
+
+    /// AList / fnOS 的 WebDAV 路径需以 `/` 开头，纠正用户漏填前导斜杠的情况（如 `dav` → `/dav`）。
+    private func normalizedRemotePath(_ path: String) -> String? {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if (selectedType == .alist || selectedType == .fnos), !trimmed.hasPrefix("/") {
+            return "/" + trimmed
+        }
+        return trimmed
     }
 
     private func supportsHTTPS(for type: ConnectionType) -> Bool {
