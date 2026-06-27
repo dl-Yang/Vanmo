@@ -5,12 +5,32 @@ final class RemoteFetcher {
     let cleanURL: URL
     private let extraHeaders: [String: String]
     private let session: URLSession
+    private let ownsSession: Bool
 
-    init(originalURL: URL, session: URLSession = .shared) {
+    /// 默认创建带重定向委托的专用 session：当 AList/网盘把 WebDAV 直链 302 到对象存储
+    /// 签名直链（跨 host）时剥离 Authorization，避免把 Basic Auth 凭据转发到第三方 CDN，
+    /// 也避免多余的 Authorization 头与签名 URL 自带鉴权冲突导致 403。
+    init(originalURL: URL, session: URLSession? = nil) {
         let (clean, headers) = Self.stripCredentials(originalURL)
         self.cleanURL = clean
         self.extraHeaders = headers
-        self.session = session
+        if let session {
+            self.session = session
+            self.ownsSession = false
+        } else {
+            self.session = URLSession(
+                configuration: .default,
+                delegate: RedirectAuthStripper(),
+                delegateQueue: nil
+            )
+            self.ownsSession = true
+        }
+    }
+
+    deinit {
+        if ownsSession {
+            session.finishTasksAndInvalidate()
+        }
     }
 
     static func stripCredentials(_ url: URL) -> (URL, [String: String]) {
@@ -143,5 +163,28 @@ final class RemoteFetcher {
         let endStr = String(afterBytes[afterBytes.index(after: dashIdx)...])
         guard let s = Int64(startStr), let e = Int64(endStr) else { return nil }
         return s...e
+    }
+}
+
+/// 跨 host HTTP 重定向时剥离 Authorization 头。
+/// 同 host（如服务器内部路径跳转）保留凭据，确保正常的 WebDAV/Emby 鉴权不受影响。
+private final class RedirectAuthStripper: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        let originalHost = task.originalRequest?.url?.host
+        let newHost = request.url?.host
+        guard originalHost != newHost else {
+            completionHandler(request)
+            return
+        }
+        var stripped = request
+        stripped.setValue(nil, forHTTPHeaderField: "Authorization")
+        VanmoLogger.prefetch.info("[Prefetch] cross-host redirect, stripped Authorization: \(originalHost ?? "?") -> \(newHost ?? "?")")
+        completionHandler(stripped)
     }
 }
