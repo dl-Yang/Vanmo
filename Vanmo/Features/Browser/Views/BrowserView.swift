@@ -155,7 +155,11 @@ struct ConnectionsView: View {
         } else if let message = viewModel.fileBrowserErrorMessage {
             FilesMessageView(icon: "exclamationmark.triangle", title: "无法加载目录", message: message)
         } else if viewModel.files.isEmpty {
-            FilesMessageView(icon: "folder", title: "文件夹为空", message: "此目录下没有可显示的文件")
+            if isIPTVBrowsing {
+                FilesMessageView(icon: "tv.slash", title: "暂无频道", message: "播放列表为空或无法解析，请检查 M3U 源后点击右上角刷新")
+            } else {
+                FilesMessageView(icon: "folder", title: "文件夹为空", message: "此目录下没有可显示的文件")
+            }
         } else if isIPTVBrowsing {
             iptvChannelList
         } else {

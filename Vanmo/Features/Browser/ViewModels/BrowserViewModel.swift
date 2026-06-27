@@ -433,6 +433,11 @@ final class ConnectionsViewModel: ObservableObject {
     }
 
     func refreshCurrentDirectory() async {
+        // IPTV 频道列表在 connect() 时一次性下载解析并缓存在 service 内存中，
+        // 普通 listDirectory 不会重新拉取 M3U；刷新时强制重建 service 以重新下载播放列表。
+        if selectedConnection?.type == .iptv {
+            await disconnectBrowserServiceIfNeeded()
+        }
         await loadDirectory(path: currentPath)
     }
 
