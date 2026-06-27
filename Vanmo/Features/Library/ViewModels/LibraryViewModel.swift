@@ -533,7 +533,7 @@ final class LibraryViewModel: ObservableObject {
         connections: [SavedConnection],
         in context: ModelContext
     ) throws {
-        let scannedConnections = plexConnections(from: connections)
+        let scannedConnections = scannableConnections(from: connections)
         guard !scannedConnections.isEmpty else {
             scannedLibraryFolders = [:]
             scannedConnectionsById = [:]
@@ -776,9 +776,16 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
-    private func plexConnections(from connections: [SavedConnection]) -> [SavedConnection] {
+    /// 通过 MediaScanner 扫描入库、并以本地 MediaItem 聚合到首页「扫描媒体库」的连接。
+    /// 排除 Emby/Jellyfin（走服务端合集 API）与 IPTV（直播频道不归入电影/电视剧库）。
+    private func scannableConnections(from connections: [SavedConnection]) -> [SavedConnection] {
         return connections.filter { connection in
-            connection.type == .plex
+            switch connection.type {
+            case .emby, .jellyfin, .iptv:
+                return false
+            default:
+                return true
+            }
         }
     }
 
