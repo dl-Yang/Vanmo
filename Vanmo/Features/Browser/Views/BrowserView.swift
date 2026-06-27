@@ -156,6 +156,8 @@ struct ConnectionsView: View {
             FilesMessageView(icon: "exclamationmark.triangle", title: "无法加载目录", message: message)
         } else if viewModel.files.isEmpty {
             FilesMessageView(icon: "folder", title: "文件夹为空", message: "此目录下没有可显示的文件")
+        } else if isIPTVBrowsing {
+            iptvChannelList
         } else {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 4) {
@@ -195,6 +197,54 @@ struct ConnectionsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - IPTV 频道（分组 + 台标）
+
+    private var isIPTVBrowsing: Bool {
+        viewModel.selectedConnection?.type == .iptv
+    }
+
+    private var iptvChannelList: some View {
+        ScrollView(showsIndicators: false) {
+            LazyVStack(alignment: .leading, spacing: 4, pinnedViews: [.sectionHeaders]) {
+                ForEach(groupedChannels(viewModel.files), id: \.group) { section in
+                    Section {
+                        ForEach(section.channels) { channel in
+                            iptvChannelRow(channel)
+                        }
+                    } header: {
+                        FilesSectionHeader(title: section.group)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .refreshable {
+            await viewModel.refreshCurrentDirectory()
+        }
+    }
+
+    private func iptvChannelRow(_ channel: RemoteFile) -> some View {
+        Button {
+            Task { await play(channel) }
+        } label: {
+            IPTVChannelCard(channel: channel)
+        }
+        .buttonStyle(FilesRowButtonStyle())
+    }
+
+    /// 按 group-title 分组，保持频道在播放列表中的原始顺序；无分组归入「未分组」。
+    private func groupedChannels(_ files: [RemoteFile]) -> [(group: String, channels: [RemoteFile])] {
+        var order: [String] = []
+        var grouped: [String: [RemoteFile]] = [:]
+        for file in files {
+            let group = (file.groupTitle?.isEmpty == false ? file.groupTitle : nil) ?? "未分组"
+            if grouped[group] == nil { order.append(group) }
+            grouped[group, default: []].append(file)
+        }
+        return order.map { ($0, grouped[$0] ?? []) }
     }
 
     // MARK: - 导航 & 标题
@@ -518,6 +568,65 @@ private struct FileCard: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(FilesDesign.subtitle)
         }
+    }
+}
+
+// MARK: - IPTV 频道行卡片
+
+private struct IPTVChannelCard: View {
+    let channel: RemoteFile
+
+    var body: some View {
+        HStack(spacing: 0) {
+            FilesIconBox(background: FilesDesign.iconBoxGray) {
+                if let logoURL = channel.logoURL {
+                    AsyncImage(url: logoURL) { phase in
+                        if case .success(let image) = phase {
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 36, height: 36)
+                        } else {
+                            placeholderIcon
+                        }
+                    }
+                } else {
+                    placeholderIcon
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(channel.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(FilesDesign.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if let group = channel.groupTitle, !group.isEmpty {
+                    Text(group)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(FilesDesign.subtitle)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.leading, 16)
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(FilesDesign.accent)
+                .frame(width: 20, height: 20)
+        }
+        .padding(12)
+    }
+
+    private var placeholderIcon: some View {
+        Image(systemName: "tv")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 24, height: 24)
+            .foregroundStyle(FilesDesign.secondaryIcon)
     }
 }
 
