@@ -44,6 +44,7 @@ struct LibraryView: View {
             viewModel.setModelContext(modelContext)
             await connectionsViewModel.loadSavedConnections()
             await viewModel.loadInitialSections(connections: connectionsViewModel.savedConnections)
+            viewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)
         }
         .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in
             Task {
@@ -57,6 +58,10 @@ struct LibraryView: View {
                 await viewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
                 showSyncToast("数据同步完成")
             }
+        }
+        .onChange(of: appState.selectedTab) { _, newValue in
+            guard newValue == .library else { return }
+            viewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)
         }
     }
 
@@ -111,6 +116,10 @@ struct LibraryView: View {
 
             if viewModel.totalFavoritesCount > 0 {
                 favoritesStackedSection
+            }
+
+            if !viewModel.folderBookmarks.isEmpty {
+                folderBookmarksSection
             }
 
             if hasEmbyConnectionsConfigured {
@@ -270,6 +279,60 @@ struct LibraryView: View {
         }
         .buttonStyle(FavoritesCardButtonStyle())
         .padding(.horizontal, 24)
+    }
+
+    // MARK: - Folder Bookmarks
+
+    private var folderBookmarksSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(HomeDesign.serverIconFill)
+
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HomeDesign.accent)
+                }
+                .frame(width: 42, height: 42)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("文件夹书签")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(HomeDesign.onSurface)
+
+                    Text("\(viewModel.folderBookmarks.count) 个快捷入口")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
+                }
+
+                Spacer(minLength: 12)
+            }
+            .padding(.horizontal, 24)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(viewModel.folderBookmarks) { bookmark in
+                        Button {
+                            openFolderBookmark(bookmark)
+                        } label: {
+                            FolderBookmarkCard(bookmark: bookmark)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 4)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    private func openFolderBookmark(_ bookmark: FolderBookmark) {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        connectionsViewModel.requestOpenFolderBookmark(bookmark)
+        appState.selectedTab = .connections
     }
 
     // MARK: - Collection Folder Sections
@@ -1008,6 +1071,59 @@ private struct HomeFavoritesCard: View {
             .frame(width: 58, height: 76)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 8)
+    }
+}
+
+private struct FolderBookmarkCard: View {
+    let bookmark: FolderBookmark
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(HomeDesign.serverIconFill)
+
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(HomeDesign.accent)
+                }
+                .frame(width: 38, height: 38)
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(HomeDesign.onSurface.opacity(0.42))
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(bookmark.title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(HomeDesign.onSurface)
+                    .lineLimit(1)
+
+                Text(bookmark.connectionName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
+                    .lineLimit(1)
+
+                Text(bookmark.path)
+                    .font(.system(size: 11))
+                    .foregroundStyle(HomeDesign.onSurface.opacity(0.52))
+                    .lineLimit(1)
+            }
+        }
+        .padding(14)
+        .frame(width: 190, alignment: .leading)
+        .background(HomeDesign.favoritesCardFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(HomeDesign.cardStroke, lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(bookmark.title)，\(bookmark.connectionName)")
     }
 }
 

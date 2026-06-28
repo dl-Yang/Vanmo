@@ -21,6 +21,7 @@ final class LibraryViewModel: ObservableObject {
     @Published private(set) var scannedConnectionsById: [UUID: SavedConnection] = [:]
     @Published private(set) var scannedFolderPreviews: [String: [MediaItem]] = [:]
     @Published private(set) var scannedFolderTotalCounts: [String: Int] = [:]
+    @Published private(set) var folderBookmarks: [FolderBookmark] = []
 
     @Published private(set) var isLoading = false
     @Published private(set) var isLibraryEmpty = true
@@ -126,6 +127,7 @@ final class LibraryViewModel: ObservableObject {
         do {
             try await reloadHighlights(in: context, connections: connections)
             try loadScannedLibraries(connections: connections, in: context)
+            try loadFolderBookmarks(connections: connections, in: context)
             await restoreHomeCacheIfNeeded(connections: connections)
             updateLibraryEmptyState(connections: connections)
 
@@ -157,6 +159,7 @@ final class LibraryViewModel: ObservableObject {
             )
             try await reloadHighlights(in: context, connections: connections)
             try loadScannedLibraries(connections: connections, in: context)
+            try loadFolderBookmarks(connections: connections, in: context)
             updateLibraryEmptyState(connections: connections)
         } catch {
             errorMessage = error.localizedDescription
@@ -175,11 +178,23 @@ final class LibraryViewModel: ObservableObject {
         do {
             try await reloadHighlights(in: context, connections: connections)
             try loadScannedLibraries(connections: connections, in: context)
+            try loadFolderBookmarks(connections: connections, in: context)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
         }
         updateLibraryEmptyState(connections: connections)
+    }
+
+    func refreshFolderBookmarks(connections: [SavedConnection]) {
+        guard let context = modelContext else { return }
+        do {
+            try loadFolderBookmarks(connections: connections, in: context)
+            updateLibraryEmptyState(connections: connections)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
     }
 
     // MARK: - Emby Live Refresh + Persist
@@ -596,6 +611,19 @@ final class LibraryViewModel: ObservableObject {
         scannedFolderTotalCounts = totalCountsByFolder
     }
 
+    private func loadFolderBookmarks(
+        connections: [SavedConnection],
+        in context: ModelContext
+    ) throws {
+        let activeConnectionIds = Set(connections.map(\.id))
+        let descriptor = FetchDescriptor<FolderBookmark>(
+            sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
+        )
+        folderBookmarks = try context.fetch(descriptor).filter { bookmark in
+            activeConnectionIds.contains(bookmark.connectionId)
+        }
+    }
+
     private func makeScannedFolder(
         id: String,
         name: String,
@@ -761,12 +789,14 @@ final class LibraryViewModel: ObservableObject {
     private func updateLibraryEmptyState(connections: [SavedConnection]) {
         let hasCollectionFolders = serverCollectionFolders.values.contains { !$0.isEmpty }
         let hasScannedLibraryFolders = scannedLibraryFolders.values.contains { !$0.isEmpty }
+        let hasFolderBookmarks = !folderBookmarks.isEmpty
         let hasRelevantConnection = !connections.isEmpty
         isLibraryEmpty =
             recentlyPlayed.isEmpty &&
             favorites.isEmpty &&
             !hasCollectionFolders &&
             !hasScannedLibraryFolders &&
+            !hasFolderBookmarks &&
             !hasRelevantConnection
     }
 

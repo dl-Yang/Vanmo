@@ -107,7 +107,7 @@ final class MediaItem {
     }
 }
 
-enum MediaType: String, Codable, CaseIterable {
+enum MediaType: String, Codable, CaseIterable, Sendable {
     case movie
     case tvShow
     case tvEpisode

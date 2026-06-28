@@ -8,7 +8,7 @@ import UIKit
 /// 2. 用 token 直接访问 PMS（`http://<host>:32400`）。
 ///
 /// PMS 默认返回 XML，所有请求都加 `Accept: application/json` 头部强制 JSON 响应。
-final class PlexService: MediaServerService {
+final class PlexService: MediaServerService, MediaSearchProviding {
     let type: ConnectionType = .plex
     private(set) var isConnected = false
 
@@ -130,6 +130,42 @@ final class PlexService: MediaServerService {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    func searchMedia(query: String, limit: Int = 30) async throws -> [ServerMediaItem] {
+        guard isConnected, let baseURL = resolvedBaseURL, let token else {
+            throw NetworkError.notConnected
+        }
+
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("library/search"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "query", value: trimmed),
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "X-Plex-Token", value: token),
+        ]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        applyHeaders(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+        try validatePlexResponse(response, body: data, context: "search media")
+
+        let result = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
+        let mapped = (result.mediaContainer.metadata ?? []).compactMap { meta in
+            mapPlexMediaItem(meta, baseURL: baseURL, token: token)
+        }
+        return Array(mapped.prefix(limit))
     }
 
     private func fetchAllSections(

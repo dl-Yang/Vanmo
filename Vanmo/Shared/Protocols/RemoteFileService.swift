@@ -17,13 +17,41 @@ protocol RemoteFileService: AnyObject {
 
 extension RemoteFileService {
     func search(query: String, path: String = "/") async throws -> [RemoteFile] {
+        try await search(query: query, path: path, maxDepth: 0, limit: 50)
+    }
+
+    func search(
+        query: String,
+        path: String = "/",
+        maxDepth: Int,
+        limit: Int
+    ) async throws -> [RemoteFile] {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !normalizedQuery.isEmpty else { return [] }
 
-        let files = try await listDirectory(path: path)
-        return files.filter { file in
-            file.name.lowercased().contains(normalizedQuery)
+        var results: [RemoteFile] = []
+        var queue: [(path: String, depth: Int)] = [(path, 0)]
+        var visited: Set<String> = []
+
+        while !queue.isEmpty, results.count < limit {
+            try Task.checkCancellation()
+            let current = queue.removeFirst()
+            guard visited.insert(current.path).inserted else { continue }
+
+            let files = try await listDirectory(path: current.path)
+            for file in files {
+                if file.name.lowercased().contains(normalizedQuery) {
+                    results.append(file)
+                    if results.count >= limit { break }
+                }
+
+                if file.isDirectory, current.depth < maxDepth {
+                    queue.append((file.path, current.depth + 1))
+                }
+            }
         }
+
+        return results
     }
 }
 
@@ -34,7 +62,11 @@ protocol MediaServerService: RemoteFileService {
     ) -> AsyncThrowingStream<[ServerMediaItem], Error>
 }
 
-struct ServerMediaItem {
+protocol MediaSearchProviding: AnyObject {
+    func searchMedia(query: String, limit: Int) async throws -> [ServerMediaItem]
+}
+
+struct ServerMediaItem: Sendable {
     let serverId: String
     let title: String
     let originalTitle: String?

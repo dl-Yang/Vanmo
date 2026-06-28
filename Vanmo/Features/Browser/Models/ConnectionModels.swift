@@ -182,7 +182,7 @@ final class SavedConnection {
     }
 }
 
-struct RemoteFile: Identifiable, Hashable {
+struct RemoteFile: Identifiable, Hashable, Sendable {
     let id = UUID()
     let name: String
     let path: String
@@ -201,7 +201,7 @@ struct RemoteFile: Identifiable, Hashable {
     var isVideo: Bool { type == .video }
 }
 
-enum RemoteFileType {
+enum RemoteFileType: Sendable {
     case video
     case subtitle
     case audio

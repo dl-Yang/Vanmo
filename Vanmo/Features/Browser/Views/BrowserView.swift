@@ -31,6 +31,10 @@ struct ConnectionsView: View {
         .task {
             viewModel.setModelContext(modelContext)
             await viewModel.loadSavedConnections()
+            await openPendingFolderBookmarkIfNeeded()
+        }
+        .onChange(of: viewModel.pendingFolderBookmarkNavigation?.id) { _, _ in
+            Task { await openPendingFolderBookmarkIfNeeded() }
         }
         .alert("错误", isPresented: $viewModel.showError) {
             Button("确定") {}
@@ -192,6 +196,17 @@ struct ConnectionsView: View {
                 } label: {
                     Label("打开", systemImage: "folder")
                 }
+                if viewModel.canBookmarkFoldersInSelectedConnection {
+                    Button {
+                        viewModel.toggleFolderBookmark(file)
+                    } label: {
+                        if viewModel.isFolderBookmarked(file) {
+                            Label("取消书签", systemImage: "bookmark.slash")
+                        } else {
+                            Label("添加书签", systemImage: "bookmark")
+                        }
+                    }
+                }
             }
             if file.isVideo {
                 Button {
@@ -265,6 +280,16 @@ struct ConnectionsView: View {
             enteredConnectionID = connection.id
         }
         Task { await viewModel.selectConnection(connection) }
+    }
+
+    private func openPendingFolderBookmarkIfNeeded() async {
+        guard let request = viewModel.pendingFolderBookmarkNavigation else { return }
+        await MainActor.run {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                enteredConnectionID = request.connectionId
+            }
+        }
+        _ = await viewModel.openFolderBookmarkRequest(request)
     }
 
     private func handleBack() {

@@ -5,6 +5,7 @@ import Kingfisher
 struct SearchView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
     @StateObject private var viewModel = SearchViewModel()
 
     var body: some View {
@@ -24,8 +25,14 @@ struct SearchView: View {
         .onChange(of: viewModel.searchText) { _, _ in
             viewModel.search()
         }
+        .onChange(of: connectionsViewModel.savedConnections.map(\.id)) { _, _ in
+            viewModel.setConnections(connectionsViewModel.savedConnections)
+            viewModel.search()
+        }
         .task {
             viewModel.setModelContext(modelContext)
+            await connectionsViewModel.loadSavedConnections()
+            viewModel.setConnections(connectionsViewModel.savedConnections)
         }
     }
 
@@ -48,30 +55,67 @@ struct SearchView: View {
     private var searchResults: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                libraryResults
+                groupedResults
             }
             .padding()
         }
     }
 
     @ViewBuilder
-    private var libraryResults: some View {
-        if viewModel.results.isEmpty {
+    private var groupedResults: some View {
+        if viewModel.sections.isEmpty {
             ContentUnavailableView.search(text: viewModel.searchText)
         } else {
             Text(searchSummary)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            ForEach(viewModel.results) { item in
-                NavigationLink {
-                    MediaDetailView(item: item)
-                } label: {
-                    MediaListRow(item: item)
+            ForEach(viewModel.sections) { section in
+                Section {
+                    VStack(spacing: 10) {
+                        ForEach(section.items) { result in
+                            NavigationLink {
+                                MediaDetailView(item: result.item)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    MediaListRow(item: result.item)
+                                    if result.isRemoteResult {
+                                        Image(systemName: "bolt.horizontal.circle")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                            .accessibilityLabel("远程实时结果")
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    searchSectionHeader(section)
                 }
-                .buttonStyle(.plain)
             }
         }
+    }
+
+    private func searchSectionHeader(_ section: SearchResultSection) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(section.title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            if let subtitle = section.subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Text("\(section.items.count)")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 6)
     }
 
     private var searchSummary: String {
@@ -87,5 +131,6 @@ struct SearchView: View {
         SearchView()
     }
     .environmentObject(AppState())
+    .environmentObject(ConnectionsViewModel())
     .preferredColorScheme(.dark)
 }

@@ -9,6 +9,12 @@ enum ConnectionStatus {
     case failed
 }
 
+struct FolderBookmarkNavigationRequest: Identifiable, Equatable {
+    let id = UUID()
+    let connectionId: UUID
+    let path: String
+}
+
 @MainActor
 final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var savedConnections: [SavedConnection] = []
@@ -24,6 +30,7 @@ final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var files: [RemoteFile] = []
     @Published private(set) var isBrowsingFiles = false
     @Published private(set) var fileBrowserErrorMessage: String?
+    @Published private(set) var pendingFolderBookmarkNavigation: FolderBookmarkNavigationRequest?
     @Published var showAddConnection = false
     @Published var showError = false
     @Published var errorMessage = ""
@@ -79,6 +86,16 @@ final class ConnectionsViewModel: ObservableObject {
     var selectedConnection: SavedConnection? {
         guard let selectedConnectionID else { return nil }
         return savedConnections.first { $0.id == selectedConnectionID }
+    }
+
+    var canBookmarkFoldersInSelectedConnection: Bool {
+        guard let selectedConnection else { return false }
+        switch selectedConnection.type {
+        case .localFolder, .smb, .webdav, .alist, .fnos:
+            return true
+        default:
+            return false
+        }
     }
 
     func loadSavedConnections() async {
@@ -334,6 +351,7 @@ final class ConnectionsViewModel: ObservableObject {
         }
 
         deleteMediaItems(for: connectionId)
+        deleteFolderBookmarks(for: connectionId)
         modelContext?.delete(connection)
         try? modelContext?.save()
         connectionStatuses.removeValue(forKey: connectionId)
@@ -369,6 +387,114 @@ final class ConnectionsViewModel: ObservableObject {
             }
         } catch {
             VanmoLogger.library.error("[Connections] Delete cached media failed: \(error.localizedDescription)")
+        }
+    }
+
+    func isFolderBookmarked(_ file: RemoteFile) -> Bool {
+        guard file.isDirectory,
+              let connectionId = selectedConnectionID else {
+            return false
+        }
+        return folderBookmark(connectionId: connectionId, path: file.path) != nil
+    }
+
+    func toggleFolderBookmark(_ file: RemoteFile) {
+        guard file.isDirectory,
+              canBookmarkFoldersInSelectedConnection,
+              let context = modelContext,
+              let connection = selectedConnection else {
+            return
+        }
+
+        if let existing = folderBookmark(connectionId: connection.id, path: file.path) {
+            context.delete(existing)
+        } else {
+            context.insert(
+                FolderBookmark(
+                    title: folderBookmarkTitle(for: file),
+                    connectionId: connection.id,
+                    connectionName: connection.name,
+                    path: file.path
+                )
+            )
+        }
+        do {
+            try context.save()
+        } catch {
+            VanmoLogger.library.error("[FolderBookmark] Save failed: \(error.localizedDescription)")
+        }
+    }
+
+    func requestOpenFolderBookmark(_ bookmark: FolderBookmark) {
+        pendingFolderBookmarkNavigation = FolderBookmarkNavigationRequest(
+            connectionId: bookmark.connectionId,
+            path: bookmark.path
+        )
+    }
+
+    func openFolderBookmarkRequest(_ request: FolderBookmarkNavigationRequest) async -> Bool {
+        if savedConnections.isEmpty {
+            await loadSavedConnections()
+        }
+
+        guard let connection = savedConnections.first(where: { $0.id == request.connectionId }) else {
+            if pendingFolderBookmarkNavigation?.id == request.id {
+                pendingFolderBookmarkNavigation = nil
+            }
+            return false
+        }
+
+        if selectedConnectionID != connection.id {
+            selectedConnectionID = connection.id
+            currentPath = "/"
+            pathStack = []
+            files = []
+            fileBrowserErrorMessage = nil
+            await disconnectBrowserServiceIfNeeded()
+        }
+
+        pathStack = []
+        let didLoad = await loadDirectory(path: request.path)
+        if pendingFolderBookmarkNavigation?.id == request.id {
+            pendingFolderBookmarkNavigation = nil
+        }
+        return didLoad
+    }
+
+    private func folderBookmark(connectionId: UUID, path: String) -> FolderBookmark? {
+        guard let context = modelContext else { return nil }
+        let targetConnectionId = connectionId
+        let targetPath = path
+        let descriptor = FetchDescriptor<FolderBookmark>(
+            predicate: #Predicate<FolderBookmark> { bookmark in
+                bookmark.connectionId == targetConnectionId && bookmark.path == targetPath
+            }
+        )
+        return try? context.fetch(descriptor).first
+    }
+
+    private func folderBookmarkTitle(for file: RemoteFile) -> String {
+        let trimmed = file.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        let last = (file.path as NSString).lastPathComponent
+        return last.isEmpty ? file.path : last
+    }
+
+    private func deleteFolderBookmarks(for connectionId: UUID) {
+        guard let context = modelContext else { return }
+        let targetConnectionId = connectionId
+        let descriptor = FetchDescriptor<FolderBookmark>(
+            predicate: #Predicate<FolderBookmark> { bookmark in
+                bookmark.connectionId == targetConnectionId
+            }
+        )
+        do {
+            let bookmarks = try context.fetch(descriptor)
+            for bookmark in bookmarks {
+                context.delete(bookmark)
+            }
+        } catch {
+            VanmoLogger.library.error("[Connections] Delete folder bookmarks failed: \(error.localizedDescription)")
         }
     }
 

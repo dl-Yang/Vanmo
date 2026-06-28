@@ -11,7 +11,7 @@ import Foundation
 /// 因此 `JellyfinService` 复用 `EmbyService` 的全部实现，仅切换 `type` 与
 /// `apiPrefix` 参数。如果未来 Jellyfin 出现独有 endpoint，再在此薄包装中
 /// override 对应方法即可，不必污染 `EmbyService`。
-final class JellyfinService: MediaServerService {
+final class JellyfinService: MediaServerService, MediaSearchProviding {
     private let inner: EmbyService
 
     var type: ConnectionType { inner.type }
@@ -50,5 +50,9 @@ final class JellyfinService: MediaServerService {
         pageSize: Int
     ) -> AsyncThrowingStream<[ServerMediaItem], Error> {
         inner.streamMediaItems(since: since, pageSize: pageSize)
+    }
+
+    func searchMedia(query: String, limit: Int) async throws -> [ServerMediaItem] {
+        try await inner.searchMedia(query: query, limit: limit)
     }
 }

@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 
-final class EmbyService: MediaServerService {
+final class EmbyService: MediaServerService, MediaSearchProviding {
     let type: ConnectionType
     private(set) var isConnected = false
 
@@ -598,6 +598,35 @@ final class EmbyService: MediaServerService {
         ]
 
         let page = try await fetchItemsPage(components: components, baseURL: base, token: token, context: "fetch favorite items")
+        return page.items
+    }
+
+    /// 服务端全局搜索，覆盖 Emby/Jellyfin 当前用户可见的视频库。
+    func searchMedia(query: String, limit: Int = 30) async throws -> [ServerMediaItem] {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "SearchTerm", value: trimmed),
+            URLQueryItem(name: "Recursive", value: "true"),
+            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series,Episode,Video"),
+            URLQueryItem(name: "Fields", value: Self.liveItemFields),
+            URLQueryItem(name: "SortBy", value: "SortName"),
+            URLQueryItem(name: "SortOrder", value: "Ascending"),
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        let page = try await fetchItemsPage(components: components, baseURL: base, token: token, context: "search media")
         return page.items
     }
 
