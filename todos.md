@@ -8,8 +8,8 @@
 
 ### 2. 媒体源与国内生态
 - [x] **AList 网盘入口产品化**：已完成 WebDAV 兼容入口说明、AList/fnOS 路径前导斜杠规范化、404 路径错误指引、首页扫描媒体库回归，以及跨 host 302 取流时剥离 `Authorization` 的兼容与安全修复。
-- [ ] **IPTV MVP 产品化**：已完成 M3U/M3U8 播放列表解析、`group-title` / `tvg-logo` / `tvg-id` / `url-tvg` 元数据解析、频道分组与台标 UI、刷新强制重拉播放列表、空频道提示和直播播放体验优化（LIVE 标识、跳过续播、断流重试、HLS 走 AVFoundation）；当前仅在工作区未提交改动中落盘 XMLTV/EPG 解析层，仍需接入 ViewModel/UI 展示当前/下一节目，并继续补强失效频道提示或探测。
-- [ ] **fnOS 轻量适配完善**：当前按 WebDAV 兼容预设接入，并已有部分 AList/fnOS 路径规范化与 404 路径提示；继续补充 fnOS/SMB/WebDAV 预设说明、默认 HTTPS/端口/路径校验，并调研是否需要 fnOS 专属 API。
+- [x] **IPTV MVP 产品化**：已完成 M3U/M3U8 播放列表解析、`group-title` / `tvg-logo` / `tvg-id` / `url-tvg` 元数据解析、频道分组与台标 UI、刷新强制重拉播放列表、空频道提示和直播播放体验优化（LIVE 标识、跳过续播、断流重试、HLS 走 AVFoundation），并接入 XMLTV/EPG 拉取与 ViewModel/UI 展示当前/下一节目；播放失败的频道会在列表内标记为无法播放。
+- [x] **fnOS 轻量适配完善**：已按 WebDAV 兼容预设接入，完成 AList/fnOS 路径规范化、按类型拆分 404 路径提示、fnOS/SMB/WebDAV 预设说明、fnOS 默认路径与 HTTPS/端口联动、端口/路径表单校验；P0 阶段继续以 WebDAV/SMB 为主，不引入 fnOS 专属 API。
 
 ### 3. 媒体库与交互
 - [ ] **全局搜索增强**：当前搜索覆盖本地已同步媒体并做去重；继续接入 Emby/Plex live API、网盘远程搜索和按来源分组展示。

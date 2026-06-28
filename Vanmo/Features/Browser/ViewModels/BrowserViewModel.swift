@@ -23,6 +23,9 @@ final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var pathStack: [String] = []
     @Published private(set) var files: [RemoteFile] = []
     @Published private(set) var isBrowsingFiles = false
+    @Published private(set) var epgGuide = EPGGuide(programsByChannel: [:])
+    @Published private(set) var isLoadingEPG = false
+    @Published private(set) var failedChannelPaths: Set<String> = []
     @Published private(set) var fileBrowserErrorMessage: String?
     @Published var showAddConnection = false
     @Published var showError = false
@@ -33,6 +36,7 @@ final class ConnectionsViewModel: ObservableObject {
     private var didAttemptAutoReconnect = false
     private var browserService: RemoteFileService?
     private var browserServiceConnectionID: UUID?
+    private var epgLoadID: UUID?
     /// 仅 localFolder 用：保留正在持有 security-scoped access 的 service 实例，
     /// 让 App 生命周期内 file:// URL 始终可读，避免播放时权限失效。
     private var activeLocalServices: [UUID: LocalFolderService] = [:]
@@ -380,6 +384,7 @@ final class ConnectionsViewModel: ObservableObject {
             pathStack = []
             files = []
             fileBrowserErrorMessage = nil
+            resetIPTVState()
             await disconnectBrowserServiceIfNeeded()
         }
         await loadDirectory(path: currentPath)
@@ -406,6 +411,11 @@ final class ConnectionsViewModel: ObservableObject {
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
             isBrowsingFiles = false
+            if connection.type == .iptv {
+                await loadEPGGuide(from: service, connectionID: connection.id)
+            } else {
+                resetIPTVState()
+            }
             return true
         } catch {
             VanmoLogger.network.error("[Files] Failed to browse \(connection.name): \(error.localizedDescription)")
@@ -436,6 +446,7 @@ final class ConnectionsViewModel: ObservableObject {
         // IPTV 频道列表在 connect() 时一次性下载解析并缓存在 service 内存中，
         // 普通 listDirectory 不会重新拉取 M3U；刷新时强制重建 service 以重新下载播放列表。
         if selectedConnection?.type == .iptv {
+            resetIPTVState()
             await disconnectBrowserServiceIfNeeded()
         }
         await loadDirectory(path: currentPath)
@@ -461,6 +472,14 @@ final class ConnectionsViewModel: ObservableObject {
         }
         let service = try await browserFileService(for: connection)
         return try await service.streamURL(for: file)
+    }
+
+    func markChannelPlaybackFailed(_ file: RemoteFile) {
+        failedChannelPaths.insert(file.path)
+    }
+
+    func isChannelPlaybackFailed(_ file: RemoteFile) -> Bool {
+        failedChannelPaths.contains(file.path)
     }
 
     private func reconcileSelectedConnection() {
@@ -490,6 +509,33 @@ final class ConnectionsViewModel: ObservableObject {
         }
     }
 
+    private func loadEPGGuide(from service: RemoteFileService, connectionID: UUID) async {
+        guard let iptvService = service as? IPTVService else {
+            epgGuide = EPGGuide(programsByChannel: [:])
+            isLoadingEPG = false
+            return
+        }
+
+        let loadID = UUID()
+        epgLoadID = loadID
+        isLoadingEPG = true
+        let guide = await iptvService.fetchEPGGuide()
+        guard epgLoadID == loadID,
+              selectedConnectionID == connectionID,
+              selectedConnection?.type == .iptv else {
+            return
+        }
+        epgGuide = guide
+        isLoadingEPG = false
+    }
+
+    private func resetIPTVState() {
+        epgLoadID = nil
+        epgGuide = EPGGuide(programsByChannel: [:])
+        isLoadingEPG = false
+        failedChannelPaths = []
+    }
+
     private func resetFileBrowser() {
         selectedConnectionID = nil
         currentPath = "/"
@@ -497,6 +543,7 @@ final class ConnectionsViewModel: ObservableObject {
         files = []
         isBrowsingFiles = false
         fileBrowserErrorMessage = nil
+        resetIPTVState()
     }
 
     private func browserFileService(for connection: SavedConnection) async throws -> RemoteFileService {

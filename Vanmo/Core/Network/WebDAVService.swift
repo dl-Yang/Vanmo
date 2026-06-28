@@ -60,10 +60,14 @@ final class WebDAVService: RemoteFileService {
         case 401, 403:
             throw NetworkError.authenticationFailed
         case 404:
-            if type == .alist || type == .fnos {
-                throw NetworkError.connectionFailed("路径不存在: \(probePath)。AList/fnOS 的 WebDAV 路径通常为 /dav，请检查路径设置。")
+            switch type {
+            case .alist:
+                throw NetworkError.connectionFailed("路径不存在: \(probePath)。AList 的 WebDAV 路径通常为 /dav，请检查路径设置。")
+            case .fnos:
+                throw NetworkError.connectionFailed("路径不存在: \(probePath)。fnOS WebDAV 路径通常留空，请确认 NAS 已开启 WebDAV 服务并授予文件夹权限。")
+            default:
+                throw NetworkError.connectionFailed("路径不存在: \(probePath)，请检查 WebDAV 根路径或目录权限。")
             }
-            throw NetworkError.connectionFailed("路径不存在: \(probePath)")
         default:
             let bodyPreview = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
             throw NetworkError.connectionFailed("PROPFIND 失败 (\(httpResponse.statusCode)): \(bodyPreview)")
