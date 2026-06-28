@@ -57,6 +57,25 @@ final class IPTVService: RemoteFileService {
         throw NetworkError.unsupportedProtocol
     }
 
+    func fetchEPGGuide() async -> EPGGuide {
+        guard let epgURL else {
+            return EPGGuide(programsByChannel: [:])
+        }
+
+        do {
+            let (data, response) = try await session.data(from: epgURL)
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
+                VanmoLogger.network.warning("[IPTV] EPG request failed: HTTP \(httpResponse.statusCode)")
+                return EPGGuide(programsByChannel: [:])
+            }
+            return XMLTVParser().parse(data: data)
+        } catch {
+            VanmoLogger.network.warning("[IPTV] EPG request failed: \(error.localizedDescription)")
+            return EPGGuide(programsByChannel: [:])
+        }
+    }
+
     private func playlistURL(from config: ConnectionConfig) -> URL? {
         let raw = (config.path?.isEmpty == false ? config.path : config.host) ?? config.host
         if let url = URL(string: raw), url.scheme != nil {

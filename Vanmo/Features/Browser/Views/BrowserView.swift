@@ -249,7 +249,12 @@ struct ConnectionsView: View {
         Button {
             Task { await play(channel) }
         } label: {
-            IPTVChannelCard(channel: channel)
+            IPTVChannelCard(
+                channel: channel,
+                epgGuide: viewModel.epgGuide,
+                isLoadingEPG: viewModel.isLoadingEPG,
+                isPlaybackFailed: viewModel.isChannelPlaybackFailed(channel)
+            )
         }
         .buttonStyle(FilesRowButtonStyle())
     }
@@ -340,6 +345,9 @@ struct ConnectionsView: View {
             item.container = ext.isEmpty ? nil : ext.lowercased()
             appState.play(item)
         } catch {
+            if isIPTVBrowsing {
+                viewModel.markChannelPlaybackFailed(file)
+            }
             viewModel.errorMessage = error.localizedDescription
             viewModel.showError = true
         }
@@ -611,6 +619,9 @@ private struct FileCard: View {
 
 private struct IPTVChannelCard: View {
     let channel: RemoteFile
+    let epgGuide: EPGGuide
+    let isLoadingEPG: Bool
+    let isPlaybackFailed: Bool
 
     var body: some View {
         HStack(spacing: 0) {
@@ -634,11 +645,32 @@ private struct IPTVChannelCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(channel.name)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(FilesDesign.title)
+                    .foregroundStyle(isPlaybackFailed ? FilesDesign.subtitle : FilesDesign.title)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                if let group = channel.groupTitle, !group.isEmpty {
+                if isPlaybackFailed {
+                    Text("无法播放，请检查频道源")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
+                } else if let currentProgramTitle {
+                    Text("正在播放：\(currentProgramTitle)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(FilesDesign.subtitle)
+                        .lineLimit(1)
+                    if let nextProgramTitle {
+                        Text("下一档：\(nextProgramTitle)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(FilesDesign.subtitle)
+                            .lineLimit(1)
+                    }
+                } else if isLoadingEPG, channel.tvgId?.isEmpty == false {
+                    Text("节目单加载中...")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(FilesDesign.subtitle)
+                        .lineLimit(1)
+                } else if let group = channel.groupTitle, !group.isEmpty {
                     Text(group)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(FilesDesign.subtitle)
@@ -651,10 +683,26 @@ private struct IPTVChannelCard: View {
 
             Image(systemName: "play.circle.fill")
                 .font(.system(size: 20))
-                .foregroundStyle(FilesDesign.accent)
+                .foregroundStyle(isPlaybackFailed ? FilesDesign.subtitle : FilesDesign.accent)
                 .frame(width: 20, height: 20)
         }
         .padding(12)
+        .opacity(isPlaybackFailed ? 0.65 : 1)
+    }
+
+    private var currentProgramTitle: String? {
+        guard let channelId = channel.tvgId, !channelId.isEmpty else { return nil }
+        return normalizedProgramTitle(epgGuide.current(for: channelId)?.title)
+    }
+
+    private var nextProgramTitle: String? {
+        guard let channelId = channel.tvgId, !channelId.isEmpty else { return nil }
+        return normalizedProgramTitle(epgGuide.next(for: channelId)?.title)
+    }
+
+    private func normalizedProgramTitle(_ title: String?) -> String? {
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private var placeholderIcon: some View {

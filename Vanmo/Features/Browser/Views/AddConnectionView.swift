@@ -48,9 +48,9 @@ struct AddConnectionView: View {
                 }
             }
             .onAppear {
-                port = "\(selectedType.defaultPort)"
+                useHTTPS = inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: selectedType))
+                port = "\(defaultPort(for: selectedType, useHTTPS: useHTTPS))"
                 applyDefaults(for: selectedType)
-                useHTTPS = inferredHTTPSFromHost(defaultValue: true)
             }
             .fileImporter(
                 isPresented: $showFolderPicker,
@@ -73,9 +73,11 @@ struct AddConnectionView: View {
             }
             .pickerStyle(.menu)
             .onChange(of: selectedType) { _, newValue in
-                port = "\(newValue.defaultPort)"
+                useHTTPS = supportsHTTPS(for: newValue)
+                    ? inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: newValue))
+                    : false
+                port = "\(defaultPort(for: newValue, useHTTPS: useHTTPS))"
                 applyDefaults(for: newValue)
-                useHTTPS = supportsHTTPS(for: newValue) ? inferredHTTPSFromHost(defaultValue: true) : false
                 if !newValue.isLocal {
                     folderURL = nil
                     folderBookmark = nil
@@ -139,6 +141,9 @@ struct AddConnectionView: View {
 
             if supportsHTTPS(for: selectedType) {
                 Toggle("HTTPS", isOn: $useHTTPS)
+                    .onChange(of: useHTTPS) { _, newValue in
+                        applyHTTPSPortDefault(newValue)
+                    }
             }
 
             TextField("端口", text: $port)
@@ -147,16 +152,18 @@ struct AddConnectionView: View {
             TextField(pathPlaceholder, text: $path)
                 .autocapitalization(.none)
 
-            if selectedType == .alist {
-                Text("AList 默认端口 5244、WebDAV 路径为 /dav，是否启用 HTTPS 取决于实例配置。用户名/密码为 AList 账户，可聚合阿里云盘、百度网盘、115、夸克等来源；部分网盘的直链取流可能受限或限速。")
+            if let formValidationMessage {
+                Text(formValidationMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else if let fnOSPortHint {
+                Text(fnOSPortHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if selectedType == .iptv {
-                Text("可在主机地址或路径中填写完整 M3U/M3U8 播放列表 URL。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else if selectedType == .fnos {
-                Text("fnOS 默认按 WebDAV 兼容方式连接；如使用 SMB，可选择 SMB 协议并填写同一台 NAS 地址。")
+            }
+
+            if let caption = connectionTypeCaption {
+                Text(caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -196,10 +203,63 @@ struct AddConnectionView: View {
             return folderBookmark != nil
         }
         guard !host.isEmpty else { return false }
+        guard isPortValid, isRemotePathValid else { return false }
         if selectedType.requiresAuth {
             return !username.isEmpty
         }
         return true
+    }
+
+    private var isPortValid: Bool {
+        let trimmed = port.trimmingCharacters(in: .whitespacesAndNewlines)
+        if selectedType == .iptv, trimmed.isEmpty {
+            return true
+        }
+        guard let value = Int(trimmed) else { return false }
+        if selectedType == .iptv {
+            return (0...65535).contains(value)
+        }
+        return (1...65535).contains(value)
+    }
+
+    private var isRemotePathValid: Bool {
+        guard selectedType == .webdav || selectedType == .alist || selectedType == .fnos else {
+            return true
+        }
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed.hasPrefix("/")
+    }
+
+    private var formValidationMessage: String? {
+        if !isPortValid {
+            return selectedType == .iptv ? "端口需为 0-65535，或留空使用播放列表 URL。" : "端口需为 1-65535。"
+        }
+        if !isRemotePathValid {
+            return "WebDAV 路径需以 / 开头；不确定时可留空。"
+        }
+        return nil
+    }
+
+    private var fnOSPortHint: String? {
+        guard selectedType == .fnos, useHTTPS, Int(port) == 5005 else { return nil }
+        return "fnOS HTTPS 通常使用 5006；FN Connect 外网域名通常使用 443，路径留空。"
+    }
+
+    private var connectionTypeCaption: String? {
+        switch selectedType {
+        case .alist:
+            return "AList 默认端口 5244、WebDAV 路径为 /dav，是否启用 HTTPS 取决于实例配置。用户名/密码为 AList 账户，可聚合阿里云盘、百度网盘、115、夸克等来源；部分网盘的直链取流可能受限或限速。"
+        case .webdav:
+            return "通用 WebDAV 连接。主机可填写域名或 IP，路径用于指定服务器上的根目录；不确定路径时可留空。"
+        case .smb:
+            return "SMB 适用于 fnOS、NAS 或局域网共享，默认端口 445；保存后可从共享根目录继续进入具体文件夹。"
+        case .iptv:
+            return "可在主机地址或路径中填写完整 M3U/M3U8 播放列表 URL。"
+        case .fnos:
+            return "fnOS 按 WebDAV 兼容方式连接：局域网 HTTP 通常为 5005，HTTPS 通常为 5006，路径一般留空；如使用 SMB，请选择 SMB 协议。"
+        default:
+            return nil
+        }
     }
 
     private var resolvedPort: Int {
@@ -303,11 +363,43 @@ struct AddConnectionView: View {
         return URLComponents(string: "https://\(value)")
     }
 
+    private func defaultHTTPS(for type: ConnectionType) -> Bool {
+        switch type {
+        case .fnos:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func defaultPort(for type: ConnectionType, useHTTPS: Bool) -> Int {
+        switch type {
+        case .fnos:
+            return useHTTPS ? 5006 : 5005
+        case .webdav:
+            return useHTTPS ? 443 : 80
+        default:
+            return type.defaultPort
+        }
+    }
+
+    private func applyHTTPSPortDefault(_ useHTTPS: Bool) {
+        guard selectedType == .fnos else { return }
+        let currentPort = Int(port)
+        if currentPort == nil || currentPort == 5005 || currentPort == 5006 {
+            port = "\(defaultPort(for: selectedType, useHTTPS: useHTTPS))"
+        }
+    }
+
     private func applyDefaults(for type: ConnectionType) {
         switch type {
-        case .alist, .fnos:
+        case .alist:
             if path.isEmpty {
                 path = "/dav"
+            }
+        case .fnos:
+            if path == "/dav" {
+                path = ""
             }
         default:
             break
