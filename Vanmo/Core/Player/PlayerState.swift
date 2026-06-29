@@ -68,6 +68,15 @@ struct PlayerConfig {
     }
 }
 
+enum PlaybackPreferences {
+    static let hardwareDecodingKey = "playback.hardwareDecoding"
+    static let audioOutputModeKey = "audio.outputMode"
+
+    static var hardwareDecodingEnabled: Bool {
+        UserDefaults.standard.object(forKey: hardwareDecodingKey) as? Bool ?? true
+    }
+}
+
 enum AudioOutputMode: String, CaseIterable {
     case auto
     case stereo
@@ -90,7 +99,7 @@ enum AudioOutputMode: String, CaseIterable {
     }
 
     static var current: AudioOutputMode {
-        let raw = UserDefaults.standard.string(forKey: "audio.outputMode") ?? "auto"
+        let raw = UserDefaults.standard.string(forKey: PlaybackPreferences.audioOutputModeKey) ?? "auto"
         return AudioOutputMode(rawValue: raw) ?? .auto
     }
 }

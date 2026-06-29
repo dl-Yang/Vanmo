@@ -22,10 +22,10 @@
 
 ### 1. 播放器与字幕
 
-- [ ] **ASS/SSA 特效字幕引擎**：接入 libass 或 KSPlayer 原生 ASS 渲染能力，支持样式、定位、描边、动画和复杂字幕特效；当前仅避免把 ASS/SSA 误当 SRT 解析。
-- [ ] **KSPlayer PiP 支持**：调研并实现 MKV/TS/AVI 等 KSPlayer 路径的 PiP，或提供明确的不可用提示与 AVFoundation fallback。
-- [ ] **硬件解码设置接入**：将设置页中的硬件解码开关真正传入 KSPlayer options，并验证不同格式下的稳定性。
-- [ ] **蓝光 ISO / 原盘播放**：在已有 `Core/Player/Disc/` 占位解析层基础上实现真实 playlist 解析、章节/音轨/字幕映射、playlist 选择和远程 Range 读取策略。
+- [x] **ASS/SSA 特效字幕引擎**：已允许本地/远程 ASS/SSA 外挂轨进入选轨列表，KSPlayer 路径交由 `URLSubtitleInfo` / `KSSubtitleProtocol` 富字幕渲染并支持图片字幕输出；AVFoundation 或不可用路径会给出明确提示，仍避免误当 SRT/VTT 解析。
+- [x] **KSPlayer PiP 支持**：已接入 KSPlayer sample-buffer PiP 能力探测与启动/退出入口；不可启动时提供明确提示，AVFoundation 原生路径继续使用既有 PiP。
+- [x] **硬件解码设置接入**：已统一 `playback.hardwareDecoding` 偏好读取并传入 `KSOptions.hardwareDecode`，硬解加载失败时自动软解重试；设置页说明该开关下次加载生效。
+- [x] **蓝光 ISO / 原盘播放**：已将 `Core/Player/Disc/` 从占位扩展为本地 BDMV / `.mpls` playlist 解析、主 playlist 选择、章节映射与 KSPlayer 播放 URL 解析；ISO 与远程原盘在未引入 UDF/libbluray/远程随机读完整链路前提供明确提示并保留 KSPlayer 直喂 fallback。
 
 ### 2. 官方国内网盘
 

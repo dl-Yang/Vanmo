@@ -37,6 +37,7 @@ enum MediaFormatProbe {
         nativeVideoExtensions
             .union(ffmpegVideoExtensions)
             .union(discImageExtensions)
+            .union(discPlaylistExtensions)
             .union(playlistExtensions)
     }
 
@@ -51,7 +52,8 @@ enum MediaFormatProbe {
         if discImageExtensions.contains(ext) || discPlaylistExtensions.contains(ext) {
             return true
         }
-        return url.path.uppercased().contains("/BDMV/")
+        let uppercasedPath = url.path.uppercased()
+        return uppercasedPath.contains("/BDMV/") || url.lastPathComponent.uppercased() == "BDMV"
     }
 }
 

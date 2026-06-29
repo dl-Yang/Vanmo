@@ -67,6 +67,8 @@ struct SettingsView: View {
             }
         } header: {
             Label("播放", systemImage: "play.circle")
+        } footer: {
+            Text("硬件解码优先仅影响 KSPlayer 播放路径，并在下一次加载视频时生效；如果硬解初始化失败，播放器会自动尝试软解。")
         }
     }
 

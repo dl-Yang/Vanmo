@@ -46,6 +46,10 @@ enum SubtitleFormat: Equatable {
     case ass
     case unknown
 
+    var isRichTextFormat: Bool {
+        self == .ass
+    }
+
     static func detect(from url: URL) -> SubtitleFormat {
         switch url.pathExtension.lowercased() {
         case "srt": return .srt

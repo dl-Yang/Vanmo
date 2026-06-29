@@ -37,6 +37,7 @@ final class PlayerViewModel: ObservableObject {
     @Published var isRateBoosting = false
     @Published var seekPreviewActive = false
     @Published var seekPreviewForward = true
+    @Published var notice: PlayerNotice?
 
     let engine: PlayerEngine
     private var item: MediaItem
@@ -47,7 +48,9 @@ final class PlayerViewModel: ObservableObject {
     private var liveRetryCount = 0
     private let externalSubtitleManager = SubtitleManager()
     private var activeExternalSubtitleID: Int?
+    private var activeRichSubtitleID: Int?
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
+    private var discChapters: [Chapter] = []
     private var seekBaseTime: TimeInterval?
     private let rateBoostHaptic = UIImpactFeedbackGenerator(style: .medium)
 
@@ -79,6 +82,22 @@ final class PlayerViewModel: ObservableObject {
 
     var ksPlayerVideoView: UIView? {
         (engine as? KSPlayerEngine)?.videoView
+    }
+
+    var canShowPictureInPictureButton: Bool {
+        avPlayer != nil || engine is KSPlayerEngine
+    }
+
+    var isPictureInPictureActive: Bool {
+        if let ksEngine = engine as? KSPlayerEngine {
+            return ksEngine.isPictureInPictureActive
+        }
+        return false
+    }
+
+    var isPictureInPicturePossible: Bool {
+        if avPlayer != nil { return true }
+        return (engine as? KSPlayerEngine)?.isPictureInPicturePossible == true
     }
 
     // MARK: - Setup
@@ -163,15 +182,16 @@ final class PlayerViewModel: ObservableObject {
         resetPlaybackMetadata()
 
         let originalURL = item.fileURL
+        let playbackURL = await resolveDiscPlaybackURLIfNeeded(originalURL)
         let loadURL: URL
-        if originalURL.isFileURL {
-            loadURL = originalURL
-        } else if let registration = await PrefetchProxy.shared.register(originalURL: originalURL) {
+        if playbackURL.isFileURL || Self.shouldBypassPrefetch(for: playbackURL) {
+            loadURL = playbackURL
+        } else if let registration = await PrefetchProxy.shared.register(originalURL: playbackURL) {
             loadURL = registration.url
             prefetchToken = registration.token
             VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
         } else {
-            loadURL = originalURL
+            loadURL = playbackURL
             VanmoLogger.player.info("[PlayerVM] prefetch unavailable, loading remote URL directly")
         }
 
@@ -203,7 +223,9 @@ final class PlayerViewModel: ObservableObject {
         chapters = []
         currentSubtitleContent = nil
         activeExternalSubtitleID = nil
+        activeRichSubtitleID = nil
         externalSubtitleTracks = []
+        discChapters = []
         Task {
             await externalSubtitleManager.clear()
         }
@@ -268,6 +290,23 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    func toggleKSPictureInPicture() {
+        guard let ksEngine = engine as? KSPlayerEngine else { return }
+        if !ksEngine.isPictureInPictureSupported {
+            showNotice(
+                title: "画中画不可用",
+                message: "当前 KSPlayer 路径暂无法启动画中画。可尝试 MP4/MOV/HLS 等 AVFoundation 原生格式。"
+            )
+            return
+        }
+        if !ksEngine.togglePictureInPicture() {
+            showNotice(
+                title: "画中画暂不可用",
+                message: "系统尚未允许当前视频进入画中画，请稍后重试或确认设备支持画中画。"
+            )
+        }
+    }
+
     func selectAudioTrack(_ index: Int) {
         config.selectedAudioTrack = index
         Task { await engine.selectAudioTrack(index: index) }
@@ -285,6 +324,9 @@ final class PlayerViewModel: ObservableObject {
         config.subtitleDelay = delay
         Task {
             await externalSubtitleManager.setDelay(delay)
+            if activeRichSubtitleID != nil, let ksEngine = engine as? KSPlayerEngine {
+                ksEngine.setExternalRichSubtitleDelay(delay)
+            }
             updateExternalSubtitle(at: currentTime)
         }
     }
@@ -292,8 +334,10 @@ final class PlayerViewModel: ObservableObject {
     private func applySubtitleSelection(_ index: Int?) async {
         guard let index else {
             activeExternalSubtitleID = nil
+            activeRichSubtitleID = nil
             currentSubtitleContent = nil
             await externalSubtitleManager.clear()
+            (engine as? KSPlayerEngine)?.clearExternalRichSubtitle()
             await engine.selectSubtitleTrack(index: nil)
             return
         }
@@ -302,19 +346,36 @@ final class PlayerViewModel: ObservableObject {
         if let fileURL = track.fileURL, !track.isEmbedded {
             do {
                 await engine.selectSubtitleTrack(index: nil)
-                try await externalSubtitleManager.load(from: fileURL)
-                await externalSubtitleManager.setDelay(config.subtitleDelay)
-                activeExternalSubtitleID = track.id
-                updateExternalSubtitle(at: currentTime)
+                if SubtitleFormat.detect(from: fileURL).isRichTextFormat {
+                    guard let ksEngine = engine as? KSPlayerEngine else {
+                        throw SubtitleError.assRenderingUnavailable
+                    }
+                    await externalSubtitleManager.clear()
+                    try await ksEngine.selectExternalRichSubtitle(url: fileURL, delay: config.subtitleDelay)
+                    activeExternalSubtitleID = nil
+                    activeRichSubtitleID = track.id
+                    currentSubtitleContent = nil
+                } else {
+                    (engine as? KSPlayerEngine)?.clearExternalRichSubtitle()
+                    try await externalSubtitleManager.load(from: fileURL)
+                    await externalSubtitleManager.setDelay(config.subtitleDelay)
+                    activeExternalSubtitleID = track.id
+                    activeRichSubtitleID = nil
+                    updateExternalSubtitle(at: currentTime)
+                }
             } catch {
                 VanmoLogger.subtitle.error("[PlayerVM] Failed to load external subtitle: \(error.localizedDescription)")
                 activeExternalSubtitleID = nil
+                activeRichSubtitleID = nil
                 currentSubtitleContent = nil
+                showNotice(title: "字幕不可用", message: error.localizedDescription)
             }
         } else {
             activeExternalSubtitleID = nil
+            activeRichSubtitleID = nil
             currentSubtitleContent = nil
             await externalSubtitleManager.clear()
+            (engine as? KSPlayerEngine)?.clearExternalRichSubtitle()
             await engine.selectSubtitleTrack(index: index)
         }
     }
@@ -474,11 +535,8 @@ final class PlayerViewModel: ObservableObject {
         return SubtitleManager.findSubtitleFiles(for: videoURL)
             .filter { url in
                 switch SubtitleFormat.detect(from: url) {
-                case .srt, .vtt:
+                case .srt, .vtt, .ass:
                     return true
-                case .ass:
-                    VanmoLogger.subtitle.info("[PlayerVM] ASS/SSA subtitle found but deferred to rich renderer: \(url.lastPathComponent)")
-                    return false
                 case .unknown:
                     return false
                 }
@@ -504,7 +562,7 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
-    /// 远程视频的同目录外挂字幕发现：列出视频所在目录，筛出同名前缀的 .srt/.vtt，
+    /// 远程视频的同目录外挂字幕发现：列出视频所在目录，筛出同名前缀的 .srt/.vtt/.ass/.ssa，
     /// 下载到本地缓存后以本地外挂轨形式暴露（复用现有选轨/加载路径）。
     private func remoteExternalSubtitleTracks() async -> [SubtitleTrackInfo] {
         guard let connectionId = item.sourceConnectionId,
@@ -536,7 +594,7 @@ final class PlayerViewModel: ObservableObject {
                 let stem = (file.name as NSString).deletingPathExtension
                 guard stem.hasPrefix(videoStem) else { return false }
                 switch SubtitleFormat.detect(from: URL(fileURLWithPath: file.name)) {
-                case .srt, .vtt: return true
+                case .srt, .vtt, .ass: return true
                 default: return false
                 }
             }
@@ -777,9 +835,138 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func loadChapters() {
-        if let ksEngine = engine as? KSPlayerEngine {
+        if !discChapters.isEmpty {
+            chapters = discChapters
+        } else if let ksEngine = engine as? KSPlayerEngine {
             chapters = ksEngine.availableChapters
         }
+    }
+
+    private func resolveDiscPlaybackURLIfNeeded(_ url: URL) async -> URL {
+        guard MediaFormatProbe.isDiscImage(url) else { return url }
+        guard url.isFileURL else {
+            showNotice(
+                title: "远程原盘将直接尝试播放",
+                message: "远程 BDMV/ISO 的 playlist 随机读取尚受限，当前会先交给 KSPlayer 直接尝试。"
+            )
+            return url
+        }
+        guard url.pathExtension.lowercased() != "iso" else {
+            showNotice(
+                title: "ISO playlist 解析暂不可用",
+                message: "当前未引入 UDF/libbluray，ISO 会先交给 KSPlayer 直接尝试播放；未加密 BDMV 目录和 .mpls 已支持 playlist 解析。"
+            )
+            return url
+        }
+
+        do {
+            let parser = BDMVPlaylistParser()
+            let structure = try await parser.parseStructure(at: url)
+            guard let playlist = structure.mainPlaylist else { return url }
+            discChapters = Self.chapters(from: playlist)
+            if let playbackURL = Self.playbackURL(for: playlist, originalURL: url) {
+                VanmoLogger.player.info("[PlayerVM] resolved BDMV playlist \(playlist.id) to \(playbackURL.absoluteString)")
+                return playbackURL
+            }
+            showNotice(
+                title: "原盘 playlist 已解析",
+                message: "已识别 \(playlist.id)，但播放片段路径无法定位，将回退为直接播放原始路径。"
+            )
+        } catch {
+            VanmoLogger.player.error("[PlayerVM] BDMV playlist parse failed: \(error.localizedDescription)")
+            showNotice(
+                title: "原盘解析失败",
+                message: "\(error.localizedDescription)。将回退为 KSPlayer 直接尝试播放。"
+            )
+        }
+        return url
+    }
+
+    private static func shouldBypassPrefetch(for url: URL) -> Bool {
+        switch url.scheme?.lowercased() {
+        case "concat":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private static func playbackURL(for playlist: DiscPlaylist, originalURL: URL) -> URL? {
+        guard let root = bdmvRoot(for: originalURL), !playlist.segments.isEmpty else { return nil }
+        if playlist.segments.count == 1 {
+            return root
+                .deletingLastPathComponent()
+                .appendingPathComponent(playlist.segments[0].relativePath)
+        }
+
+        return makeLocalDiscPlaylistFile(for: playlist, bdmvParent: root.deletingLastPathComponent())
+    }
+
+    private static func makeLocalDiscPlaylistFile(for playlist: DiscPlaylist, bdmvParent: URL) -> URL? {
+        guard let directory = try? FileManager.default.url(
+            for: .cachesDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        ).appendingPathComponent("DiscPlaylists", isDirectory: true) else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let targetDuration = max(1, Int(ceil(playlist.segments.map(\.duration).max() ?? 1)))
+        var lines = [
+            "#EXTM3U",
+            "#EXT-X-VERSION:3",
+            "#EXT-X-PLAYLIST-TYPE:VOD",
+            "#EXT-X-TARGETDURATION:\(targetDuration)",
+            "#EXT-X-MEDIA-SEQUENCE:0",
+        ]
+
+        for segment in playlist.segments {
+            let segmentURL = bdmvParent.appendingPathComponent(segment.relativePath)
+            lines.append(String(format: "#EXTINF:%.3f,", segment.duration))
+            lines.append(segmentURL.absoluteString)
+        }
+        lines.append("#EXT-X-ENDLIST")
+
+        let fileName = "\(playlist.id.replacingOccurrences(of: ".", with: "-"))-\(UUID().uuidString).m3u8"
+        let playlistURL = directory.appendingPathComponent(fileName)
+        do {
+            try lines.joined(separator: "\n").write(to: playlistURL, atomically: true, encoding: .utf8)
+            return playlistURL
+        } catch {
+            VanmoLogger.player.error("[PlayerVM] failed to write BDMV helper playlist: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private static func chapters(from playlist: DiscPlaylist) -> [Chapter] {
+        let sorted = playlist.chapters.sorted { $0.startTime < $1.startTime }
+        guard !sorted.isEmpty else { return [] }
+        return sorted.enumerated().map { offset, chapter in
+            let end: TimeInterval
+            if offset + 1 < sorted.count {
+                end = sorted[offset + 1].startTime
+            } else {
+                end = playlist.duration
+            }
+            return Chapter(
+                id: chapter.index,
+                title: "章节 \(offset + 1)",
+                startTime: CMTime(seconds: chapter.startTime, preferredTimescale: 600),
+                endTime: CMTime(seconds: max(end, chapter.startTime), preferredTimescale: 600)
+            )
+        }
+    }
+
+    private static func bdmvRoot(for url: URL) -> URL? {
+        let standardized = url.standardizedFileURL
+        let components = standardized.pathComponents
+        guard let index = components.lastIndex(where: { $0.uppercased() == "BDMV" }) else {
+            return standardized.lastPathComponent.uppercased() == "BDMV" ? standardized : nil
+        }
+        let rootPath = NSString.path(withComponents: Array(components[0...index]))
+        return URL(fileURLWithPath: rootPath, isDirectory: true)
     }
 
     /// 首播时读取本地视频真实 HDR 元数据并持久化，供详情/收藏角标使用。
@@ -949,6 +1136,16 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    private func showNotice(title: String, message: String) {
+        notice = PlayerNotice(title: title, message: message)
+    }
+
+}
+
+struct PlayerNotice: Identifiable, Equatable {
+    let id = UUID()
+    let title: String
+    let message: String
 }
 
 struct PlayerEpisodeSeason: Identifiable, Equatable {

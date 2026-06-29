@@ -1,7 +1,9 @@
 import Foundation
 import AVFoundation
+import AVKit
 import Combine
 import KSPlayer
+import SwiftUI
 import UIKit
 
 final class KSPlayerEngine: NSObject, PlayerEngine {
@@ -37,12 +39,38 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     private var shouldResumeAfterBuffering = false
     private var lastPlayableTime: CFAbsoluteTime = 0
     private var selectedSubtitleSearchable: (any KSSubtitleProtocol)?
+    private var externalRichSubtitle: URLSubtitleInfo?
+    private var externalRichSubtitleDelay: TimeInterval = 0
     private var subtitleLogCounter: Int = 0
     private var cachedSubtitleParts: [SubtitlePart] = []
 
     // MARK: - Video View
 
     var videoView: UIView? { player?.view }
+
+    @MainActor
+    var isPictureInPictureSupported: Bool {
+        if #available(iOS 15.0, tvOS 15.0, *) {
+            return AVPictureInPictureController.isPictureInPictureSupported() && player?.pipController != nil
+        }
+        return false
+    }
+
+    @MainActor
+    var isPictureInPictureActive: Bool {
+        if #available(iOS 15.0, tvOS 15.0, *) {
+            return player?.pipController?.isPictureInPictureActive == true
+        }
+        return false
+    }
+
+    @MainActor
+    var isPictureInPicturePossible: Bool {
+        if #available(iOS 15.0, tvOS 15.0, *) {
+            return player?.pipController?.isPictureInPicturePossible == true
+        }
+        return false
+    }
 
     // MARK: - Chapters
 
@@ -79,6 +107,31 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         await MainActor.run { stop() }
         stateSubject.send(.loading)
 
+        let hardwareDecode = PlaybackPreferences.hardwareDecodingEnabled
+        do {
+            try await loadPlayer(
+                url: url,
+                startPosition: startPosition,
+                hardwareDecode: hardwareDecode
+            )
+        } catch {
+            guard hardwareDecode else { throw error }
+            VanmoLogger.player.error("[KSEngine] hardware decode load failed, retrying with software decode: \(error.localizedDescription)")
+            await MainActor.run {
+                player?.shutdown()
+                player = nil
+            }
+            readyContinuation = nil
+            stateSubject.send(.loading)
+            try await loadPlayer(
+                url: url,
+                startPosition: startPosition,
+                hardwareDecode: false
+            )
+        }
+    }
+
+    private func loadPlayer(url: URL, startPosition: CMTime?, hardwareDecode: Bool) async throws {
         let options = KSOptions()
         if let startPosition, startPosition.seconds > 0 {
             options.startPlayTime = startPosition.seconds
@@ -92,7 +145,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
 
         // 接通设置页「硬件解码优先」开关（VideoToolbox 硬解）。
         // HDR 显示标准（preferredDisplayCriteria）由 KSPlayer 依据内容动态范围内部自动配置。
-        let hardwareDecode = UserDefaults.standard.object(forKey: "playback.hardwareDecoding") as? Bool ?? true
         options.hardwareDecode = hardwareDecode
         VanmoLogger.player.info("[KSEngine] hardwareDecode: \(hardwareDecode)")
 
@@ -157,6 +209,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         player?.shutdown()
         player = nil
         selectedSubtitleSearchable = nil
+        externalRichSubtitle = nil
+        externalRichSubtitleDelay = 0
         cachedSubtitleParts = []
         stateSubject.send(.idle)
         currentTimeSubject.send(.zero)
@@ -179,6 +233,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     func selectSubtitleTrack(index: Int?) async {
         guard let player else { return }
         let subtitleTracks = player.tracks(mediaType: .subtitle)
+        externalRichSubtitle = nil
+        externalRichSubtitleDelay = 0
 
         if let index, index < subtitleTracks.count {
             let track = subtitleTracks[index]
@@ -200,6 +256,35 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             cachedSubtitleParts = []
             subtitleContentSubject.send(nil)
         }
+    }
+
+    func selectExternalRichSubtitle(url: URL, delay: TimeInterval) async throws {
+        guard player != nil else { throw SubtitleError.assRenderingUnavailable }
+        let subtitle = URLSubtitleInfo(url: url)
+        try await subtitle.parse(url: url)
+        for track in player?.tracks(mediaType: .subtitle) ?? [] {
+            track.isEnabled = false
+        }
+        externalRichSubtitle = subtitle
+        externalRichSubtitleDelay = delay
+        selectedSubtitleSearchable = subtitle
+        cachedSubtitleParts = []
+        subtitleContentSubject.send(nil)
+        VanmoLogger.subtitle.info("[KSEngine] external rich subtitle selected: \(url.lastPathComponent)")
+    }
+
+    func clearExternalRichSubtitle() {
+        externalRichSubtitle = nil
+        externalRichSubtitleDelay = 0
+        if selectedSubtitleSearchable is URLSubtitleInfo {
+            selectedSubtitleSearchable = nil
+            cachedSubtitleParts = []
+            subtitleContentSubject.send(nil)
+        }
+    }
+
+    func setExternalRichSubtitleDelay(_ delay: TimeInterval) {
+        externalRichSubtitleDelay = delay
     }
 
     func availableAudioTracks() async -> [AudioTrackInfo] {
@@ -283,6 +368,19 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         player?.contentMode = contentMode
     }
 
+    @MainActor
+    func togglePictureInPicture() -> Bool {
+        guard isPictureInPictureSupported else { return false }
+        guard let controller = player?.pipController else { return false }
+        if controller.isPictureInPictureActive {
+            controller.stopPictureInPicture()
+            return true
+        }
+        guard controller.isPictureInPicturePossible else { return false }
+        controller.startPictureInPicture()
+        return true
+    }
+
     // MARK: - Audio Configuration
 
     private func setupAudioSession() {
@@ -355,17 +453,31 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             return
         }
 
-        let newParts = searchable.search(for: time)
+        let searchTime = searchable is URLSubtitleInfo ? time + externalRichSubtitleDelay : time
+        let newParts = searchable.search(for: searchTime)
 
         if !newParts.isEmpty {
             cachedSubtitleParts = newParts
         } else {
-            cachedSubtitleParts = cachedSubtitleParts.filter { $0 == time }
+            cachedSubtitleParts = cachedSubtitleParts.filter { $0 == searchTime }
         }
 
-        let text = cachedSubtitleParts.compactMap { $0.text?.string }.joined(separator: "\n")
+        let shouldUseAttributedText = searchable is URLSubtitleInfo
+            || cachedSubtitleParts.contains { $0.textPosition != nil || $0.image != nil }
+        let attributedText = shouldUseAttributedText ? Self.joinAttributedSubtitleParts(cachedSubtitleParts) : nil
+        let text = attributedText == nil
+            ? cachedSubtitleParts.compactMap { $0.text?.string }.joined(separator: "\n")
+            : ""
         let image = cachedSubtitleParts.compactMap { $0.image }.first
-        let content: SubtitleContent? = (text.isEmpty && image == nil) ? nil : SubtitleContent(text: text.isEmpty ? nil : text, image: image)
+        let placement = cachedSubtitleParts.compactMap { Self.subtitlePlacement(from: $0.textPosition) }.first
+        let content: SubtitleContent? = (text.isEmpty && attributedText == nil && image == nil)
+            ? nil
+            : SubtitleContent(
+                text: text.isEmpty ? nil : text,
+                attributedText: attributedText,
+                image: image,
+                placement: placement
+            )
 
         if content != subtitleContentSubject.value {
             subtitleContentSubject.send(content)
@@ -375,6 +487,49 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     private func stopTimeUpdateTimer() {
         timeUpdateTimer?.invalidate()
         timeUpdateTimer = nil
+    }
+
+    private static func joinAttributedSubtitleParts(_ parts: [SubtitlePart]) -> NSAttributedString? {
+        let attributedParts = parts.compactMap(\.text)
+        guard !attributedParts.isEmpty else { return nil }
+        let joined = NSMutableAttributedString(string: "")
+        for (index, attributedPart) in attributedParts.enumerated() {
+            if index > 0 {
+                joined.append(NSAttributedString(string: "\n"))
+            }
+            joined.append(attributedPart)
+        }
+        return joined
+    }
+
+    private static func subtitlePlacement(from position: TextPosition?) -> SubtitlePlacement? {
+        guard let position else { return nil }
+
+        let vertical: SubtitlePlacement.Vertical
+        if position.verticalAlign == .top {
+            vertical = .top
+        } else if position.verticalAlign == .center {
+            vertical = .center
+        } else {
+            vertical = .bottom
+        }
+
+        let horizontal: SubtitlePlacement.Horizontal
+        if position.horizontalAlign == .leading {
+            horizontal = .leading
+        } else if position.horizontalAlign == .trailing {
+            horizontal = .trailing
+        } else {
+            horizontal = .center
+        }
+
+        return SubtitlePlacement(
+            vertical: vertical,
+            horizontal: horizontal,
+            verticalMargin: position.verticalMargin,
+            leadingMargin: position.leftMargin,
+            trailingMargin: position.rightMargin
+        )
     }
 }
 

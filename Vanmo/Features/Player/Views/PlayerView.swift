@@ -74,8 +74,15 @@ struct PlayerView: View {
         }
         .task { await viewModel.onAppear(modelContext: modelContext) }
         .onDisappear {
-            viewModel.onDisappear(keepingPlaybackActive: pictureInPicture.isActive)
+            viewModel.onDisappear(keepingPlaybackActive: pictureInPicture.isActive || viewModel.isPictureInPictureActive)
             AppOrientation.restoreDefault()
+        }
+        .alert(item: $viewModel.notice) { notice in
+            Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                dismissButton: .default(Text("知道了"))
+            )
         }
         .sheet(isPresented: $viewModel.showTrackSelector) {
             TrackSelectorView(viewModel: viewModel)
@@ -234,16 +241,20 @@ struct PlayerView: View {
             Spacer()
 
             HStack(spacing: 16) {
-                if pictureInPicture.isSupported && viewModel.avPlayer != nil {
+                if pictureInPicture.isSupported && viewModel.canShowPictureInPictureButton {
                     Button {
-                        pictureInPicture.toggle()
+                        if viewModel.avPlayer != nil {
+                            pictureInPicture.toggle()
+                        } else {
+                            viewModel.toggleKSPictureInPicture()
+                        }
                     } label: {
-                        Image(systemName: pictureInPicture.isActive ? "pip.exit" : "pip.enter")
+                        Image(systemName: (pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "pip.exit" : "pip.enter")
                             .font(.title3)
                             .foregroundStyle(.white)
                     }
-                    .disabled(!pictureInPicture.isPossible && !pictureInPicture.isActive)
-                    .accessibilityLabel(pictureInPicture.isActive ? "退出画中画" : "进入画中画")
+                    .disabled(viewModel.avPlayer != nil && !pictureInPicture.isPossible && !pictureInPicture.isActive)
+                    .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "退出画中画" : "进入画中画")
                 }
 
                 if viewModel.canSelectEpisode {

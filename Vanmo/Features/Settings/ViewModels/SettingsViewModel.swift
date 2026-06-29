@@ -6,8 +6,8 @@ final class SettingsViewModel: ObservableObject {
     @AppStorage("playback.autoPlay") var autoPlayNext = true
     @AppStorage("playback.resumePlayback") var resumePlayback = true
     @AppStorage("playback.defaultRate") var defaultRate: Double = 1.0
-    @AppStorage("playback.hardwareDecoding") var hardwareDecoding = true
-    @AppStorage("audio.outputMode") var audioOutputMode: AudioOutputMode = .auto
+    @AppStorage(PlaybackPreferences.hardwareDecodingKey) var hardwareDecoding = true
+    @AppStorage(PlaybackPreferences.audioOutputModeKey) var audioOutputMode: AudioOutputMode = .auto
 
     @AppStorage("subtitle.autoLoad") var subtitleAutoLoad = true
     @AppStorage("subtitle.fontSize") var subtitleFontSize: Double = 18

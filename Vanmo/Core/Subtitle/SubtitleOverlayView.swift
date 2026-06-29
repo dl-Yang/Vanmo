@@ -6,23 +6,71 @@ struct SubtitleOverlayView: View {
 
     var body: some View {
         VStack {
-            if style.position == .top {
-                subtitleBody
-                    .padding(.top, style.bottomPadding)
+            switch verticalPlacement {
+            case .top:
+                positionedSubtitleBody
+                    .padding(.top, verticalMargin)
                 Spacer()
-            } else {
+            case .center:
                 Spacer()
-                subtitleBody
-                    .padding(.bottom, style.bottomPadding)
+                positionedSubtitleBody
+                Spacer()
+            case .bottom:
+                Spacer()
+                positionedSubtitleBody
+                    .padding(.bottom, verticalMargin)
             }
         }
+    }
+
+    private var verticalPlacement: SubtitlePlacement.Vertical {
+        if let placement = content?.placement {
+            return placement.vertical
+        }
+        return style.position == .top ? .top : .bottom
+    }
+
+    private var verticalMargin: CGFloat {
+        content?.placement?.verticalMargin ?? style.bottomPadding
+    }
+
+    private var horizontalAlignment: Alignment {
+        switch content?.placement?.horizontal {
+        case .leading:
+            return .leading
+        case .trailing:
+            return .trailing
+        case .center, .none:
+            return .center
+        }
+    }
+
+    private var horizontalPadding: EdgeInsets {
+        guard let placement = content?.placement else {
+            return EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24)
+        }
+        return EdgeInsets(
+            top: 0,
+            leading: max(24, placement.leadingMargin),
+            bottom: 0,
+            trailing: max(24, placement.trailingMargin)
+        )
+    }
+
+    private var positionedSubtitleBody: some View {
+        subtitleBody
+            .frame(maxWidth: .infinity, alignment: horizontalAlignment)
+            .padding(horizontalPadding)
     }
 
     @ViewBuilder
     private var subtitleBody: some View {
         if let content, !content.isEmpty {
             Group {
-                if let text = content.text, !text.isEmpty {
+                if let attributedText = content.attributedText {
+                    AttributedSubtitleLabel(attributedText: attributedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let text = content.text, !text.isEmpty {
                     Text(text)
                         .font(.system(size: style.fontSize))
                         .fontWeight(.medium)
@@ -36,13 +84,29 @@ struct SubtitleOverlayView: View {
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFit()
-                        .frame(maxHeight: style.fontSize * 2)
+                        .frame(maxWidth: .infinity, maxHeight: 220)
                 }
             }
-            .padding(.horizontal, 24)
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.15), value: content.text)
         }
+    }
+}
+
+private struct AttributedSubtitleLabel: UIViewRepresentable {
+    let attributedText: NSAttributedString
+
+    func makeUIView(context: Context) -> UILabel {
+        let label = UILabel()
+        label.backgroundColor = .clear
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.adjustsFontSizeToFitWidth = false
+        return label
+    }
+
+    func updateUIView(_ label: UILabel, context: Context) {
+        label.attributedText = attributedText
     }
 }
 

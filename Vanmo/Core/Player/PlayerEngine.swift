@@ -5,13 +5,49 @@ import UIKit
 
 struct SubtitleContent: Equatable {
     var text: String?
+    var attributedText: NSAttributedString?
     var image: UIImage?
+    var placement: SubtitlePlacement?
 
-    var isEmpty: Bool { text == nil && image == nil }
+    var isEmpty: Bool { text == nil && attributedText == nil && image == nil }
 
     static func == (lhs: SubtitleContent, rhs: SubtitleContent) -> Bool {
-        lhs.text == rhs.text && lhs.image === rhs.image
+        lhs.text == rhs.text
+            && attributedTextEquals(lhs.attributedText, rhs.attributedText)
+            && lhs.image === rhs.image
+            && lhs.placement == rhs.placement
     }
+
+    private static func attributedTextEquals(_ lhs: NSAttributedString?, _ rhs: NSAttributedString?) -> Bool {
+        switch (lhs, rhs) {
+        case (.none, .none):
+            return true
+        case (.some(let lhs), .some(let rhs)):
+            return lhs.isEqual(rhs)
+        default:
+            return false
+        }
+    }
+}
+
+struct SubtitlePlacement: Equatable {
+    enum Vertical: Equatable {
+        case top
+        case center
+        case bottom
+    }
+
+    enum Horizontal: Equatable {
+        case leading
+        case center
+        case trailing
+    }
+
+    let vertical: Vertical
+    let horizontal: Horizontal
+    let verticalMargin: CGFloat
+    let leadingMargin: CGFloat
+    let trailingMargin: CGFloat
 }
 
 protocol PlayerEngine: AnyObject {
