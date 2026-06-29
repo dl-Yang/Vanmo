@@ -95,7 +95,7 @@ final class ConnectionsViewModel: ObservableObject {
     var canBookmarkFoldersInSelectedConnection: Bool {
         guard let selectedConnection else { return false }
         switch selectedConnection.type {
-        case .localFolder, .smb, .webdav, .alist, .fnos:
+        case .localFolder, .smb, .webdav, .alist, .fnos, .aliyunDrive:
             return true
         default:
             return false
@@ -314,7 +314,17 @@ final class ConnectionsViewModel: ObservableObject {
 
         modelContext?.insert(connection)
 
-        if let password, !password.isEmpty {
+        if type.isOfficialCloudDrive, let password, !password.isEmpty {
+            do {
+                let credential = try OAuthCredentialStore.decodedCredential(from: password)
+                try OAuthCredentialStore.save(credential, connectionId: connection.id)
+            } catch {
+                modelContext?.delete(connection)
+                errorMessage = "保存 \(type.displayName) 授权信息失败: \(error.localizedDescription)"
+                showError = true
+                return false
+            }
+        } else if let password, !password.isEmpty {
             try? KeychainManager.shared.save(password, for: "conn_\(connection.id)")
         }
 
@@ -334,6 +344,9 @@ final class ConnectionsViewModel: ObservableObject {
         let isMediaServerConnection = connection.type.isMediaServer
 
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
+        if connection.type.isOfficialCloudDrive {
+            try? OAuthCredentialStore.delete(connectionId: connection.id)
+        }
 
         let deletedActiveMediaServer = activeMediaServerConnectionID == connection.id && isMediaServer(connection.type)
         if deletedActiveMediaServer {
@@ -722,6 +735,12 @@ final class ConnectionsViewModel: ObservableObject {
     }
 
     private func userFacingFileBrowserMessage(for error: Error, connection: SavedConnection) -> String {
+        if connection.type.isOfficialCloudDrive {
+            if connection.type == .aliyunDrive {
+                return error.localizedDescription
+            }
+            return "\(connection.type.displayName) 官方接入仍在合规调研中，当前不会使用非官方接口。可先通过 AList/WebDAV 间接连接。"
+        }
         if connection.type == .ftp || connection.type == .sftp || connection.type == .nfs || connection.type == .dlna {
             return "\(connection.type.displayName) 文件浏览暂不可用或该目录为空"
         }

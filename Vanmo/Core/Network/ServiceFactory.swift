@@ -11,6 +11,10 @@ enum RemoteServiceFactory {
             return WebDAVService()
         case .alist:
             return WebDAVService(type: .alist)
+        case .aliyunDrive:
+            return AliyunDriveService()
+        case .baiduNetdisk, .drive115, .quarkDrive:
+            return UnsupportedOfficialCloudDriveService(type: type)
         case .iptv:
             return IPTVService()
         case .fnos:
@@ -26,6 +30,35 @@ enum RemoteServiceFactory {
         default:
             return GenericHTTPService()
         }
+    }
+}
+
+final class UnsupportedOfficialCloudDriveService: RemoteFileService {
+    let type: ConnectionType
+    private(set) var isConnected = false
+
+    init(type: ConnectionType) {
+        self.type = type
+    }
+
+    func connect(config: ConnectionConfig) async throws {
+        throw NetworkError.unsupportedProtocol
+    }
+
+    func disconnect() async {
+        isConnected = false
+    }
+
+    func listDirectory(path: String) async throws -> [RemoteFile] {
+        throw NetworkError.unsupportedProtocol
+    }
+
+    func streamURL(for file: RemoteFile) async throws -> URL {
+        throw NetworkError.unsupportedProtocol
+    }
+
+    func download(file: RemoteFile, to localURL: URL, progress: @escaping (Double) -> Void) async throws {
+        throw NetworkError.unsupportedProtocol
     }
 }
 

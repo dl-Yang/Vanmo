@@ -167,6 +167,7 @@ struct ServerMediaItem: Sendable {
 }
 
 struct ConnectionConfig {
+    let connectionId: UUID?
     let type: ConnectionType
     let host: String
     let port: Int
@@ -177,6 +178,7 @@ struct ConnectionConfig {
     let bookmarkData: Data?
 
     init(from saved: SavedConnection, password: String? = nil) {
+        self.connectionId = saved.id
         self.type = saved.type
         self.host = saved.host
         self.port = saved.port
@@ -187,6 +189,7 @@ struct ConnectionConfig {
     }
 
     init(
+        connectionId: UUID? = nil,
         type: ConnectionType,
         host: String,
         port: Int? = nil,
@@ -195,6 +198,7 @@ struct ConnectionConfig {
         path: String? = nil,
         bookmarkData: Data? = nil
     ) {
+        self.connectionId = connectionId
         self.type = type
         self.host = host
         self.port = port ?? type.defaultPort

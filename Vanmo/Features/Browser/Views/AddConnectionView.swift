@@ -18,6 +18,9 @@ struct AddConnectionView: View {
     @State private var folderBookmark: Data?
     @State private var showFolderPicker = false
     @State private var folderPickerError: String?
+    @State private var oauthCredential: OAuthCredential?
+    @State private var isAuthorizing = false
+    @State private var oauthErrorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -26,6 +29,8 @@ struct AddConnectionView: View {
 
                 if selectedType.isLocal {
                     localFolderSection
+                } else if selectedType.isOfficialCloudDrive {
+                    officialCloudDriveSection
                 } else {
                     remoteServerSection
 
@@ -82,6 +87,8 @@ struct AddConnectionView: View {
                     folderURL = nil
                     folderBookmark = nil
                 }
+                oauthCredential = nil
+                oauthErrorMessage = nil
             }
         }
     }
@@ -181,6 +188,54 @@ struct AddConnectionView: View {
         }
     }
 
+    private var officialCloudDriveSection: some View {
+        Section("官方授权") {
+            TextField("名称", text: $name)
+                .textContentType(.name)
+
+            TextField(hostPlaceholder, text: $host)
+                .textContentType(.URL)
+                .autocapitalization(.none)
+                .keyboardType(.URL)
+
+            TextField(pathPlaceholder, text: $path)
+                .autocapitalization(.none)
+
+            Button {
+                authorizeOfficialCloudDrive()
+            } label: {
+                HStack {
+                    if isAuthorizing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                    }
+                    Text(oauthCredential == nil ? "开始 OAuth 授权" : "重新授权")
+                }
+            }
+            .disabled(isAuthorizing || !canAuthorizeOfficialCloudDrive)
+
+            if let oauthCredential {
+                Text("已完成授权，token 将按连接隔离保存到 Keychain。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Access token 过期时间：\(oauthCredential.expiresAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            if let oauthErrorMessage {
+                Text(oauthErrorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else if let caption = connectionTypeCaption {
+                Text(caption)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private var hostPlaceholder: String {
@@ -190,11 +245,23 @@ struct AddConnectionView: View {
         if selectedType == .iptv {
             return "播放列表 URL 或主机地址"
         }
+        if selectedType == .aliyunDrive {
+            return "PDS domainId 或 https://{domainId}.api.aliyunpds.com"
+        }
+        if selectedType.isOfficialCloudDrive {
+            return "开放平台域名或应用参数"
+        }
         return "主机地址"
     }
 
     private var pathPlaceholder: String {
-        selectedType == .iptv ? "播放列表路径或 URL" : "路径 (可选)"
+        if selectedType == .iptv {
+            return "播放列表路径或 URL"
+        }
+        if selectedType.isOfficialCloudDrive {
+            return "起始目录 (可选，留空为根目录)"
+        }
+        return "路径 (可选)"
     }
 
     private var isValid: Bool {
@@ -203,6 +270,9 @@ struct AddConnectionView: View {
             return folderBookmark != nil
         }
         guard !host.isEmpty else { return false }
+        if selectedType.isOfficialCloudDrive {
+            return selectedType == .aliyunDrive && oauthCredential != nil
+        }
         guard isPortValid, isRemotePathValid else { return false }
         if selectedType.requiresAuth {
             return !username.isEmpty
@@ -257,6 +327,17 @@ struct AddConnectionView: View {
             return "可在主机地址或路径中填写完整 M3U/M3U8 播放列表 URL。"
         case .fnos:
             return "fnOS 按 WebDAV 兼容方式连接：局域网 HTTP 通常为 5005，HTTPS 通常为 5006，路径一般留空；如使用 SMB，请选择 SMB 协议。"
+        case .aliyunDrive:
+            if OAuthProviderConfiguration.isConfigured(for: .aliyunDrive) {
+                return "使用阿里云盘 PDS 官方 OAuth2。请填写 domainId 或完整 API 域名，授权后可浏览目录并获取短时下载 URL。"
+            }
+            return "阿里云盘官方接入已预留 OAuth2 流程，请先在 OAuthProviderConfiguration 中填写 client id、redirect URI 对应配置后再授权。"
+        case .baiduNetdisk:
+            return "百度网盘官方接入保留入口；将仅使用开放平台 OAuth 与官方 API，未配置前不会使用 Cookie、抓包或逆向接口。"
+        case .drive115:
+            return "115 网盘需通过开放平台入驻和应用审核；本入口仅保留合规接入提示，当前不使用非官方接口。"
+        case .quarkDrive:
+            return "夸克网盘官方开放能力仍需调研确认；本入口仅保留合规接入提示，当前不使用非官方接口。"
         default:
             return nil
         }
@@ -269,6 +350,14 @@ struct AddConnectionView: View {
     private var normalizedRemoteInput: (host: String, port: Int, path: String?) {
         let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if selectedType.isOfficialCloudDrive {
+            return (
+                host: trimmedHost,
+                port: selectedType.defaultPort,
+                path: trimmedPath.isEmpty ? nil : trimmedPath
+            )
+        }
 
         guard supportsHTTPS(for: selectedType) else {
             return (
@@ -383,6 +472,12 @@ struct AddConnectionView: View {
         }
     }
 
+    private var canAuthorizeOfficialCloudDrive: Bool {
+        selectedType == .aliyunDrive &&
+            OAuthProviderConfiguration.isConfigured(for: selectedType) &&
+            !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private func applyHTTPSPortDefault(_ useHTTPS: Bool) {
         guard selectedType == .fnos else { return }
         let currentPort = Int(port)
@@ -455,13 +550,19 @@ struct AddConnectionView: View {
                 )
             } else {
                 let input = normalizedRemoteInput
+                let credentialPayload: String?
+                if selectedType.isOfficialCloudDrive, let oauthCredential {
+                    credentialPayload = try? OAuthCredentialStore.encodedString(oauthCredential)
+                } else {
+                    credentialPayload = password.isEmpty ? nil : password
+                }
                 didConnect = await viewModel.saveConnection(
                     name: name,
                     type: selectedType,
                     host: input.host,
                     port: input.port,
                     username: username.isEmpty ? nil : username,
-                    password: password.isEmpty ? nil : password,
+                    password: credentialPayload,
                     path: input.path,
                     bookmarkData: nil
                 )
@@ -469,6 +570,23 @@ struct AddConnectionView: View {
             if didConnect {
                 dismiss()
             }
+        }
+    }
+
+    private func authorizeOfficialCloudDrive() {
+        guard canAuthorizeOfficialCloudDrive else { return }
+        isAuthorizing = true
+        oauthErrorMessage = nil
+        Task {
+            do {
+                oauthCredential = try await OAuthCoordinator.shared.authenticate(
+                    type: selectedType,
+                    host: host.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            } catch {
+                oauthErrorMessage = error.localizedDescription
+            }
+            isAuthorizing = false
         }
     }
 }

@@ -8,6 +8,10 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
     case sftp
     case webdav
     case alist
+    case aliyunDrive
+    case baiduNetdisk
+    case drive115
+    case quarkDrive
     case iptv
     case fnos
     case nfs
@@ -26,6 +30,10 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .sftp: return "SFTP"
         case .webdav: return "WebDAV"
         case .alist: return "AList 网盘"
+        case .aliyunDrive: return "阿里云盘"
+        case .baiduNetdisk: return "百度网盘"
+        case .drive115: return "115 网盘"
+        case .quarkDrive: return "夸克网盘"
         case .iptv: return "IPTV"
         case .fnos: return "飞牛 fnOS"
         case .nfs: return "NFS"
@@ -43,6 +51,8 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .ftp, .sftp: return "arrow.up.arrow.down.circle"
         case .webdav: return "globe"
         case .alist: return "cloud"
+        case .aliyunDrive: return "cloud.fill"
+        case .baiduNetdisk, .drive115, .quarkDrive: return "cloud"
         case .iptv: return "tv"
         case .fnos: return "externaldrive.badge.wifi"
         case .dlna: return "tv.and.mediabox"
@@ -58,6 +68,7 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .sftp: return 22
         case .webdav: return 80
         case .alist: return 5244
+        case .aliyunDrive, .baiduNetdisk, .drive115, .quarkDrive: return 443
         case .iptv: return 0
         case .fnos: return 5005
         case .nfs: return 2049
@@ -85,6 +96,15 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
     /// 本地协议无需主机/端口/账户，UI 与连接流程走专门分支。
     var isLocal: Bool {
         self == .localFolder
+    }
+
+    var isOfficialCloudDrive: Bool {
+        switch self {
+        case .aliyunDrive, .baiduNetdisk, .drive115, .quarkDrive:
+            return true
+        default:
+            return false
+        }
     }
 }
 

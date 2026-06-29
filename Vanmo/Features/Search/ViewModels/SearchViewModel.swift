@@ -363,6 +363,7 @@ private struct SearchConnectionSnapshot: Sendable {
 
     var config: ConnectionConfig {
         ConnectionConfig(
+            connectionId: id,
             type: type,
             host: host,
             port: port,
@@ -375,7 +376,7 @@ private struct SearchConnectionSnapshot: Sendable {
 
     var isFileSearchable: Bool {
         switch type {
-        case .localFolder, .smb, .webdav, .alist, .fnos:
+        case .localFolder, .smb, .webdav, .alist, .fnos, .aliyunDrive:
             return true
         default:
             return false
