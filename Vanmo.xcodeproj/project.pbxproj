@@ -26,6 +26,7 @@
 		2281344F0A25C3DC28C9AB47 /* PlaybackRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565616C3B840D93CC3E938A5 /* PlaybackRecord.swift */; };
 		2BCE6B2C8BF8958400994F81 /* DominantColorExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75DD80E300987DB0FA023D4B /* DominantColorExtractor.swift */; };
 		2DD0D4B83BF763364628E6FC /* PosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7719C17F340864CF4664CC1 /* PosterCard.swift */; };
+		2EDE242DDACFFD72E673A817 /* BoxDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA4E02E5CA11DDB094886F8 /* BoxDriveService.swift */; };
 		3B534824573E767CB230923B /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = C13966A794B8810C8E1F267D /* Lottie */; };
 		3C4E4BE1692F90D59620358D /* IPTVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F5FEC9AF51B13EF36A7172 /* IPTVService.swift */; };
 		3CBDFA6CC2E597136D0A5676 /* VanmoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7387B492C566DB95D6C62D0C /* VanmoApp.swift */; };
@@ -154,6 +155,7 @@
 		68ADF359717CDE03BB014EA2 /* SecondFloorItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorItemView.swift; sourceTree = "<group>"; };
 		68E11D6C42159C14B59AE87B /* CollectionFolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionFolderListView.swift; sourceTree = "<group>"; };
 		6980490DB3D3A63E200844BA /* MetadataCacheKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataCacheKey.swift; sourceTree = "<group>"; };
+		6AA4E02E5CA11DDB094886F8 /* BoxDriveService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BoxDriveService.swift; sourceTree = "<group>"; };
 		7387B492C566DB95D6C62D0C /* VanmoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VanmoApp.swift; sourceTree = "<group>"; };
 		73FCD9328997108A87076482 /* JellyfinService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JellyfinService.swift; sourceTree = "<group>"; };
 		75DD80E300987DB0FA023D4B /* DominantColorExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DominantColorExtractor.swift; sourceTree = "<group>"; };
@@ -595,6 +597,7 @@
 			children = (
 				15CADB88B0AD07775D1AB4F4 /* GoogleDriveService.swift */,
 				2B122FDDCDFCE4FBC521E61D /* OneDriveService.swift */,
+				6AA4E02E5CA11DDB094886F8 /* BoxDriveService.swift */,
 			);
 			name = CloudDrive;
 			path = CloudDrive;
@@ -857,6 +860,7 @@
 				0001FBCFB8B95FEF560068DB /* OAuthCoordinator.swift in Sources */,
 				1E348042C40EF136C40A68ED /* GoogleDriveService.swift in Sources */,
 				A4C057B4DBF86D015F759BCD /* OneDriveService.swift in Sources */,
+				2EDE242DDACFFD72E673A817 /* BoxDriveService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
