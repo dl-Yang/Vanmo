@@ -35,6 +35,7 @@
 		4873A348F7FB8089C635F5F4 /* EmbyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF56CEA135D36E2F995C734 /* EmbyService.swift */; };
 		4D1FF76F2DBB43A073DBFCAF /* PlayerProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */; };
 		4D4A7648906ED7B2CA43B310 /* OnlineSubtitleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC869EEC62D53CCEE7FF2382 /* OnlineSubtitleService.swift */; };
+		4F769D798C519AEB201A519B /* YandexDiskService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */; };
 		4F8C56D3F3B56E7D44BFAA44 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61585942DFE77AC7C9FD50CC /* FlowLayout.swift */; };
 		558D973A7C068676AFC8BBC7 /* FilterChipsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */; };
 		56257939BD5197F8F7C85D8F /* PrefetchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FE3D8BF6B216D29FB14291 /* PrefetchSession.swift */; };
@@ -118,6 +119,7 @@
 		02FB3A1F58187535A7434A20 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		03DEC87067987F9F73EF86AC /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		05B61CB7E7AA5DC184A6CDF5 /* SMBService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMBService.swift; sourceTree = "<group>"; };
+		05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YandexDiskService.swift; sourceTree = "<group>"; };
 		08234FF3E6FF37B91B2198A7 /* iCloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudSyncService.swift; sourceTree = "<group>"; };
 		0D6271C2249F5AA98F16F467 /* LibraryFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFilters.swift; sourceTree = "<group>"; };
 		0DF56CEA135D36E2F995C734 /* EmbyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyService.swift; sourceTree = "<group>"; };
@@ -601,6 +603,7 @@
 				2B122FDDCDFCE4FBC521E61D /* OneDriveService.swift */,
 				6AA4E02E5CA11DDB094886F8 /* BoxDriveService.swift */,
 				520F88CCE40D6906CD69765C /* PCloudDriveService.swift */,
+				05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */,
 			);
 			name = CloudDrive;
 			path = CloudDrive;
@@ -865,6 +868,7 @@
 				A4C057B4DBF86D015F759BCD /* OneDriveService.swift in Sources */,
 				2EDE242DDACFFD72E673A817 /* BoxDriveService.swift in Sources */,
 				A0DE1089A726A6F5CA76471B /* PCloudDriveService.swift in Sources */,
+				4F769D798C519AEB201A519B /* YandexDiskService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
