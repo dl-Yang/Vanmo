@@ -20,6 +20,7 @@
 		197EEEB941D6C6F3220D8584 /* BrowserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C0E5923BE6FFCEFCB6C4DC /* BrowserViewModel.swift */; };
 		1AF2B09C006AF39CD9B4406F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */; };
 		1BB6DD34A9CDD2708545EDA2 /* SecondFloorItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68ADF359717CDE03BB014EA2 /* SecondFloorItemView.swift */; };
+		1E348042C40EF136C40A68ED /* GoogleDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CADB88B0AD07775D1AB4F4 /* GoogleDriveService.swift */; };
 		2085FE59C948EB8401962BB3 /* LoadingIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */; };
 		21156474DADE809BFC7E4AF3 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D3F3AD3CCD5F63E8C40925 /* EmptyStateView.swift */; };
 		2281344F0A25C3DC28C9AB47 /* PlaybackRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565616C3B840D93CC3E938A5 /* PlaybackRecord.swift */; };
@@ -119,6 +120,7 @@
 		0DF56CEA135D36E2F995C734 /* EmbyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyService.swift; sourceTree = "<group>"; };
 		14F5FEC9AF51B13EF36A7172 /* IPTVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPTVService.swift; sourceTree = "<group>"; };
 		14FA84632B3100F245AE174F /* OAuthProviderConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OAuthProviderConfiguration.swift; sourceTree = "<group>"; };
+		15CADB88B0AD07775D1AB4F4 /* GoogleDriveService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoogleDriveService.swift; sourceTree = "<group>"; };
 		162372EE7823659FFCD1E918 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		17D44E8B7DE8F7F531D8740F /* HTTPProtocolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPProtocolHandler.swift; sourceTree = "<group>"; };
 		18EA22E1240358F4E17759AC /* Vanmo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vanmo.entitlements; sourceTree = "<group>"; };
@@ -573,6 +575,7 @@
 				05B61CB7E7AA5DC184A6CDF5 /* SMBService.swift */,
 				C900FB34F4BBFFF323A8041B /* WebDAVService.swift */,
 				9DF65FA3D284B0BF4C09CDDE /* OAuth */,
+				DB956EA3EC2E792DAE7B5D1D /* CloudDrive */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -583,6 +586,15 @@
 				F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		DB956EA3EC2E792DAE7B5D1D /* CloudDrive */ = {
+			isa = PBXGroup;
+			children = (
+				15CADB88B0AD07775D1AB4F4 /* GoogleDriveService.swift */,
+			);
+			name = CloudDrive;
+			path = CloudDrive;
 			sourceTree = "<group>";
 		};
 		DF171931D4FCCFCE69AF7F76 /* Core */ = {
@@ -840,6 +852,7 @@
 				09121874750C74A31ADD7636 /* OAuthCredential.swift in Sources */,
 				CF8406050C6AAA259C574260 /* OAuthProviderConfiguration.swift in Sources */,
 				0001FBCFB8B95FEF560068DB /* OAuthCoordinator.swift in Sources */,
+				1E348042C40EF136C40A68ED /* GoogleDriveService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
