@@ -118,7 +118,13 @@ enum OAuthProviderConfiguration {
     }
 
     static func isConfigured(for type: ConnectionType) -> Bool {
-        !clientID(for: type).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard !clientID(for: type).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        // PKCE 公共客户端（Google/OneDrive）不需要 secret；其余走 client secret 模式的网盘
+        // 必须同时配置好 secret，否则登录能启动但 token exchange 必然失败。
+        guard !usesPKCE(for: type) else { return true }
+        return !(clientSecret(for: type) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// 未配置时展示给用户的提示，指引去哪里申请。

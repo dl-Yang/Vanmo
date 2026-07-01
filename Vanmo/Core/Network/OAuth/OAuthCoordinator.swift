@@ -53,11 +53,15 @@ final class OAuthCoordinator: NSObject {
     }
 
     /// 返回可用的 access token；若已过期则先用 refresh_token 换新并写回 Keychain。
-    func validAccessToken(for type: ConnectionType, connectionId: UUID) async throws -> String {
+    ///
+    /// - Parameter forceRefresh: 服务端已经用一个"本地看起来还没过期"的 token 返回 401 时
+    ///   （token 被撤销、服务端提前失效、本地过期时间估算不准等），调用方应该传 `true`
+    ///   强制换新，而不是原样返回同一个必然还会 401 的 token。
+    func validAccessToken(for type: ConnectionType, connectionId: UUID, forceRefresh: Bool = false) async throws -> String {
         guard let credential = try OAuthCredentialStore.load(connectionId: connectionId) else {
             throw NetworkError.authenticationFailed
         }
-        guard credential.isExpired else {
+        guard forceRefresh || credential.isExpired else {
             return credential.accessToken
         }
         let refreshed = try await refresh(credential, type: type, connectionId: connectionId)

@@ -91,7 +91,7 @@ final class GoogleDriveService: RemoteFileService {
 
         var (tempURL, response) = try await session.download(for: makeRequest(token: token))
         if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 401 {
-            token = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId)
+            token = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId, forceRefresh: true)
             accessToken = token
             (tempURL, response) = try await session.download(for: makeRequest(token: token))
         }
@@ -117,7 +117,7 @@ final class GoogleDriveService: RemoteFileService {
             return try await performRequest(path: path, queryItems: queryItems)
         } catch NetworkError.authenticationFailed {
             guard let connectionId else { throw NetworkError.authenticationFailed }
-            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId)
+            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId, forceRefresh: true)
             return try await performRequest(path: path, queryItems: queryItems)
         }
     }

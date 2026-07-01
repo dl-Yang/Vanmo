@@ -119,7 +119,7 @@ final class OneDriveService: RemoteFileService {
             return try await performRequest(url: url)
         } catch NetworkError.authenticationFailed {
             guard let connectionId else { throw NetworkError.authenticationFailed }
-            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId)
+            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId, forceRefresh: true)
             return try await performRequest(url: url)
         }
     }

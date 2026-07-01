@@ -95,7 +95,7 @@ final class BoxDriveService: RemoteFileService {
             return try await performResolveDownloadRedirect(fileId: fileId)
         } catch NetworkError.authenticationFailed {
             guard let connectionId else { throw NetworkError.authenticationFailed }
-            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId)
+            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId, forceRefresh: true)
             return try await performResolveDownloadRedirect(fileId: fileId)
         }
     }
@@ -150,7 +150,7 @@ final class BoxDriveService: RemoteFileService {
             return try await performRequest(url: url)
         } catch NetworkError.authenticationFailed {
             guard let connectionId else { throw NetworkError.authenticationFailed }
-            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId)
+            accessToken = try await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId, forceRefresh: true)
             return try await performRequest(url: url)
         }
     }

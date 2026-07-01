@@ -186,7 +186,7 @@ final class PlayerViewModel: ObservableObject {
         try await unregisterPrefetchIfNeeded()
         resetPlaybackMetadata()
 
-        let originalURL = item.fileURL
+        let originalURL = await resolveCloudDriveStreamURLIfNeeded(item.fileURL)
         let playbackURL = await resolveDiscPlaybackURLIfNeeded(originalURL)
         let loadURL: URL
         if playbackURL.isFileURL || Self.shouldBypassPrefetch(for: playbackURL) {
@@ -245,6 +245,42 @@ final class PlayerViewModel: ObservableObject {
         guard let token = prefetchToken else { return }
         prefetchToken = nil
         await PrefetchProxy.shared.unregister(token: token)
+    }
+
+    /// OneDrive/Box/pCloud/Yandex.Disk 换到的直链都是有时效性的签名 URL，扫描时持久化进
+    /// `MediaItem.fileURL` 的版本很可能在播放时已经过期；这里按 `sourceConnectionId + serverId`
+    /// 重新连接对应服务、换一个新鲜直链再播放。Google Drive 的 API URL 本身不过期（靠下面的
+    /// headerProvider 动态带 Bearer），不需要这一步；非 OAuth 网盘也直接跳过。
+    private func resolveCloudDriveStreamURLIfNeeded(_ url: URL) async -> URL {
+        guard let connectionId = item.sourceConnectionId,
+              let serverPath = item.serverId,
+              let modelContext else { return url }
+
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        guard let connection = try? modelContext.fetch(descriptor).first,
+              connection.type.isOAuthCloudDrive,
+              !connection.type.requiresBearerStreaming else {
+            return url
+        }
+
+        let service = RemoteServiceFactory.create(for: connection.type)
+        do {
+            try await service.connect(config: ConnectionConfig(from: connection))
+            let placeholder = RemoteFile(
+                name: item.originalFileName ?? url.lastPathComponent,
+                path: serverPath,
+                size: item.fileSize,
+                isDirectory: false,
+                modifiedDate: nil,
+                type: .video
+            )
+            return try await service.streamURL(for: placeholder)
+        } catch {
+            VanmoLogger.player.error("[PlayerVM] 重新解析 \(connection.type.displayName) 直链失败，回退到缓存 URL: \(error.localizedDescription)")
+            return url
+        }
     }
 
     /// 若当前条目来自需要 Bearer token 的 OAuth 网盘（如 Google Drive），返回一个绑定该连接的
@@ -706,7 +742,10 @@ final class PlayerViewModel: ObservableObject {
         )
         guard let connection = try? modelContext.fetch(descriptor).first else { return [] }
 
-        let supportedTypes: Set<ConnectionType> = [.webdav, .alist, .fnos, .smb]
+        let supportedTypes: Set<ConnectionType> = [
+            .webdav, .alist, .fnos, .smb,
+            .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk,
+        ]
         guard supportedTypes.contains(connection.type) else { return [] }
 
         let videoBaseName = (serverPath as NSString).lastPathComponent
