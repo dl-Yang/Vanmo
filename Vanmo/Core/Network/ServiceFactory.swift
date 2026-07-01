@@ -15,8 +15,10 @@ enum RemoteServiceFactory {
             return UnsupportedOfficialCloudDriveService(type: type)
         case .googleDrive:
             return GoogleDriveService()
+        case .oneDrive:
+            return OneDriveService()
         // 以下国际网盘按 more.md 顺序逐个实现，未实现前先落到占位服务，避免误用 GenericHTTPService。
-        case .oneDrive, .box, .pCloudDrive, .yandexDisk:
+        case .box, .pCloudDrive, .yandexDisk:
             return UnsupportedOfficialCloudDriveService(type: type)
         case .iptv:
             return IPTVService()
