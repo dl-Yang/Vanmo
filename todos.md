@@ -30,10 +30,20 @@
 
 ### 2. 官方国内网盘
 
-- [x] **阿里云盘官方接入基础闭环**：已新增官方连接类型、OAuth2 授权入口、按连接隔离的 Keychain token 存储、token 刷新、分页列目录、取流 URL 和错误处理；真实使用前仍需在 `OAuthProviderConfiguration` 填入开放平台 `client_id` / redirect 配置并完成平台审核。
 - [x] **百度网盘官方接入合规占位**：已新增官方连接入口与未配置提示，明确仅走开放平台 OAuth/API，不使用 Cookie、抓包或逆向接口；文件列表、转码/原画取流策略和限速提示待官方参数与权限确认后继续实现。
 - [x] **115 网盘合规接入占位**：已新增官方连接入口与开放平台入驻/审核提示，当前不使用非官方接口；登录、目录浏览、取流与刷新待开放平台权限确认后继续实现。
 - [x] **夸克网盘合规接入占位**：已新增官方连接入口与合规调研提示，当前不使用非官方接口；目录浏览、取流与刷新待官方开放能力确认后继续实现。
+
+### 2.1 国际网盘（2026.07.01 新增）
+
+- [x] **通用 OAuth 2.0 基础设施**：`OAuthCoordinator`/`OAuthCredentialStore`/`OAuthProviderConfiguration` 支持 PKCE（公共客户端）与 Client Secret 两种授权码流程，`vanmo://oauth/{type}` 统一回调；开发者 Client ID / Secret 全部留空占位，需要手动在对应开发者后台申请后填入 `OAuthProviderConfiguration`。
+- [x] **Google Drive**：`GoogleDriveService` 已实现目录浏览（`files.list` 分页）、取流（`alt=media`，播放期间持续携带 Bearer token）、下载与 401 自动 refresh；需要在 Google Cloud Console 创建 iOS 类型 OAuth 客户端并填入 Client ID。
+- [x] **OneDrive**：`OneDriveService` 已实现目录浏览（Microsoft Graph `/me/drive` children 分页）、取流（`@microsoft.graph.downloadUrl` 匿名直链）与下载；需要在 Microsoft Entra 管理中心注册公共客户端应用并填入 Application (client) ID。
+- [x] **Box**：`BoxDriveService` 已实现目录浏览（`folders/{id}/items`）、取流（拦截 `/files/{id}/content` 的 302 只取 `Location`）与下载；需要在 Box Developer Console 创建自定义 App 并填入 Client ID / Client Secret。
+- [x] **pCloud**：`PCloudDriveService` 已实现目录浏览（`listfolder`）、取流（`getfilelink`）与下载，自动识别登录返回的 US/EU 数据中心 host；需要在 pCloud 开发者后台注册 App 并填入 Client ID / Client Secret。
+- [x] **Yandex.Disk**：`YandexDiskService` 已实现目录浏览（`/v1/disk/resources`）、取流（`/resources/download`）与下载；需要在 oauth.yandex.com 注册应用并填入 Client ID / Client Secret。
+- [ ] **上述 5 个网盘的真实登录/浏览/播放/下载验证**：当前仅完成协议实现与编译验证，尚未填入真实开发者凭据做端到端联调；拿到凭据后需要逐个真机验证登录态刷新、大文件续传、分页边界、错误提示文案。
+- [ ] **MEGA 完整接入待评估**：官方无标准 REST + OAuth 接口，需要官方 MEGA SDK（C++，端到端加密，每个文件需客户端侧解密）深度集成，工作量和风险显著高于其余网盘；当前仅保留合规占位入口（`ConnectionType.mega`，复用官方网盘占位 UI 与 `UnsupportedOfficialCloudDriveService`），完整支持留待后续单独评估排期。
 
 ### 3. 云同步与多端
 
@@ -44,6 +54,6 @@
 
 ### 4. 媒体库增强
 
-- [ ] **在线字幕搜索与下载**：实现 Shooter / Subhd 等 Provider，打通搜索、匹配、下载、缓存、轨道加载和播放器 UI 入口。
-- [ ] **Emby/Jellyfin 合集 (Collections)**：接入 BoxSet / Collections API，在详情页展示所属合集，并支持进入合集列表。
-- [ ] **远程全局搜索聚合**：并发搜索本地库、Emby、Plex、AList/WebDAV、未来官方网盘，并按来源分组、合并重复项。
+- [x] **在线字幕搜索与下载**：实现 Shooter / Subhd 等 Provider，打通搜索、匹配、下载、缓存、轨道加载和播放器 UI 入口。
+- [x] **Emby/Jellyfin 合集 (Collections)**：接入 BoxSet / Collections API，在详情页展示所属合集，并支持进入合集列表。
+- [x] **远程全局搜索聚合**：并发搜索本地库、Emby、Plex、AList/WebDAV、未来官方网盘，并按来源分组、合并重复项。
