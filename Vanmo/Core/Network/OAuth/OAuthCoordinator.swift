@@ -262,6 +262,9 @@ private struct OAuthTokenResponse: Decodable {
     let expiresIn: TimeInterval?
     let tokenType: String?
     let scope: String?
+    /// pCloud 专用：登录返回的数据中心 host（`api.pcloud.com` 或 `eapi.pcloud.com`），
+    /// 其余网盘响应里没有这个字段，解码时会被忽略。
+    let hostname: String?
 
     func makeCredential(provider: ConnectionType, fallbackRefreshToken: String, apiHost: String?) -> OAuthCredential {
         // 部分网盘（如 pCloud）默认不返回 expires_in，视为长期有效（100 年）。
@@ -273,7 +276,7 @@ private struct OAuthTokenResponse: Decodable {
             expiresAt: Date().addingTimeInterval(expiresIn),
             tokenType: tokenType ?? "Bearer",
             scope: scope,
-            apiHost: apiHost
+            apiHost: hostname ?? apiHost
         )
     }
 }
