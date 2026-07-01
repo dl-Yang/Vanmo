@@ -4,16 +4,20 @@ import Foundation
 final class RemoteFetcher {
     let cleanURL: URL
     private let extraHeaders: [String: String]
+    /// 用于 OAuth Bearer token 网盘（如 Google Drive）：token 可能在长播放会话中过期，
+    /// 每次发请求前调用以取到当前有效值，而不是像 `extraHeaders` 那样在初始化时固定。
+    private let headerProvider: (() async -> [String: String])?
     private let session: URLSession
     private let ownsSession: Bool
 
     /// 默认创建带重定向委托的专用 session：当 AList/网盘把 WebDAV 直链 302 到对象存储
     /// 签名直链（跨 host）时剥离 Authorization，避免把 Basic Auth 凭据转发到第三方 CDN，
     /// 也避免多余的 Authorization 头与签名 URL 自带鉴权冲突导致 403。
-    init(originalURL: URL, session: URLSession? = nil) {
+    init(originalURL: URL, session: URLSession? = nil, headerProvider: (() async -> [String: String])? = nil) {
         let (clean, headers) = Self.stripCredentials(originalURL)
         self.cleanURL = clean
         self.extraHeaders = headers
+        self.headerProvider = headerProvider
         if let session {
             self.session = session
             self.ownsSession = false
@@ -49,9 +53,14 @@ final class RemoteFetcher {
         return (cleanURL, ["Authorization": "Basic \(base64)"])
     }
 
-    func apply(to request: inout URLRequest) {
+    func apply(to request: inout URLRequest) async {
         for (key, value) in extraHeaders {
             request.setValue(value, forHTTPHeaderField: key)
+        }
+        if let headerProvider {
+            for (key, value) in await headerProvider() {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
         }
     }
 
@@ -75,7 +84,7 @@ final class RemoteFetcher {
     func probeTotalSize() async throws -> Int64 {
         var head = URLRequest(url: cleanURL)
         head.httpMethod = "HEAD"
-        apply(to: &head)
+        await apply(to: &head)
 
         do {
             let (_, response) = try await session.data(for: head)
@@ -116,7 +125,7 @@ final class RemoteFetcher {
         var getR = URLRequest(url: cleanURL)
         getR.setValue("bytes=\(first)-\(last)", forHTTPHeaderField: "Range")
         getR.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-        apply(to: &getR)
+        await apply(to: &getR)
 
         let (_, response) = try await session.data(for: getR)
         guard let http = response as? HTTPURLResponse else { return nil }
@@ -142,7 +151,7 @@ final class RemoteFetcher {
         var request = URLRequest(url: cleanURL)
         request.setValue("bytes=\(range.lowerBound)-\(range.upperBound)", forHTTPHeaderField: "Range")
         request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-        apply(to: &request)
+        await apply(to: &request)
         return try await session.data(for: request)
     }
 

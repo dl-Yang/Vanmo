@@ -22,10 +22,10 @@ final class PrefetchSession {
     private var activeBodyTasks: [UInt64: Task<Void, Never>] = [:]
     private let activeBodyTasksLock = NSLock()
 
-    init(token: String, originalURL: URL) throws {
+    init(token: String, originalURL: URL, headerProvider: (() async -> [String: String])? = nil) throws {
         self.token = token
         self.cache = try RangeCache(sessionId: token)
-        self.fetcher = RemoteFetcher(originalURL: originalURL)
+        self.fetcher = RemoteFetcher(originalURL: originalURL, headerProvider: headerProvider)
         self.chunkSize = PrefetchConfig.chunkSize
     }
 

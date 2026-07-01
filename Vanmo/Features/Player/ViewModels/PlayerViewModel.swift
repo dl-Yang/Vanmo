@@ -38,6 +38,11 @@ final class PlayerViewModel: ObservableObject {
     @Published var seekPreviewActive = false
     @Published var seekPreviewForward = true
     @Published var notice: PlayerNotice?
+    @Published private(set) var onlineSubtitleResults: [OnlineSubtitleResult] = []
+    @Published private(set) var isSearchingOnlineSubtitles = false
+    @Published private(set) var isDownloadingOnlineSubtitle = false
+    @Published private(set) var downloadingOnlineSubtitleID: String?
+    @Published private(set) var onlineSubtitleStatusMessage: String?
 
     let engine: PlayerEngine
     private var item: MediaItem
@@ -186,7 +191,10 @@ final class PlayerViewModel: ObservableObject {
         let loadURL: URL
         if playbackURL.isFileURL || Self.shouldBypassPrefetch(for: playbackURL) {
             loadURL = playbackURL
-        } else if let registration = await PrefetchProxy.shared.register(originalURL: playbackURL) {
+        } else if let registration = await PrefetchProxy.shared.register(
+            originalURL: playbackURL,
+            headerProvider: cloudDriveBearerHeaderProvider()
+        ) {
             loadURL = registration.url
             prefetchToken = registration.token
             VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
@@ -225,6 +233,8 @@ final class PlayerViewModel: ObservableObject {
         activeExternalSubtitleID = nil
         activeRichSubtitleID = nil
         externalSubtitleTracks = []
+        onlineSubtitleResults = []
+        onlineSubtitleStatusMessage = nil
         discChapters = []
         Task {
             await externalSubtitleManager.clear()
@@ -235,6 +245,26 @@ final class PlayerViewModel: ObservableObject {
         guard let token = prefetchToken else { return }
         prefetchToken = nil
         await PrefetchProxy.shared.unregister(token: token)
+    }
+
+    /// 若当前条目来自需要 Bearer token 的 OAuth 网盘（如 Google Drive），返回一个绑定该连接的
+    /// header provider，交给 `PrefetchProxy` 在每次 Range 请求前取最新（必要时自动 refresh）的 access token。
+    private func cloudDriveBearerHeaderProvider() -> (() async -> [String: String])? {
+        guard let modelContext, let connectionId = item.sourceConnectionId else { return nil }
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        guard let connection = try? modelContext.fetch(descriptor).first,
+              connection.type.requiresBearerStreaming else {
+            return nil
+        }
+        let type = connection.type
+        return {
+            guard let token = try? await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId) else {
+                return [:]
+            }
+            return ["Authorization": "Bearer \(token)"]
+        }
     }
 
     // MARK: - Playback Control
@@ -319,6 +349,67 @@ final class PlayerViewModel: ObservableObject {
         Task { await applySubtitleSelection(index) }
     }
 
+    func searchOnlineSubtitles() {
+        guard !isSearchingOnlineSubtitles else { return }
+        isSearchingOnlineSubtitles = true
+        onlineSubtitleStatusMessage = nil
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let results = try await OnlineSubtitleService.shared.search(for: self.item)
+                await MainActor.run {
+                    self.onlineSubtitleResults = results
+                    self.onlineSubtitleStatusMessage = results.isEmpty ? "未找到匹配的在线字幕" : nil
+                    self.isSearchingOnlineSubtitles = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.onlineSubtitleResults = []
+                    self.onlineSubtitleStatusMessage = error.localizedDescription
+                    self.isSearchingOnlineSubtitles = false
+                }
+            }
+        }
+    }
+
+    func downloadOnlineSubtitle(_ result: OnlineSubtitleResult) {
+        guard !isDownloadingOnlineSubtitle else { return }
+        isDownloadingOnlineSubtitle = true
+        downloadingOnlineSubtitleID = result.id
+        onlineSubtitleStatusMessage = nil
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let localURL = try await OnlineSubtitleService.shared.download(result, for: self.item)
+                let trackID = self.nextExternalSubtitleID()
+                let track = SubtitleTrackInfo(
+                    id: trackID,
+                    language: result.language,
+                    title: "在线 · \(result.provider) · \(result.title)",
+                    isEmbedded: false,
+                    fileURL: localURL
+                )
+                await MainActor.run {
+                    self.externalSubtitleTracks.append(track)
+                    self.subtitleTracks.append(track)
+                    self.isDownloadingOnlineSubtitle = false
+                    self.downloadingOnlineSubtitleID = nil
+                    self.onlineSubtitleStatusMessage = "已加载在线字幕：\(result.title)"
+                    self.selectSubtitleTrack(trackID)
+                }
+            } catch {
+                await MainActor.run {
+                    self.isDownloadingOnlineSubtitle = false
+                    self.downloadingOnlineSubtitleID = nil
+                    self.onlineSubtitleStatusMessage = error.localizedDescription
+                    self.showNotice(title: "在线字幕不可用", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+
     /// 设置外挂字幕的时间偏移（正值表示字幕提前显示）。内嵌字幕由引擎渲染，暂不支持偏移。
     func setSubtitleDelay(_ delay: TimeInterval) {
         config.subtitleDelay = delay
@@ -378,6 +469,14 @@ final class PlayerViewModel: ObservableObject {
             (engine as? KSPlayerEngine)?.clearExternalRichSubtitle()
             await engine.selectSubtitleTrack(index: index)
         }
+    }
+
+    private func nextExternalSubtitleID() -> Int {
+        let maxExternalID = subtitleTracks
+            .map(\.id)
+            .filter { $0 >= Self.externalSubtitleIDOffset }
+            .max()
+        return (maxExternalID ?? (Self.externalSubtitleIDOffset - 1)) + 1
     }
 
     private func applyPreferredSubtitleIfNeeded() async {
@@ -524,10 +623,14 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func discoverExternalSubtitleTracks(for videoURL: URL) async -> [SubtitleTrackInfo] {
+        let baseTracks: [SubtitleTrackInfo]
         if videoURL.isFileURL {
-            return Self.localExternalSubtitleTracks(for: videoURL)
+            baseTracks = Self.localExternalSubtitleTracks(for: videoURL)
+        } else {
+            baseTracks = await remoteExternalSubtitleTracks()
         }
-        return await remoteExternalSubtitleTracks()
+        let onlineTracks = await cachedOnlineSubtitleTracks(startingID: Self.externalSubtitleIDOffset + baseTracks.count)
+        return baseTracks + onlineTracks
     }
 
     private static func localExternalSubtitleTracks(for videoURL: URL) -> [SubtitleTrackInfo] {
@@ -560,6 +663,35 @@ final class PlayerViewModel: ObservableObject {
         return nameParts.last { part in
             ["zh", "chs", "cht", "en", "ja", "ko"].contains(part)
         }
+    }
+
+    private func cachedOnlineSubtitleTracks(startingID: Int) async -> [SubtitleTrackInfo] {
+        do {
+            let urls = try await OnlineSubtitleService.shared.cachedSubtitleURLs(for: item)
+            return urls.enumerated().map { index, url in
+                SubtitleTrackInfo(
+                    id: startingID + index,
+                    language: Self.languageCode(from: url),
+                    title: Self.onlineSubtitleTitle(from: url),
+                    isEmbedded: false,
+                    fileURL: url
+                )
+            }
+        } catch {
+            VanmoLogger.subtitle.error("[PlayerVM] online subtitle cache discovery failed: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    private static func onlineSubtitleTitle(from url: URL) -> String {
+        let stem = url.deletingPathExtension().lastPathComponent
+        let parts = stem.split(separator: "-", maxSplits: 3).map(String.init)
+        guard parts.count == 4 else {
+            return stem
+        }
+        let provider = parts[1]
+        let title = parts[3].replacingOccurrences(of: "-", with: " ")
+        return "在线 · \(provider) · \(title)"
     }
 
     /// 远程视频的同目录外挂字幕发现：列出视频所在目录，筛出同名前缀的 .srt/.vtt/.ass/.ssa，

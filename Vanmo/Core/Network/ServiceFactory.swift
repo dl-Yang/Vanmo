@@ -11,9 +11,10 @@ enum RemoteServiceFactory {
             return WebDAVService()
         case .alist:
             return WebDAVService(type: .alist)
-        case .aliyunDrive:
-            return AliyunDriveService()
-        case .baiduNetdisk, .drive115, .quarkDrive:
+        case .removedOfficialCloudDrive, .baiduNetdisk, .drive115, .quarkDrive, .mega:
+            return UnsupportedOfficialCloudDriveService(type: type)
+        // 以下国际网盘按 more.md 顺序逐个实现，未实现前先落到占位服务，避免误用 GenericHTTPService。
+        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk:
             return UnsupportedOfficialCloudDriveService(type: type)
         case .iptv:
             return IPTVService()

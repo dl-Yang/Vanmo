@@ -20,7 +20,10 @@ actor PrefetchProxy {
 
     private init() {}
 
-    func register(originalURL: URL) async -> PrefetchRegistration? {
+    func register(
+        originalURL: URL,
+        headerProvider: (() async -> [String: String])? = nil
+    ) async -> PrefetchRegistration? {
         let port: UInt16
         do {
             port = try await startListenerIfNeeded()
@@ -30,7 +33,7 @@ actor PrefetchProxy {
         }
 
         let token = UUID().uuidString
-        guard let session = try? PrefetchSession(token: token, originalURL: originalURL) else {
+        guard let session = try? PrefetchSession(token: token, originalURL: originalURL, headerProvider: headerProvider) else {
             return nil
         }
 

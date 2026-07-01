@@ -9,6 +9,7 @@ struct ConnectionsView: View {
     /// 当前正在浏览的连接 ID。nil = 显示连接列表根页（Files-Light）；
     /// 非 nil = 进入该连接的文件 / 文件夹浏览页（Files-Folders(-Videos)-Light）。
     @State private var enteredConnectionID: UUID?
+    @State private var editingConnection: SavedConnection?
 
     var body: some View {
         ZStack {
@@ -43,6 +44,9 @@ struct ConnectionsView: View {
         }
         .sheet(isPresented: $viewModel.showAddConnection) {
             AddConnectionView(viewModel: viewModel)
+        }
+        .sheet(item: $editingConnection) { connection in
+            AddConnectionView(viewModel: viewModel, editingConnection: connection)
         }
     }
 
@@ -102,6 +106,11 @@ struct ConnectionsView: View {
         .buttonStyle(FilesRowButtonStyle())
         .opacity(isOffline ? 0.5 : 1)
         .contextMenu {
+            Button {
+                editingConnection = connection
+            } label: {
+                Label("编辑", systemImage: "pencil")
+            }
             Button {
                 Task { await viewModel.connectAndScan(connection) }
             } label: {
@@ -769,7 +778,8 @@ private extension ConnectionType {
         switch self {
         case .localFolder:                 return "FilesFolder"
         case .smb, .nfs:                   return "FilesHardDrive"
-        case .ftp, .sftp, .webdav, .alist, .aliyunDrive, .baiduNetdisk, .drive115, .quarkDrive,
+        case .ftp, .sftp, .webdav, .alist, .removedOfficialCloudDrive, .baiduNetdisk, .drive115, .quarkDrive,
+             .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk, .mega,
              .iptv, .fnos, .dlna,
              .plex, .emby, .jellyfin:      return "FilesServer"
         }

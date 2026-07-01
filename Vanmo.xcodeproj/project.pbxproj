@@ -7,16 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0001FBCFB8B95FEF560068DB /* OAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995CDD4F5269B46DB5F835D3 /* OAuthCoordinator.swift */; };
 		0384C6897B4C023B8E0EDAFB /* RemoteFileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF4EBDC6D0FE1C019C3C404B /* RemoteFileService.swift */; };
 		053F218D2F004F69BCB2A9D1 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AC850C1907C97654689F25 /* SearchViewModel.swift */; };
 		08D449B2FCD839563D28E73A /* URL+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6219B4DB4376B9D457F04B /* URL+Extensions.swift */; };
+		09121874750C74A31ADD7636 /* OAuthCredential.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A87725EBFBA9E769B49C2EB /* OAuthCredential.swift */; };
 		0A95157B703B08C4B2DDF526 /* AddConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AEA12D55448D2043E54EEB /* AddConnectionView.swift */; };
 		0BDB5E06E22657DF00F9BBA3 /* ServiceFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B2C802C4391AAEDAC4EFD7 /* ServiceFactory.swift */; };
-		0CB115C69D634A85B58EF3FE /* OAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4FF80371195566D7A4C49C /* OAuthCoordinator.swift */; };
 		1094DA55B4FBE66DCF440AB0 /* ConnectionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FDE885DCDD51B1BC837E421 /* ConnectionModels.swift */; };
 		14EA1A3581D94AF5E0C7B3B6 /* PlayerEngineFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */; };
 		164097922BBA0ED99DBA6A2C /* CollectionFolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36EFA389A4BE5B97FDB88DA4 /* CollectionFolder.swift */; };
-		19107D42A6C7AC2604504A9B /* AliyunDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DEECDF56F59912F497127DE /* AliyunDriveService.swift */; };
 		197EEEB941D6C6F3220D8584 /* BrowserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C0E5923BE6FFCEFCB6C4DC /* BrowserViewModel.swift */; };
 		1AF2B09C006AF39CD9B4406F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */; };
 		1BB6DD34A9CDD2708545EDA2 /* SecondFloorItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68ADF359717CDE03BB014EA2 /* SecondFloorItemView.swift */; };
@@ -86,7 +86,7 @@
 		C2EA8CA629CD6139C41F47A7 /* SMBClient in Frameworks */ = {isa = PBXBuildFile; productRef = 5A39B9DEAA17BB6049518605 /* SMBClient */; };
 		C2F316B291D4AD249A16B8B4 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6640160B8471B99B8B34464 /* KeychainManager.swift */; };
 		C4FF4DB782E57FE62F9C9919 /* DiscPlaylistParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 785C019ED379F73235EE296B /* DiscPlaylistParser.swift */; };
-		CD998BAEF2AFE9B8542CC3C1 /* OAuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A2454299B78C7044D19CE7 /* OAuthCredentialStore.swift */; };
+		CF8406050C6AAA259C574260 /* OAuthProviderConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FA84632B3100F245AE174F /* OAuthProviderConfiguration.swift */; };
 		D0781E51FE351814142A7B35 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6A41E312952F47F072C7E3 /* MediaItem.swift */; };
 		D123D697D7FCCD04ED1E1243 /* LocalFolderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 280CCDA58FB0544ADF808AD6 /* LocalFolderService.swift */; };
 		D7DF318522A915C85933D66A /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0820A7D1C7C3A135E3E549 /* Logger.swift */; };
@@ -118,6 +118,7 @@
 		0D6271C2249F5AA98F16F467 /* LibraryFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFilters.swift; sourceTree = "<group>"; };
 		0DF56CEA135D36E2F995C734 /* EmbyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyService.swift; sourceTree = "<group>"; };
 		14F5FEC9AF51B13EF36A7172 /* IPTVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPTVService.swift; sourceTree = "<group>"; };
+		14FA84632B3100F245AE174F /* OAuthProviderConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OAuthProviderConfiguration.swift; sourceTree = "<group>"; };
 		162372EE7823659FFCD1E918 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		17D44E8B7DE8F7F531D8740F /* HTTPProtocolHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPProtocolHandler.swift; sourceTree = "<group>"; };
 		18EA22E1240358F4E17759AC /* Vanmo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vanmo.entitlements; sourceTree = "<group>"; };
@@ -141,7 +142,7 @@
 		52D957843FBE5C974DCBDE4B /* FileNameParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileNameParser.swift; sourceTree = "<group>"; };
 		565616C3B840D93CC3E938A5 /* PlaybackRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackRecord.swift; sourceTree = "<group>"; };
 		597B0E058D9E6F55D17E2D16 /* RangeCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RangeCache.swift; sourceTree = "<group>"; };
-		5DEECDF56F59912F497127DE /* AliyunDriveService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliyunDriveService.swift; sourceTree = "<group>"; };
+		5A87725EBFBA9E769B49C2EB /* OAuthCredential.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OAuthCredential.swift; sourceTree = "<group>"; };
 		60CF418D9980D92E7E15716C /* SecondFloorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorView.swift; sourceTree = "<group>"; };
 		61585942DFE77AC7C9FD50CC /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		61DDDC6CDDA187AA96EB2A3B /* PlayerCapabilityProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCapabilityProbe.swift; sourceTree = "<group>"; };
@@ -155,10 +156,8 @@
 		781055690453E6D2950A0933 /* KSPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerEngine.swift; sourceTree = "<group>"; };
 		785C019ED379F73235EE296B /* DiscPlaylistParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscPlaylistParser.swift; sourceTree = "<group>"; };
 		7A1D2F2767E167CB3EA5F372 /* MetadataCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataCache.swift; sourceTree = "<group>"; };
-		7B4FF80371195566D7A4C49C /* OAuthCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCoordinator.swift; sourceTree = "<group>"; };
 		7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChipsRow.swift; sourceTree = "<group>"; };
 		86D3F3AD3CCD5F63E8C40925 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
-		88A2454299B78C7044D19CE7 /* OAuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OAuthCredentialStore.swift; sourceTree = "<group>"; };
 		8975545DA300E57FD1C133D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8AF5B772ECCB3295AC6F5CCE /* MetadataRefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataRefreshCoordinator.swift; sourceTree = "<group>"; };
 		8C62F024193701A3ABB1B887 /* FolderBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderBookmark.swift; sourceTree = "<group>"; };
@@ -167,6 +166,7 @@
 		91F6A01D415D2E0A78B794D1 /* HomeCollectionCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCollectionCache.swift; sourceTree = "<group>"; };
 		96CE2D7094AEA16D95E3050C /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		97B2C802C4391AAEDAC4EFD7 /* ServiceFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceFactory.swift; sourceTree = "<group>"; };
+		995CDD4F5269B46DB5F835D3 /* OAuthCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OAuthCoordinator.swift; sourceTree = "<group>"; };
 		9B6219B4DB4376B9D457F04B /* URL+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+Extensions.swift"; sourceTree = "<group>"; };
 		9EFFEC6353D013B6D1CADCE8 /* SubtitleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleManager.swift; sourceTree = "<group>"; };
 		A3B7332CE86F10F0D7D0A3A4 /* SubtitleOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleOverlayView.swift; sourceTree = "<group>"; };
@@ -432,6 +432,17 @@
 			path = Subtitle;
 			sourceTree = "<group>";
 		};
+		9DF65FA3D284B0BF4C09CDDE /* OAuth */ = {
+			isa = PBXGroup;
+			children = (
+				5A87725EBFBA9E769B49C2EB /* OAuthCredential.swift */,
+				14FA84632B3100F245AE174F /* OAuthProviderConfiguration.swift */,
+				995CDD4F5269B46DB5F835D3 /* OAuthCoordinator.swift */,
+			);
+			name = OAuth;
+			path = OAuth;
+			sourceTree = "<group>";
+		};
 		9ED5893EBB7E41F59F79B35F /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -552,18 +563,16 @@
 		D39BC939FCD228797E7CD529 /* Network */ = {
 			isa = PBXGroup;
 			children = (
-				5DEECDF56F59912F497127DE /* AliyunDriveService.swift */,
 				0DF56CEA135D36E2F995C734 /* EmbyService.swift */,
 				14F5FEC9AF51B13EF36A7172 /* IPTVService.swift */,
 				73FCD9328997108A87076482 /* JellyfinService.swift */,
 				280CCDA58FB0544ADF808AD6 /* LocalFolderService.swift */,
 				255BC9880082B37A6C9F5612 /* NetworkError.swift */,
-				7B4FF80371195566D7A4C49C /* OAuthCoordinator.swift */,
-				88A2454299B78C7044D19CE7 /* OAuthCredentialStore.swift */,
 				91EA4FD5A9BAE96FE38BE250 /* PlexService.swift */,
 				97B2C802C4391AAEDAC4EFD7 /* ServiceFactory.swift */,
 				05B61CB7E7AA5DC184A6CDF5 /* SMBService.swift */,
 				C900FB34F4BBFFF323A8041B /* WebDAVService.swift */,
+				9DF65FA3D284B0BF4C09CDDE /* OAuth */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -690,6 +699,7 @@
 				0383DE30F75F95783E318F43 /* XCRemoteSwiftPackageReference "SWXMLHash" */,
 				2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */,
 			);
+			productRefGroup = 033147F46632DF78009B84E9 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -737,7 +747,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				0A95157B703B08C4B2DDF526 /* AddConnectionView.swift in Sources */,
-				19107D42A6C7AC2604504A9B /* AliyunDriveService.swift in Sources */,
 				E0103B6CF3BFE2DBE840F946 /* AppState.swift in Sources */,
 				E074FFC90A663AA52A6C951E /* BackdropHeader.swift in Sources */,
 				72BEFAE9AE6AA3775461CEA8 /* BrowserView.swift in Sources */,
@@ -786,8 +795,6 @@
 				65E508B5DBC9B1B34ADBA125 /* MetadataRefreshCoordinator.swift in Sources */,
 				C0F7E0FE82C8F19F0BC3D20B /* MetadataService.swift in Sources */,
 				F81CDA7A6F126D61EA48E2F3 /* NetworkError.swift in Sources */,
-				0CB115C69D634A85B58EF3FE /* OAuthCoordinator.swift in Sources */,
-				CD998BAEF2AFE9B8542CC3C1 /* OAuthCredentialStore.swift in Sources */,
 				4D4A7648906ED7B2CA43B310 /* OnlineSubtitleService.swift in Sources */,
 				2281344F0A25C3DC28C9AB47 /* PlaybackRecord.swift in Sources */,
 				A93455233C39CBB739BE385D /* PlayerCapabilityProbe.swift in Sources */,
@@ -830,6 +837,9 @@
 				8BB64D8644EE2B2352FB49BC /* View+Extensions.swift in Sources */,
 				826D18F64711A688F69C554F /* WebDAVService.swift in Sources */,
 				C06AA5BFC4A7C5AB3AD907E8 /* iCloudSyncService.swift in Sources */,
+				09121874750C74A31ADD7636 /* OAuthCredential.swift in Sources */,
+				CF8406050C6AAA259C574260 /* OAuthProviderConfiguration.swift in Sources */,
+				0001FBCFB8B95FEF560068DB /* OAuthCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

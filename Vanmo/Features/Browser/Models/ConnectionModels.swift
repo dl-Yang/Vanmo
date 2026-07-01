@@ -8,10 +8,16 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
     case sftp
     case webdav
     case alist
-    case aliyunDrive
+    case removedOfficialCloudDrive = "aliyunDrive"
     case baiduNetdisk
     case drive115
     case quarkDrive
+    case googleDrive
+    case oneDrive
+    case box
+    case pCloudDrive
+    case yandexDisk
+    case mega
     case iptv
     case fnos
     case nfs
@@ -22,6 +28,10 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    static var availableConnectionTypes: [ConnectionType] {
+        allCases.filter { $0 != .removedOfficialCloudDrive }
+    }
+
     var displayName: String {
         switch self {
         case .localFolder: return "本地文件夹"
@@ -30,10 +40,16 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .sftp: return "SFTP"
         case .webdav: return "WebDAV"
         case .alist: return "AList 网盘"
-        case .aliyunDrive: return "阿里云盘"
+        case .removedOfficialCloudDrive: return "已移除的网盘连接"
         case .baiduNetdisk: return "百度网盘"
         case .drive115: return "115 网盘"
         case .quarkDrive: return "夸克网盘"
+        case .googleDrive: return "Google Drive"
+        case .oneDrive: return "OneDrive"
+        case .box: return "Box"
+        case .pCloudDrive: return "pCloud"
+        case .yandexDisk: return "Yandex.Disk"
+        case .mega: return "MEGA"
         case .iptv: return "IPTV"
         case .fnos: return "飞牛 fnOS"
         case .nfs: return "NFS"
@@ -51,8 +67,10 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .ftp, .sftp: return "arrow.up.arrow.down.circle"
         case .webdav: return "globe"
         case .alist: return "cloud"
-        case .aliyunDrive: return "cloud.fill"
+        case .removedOfficialCloudDrive:
+            return "exclamationmark.triangle"
         case .baiduNetdisk, .drive115, .quarkDrive: return "cloud"
+        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk, .mega: return "cloud"
         case .iptv: return "tv"
         case .fnos: return "externaldrive.badge.wifi"
         case .dlna: return "tv.and.mediabox"
@@ -68,7 +86,8 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .sftp: return 22
         case .webdav: return 80
         case .alist: return 5244
-        case .aliyunDrive, .baiduNetdisk, .drive115, .quarkDrive: return 443
+        case .removedOfficialCloudDrive, .baiduNetdisk, .drive115, .quarkDrive: return 443
+        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk, .mega: return 443
         case .iptv: return 0
         case .fnos: return 5005
         case .nfs: return 2049
@@ -98,13 +117,32 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         self == .localFolder
     }
 
+    /// 国内官方网盘合规占位入口（暂不可用，等待开放平台权限/官方 SDK 确认）；
+    /// MEGA 官方无标准 REST+OAuth 接口，需要官方 C++ SDK 深度集成，暂归入此类占位。
     var isOfficialCloudDrive: Bool {
         switch self {
-        case .aliyunDrive, .baiduNetdisk, .drive115, .quarkDrive:
+        case .removedOfficialCloudDrive, .baiduNetdisk, .drive115, .quarkDrive, .mega:
             return true
         default:
             return false
         }
+    }
+
+    /// 走标准 OAuth 2.0 + REST API 的国际网盘，登录后可完整浏览/播放/下载。
+    var isOAuthCloudDrive: Bool {
+        switch self {
+        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 是否需要在每个流媒体 Range 请求上都带 `Authorization: Bearer`（即没有可匿名访问的
+    /// 预签名直链）。目前只有 Google Drive 需要；OneDrive/Box/pCloud/Yandex.Disk 的
+    /// `streamURL(for:)` 都会直接换取到一段时间内可匿名访问的直链，无需在播放期间持续带 token。
+    var requiresBearerStreaming: Bool {
+        self == .googleDrive
     }
 }
 

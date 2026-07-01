@@ -5,6 +5,8 @@ struct AddConnectionView: View {
     @ObservedObject var viewModel: BrowserViewModel
     @Environment(\.dismiss) private var dismiss
 
+    let editingConnection: SavedConnection?
+
     @State private var name = ""
     @State private var selectedType: ConnectionType = .localFolder
     @State private var host = ""
@@ -18,9 +20,34 @@ struct AddConnectionView: View {
     @State private var folderBookmark: Data?
     @State private var showFolderPicker = false
     @State private var folderPickerError: String?
-    @State private var oauthCredential: OAuthCredential?
-    @State private var isAuthorizing = false
+
+    @State private var isAuthenticatingOAuth = false
     @State private var oauthErrorMessage: String?
+
+    init(viewModel: BrowserViewModel, editingConnection: SavedConnection? = nil) {
+        self.viewModel = viewModel
+        self.editingConnection = editingConnection
+
+        let type = editingConnection?.type ?? .localFolder
+        let localFolderURL = editingConnection.flatMap { connection -> URL? in
+            guard connection.type.isLocal else { return nil }
+            let path = connection.path ?? connection.host
+            return path.isEmpty ? nil : URL(fileURLWithPath: path)
+        }
+
+        _name = State(initialValue: editingConnection?.name ?? "")
+        _selectedType = State(initialValue: type)
+        _host = State(initialValue: editingConnection?.host ?? "")
+        _port = State(initialValue: editingConnection.map { "\($0.port)" } ?? "")
+        _useHTTPS = State(initialValue: editingConnection.map { connection in
+            connection.host.lowercased().hasPrefix("https://") || connection.port == 443
+        } ?? true)
+        _username = State(initialValue: editingConnection?.username ?? "")
+        _password = State(initialValue: "")
+        _path = State(initialValue: editingConnection?.path ?? "")
+        _folderURL = State(initialValue: localFolderURL)
+        _folderBookmark = State(initialValue: editingConnection?.bookmarkData)
+    }
 
     var body: some View {
         NavigationStack {
@@ -31,6 +58,8 @@ struct AddConnectionView: View {
                     localFolderSection
                 } else if selectedType.isOfficialCloudDrive {
                     officialCloudDriveSection
+                } else if selectedType.isOAuthCloudDrive {
+                    oauthCloudDriveSection
                 } else {
                     remoteServerSection
 
@@ -41,7 +70,7 @@ struct AddConnectionView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.vanmoBackground)
-            .navigationTitle("添加连接")
+            .navigationTitle(isEditing ? "编辑连接" : "添加连接")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -53,6 +82,7 @@ struct AddConnectionView: View {
                 }
             }
             .onAppear {
+                guard !isEditing else { return }
                 useHTTPS = inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: selectedType))
                 port = "\(defaultPort(for: selectedType, useHTTPS: useHTTPS))"
                 applyDefaults(for: selectedType)
@@ -71,24 +101,29 @@ struct AddConnectionView: View {
 
     private var typeSection: some View {
         Section("连接类型") {
-            Picker("协议", selection: $selectedType) {
-                ForEach(ConnectionType.allCases) { type in
-                    Text(type.displayName).tag(type)
+            if isEditing {
+                LabeledContent("协议") {
+                    Text(selectedType.displayName)
+                        .foregroundStyle(.secondary)
                 }
-            }
-            .pickerStyle(.menu)
-            .onChange(of: selectedType) { _, newValue in
-                useHTTPS = supportsHTTPS(for: newValue)
-                    ? inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: newValue))
-                    : false
-                port = "\(defaultPort(for: newValue, useHTTPS: useHTTPS))"
-                applyDefaults(for: newValue)
-                if !newValue.isLocal {
-                    folderURL = nil
-                    folderBookmark = nil
+            } else {
+                Picker("协议", selection: $selectedType) {
+                    ForEach(ConnectionType.availableConnectionTypes) { type in
+                        Text(type.displayName).tag(type)
+                    }
                 }
-                oauthCredential = nil
-                oauthErrorMessage = nil
+                .pickerStyle(.menu)
+                .onChange(of: selectedType) { _, newValue in
+                    useHTTPS = supportsHTTPS(for: newValue)
+                        ? inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: newValue))
+                        : false
+                    port = "\(defaultPort(for: newValue, useHTTPS: useHTTPS))"
+                    applyDefaults(for: newValue)
+                    if !newValue.isLocal {
+                        folderURL = nil
+                        folderBookmark = nil
+                    }
+                }
             }
         }
     }
@@ -185,11 +220,17 @@ struct AddConnectionView: View {
 
             SecureField("密码", text: $password)
                 .textContentType(.password)
+
+            if isEditing {
+                Text("留空则保留现有密码。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
     private var officialCloudDriveSection: some View {
-        Section("官方授权") {
+        Section("官方接入") {
             TextField("名称", text: $name)
                 .textContentType(.name)
 
@@ -201,34 +242,7 @@ struct AddConnectionView: View {
             TextField(pathPlaceholder, text: $path)
                 .autocapitalization(.none)
 
-            Button {
-                authorizeOfficialCloudDrive()
-            } label: {
-                HStack {
-                    if isAuthorizing {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "person.crop.circle.badge.checkmark")
-                    }
-                    Text(oauthCredential == nil ? "开始 OAuth 授权" : "重新授权")
-                }
-            }
-            .disabled(isAuthorizing || !canAuthorizeOfficialCloudDrive)
-
-            if let oauthCredential {
-                Text("已完成授权，token 将按连接隔离保存到 Keychain。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("Access token 过期时间：\(oauthCredential.expiresAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-
-            if let oauthErrorMessage {
-                Text(oauthErrorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            } else if let caption = connectionTypeCaption {
+            if let caption = connectionTypeCaption {
                 Text(caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -236,7 +250,51 @@ struct AddConnectionView: View {
         }
     }
 
+    private var oauthCloudDriveSection: some View {
+        Section("账号登录") {
+            if isEditing {
+                TextField("名称", text: $name)
+                    .textContentType(.name)
+            }
+
+            if let caption = connectionTypeCaption {
+                Text(caption)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !OAuthProviderConfiguration.isConfigured(for: selectedType) {
+                Text(OAuthProviderConfiguration.missingCredentialHint(for: selectedType))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            Button {
+                Task { await beginOAuthLogin() }
+            } label: {
+                HStack {
+                    Text(isEditing ? "重新登录 \(selectedType.displayName)" : "使用 \(selectedType.displayName) 账号登录")
+                    Spacer()
+                    if isAuthenticatingOAuth {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(!OAuthProviderConfiguration.isConfigured(for: selectedType) || isAuthenticatingOAuth)
+
+            if let oauthErrorMessage {
+                Text(oauthErrorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
     // MARK: - Helpers
+
+    private var isEditing: Bool {
+        editingConnection != nil
+    }
 
     private var hostPlaceholder: String {
         if selectedType.isMediaServer {
@@ -244,9 +302,6 @@ struct AddConnectionView: View {
         }
         if selectedType == .iptv {
             return "播放列表 URL 或主机地址"
-        }
-        if selectedType == .aliyunDrive {
-            return "PDS domainId 或 https://{domainId}.api.aliyunpds.com"
         }
         if selectedType.isOfficialCloudDrive {
             return "开放平台域名或应用参数"
@@ -269,9 +324,13 @@ struct AddConnectionView: View {
         if selectedType.isLocal {
             return folderBookmark != nil
         }
+        if selectedType.isOAuthCloudDrive {
+            // 新建走登录按钮直接创建连接；编辑时允许通过"保存"改名。
+            return isEditing
+        }
         guard !host.isEmpty else { return false }
         if selectedType.isOfficialCloudDrive {
-            return selectedType == .aliyunDrive && oauthCredential != nil
+            return false
         }
         guard isPortValid, isRemotePathValid else { return false }
         if selectedType.requiresAuth {
@@ -318,7 +377,7 @@ struct AddConnectionView: View {
     private var connectionTypeCaption: String? {
         switch selectedType {
         case .alist:
-            return "AList 默认端口 5244、WebDAV 路径为 /dav，是否启用 HTTPS 取决于实例配置。用户名/密码为 AList 账户，可聚合阿里云盘、百度网盘、115、夸克等来源；部分网盘的直链取流可能受限或限速。"
+            return "AList 默认端口 5244、WebDAV 路径为 /dav，是否启用 HTTPS 取决于实例配置。用户名/密码为 AList 账户，可聚合多种网盘来源；部分网盘的直链取流可能受限或限速。"
         case .webdav:
             return "通用 WebDAV 连接。主机可填写域名或 IP，路径用于指定服务器上的根目录；不确定路径时可留空。"
         case .smb:
@@ -327,17 +386,26 @@ struct AddConnectionView: View {
             return "可在主机地址或路径中填写完整 M3U/M3U8 播放列表 URL。"
         case .fnos:
             return "fnOS 按 WebDAV 兼容方式连接：局域网 HTTP 通常为 5005，HTTPS 通常为 5006，路径一般留空；如使用 SMB，请选择 SMB 协议。"
-        case .aliyunDrive:
-            if OAuthProviderConfiguration.isConfigured(for: .aliyunDrive) {
-                return "使用阿里云盘 PDS 官方 OAuth2。请填写 domainId 或完整 API 域名，授权后可浏览目录并获取短时下载 URL。"
-            }
-            return "阿里云盘官方接入已预留 OAuth2 流程，请先在 OAuthProviderConfiguration 中填写 client id、redirect URI 对应配置后再授权。"
         case .baiduNetdisk:
             return "百度网盘官方接入保留入口；将仅使用开放平台 OAuth 与官方 API，未配置前不会使用 Cookie、抓包或逆向接口。"
         case .drive115:
             return "115 网盘需通过开放平台入驻和应用审核；本入口仅保留合规接入提示，当前不使用非官方接口。"
         case .quarkDrive:
             return "夸克网盘官方开放能力仍需调研确认；本入口仅保留合规接入提示，当前不使用非官方接口。"
+        case .mega:
+            return "MEGA 官方无标准 REST + OAuth 接口，完整支持需要官方 MEGA SDK（C++，端到端加密，每个文件需客户端侧解密）深度集成；当前仅保留入口，完整接入待后续单独评估工作量。"
+        case .removedOfficialCloudDrive:
+            return "该历史连接类型已移除，不再提供授权、浏览或取流能力；可删除此连接后改用 AList/WebDAV。"
+        case .googleDrive:
+            return "通过 Google 官方 OAuth 2.0 登录，仅请求只读权限；登录后可浏览、播放、下载你的 Google Drive 文件。"
+        case .oneDrive:
+            return "通过 Microsoft 官方 OAuth 2.0 登录（支持个人版与工作/学校账号），登录后可浏览、播放、下载 OneDrive 文件。"
+        case .box:
+            return "通过 Box 官方 OAuth 2.0 登录，登录后可浏览、播放、下载 Box 文件。"
+        case .pCloudDrive:
+            return "通过 pCloud 官方 OAuth 2.0 登录（自动识别 US/EU 数据中心），登录后可浏览、播放、下载 pCloud 文件。"
+        case .yandexDisk:
+            return "通过 Yandex 官方 OAuth 2.0 登录，登录后可浏览、播放、下载 Yandex.Disk 文件。"
         default:
             return nil
         }
@@ -472,12 +540,6 @@ struct AddConnectionView: View {
         }
     }
 
-    private var canAuthorizeOfficialCloudDrive: Bool {
-        selectedType == .aliyunDrive &&
-            OAuthProviderConfiguration.isConfigured(for: selectedType) &&
-            !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
     private func applyHTTPSPortDefault(_ useHTTPS: Bool) {
         guard selectedType == .fnos else { return }
         let currentPort = Int(port)
@@ -538,34 +600,55 @@ struct AddConnectionView: View {
             let didConnect: Bool
             if selectedType.isLocal {
                 guard let folderURL, let folderBookmark else { return }
-                didConnect = await viewModel.saveConnection(
-                    name: name,
-                    type: selectedType,
-                    host: folderURL.path,
-                    port: 0,
-                    username: nil,
-                    password: nil,
-                    path: folderURL.path,
-                    bookmarkData: folderBookmark
-                )
+                if let editingConnection {
+                    didConnect = await viewModel.updateConnection(
+                        editingConnection,
+                        name: name,
+                        host: folderURL.path,
+                        port: 0,
+                        username: nil,
+                        password: nil,
+                        path: folderURL.path,
+                        bookmarkData: folderBookmark
+                    )
+                } else {
+                    didConnect = await viewModel.saveConnection(
+                        name: name,
+                        type: selectedType,
+                        host: folderURL.path,
+                        port: 0,
+                        username: nil,
+                        password: nil,
+                        path: folderURL.path,
+                        bookmarkData: folderBookmark
+                    )
+                }
             } else {
                 let input = normalizedRemoteInput
-                let credentialPayload: String?
-                if selectedType.isOfficialCloudDrive, let oauthCredential {
-                    credentialPayload = try? OAuthCredentialStore.encodedString(oauthCredential)
+                let credentialPayload = password.isEmpty ? nil : password
+                if let editingConnection {
+                    didConnect = await viewModel.updateConnection(
+                        editingConnection,
+                        name: name,
+                        host: input.host,
+                        port: input.port,
+                        username: username.isEmpty ? nil : username,
+                        password: credentialPayload,
+                        path: input.path,
+                        bookmarkData: nil
+                    )
                 } else {
-                    credentialPayload = password.isEmpty ? nil : password
+                    didConnect = await viewModel.saveConnection(
+                        name: name,
+                        type: selectedType,
+                        host: input.host,
+                        port: input.port,
+                        username: username.isEmpty ? nil : username,
+                        password: credentialPayload,
+                        path: input.path,
+                        bookmarkData: nil
+                    )
                 }
-                didConnect = await viewModel.saveConnection(
-                    name: name,
-                    type: selectedType,
-                    host: input.host,
-                    port: input.port,
-                    username: username.isEmpty ? nil : username,
-                    password: credentialPayload,
-                    path: input.path,
-                    bookmarkData: nil
-                )
             }
             if didConnect {
                 dismiss()
@@ -573,20 +656,22 @@ struct AddConnectionView: View {
         }
     }
 
-    private func authorizeOfficialCloudDrive() {
-        guard canAuthorizeOfficialCloudDrive else { return }
-        isAuthorizing = true
+    private func beginOAuthLogin() async {
+        isAuthenticatingOAuth = true
         oauthErrorMessage = nil
-        Task {
-            do {
-                oauthCredential = try await OAuthCoordinator.shared.authenticate(
-                    type: selectedType,
-                    host: host.trimmingCharacters(in: .whitespacesAndNewlines)
-                )
-            } catch {
-                oauthErrorMessage = error.localizedDescription
-            }
-            isAuthorizing = false
+
+        let success: Bool
+        if let editingConnection {
+            success = await viewModel.reauthenticateOAuthConnection(editingConnection)
+        } else {
+            success = await viewModel.beginOAuthConnection(type: selectedType, name: name.isEmpty ? nil : name)
+        }
+
+        isAuthenticatingOAuth = false
+        if success {
+            dismiss()
+        } else {
+            oauthErrorMessage = viewModel.errorMessage.isEmpty ? "登录失败，请重试" : viewModel.errorMessage
         }
     }
 }

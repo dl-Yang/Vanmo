@@ -95,7 +95,9 @@ final class ConnectionsViewModel: ObservableObject {
     var canBookmarkFoldersInSelectedConnection: Bool {
         guard let selectedConnection else { return false }
         switch selectedConnection.type {
-        case .localFolder, .smb, .webdav, .alist, .fnos, .aliyunDrive:
+        case .localFolder, .smb, .webdav, .alist, .fnos:
+            return true
+        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk:
             return true
         default:
             return false
@@ -314,17 +316,7 @@ final class ConnectionsViewModel: ObservableObject {
 
         modelContext?.insert(connection)
 
-        if type.isOfficialCloudDrive, let password, !password.isEmpty {
-            do {
-                let credential = try OAuthCredentialStore.decodedCredential(from: password)
-                try OAuthCredentialStore.save(credential, connectionId: connection.id)
-            } catch {
-                modelContext?.delete(connection)
-                errorMessage = "保存 \(type.displayName) 授权信息失败: \(error.localizedDescription)"
-                showError = true
-                return false
-            }
-        } else if let password, !password.isEmpty {
+        if let password, !password.isEmpty {
             try? KeychainManager.shared.save(password, for: "conn_\(connection.id)")
         }
 
@@ -339,12 +331,115 @@ final class ConnectionsViewModel: ObservableObject {
         return false
     }
 
+    @discardableResult
+    func updateConnection(
+        _ connection: SavedConnection,
+        name: String,
+        host: String,
+        port: Int,
+        username: String?,
+        password: String?,
+        path: String?,
+        bookmarkData: Data? = nil
+    ) async -> Bool {
+        guard let context = modelContext else { return false }
+
+        if let password, !password.isEmpty {
+            do {
+                try KeychainManager.shared.save(password, for: "conn_\(connection.id)")
+            } catch {
+                errorMessage = "保存密码失败: \(error.localizedDescription)"
+                showError = true
+                return false
+            }
+        }
+
+        connection.name = name
+        connection.host = host
+        connection.port = port
+        connection.username = username
+        connection.path = path
+        connection.bookmarkData = bookmarkData
+        updateFolderBookmarkConnectionNames(for: connection.id, to: name, in: context)
+
+        do {
+            try context.save()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
+        }
+
+        await resetCachedServiceAfterEditing(connection)
+        resetBrowserStateAfterEditing(connection)
+        connectionStatuses[connection.id] = .idle
+        connectionErrorMessages.removeValue(forKey: connection.id)
+        await loadSavedConnections()
+        return true
+    }
+
+    /// 发起 OAuth 网盘登录：授权成功后用固定的 connectionId 落地一条新连接，
+    /// 并立即触发 `connectAndScan`（实际浏览/取流交给对应网盘的 `RemoteFileService` 实现）。
+    @discardableResult
+    func beginOAuthConnection(type: ConnectionType, name: String?) async -> Bool {
+        guard type.isOAuthCloudDrive else { return false }
+
+        let connectionId = UUID()
+        do {
+            let credential = try await OAuthCoordinator.shared.authenticate(type: type)
+            try OAuthCredentialStore.save(credential, connectionId: connectionId)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
+        }
+
+        let connection = SavedConnection(
+            name: (name?.isEmpty == false ? name! : type.displayName),
+            type: type,
+            host: "oauth",
+            port: type.defaultPort,
+            username: nil,
+            path: nil
+        )
+        connection.id = connectionId
+
+        modelContext?.insert(connection)
+        try? modelContext?.save()
+        await loadSavedConnections()
+
+        guard let saved = savedConnections.first(where: { $0.id == connectionId }) else {
+            return false
+        }
+        await selectConnection(saved)
+        return await connectAndScan(saved, showErrorAlert: true)
+    }
+
+    /// 重新走一遍 OAuth 授权码流程，覆盖写入已有连接的凭据（用于 refresh token 失效等场景）。
+    @discardableResult
+    func reauthenticateOAuthConnection(_ connection: SavedConnection) async -> Bool {
+        guard connection.type.isOAuthCloudDrive else { return false }
+
+        do {
+            let credential = try await OAuthCoordinator.shared.authenticate(type: connection.type)
+            try OAuthCredentialStore.save(credential, connectionId: connection.id)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
+        }
+
+        connectionStatuses[connection.id] = .idle
+        connectionErrorMessages.removeValue(forKey: connection.id)
+        return await connectAndScan(connection, showErrorAlert: true)
+    }
+
     func deleteConnection(_ connection: SavedConnection) {
         let connectionId = connection.id
         let isMediaServerConnection = connection.type.isMediaServer
 
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
-        if connection.type.isOfficialCloudDrive {
+        if connection.type.isOAuthCloudDrive {
             try? OAuthCredentialStore.delete(connectionId: connection.id)
         }
 
@@ -386,6 +481,48 @@ final class ConnectionsViewModel: ObservableObject {
             if isMediaServerConnection {
                 librarySyncCompletionID += 1
             }
+        }
+    }
+
+    private func resetCachedServiceAfterEditing(_ connection: SavedConnection) async {
+        if let active = activeLocalServices.removeValue(forKey: connection.id) {
+            await active.disconnect()
+        }
+
+        if browserServiceConnectionID == connection.id {
+            await disconnectBrowserServiceIfNeeded()
+        }
+    }
+
+    private func resetBrowserStateAfterEditing(_ connection: SavedConnection) {
+        guard selectedConnectionID == connection.id else { return }
+        currentPath = "/"
+        pathStack = []
+        files = []
+        isBrowsingFiles = false
+        fileBrowserErrorMessage = nil
+        resetIPTVState()
+    }
+
+    private func updateFolderBookmarkConnectionNames(
+        for connectionId: UUID,
+        to connectionName: String,
+        in context: ModelContext
+    ) {
+        let targetConnectionId = connectionId
+        let descriptor = FetchDescriptor<FolderBookmark>(
+            predicate: #Predicate<FolderBookmark> { bookmark in
+                bookmark.connectionId == targetConnectionId
+            }
+        )
+
+        do {
+            let bookmarks = try context.fetch(descriptor)
+            for bookmark in bookmarks {
+                bookmark.connectionName = connectionName
+            }
+        } catch {
+            VanmoLogger.library.error("[Connections] Update folder bookmark names failed: \(error.localizedDescription)")
         }
     }
 
@@ -735,11 +872,14 @@ final class ConnectionsViewModel: ObservableObject {
     }
 
     private func userFacingFileBrowserMessage(for error: Error, connection: SavedConnection) -> String {
+        if connection.type == .mega {
+            return "MEGA 完整接入需要官方 SDK（端到端加密）支持，当前仅保留入口，暂不可浏览。"
+        }
         if connection.type.isOfficialCloudDrive {
-            if connection.type == .aliyunDrive {
-                return error.localizedDescription
-            }
             return "\(connection.type.displayName) 官方接入仍在合规调研中，当前不会使用非官方接口。可先通过 AList/WebDAV 间接连接。"
+        }
+        if connection.type.isOAuthCloudDrive {
+            return "\(connection.type.displayName) 接入尚未就绪：\(error.localizedDescription)"
         }
         if connection.type == .ftp || connection.type == .sftp || connection.type == .nfs || connection.type == .dlna {
             return "\(connection.type.displayName) 文件浏览暂不可用或该目录为空"
