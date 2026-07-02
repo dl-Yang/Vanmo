@@ -1092,7 +1092,7 @@ private struct EmbyItem: Decodable {
 
 // MARK: - Emby Media Detail Models
 
-private struct EmbyMediaResponse: Decodable {
+private struct EmbyMediaResponse: Decodable, Sendable {
     let items: [EmbyMediaDetail]
     let totalRecordCount: Int
 
@@ -1102,7 +1102,7 @@ private struct EmbyMediaResponse: Decodable {
     }
 }
 
-private struct EmbyMediaDetail: Decodable {
+private struct EmbyMediaDetail: Decodable, Sendable {
     let id: String
     let name: String
     let type: String
@@ -1153,7 +1153,7 @@ private struct EmbyMediaDetail: Decodable {
     }
 }
 
-private struct EmbyUserData: Decodable {
+private struct EmbyUserData: Decodable, Sendable {
     let playbackPositionTicks: Int64?
     let isFavorite: Bool?
     let lastPlayedDate: Date?
@@ -1179,7 +1179,7 @@ private struct EmbyVirtualFolder: Decodable {
     }
 }
 
-private struct EmbyMediaSource: Decodable {
+private struct EmbyMediaSource: Decodable, Sendable {
     let path: String?
     let container: String?
     let size: Int64?
@@ -1191,7 +1191,7 @@ private struct EmbyMediaSource: Decodable {
     }
 }
 
-private struct EmbyPerson: Decodable {
+private struct EmbyPerson: Decodable, Sendable {
     let id: String?
     let name: String
     let type: String
@@ -1205,7 +1205,7 @@ private struct EmbyPerson: Decodable {
     }
 }
 
-private struct EmbyImageTags: Decodable {
+private struct EmbyImageTags: Decodable, Sendable {
     let primary: String?
     let logo: String?
 
@@ -1575,6 +1575,142 @@ enum EmbyItemDetailFetcher {
         }
 
         return mapped
+    }
+}
+
+enum EmbyCollectionsFetcher {
+    static func fetchCollections(
+        containing itemId: String,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> [ServerMediaItem] {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await fetchCollections(containing: itemId, context: service.makeSessionContext())
+    }
+
+    static func fetchCollections(containing itemId: String) async throws -> [ServerMediaItem] {
+        guard let baseURLStr = EmbyCredentialStore.baseURL,
+              let token = EmbyCredentialStore.token,
+              let userId = EmbyCredentialStore.userId,
+              let baseURL = URL(string: baseURLStr) else {
+            throw NetworkError.notConnected
+        }
+        return try await fetchCollections(
+            containing: itemId,
+            context: EmbySessionContext(
+                type: EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby,
+                baseURL: baseURL,
+                apiPrefix: EmbyCredentialStore.apiPrefix,
+                token: token,
+                userId: userId
+            )
+        )
+    }
+
+    private static func fetchCollections(containing itemId: String, context: EmbySessionContext) async throws -> [ServerMediaItem] {
+        let boxSets = try await fetchBoxSets(context: context)
+        guard boxSets.isEmpty == false else { return [] }
+
+        var matches: [EmbyMediaDetail] = []
+        await withTaskGroup(of: EmbyMediaDetail?.self) { group in
+            var iterator = boxSets.makeIterator()
+            let maxConcurrentChecks = 6
+
+            for _ in 0..<maxConcurrentChecks {
+                guard let boxSet = iterator.next() else { break }
+                group.addTask {
+                    await contains(itemId: itemId, in: boxSet, context: context) ? boxSet : nil
+                }
+            }
+
+            while let match = await group.next() {
+                if let match {
+                    matches.append(match)
+                }
+                if let next = iterator.next() {
+                    group.addTask {
+                        await contains(itemId: itemId, in: next, context: context) ? next : nil
+                    }
+                }
+            }
+        }
+
+        return matches.compactMap { boxSet in
+            EmbyItemMapper.map(
+                boxSet,
+                baseURL: context.baseURL,
+                apiPrefix: context.apiPrefix,
+                token: context.token
+            )
+        }
+    }
+
+    private static func fetchBoxSets(context: EmbySessionContext) async throws -> [EmbyMediaDetail] {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Users/\(context.userId)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "Recursive", value: "true"),
+            URLQueryItem(name: "IncludeItemTypes", value: "BoxSet"),
+            URLQueryItem(name: "Fields", value: "Overview,PrimaryImageAspectRatio,ImageTags,ChildCount"),
+            URLQueryItem(name: "SortBy", value: "SortName"),
+            URLQueryItem(name: "SortOrder", value: "Ascending"),
+            URLQueryItem(name: "api_key", value: context.token),
+        ]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 20
+        request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        #if DEBUG
+        VanmoLogger.network.debug("[Debug][MediaServer] BoxSet URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
+        VanmoLogger.network.debug("[Debug][MediaServer] BoxSet status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        #endif
+
+        try validateEmbyResponse(response, body: data, context: "fetch box sets")
+
+        let result = try EmbyService.makeJSONDecoder().decode(EmbyMediaResponse.self, from: data)
+        return result.items
+    }
+
+    private static func contains(
+        itemId: String,
+        in boxSet: EmbyMediaDetail,
+        context: EmbySessionContext
+    ) async -> Bool {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Users/\(context.userId)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "ParentId", value: boxSet.id),
+            URLQueryItem(name: "Ids", value: itemId),
+            URLQueryItem(name: "Limit", value: "1"),
+            URLQueryItem(name: "api_key", value: context.token),
+        ]
+
+        guard let url = components.url else { return false }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            try validateEmbyResponse(response, body: data, context: "check box set membership")
+            let result = try EmbyService.makeJSONDecoder().decode(EmbyMediaResponse.self, from: data)
+            return result.items.isEmpty == false
+        } catch {
+            VanmoLogger.network.error("[MediaServer] BoxSet membership check failed: \(error.localizedDescription)")
+            return false
+        }
     }
 }
 

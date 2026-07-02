@@ -449,7 +449,6 @@
 				14FA84632B3100F245AE174F /* OAuthProviderConfiguration.swift */,
 				995CDD4F5269B46DB5F835D3 /* OAuthCoordinator.swift */,
 			);
-			name = OAuth;
 			path = OAuth;
 			sourceTree = "<group>";
 		};
@@ -605,7 +604,6 @@
 				520F88CCE40D6906CD69765C /* PCloudDriveService.swift */,
 				05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */,
 			);
-			name = CloudDrive;
 			path = CloudDrive;
 			sourceTree = "<group>";
 		};

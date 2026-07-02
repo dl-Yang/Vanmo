@@ -70,6 +70,49 @@ struct TrackSelectorView: View {
             }
             .tint(.primary)
 
+            Button {
+                viewModel.searchOnlineSubtitles()
+            } label: {
+                HStack {
+                    Label("搜索在线字幕", systemImage: "magnifyingglass")
+                    Spacer()
+                    if viewModel.isSearchingOnlineSubtitles {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(viewModel.isSearchingOnlineSubtitles)
+
+            if let message = viewModel.onlineSubtitleStatusMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(viewModel.onlineSubtitleResults) { result in
+                Button {
+                    viewModel.downloadOnlineSubtitle(result)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(result.title)
+                                .font(.subheadline)
+                            Text(onlineSubtitleMetadata(for: result))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if viewModel.downloadingOnlineSubtitleID == result.id {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.down.circle")
+                                .foregroundStyle(Color.vanmoPrimary)
+                        }
+                    }
+                }
+                .disabled(viewModel.downloadingOnlineSubtitleID == result.id)
+            }
+
             ForEach(viewModel.subtitleTracks) { track in
                 Button {
                     viewModel.selectSubtitleTrack(track.id)
@@ -92,5 +135,24 @@ struct TrackSelectorView: View {
                 .tint(.primary)
             }
         }
+    }
+
+    private func onlineSubtitleMetadata(for result: OnlineSubtitleResult) -> String {
+        var parts = [
+            result.provider,
+            result.language,
+            result.format.fileExtension.uppercased()
+        ].compactMap { $0 }
+        if let downloadCount = result.downloadCount {
+            parts.append("\(downloadCount) 次下载")
+        }
+        if result.isTrusted == true {
+            parts.append("可信")
+        }
+        if result.isMachineTranslated == true {
+            parts.append("机器翻译")
+        }
+        return parts
+        .joined(separator: " · ")
     }
 }

@@ -27,6 +27,7 @@ final class SearchViewModel: ObservableObject {
     private var connectionSnapshots: [SearchConnectionSnapshot] = []
     private var searchTask: Task<Void, Never>?
     private var searchGeneration = UUID()
+    private let maxConcurrentRemoteSearches = 4
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
@@ -171,20 +172,28 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func searchRemoteConnections(_ query: String) async -> [RemoteSearchPayload] {
-        let snapshots = connectionSnapshots
+        let snapshots = connectionSnapshots.filter(\.isSearchEligible)
         guard !snapshots.isEmpty else { return [] }
 
         return await withTaskGroup(of: RemoteSearchPayload?.self) { group in
-            for snapshot in snapshots {
+            var iterator = snapshots.makeIterator()
+            for _ in 0..<maxConcurrentRemoteSearches {
+                guard let snapshot = iterator.next() else { break }
                 group.addTask {
                     await Self.remoteSearchPayload(query: query, snapshot: snapshot)
                 }
             }
 
             var payloads: [RemoteSearchPayload] = []
-            for await payload in group {
-                guard let payload, !Task.isCancelled else { continue }
-                payloads.append(payload)
+            while let payload = await group.next() {
+                if let payload, !Task.isCancelled {
+                    payloads.append(payload)
+                }
+                if let snapshot = iterator.next() {
+                    group.addTask {
+                        await Self.remoteSearchPayload(query: query, snapshot: snapshot)
+                    }
+                }
             }
             return payloads.sorted { $0.sourceName.localizedStandardCompare($1.sourceName) == .orderedAscending }
         }
@@ -219,19 +228,7 @@ final class SearchViewModel: ObservableObject {
 
             let rootPath = (snapshot.path?.isEmpty == false ? snapshot.path : nil) ?? "/"
             let matches = try await service.search(query: query, path: rootPath, maxDepth: 2, limit: 40)
-            var fileHits: [RemoteFileHit] = []
-            for file in matches where file.isVideo {
-                try Task.checkCancellation()
-                guard let streamURL = try? await service.streamURL(for: file) else { continue }
-                fileHits.append(
-                    RemoteFileHit(
-                        name: file.name,
-                        path: file.path,
-                        size: file.size,
-                        streamURL: streamURL
-                    )
-                )
-            }
+            let fileHits = await fileHits(from: matches.filter(\.isVideo), service: service)
 
             await service.disconnect()
             return RemoteSearchPayload(
@@ -245,6 +242,32 @@ final class SearchViewModel: ObservableObject {
             await service.disconnect()
             return nil
         }
+    }
+
+    private nonisolated static func fileHits(
+        from files: [RemoteFile],
+        service: RemoteFileService
+    ) async -> [RemoteFileHit] {
+        var hits: [RemoteFileHit] = []
+        for file in files {
+            do {
+                try Task.checkCancellation()
+                let streamURL = try await service.streamURL(for: file)
+                hits.append(
+                    RemoteFileHit(
+                        name: file.name,
+                        path: file.path,
+                        size: file.size,
+                        streamURL: streamURL
+                    )
+                )
+            } catch is CancellationError {
+                break
+            } catch {
+                continue
+            }
+        }
+        return hits.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     private func makeRemoteSection(from payload: RemoteSearchPayload) -> SearchResultSection? {
@@ -336,16 +359,19 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func deduplicatedResultItems(_ items: [SearchResultItem]) -> [SearchResultItem] {
-        var seenKeys: Set<String> = []
+        var seenStableKeys: Set<String> = []
+        var seenMetadataKeys: Set<String> = []
         return items.filter { result in
             let item = result.item
-            let key = [
-                item.serverId ?? "",
+            let stableKey = item.serverId.map { "server:\($0)" } ?? "url:\(item.fileURL.absoluteString)"
+            let metadataKey = [
                 item.displayTitle.lowercased(),
                 item.year.map(String.init) ?? "",
                 item.duration > 0 ? String(Int(item.duration)) : "",
             ].joined(separator: "|")
-            return seenKeys.insert(key).inserted
+            guard seenStableKeys.insert(stableKey).inserted else { return false }
+            guard seenMetadataKeys.insert(metadataKey).inserted else { return false }
+            return true
         }
     }
 }
@@ -376,11 +402,15 @@ private struct SearchConnectionSnapshot: Sendable {
 
     var isFileSearchable: Bool {
         switch type {
-        case .localFolder, .smb, .webdav, .alist, .fnos, .aliyunDrive:
+        case .localFolder, .smb, .webdav, .alist, .fnos:
             return true
         default:
             return false
         }
+    }
+
+    var isSearchEligible: Bool {
+        type.isMediaServer || isFileSearchable
     }
 
     init(connection: SavedConnection, password: String?) {

@@ -22,6 +22,7 @@ struct MediaDetailView: View {
     @State private var logoStore = MediaDetailLogoStore()
     @State private var episodesStore = MediaDetailEpisodesStore()
     @State private var enrichmentStore = MediaDetailEnrichmentStore()
+    @State private var collectionsStore = MediaDetailCollectionsStore()
 
     /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
     private enum PanelState { case collapsed, expanded }
@@ -96,6 +97,9 @@ struct MediaDetailView: View {
         }
         .task(id: item.serverId) {
             await enrichItemDetailIfNeeded()
+        }
+        .task(id: item.serverId) {
+            await loadCollectionsIfNeeded()
         }
         .task(id: metadataTaskID) {
             guard supportsMetadataRefresh else { return }
@@ -333,6 +337,7 @@ struct MediaDetailView: View {
 
             MediaDetailSynopsisSection(store: enrichmentStore, item: item) { activeSheet = .synopsis }
             MediaDetailCastSection(store: castStore, enrichment: enrichmentStore, item: item)
+            MediaDetailCollectionsSection(store: collectionsStore, makeItem: makeCollectionItem)
             MediaDetailDetailsSection(store: enrichmentStore, item: item, directorLabel: "导演")
         }
     }
@@ -347,6 +352,7 @@ struct MediaDetailView: View {
             MediaDetailSynopsisSection(store: enrichmentStore, item: item) { activeSheet = .synopsis }
             MediaDetailEpisodesSection(store: episodesStore, accentColor: Color.vanmoAccent, onPlay: playEpisode)
             MediaDetailCastSection(store: castStore, enrichment: enrichmentStore, item: item)
+            MediaDetailCollectionsSection(store: collectionsStore, makeItem: makeCollectionItem)
             MediaDetailDetailsSection(store: enrichmentStore, item: item, directorLabel: "主创")
         }
     }
@@ -629,6 +635,35 @@ struct MediaDetailView: View {
         }
     }
 
+    private func loadCollectionsIfNeeded() async {
+        guard let serverId = item.serverId,
+              item.mediaType != .boxSet else {
+            collectionsStore.setCollections([])
+            return
+        }
+
+        do {
+            if let snapshot = try? mediaServerConnectionSnapshot() {
+                guard snapshot.type == .emby || snapshot.type == .jellyfin else {
+                    collectionsStore.setCollections([])
+                    return
+                }
+                collectionsStore.setCollections(
+                    try await EmbyCollectionsFetcher.fetchCollections(containing: serverId, connection: snapshot)
+                )
+            } else {
+                guard isEmbyOriginItem else {
+                    collectionsStore.setCollections([])
+                    return
+                }
+                collectionsStore.setCollections(try await EmbyCollectionsFetcher.fetchCollections(containing: serverId))
+            }
+        } catch {
+            VanmoLogger.library.error("[MediaDetail] Failed to load collections: \(error.localizedDescription)")
+            collectionsStore.setCollections([])
+        }
+    }
+
     private func setFavorite(_ isFavorite: Bool) async {
         guard !isUpdatingFavorite else { return }
 
@@ -682,6 +717,12 @@ struct MediaDetailView: View {
         episodeItem.seriesId = item.serverId ?? item.seriesId
         episodeItem.sourceConnectionId = item.sourceConnectionId
         appState.play(episodeItem)
+    }
+
+    private func makeCollectionItem(_ collection: ServerMediaItem) -> MediaItem {
+        let collectionItem = collection.makeMediaItem()
+        collectionItem.sourceConnectionId = item.sourceConnectionId
+        return collectionItem
     }
 
     private func loadEpisodes() async {
@@ -905,6 +946,16 @@ private final class MediaDetailEpisodesStore: ObservableObject {
 
     func setEpisodes(_ newEpisodes: [EpisodeInfo]) {
         episodes = newEpisodes
+    }
+}
+
+@MainActor
+private final class MediaDetailCollectionsStore: ObservableObject {
+    @Published private(set) var collections: [ServerMediaItem] = []
+
+    func setCollections(_ newCollections: [ServerMediaItem]) {
+        guard collections.map(\.serverId) != newCollections.map(\.serverId) else { return }
+        collections = newCollections
     }
 }
 
@@ -1205,6 +1256,68 @@ private struct MediaDetailCastAvatar: View {
     }
 }
 
+private struct MediaDetailCollectionsSection: View {
+    @ObservedObject var store: MediaDetailCollectionsStore
+    let makeItem: (ServerMediaItem) -> MediaItem
+
+    var body: some View {
+        if !store.collections.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("合集")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.primary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(store.collections, id: \.serverId) { collection in
+                            NavigationLink {
+                                EmbyFolderBrowseView(container: makeItem(collection))
+                            } label: {
+                                MediaDetailCollectionCard(collection: collection)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                }
+                .padding(.horizontal, -24)
+            }
+        }
+    }
+}
+
+private struct MediaDetailCollectionCard: View {
+    let collection: ServerMediaItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(.secondarySystemBackground))
+
+                if let posterURL = collection.posterURL {
+                    KFImage(posterURL)
+                        .fade(duration: 0.2)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(Color.vanmoPrimary)
+                }
+            }
+            .frame(width: 120, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+            Text(collection.title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .frame(width: 120, alignment: .leading)
+        }
+    }
+}
+
 private struct MediaDetailMetaRow: View {
     enum Style { case collapsed, header }
 
@@ -1436,10 +1549,6 @@ private struct MediaDetailEpisodesSection: View {
     .environmentObject(AppState())
     .preferredColorScheme(.dark)
 }
-
-
-
-
 
 
 

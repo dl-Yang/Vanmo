@@ -6,6 +6,11 @@ import UIKit
 struct VanmoApp: App {
     init() {
         PrefetchTemporaryStore.cleanupOrphans()
+        Task {
+            await OnlineSubtitleService.shared.register(OpenSubtitlesProvider())
+            await OnlineSubtitleService.shared.register(ShooterSubtitleProvider())
+            await OnlineSubtitleService.shared.register(SubhdSubtitleProvider())
+        }
     }
 
     @StateObject private var appState = AppState()

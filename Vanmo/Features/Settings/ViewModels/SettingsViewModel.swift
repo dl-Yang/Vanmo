@@ -12,6 +12,7 @@ final class SettingsViewModel: ObservableObject {
     @AppStorage("subtitle.autoLoad") var subtitleAutoLoad = true
     @AppStorage("subtitle.fontSize") var subtitleFontSize: Double = 18
     @AppStorage("subtitle.preferredLanguage") var subtitlePreferredLanguage = "zh"
+    @AppStorage(OpenSubtitlesCredentialStore.enabledKey) var openSubtitlesEnabled = false
     @AppStorage(SubtitleStylePreferences.textColorKey) var subtitleTextColorHex = "#FFFFFFFF"
     @AppStorage(SubtitleStylePreferences.backgroundColorKey) var subtitleBackgroundColorHex = "#00000099"
     @AppStorage(SubtitleStylePreferences.positionKey) var subtitlePositionRaw = SubtitleStyle.SubtitlePosition.bottom.rawValue
@@ -37,6 +38,17 @@ final class SettingsViewModel: ObservableObject {
     @Published var showClearCacheAlert = false
     @Published var showClearMetadataCacheAlert = false
     @Published var showResetAlert = false
+    @Published var openSubtitlesAPIKey = ""
+    @Published var openSubtitlesUsername = ""
+    @Published var openSubtitlesPassword = ""
+    @Published var openSubtitlesStatusMessage: String?
+    @Published var isTestingOpenSubtitles = false
+
+    init() {
+        openSubtitlesAPIKey = OpenSubtitlesCredentialStore.apiKey ?? ""
+        openSubtitlesUsername = OpenSubtitlesCredentialStore.username ?? ""
+        openSubtitlesPassword = OpenSubtitlesCredentialStore.password ?? ""
+    }
 
     var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -91,6 +103,43 @@ final class SettingsViewModel: ObservableObject {
         await calculateCacheSize()
     }
 
+    func saveOpenSubtitlesCredentials() {
+        do {
+            try OpenSubtitlesCredentialStore.saveCredentials(
+                apiKey: openSubtitlesAPIKey.trimmingCharacters(in: .whitespacesAndNewlines),
+                username: openSubtitlesUsername.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: openSubtitlesPassword
+            )
+            openSubtitlesStatusMessage = "OpenSubtitles 配置已保存"
+        } catch {
+            openSubtitlesStatusMessage = error.localizedDescription
+        }
+    }
+
+    func testOpenSubtitlesLogin() async {
+        guard !isTestingOpenSubtitles else { return }
+        saveOpenSubtitlesCredentials()
+        isTestingOpenSubtitles = true
+        defer { isTestingOpenSubtitles = false }
+
+        do {
+            let response = try await OpenSubtitlesProvider.testLogin()
+            let quota = response.user.allowedDownloads.map { "，下载额度 \($0)" } ?? ""
+            openSubtitlesStatusMessage = "登录成功：\(response.user.level ?? "OpenSubtitles")\(quota)"
+        } catch {
+            openSubtitlesStatusMessage = error.localizedDescription
+        }
+    }
+
+    func clearOpenSubtitlesCredentials() {
+        OpenSubtitlesCredentialStore.clearAll()
+        openSubtitlesEnabled = false
+        openSubtitlesAPIKey = ""
+        openSubtitlesUsername = ""
+        openSubtitlesPassword = ""
+        openSubtitlesStatusMessage = "OpenSubtitles 配置已清除"
+    }
+
     func resetAllSettings() {
         autoPlayNext = true
         resumePlayback = true
@@ -100,6 +149,8 @@ final class SettingsViewModel: ObservableObject {
         subtitleAutoLoad = true
         subtitleFontSize = 18
         subtitlePreferredLanguage = "zh"
+        openSubtitlesEnabled = false
+        clearOpenSubtitlesCredentials()
         subtitleTextColorHex = "#FFFFFFFF"
         subtitleBackgroundColorHex = "#00000099"
         subtitlePositionRaw = SubtitleStyle.SubtitlePosition.bottom.rawValue

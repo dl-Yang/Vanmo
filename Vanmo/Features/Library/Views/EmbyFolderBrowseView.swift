@@ -98,7 +98,7 @@ struct LibraryItemDestination: View {
 
     var body: some View {
         switch item.mediaType {
-        case .folder, .season:
+        case .folder, .collectionFolder, .season, .boxSet:
             if item.serverId != nil {
                 EmbyFolderBrowseView(container: item)
             } else {

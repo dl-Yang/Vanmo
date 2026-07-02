@@ -122,10 +122,53 @@ struct SettingsView: View {
                 Text("顶部").tag(SubtitleStyle.SubtitlePosition.top.rawValue)
                 Text("底部").tag(SubtitleStyle.SubtitlePosition.bottom.rawValue)
             }
+
+            Toggle("启用 OpenSubtitles", isOn: $viewModel.openSubtitlesEnabled)
+
+            if viewModel.openSubtitlesEnabled {
+                TextField("OpenSubtitles API Key", text: $viewModel.openSubtitlesAPIKey)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                TextField("用户名", text: $viewModel.openSubtitlesUsername)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                SecureField("密码", text: $viewModel.openSubtitlesPassword)
+
+                HStack {
+                    Button("保存配置") {
+                        viewModel.saveOpenSubtitlesCredentials()
+                    }
+
+                    Spacer()
+
+                    Button {
+                        Task { await viewModel.testOpenSubtitlesLogin() }
+                    } label: {
+                        if viewModel.isTestingOpenSubtitles {
+                            ProgressView()
+                        } else {
+                            Text("测试登录")
+                        }
+                    }
+                    .disabled(viewModel.isTestingOpenSubtitles)
+                }
+
+                Button("清除 OpenSubtitles 配置", role: .destructive) {
+                    viewModel.clearOpenSubtitlesCredentials()
+                }
+
+                if let message = viewModel.openSubtitlesStatusMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         } header: {
             Label("字幕", systemImage: "captions.bubble")
         } footer: {
-            Text("字幕外观为全局默认值，进入播放器后仍可临时调整。")
+            Text("字幕外观为全局默认值，进入播放器后仍可临时调整。OpenSubtitles 搜索使用官方 REST API；下载需要账户额度，API Key、用户名和密码会保存在 Keychain。")
         }
     }
 

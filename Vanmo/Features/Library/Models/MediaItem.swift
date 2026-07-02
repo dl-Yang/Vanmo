@@ -114,6 +114,7 @@ enum MediaType: String, Codable, CaseIterable, Sendable {
     case season
     case folder
     case collectionFolder
+    case boxSet
     case audio
     case musicAlbum
     case photo
@@ -127,6 +128,7 @@ enum MediaType: String, Codable, CaseIterable, Sendable {
         case .season: return "季"
         case .folder: return "文件夹"
         case .collectionFolder: return "媒体库"
+        case .boxSet: return "合集"
         case .audio: return "音频"
         case .musicAlbum: return "专辑"
         case .photo: return "照片"
@@ -142,6 +144,7 @@ enum MediaType: String, Codable, CaseIterable, Sendable {
         case .season: return "square.stack"
         case .folder: return "folder"
         case .collectionFolder: return "rectangle.stack"
+        case .boxSet: return "rectangle.stack.fill"
         case .audio: return "music.note"
         case .musicAlbum: return "opticaldisc"
         case .photo: return "photo"
@@ -152,7 +155,7 @@ enum MediaType: String, Codable, CaseIterable, Sendable {
     /// 可进入子级列表（Folder / 媒体库 / 季）。电视剧仍走详情页分集列表。
     var isBrowsable: Bool {
         switch self {
-        case .folder, .collectionFolder, .season:
+        case .folder, .collectionFolder, .season, .boxSet:
             return true
         default:
             return false
@@ -177,6 +180,7 @@ enum MediaType: String, Codable, CaseIterable, Sendable {
         case "Episode": return .tvEpisode
         case "Season": return .season
         case "CollectionFolder": return .collectionFolder
+        case "BoxSet": return .boxSet
         default: return .other
         }
     }

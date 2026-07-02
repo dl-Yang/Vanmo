@@ -57,6 +57,10 @@ struct SubtitleOverlayView: View {
         )
     }
 
+    private var imageSubtitleScale: CGFloat {
+        min(0.75, max(0.45, style.fontSize / 32))
+    }
+
     private var positionedSubtitleBody: some View {
         subtitleBody
             .frame(maxWidth: .infinity, alignment: horizontalAlignment)
@@ -81,15 +85,48 @@ struct SubtitleOverlayView: View {
                         .background(style.backgroundColor)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 } else if let uiImage = content.image {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: 220)
+                    ImageSubtitleView(uiImage: uiImage, targetScale: imageSubtitleScale)
                 }
             }
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.15), value: content.text)
         }
+    }
+}
+
+private struct ImageSubtitleView: View {
+    let uiImage: UIImage
+    let targetScale: CGFloat
+
+    var body: some View {
+        let preferredHeight = max(1, uiImage.size.height * targetScale)
+
+        GeometryReader { proxy in
+            let size = displaySize(maxWidth: proxy.size.width)
+
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size.width, height: size.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(height: preferredHeight)
+    }
+
+    private func displaySize(maxWidth: CGFloat) -> CGSize {
+        let imageSize = uiImage.size
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return CGSize(width: 1, height: 1)
+        }
+
+        let targetWidth = imageSize.width * targetScale
+        let targetHeight = imageSize.height * targetScale
+        guard targetWidth > maxWidth else {
+            return CGSize(width: targetWidth, height: targetHeight)
+        }
+
+        let aspectRatio = imageSize.width / imageSize.height
+        return CGSize(width: maxWidth, height: maxWidth / aspectRatio)
     }
 }
 
