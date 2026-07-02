@@ -13,21 +13,52 @@ import Foundation
 /// | pCloud | Client ID + Client Secret | https://docs.pcloud.com/my_apps/ |
 /// | Yandex.Disk | Client ID + Client Secret | https://oauth.yandex.com |
 ///
-/// 所有网盘的 Redirect URI 统一为 `vanmo://oauth/{ConnectionType.rawValue}`，
-/// 需要在对应开发者后台的应用配置里登记同样的值。
+/// Redirect URI 按 provider 分流：
+/// - Google Drive：iOS OAuth Client ID 派生的反向域名 scheme，`com.googleusercontent.apps.<prefix>:/oauth2redirect`
+/// - 其余 OAuth 网盘：`vanmo://oauth/{ConnectionType.rawValue}`，需在对应开发者后台登记
 enum OAuthProviderConfiguration {
-    static let redirectScheme = "vanmo"
-    static let redirectHost = "oauth"
+    static let vanmoRedirectScheme = "vanmo"
+    static let vanmoRedirectHost = "oauth"
+    static let googleRedirectPath = "/oauth2redirect"
+
+    /// Google iOS OAuth Client ID 对应的 URL scheme（由 Client ID 前缀派生）。
+    /// 更换 Client ID 时须同步更新 `Info.plist` 中 `CFBundleURLSchemes` 的 Google 条目。
+    static func googleURLScheme(for type: ConnectionType = .googleDrive) -> String? {
+        guard type == .googleDrive else { return nil }
+        let clientID = clientID(for: .googleDrive)
+        let suffix = ".apps.googleusercontent.com"
+        guard clientID.hasSuffix(suffix) else { return nil }
+        let prefix = String(clientID.dropLast(suffix.count))
+        guard !prefix.isEmpty else { return nil }
+        return "com.googleusercontent.apps.\(prefix)"
+    }
 
     static func redirectURI(for type: ConnectionType) -> String {
-        "\(redirectScheme)://\(redirectHost)/\(type.rawValue)"
+        if let scheme = googleURLScheme(for: type) {
+            return "\(scheme):\(googleRedirectPath)"
+        }
+        return "\(vanmoRedirectScheme)://\(vanmoRedirectHost)/\(type.rawValue)"
+    }
+
+    /// `ASWebAuthenticationSession` 回调 scheme，须与 redirect URI 的 scheme 一致。
+    static func callbackURLScheme(for type: ConnectionType) -> String {
+        googleURLScheme(for: type) ?? vanmoRedirectScheme
+    }
+
+    static func matchesCallback(_ components: URLComponents, type: ConnectionType) -> Bool {
+        if let scheme = googleURLScheme(for: type) {
+            return components.scheme == scheme && components.path == googleRedirectPath
+        }
+        return components.scheme == vanmoRedirectScheme &&
+            components.host == vanmoRedirectHost &&
+            components.path == "/\(type.rawValue)"
     }
 
     /// TODO(User)：在下方对应 case 中填入开发者后台申请到的 Client ID。
     static func clientID(for type: ConnectionType) -> String {
         switch type {
         case .googleDrive:
-            return ""
+            return "311522710381-42mtgv9v8kbjm6dqtta9e2ntmane387g.apps.googleusercontent.com"
         case .oneDrive:
             return ""
         case .box:

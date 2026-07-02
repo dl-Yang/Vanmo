@@ -36,7 +36,7 @@
 
 ### 2.1 国际网盘（2026.07.01 新增）
 
-- [x] **通用 OAuth 2.0 基础设施**：`OAuthCoordinator`/`OAuthCredentialStore`/`OAuthProviderConfiguration` 支持 PKCE（公共客户端）与 Client Secret 两种授权码流程，`vanmo://oauth/{type}` 统一回调；开发者 Client ID / Secret 全部留空占位，需要手动在对应开发者后台申请后填入 `OAuthProviderConfiguration`。
+- [x] **通用 OAuth 2.0 基础设施**：`OAuthCoordinator`/`OAuthCredentialStore`/`OAuthProviderConfiguration` 支持 PKCE（公共客户端）与 Client Secret 两种授权码流程；Google Drive 使用 iOS Client ID 派生的 `com.googleusercontent.apps.*:/oauth2redirect`，其余 OAuth 网盘使用 `vanmo://oauth/{type}`；开发者 Client ID / Secret 需手动在对应开发者后台申请后填入 `OAuthProviderConfiguration`。
 - [x] **Google Drive**：`GoogleDriveService` 已实现目录浏览（`files.list` 分页）、取流（`alt=media`，播放期间持续携带 Bearer token）、下载与 401 自动 refresh；需要在 Google Cloud Console 创建 iOS 类型 OAuth 客户端并填入 Client ID。
 - [x] **OneDrive**：`OneDriveService` 已实现目录浏览（Microsoft Graph `/me/drive` children 分页）、取流（`@microsoft.graph.downloadUrl` 匿名直链）与下载；需要在 Microsoft Entra 管理中心注册公共客户端应用并填入 Application (client) ID。
 - [x] **Box**：`BoxDriveService` 已实现目录浏览（`folders/{id}/items`）、取流（拦截 `/files/{id}/content` 的 302 只取 `Location`）与下载；需要在 Box Developer Console 创建自定义 App 并填入 Client ID / Client Secret。

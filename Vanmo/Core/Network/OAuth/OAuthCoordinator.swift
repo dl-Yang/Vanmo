@@ -30,10 +30,10 @@ final class OAuthCoordinator: NSObject {
         let pkce = OAuthProviderConfiguration.usesPKCE(for: type) ? PKCEPair.generate() : nil
 
         let authorizationURL = try makeAuthorizationURL(type: type, state: state, pkce: pkce)
-        let callbackURL = try await startAuthenticationSession(url: authorizationURL)
+        let callbackURL = try await startAuthenticationSession(url: authorizationURL, type: type)
 
         guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
-              isExpectedCallback(components, type: type) else {
+              OAuthProviderConfiguration.matchesCallback(components, type: type) else {
             throw NetworkError.authenticationFailed
         }
 
@@ -112,27 +112,23 @@ final class OAuthCoordinator: NSObject {
         if !scope.isEmpty {
             items.append(URLQueryItem(name: "scope", value: scope))
         }
-        if type == .oneDrive {
+        if type == .googleDrive {
+            items.append(URLQueryItem(name: "access_type", value: "offline"))
+            items.append(URLQueryItem(name: "include_granted_scopes", value: "true"))
+            items.append(URLQueryItem(name: "prompt", value: "consent"))
+        } else if type == .oneDrive {
             // 使用离线访问以拿到 refresh_token。
             items.append(URLQueryItem(name: "prompt", value: "select_account"))
         }
         if let pkce {
             items.append(URLQueryItem(name: "code_challenge", value: pkce.challenge))
             items.append(URLQueryItem(name: "code_challenge_method", value: "S256"))
-        } else if type == .googleDrive || type == .oneDrive {
-            // 理论上不会走到这里（两者都强制 PKCE），保留以防未来配置变更。
-        } else {
+        } else if type != .googleDrive && type != .oneDrive {
             items.append(URLQueryItem(name: "access_type", value: "offline"))
         }
         components?.queryItems = items
         guard let url = components?.url else { throw NetworkError.invalidURL }
         return url
-    }
-
-    private func isExpectedCallback(_ components: URLComponents, type: ConnectionType) -> Bool {
-        components.scheme == OAuthProviderConfiguration.redirectScheme &&
-            components.host == OAuthProviderConfiguration.redirectHost &&
-            components.path == "/\(type.rawValue)"
     }
 
     // MARK: - Token exchange
@@ -192,11 +188,11 @@ final class OAuthCoordinator: NSObject {
 
     // MARK: - ASWebAuthenticationSession
 
-    private func startAuthenticationSession(url: URL) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
+    private func startAuthenticationSession(url: URL, type: ConnectionType) async throws -> URL {
+        return try await withCheckedThrowingContinuation { continuation in
             let authSession = ASWebAuthenticationSession(
                 url: url,
-                callbackURLScheme: OAuthProviderConfiguration.redirectScheme
+                callbackURLScheme: OAuthProviderConfiguration.callbackURLScheme(for: type)
             ) { callbackURL, error in
                 if let callbackURL {
                     continuation.resume(returning: callbackURL)
