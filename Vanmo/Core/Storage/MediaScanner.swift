@@ -113,7 +113,11 @@ actor MediaScanner {
 
                 let streamURL: URL
                 do {
-                    streamURL = try await service.streamURL(for: file)
+                    if service.type.usesEphemeralStreamURLs {
+                        streamURL = service.type.catalogPlaybackURL(serverPath: file.path)
+                    } else {
+                        streamURL = try await service.streamURL(for: file)
+                    }
                 } catch {
                     VanmoLogger.library.error("Failed to get stream URL for \(file.name): \(error.localizedDescription)")
                     continue

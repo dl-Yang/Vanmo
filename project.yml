@@ -73,6 +73,14 @@ targets:
           - "Security"
           - "-framework"
           - "CoreFoundation"
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo-Cloud.entitlements
+          OTHER_SWIFT_FLAGS:
+            - "-DFFMPEG_ENABLED"
+            - "-DCLOUDKIT_SYNC_ENABLED"
     entitlements:
       path: Vanmo/Vanmo.entitlements
       properties:

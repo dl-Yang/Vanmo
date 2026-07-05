@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 
 /// Plex Media Server 协议实现。
 ///
@@ -422,10 +421,16 @@ final class PlexService: MediaServerService, MediaSearchProviding {
         request.setValue(PlexCredentialStore.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
         request.setValue(Self.clientName, forHTTPHeaderField: "X-Plex-Product")
         request.setValue(Self.clientVersion, forHTTPHeaderField: "X-Plex-Version")
-        request.setValue(UIDevice.current.model, forHTTPHeaderField: "X-Plex-Device")
+        request.setValue(PlatformDeviceInfo.model, forHTTPHeaderField: "X-Plex-Device")
         request.setValue("Vanmo", forHTTPHeaderField: "X-Plex-Device-Name")
+        #if os(iOS)
         request.setValue("iOS", forHTTPHeaderField: "X-Plex-Platform")
-        request.setValue(UIDevice.current.systemVersion, forHTTPHeaderField: "X-Plex-Platform-Version")
+        #elseif os(macOS)
+        request.setValue("macOS", forHTTPHeaderField: "X-Plex-Platform")
+        #else
+        request.setValue("Unknown", forHTTPHeaderField: "X-Plex-Platform")
+        #endif
+        request.setValue(PlatformDeviceInfo.systemVersion, forHTTPHeaderField: "X-Plex-Platform-Version")
         if request.value(forHTTPHeaderField: "Accept") == nil {
             request.setValue("application/json", forHTTPHeaderField: "Accept")
         }

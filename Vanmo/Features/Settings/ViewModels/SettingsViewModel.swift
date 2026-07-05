@@ -33,6 +33,9 @@ final class SettingsViewModel: ObservableObject {
 
     @AppStorage(ColorTheme.storageKey) var theme: ColorTheme = .system
 
+    @AppStorage(CloudSyncPreferences.enabledKey) var cloudSyncEnabled = true
+    @Published var cloudSyncStatusMessage: String?
+
     @Published var cacheSize: String = "计算中..."
     @Published var metadataCacheSize: String = "计算中..."
     @Published var showClearCacheAlert = false
@@ -54,6 +57,26 @@ final class SettingsViewModel: ObservableObject {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) (\(build))"
+    }
+
+    var cloudSyncLastUpdatedText: String {
+        guard let lastSyncAt = CloudSyncPreferences.lastSyncAt else {
+            return "尚未同步"
+        }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter.localizedString(for: lastSyncAt, relativeTo: Date())
+    }
+
+    func bindCloudSyncCoordinator(_ coordinator: CloudSyncCoordinator) {
+        cloudSyncStatusMessage = coordinator.statusMessage
+    }
+
+    func updateCloudSyncEnabled(_ enabled: Bool, coordinator: CloudSyncCoordinator) {
+        guard CloudSyncAvailability.isCloudKitEnabled else { return }
+        cloudSyncEnabled = enabled
+        coordinator.setEnabled(enabled)
+        cloudSyncStatusMessage = coordinator.statusMessage
     }
 
     func calculateCacheSize() async {
@@ -158,5 +181,7 @@ final class SettingsViewModel: ObservableObject {
         showUnwatchedBadge = true
         metadataAutoDownload = true
         theme = .system
+        cloudSyncEnabled = true
+        CloudSyncPreferences.isEnabled = true
     }
 }

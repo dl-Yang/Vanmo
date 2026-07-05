@@ -328,7 +328,12 @@ struct ConnectionsView: View {
 
     private func play(_ file: RemoteFile) async {
         do {
-            let url = try await viewModel.streamURL(for: file)
+            let url: URL
+            if let connection = viewModel.selectedConnection, connection.type.usesEphemeralStreamURLs {
+                url = connection.type.catalogPlaybackURL(serverPath: file.path)
+            } else {
+                url = try await viewModel.streamURL(for: file)
+            }
             let item: MediaItem
             if isIPTVBrowsing {
                 // 直播频道：用频道原名作标题，不跑文件名解析（避免把频道名误判成季集）。

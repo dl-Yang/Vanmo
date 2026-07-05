@@ -36,6 +36,7 @@
 		4D1FF76F2DBB43A073DBFCAF /* PlayerProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */; };
 		4D4A7648906ED7B2CA43B310 /* OnlineSubtitleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC869EEC62D53CCEE7FF2382 /* OnlineSubtitleService.swift */; };
 		4F769D798C519AEB201A519B /* YandexDiskService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */; };
+		A8F3C2E1D4B5678901234AB /* BaiduNetdiskService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2U3D4E5F6789012345678 /* BaiduNetdiskService.swift */; };
 		4F8C56D3F3B56E7D44BFAA44 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61585942DFE77AC7C9FD50CC /* FlowLayout.swift */; };
 		558D973A7C068676AFC8BBC7 /* FilterChipsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */; };
 		56257939BD5197F8F7C85D8F /* PrefetchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FE3D8BF6B216D29FB14291 /* PrefetchSession.swift */; };
@@ -113,6 +114,120 @@
 		FE0A2201C9F3CDCA472EBE00 /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96CE2D7094AEA16D95E3050C /* PlayerViewModel.swift */; };
 		FF84C30ADC33D47677635F7B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDAAA9821B6C7B549EC0C654 /* LibraryViewModel.swift */; };
 		FFAD6AE5A46376A5B04BF5F3 /* RangeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 597B0E058D9E6F55D17E2D16 /* RangeCache.swift */; };
+		ACE071B6760848779B4627BF /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB8875D30954E588A912E1C /* ModelContainerFactory.swift */; };
+		72E5C73395B54AE0A59A5B34 /* ModelContainerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FB8875D30954E588A912E1C /* ModelContainerFactory.swift */; };
+		2432B34AB4A3410796DBD8D7 /* CloudSyncPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346D6A996E5649A29ED55148 /* CloudSyncPreferences.swift */; };
+		506AC7E26B3A444FB2691993 /* CloudSyncPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 346D6A996E5649A29ED55148 /* CloudSyncPreferences.swift */; };
+		82A2F116F20C44299930E178 /* CloudSyncConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B0B37ECC274856863E1EC0 /* CloudSyncConflictResolver.swift */; };
+		4810234809BE41E88BDE5B5F /* CloudSyncConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B0B37ECC274856863E1EC0 /* CloudSyncConflictResolver.swift */; };
+		D9D46820F5D34A4FB6DFC6FC /* CloudSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CA87388BAE34698AEA45F02 /* CloudSyncCoordinator.swift */; };
+		86E948D55D0B4228B35178E9 /* CloudSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CA87388BAE34698AEA45F02 /* CloudSyncCoordinator.swift */; };
+		59BC164452B245AF8A41F3BD /* CloudMediaState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5736BDEF39854F38BD38D7CF /* CloudMediaState.swift */; };
+		641EC4A9DB0140979F3C60D7 /* CloudMediaState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5736BDEF39854F38BD38D7CF /* CloudMediaState.swift */; };
+		5AC6E7387B9745B19AB5DD81 /* VanmoMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 014BA1E49CD2445AA7287C7E /* VanmoMacApp.swift */; };
+		7DB91124792240A59C6BB0E4 /* VanmoMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 014BA1E49CD2445AA7287C7E /* VanmoMacApp.swift */; };
+		15D29AA4C7304B4BA1549D59 /* PlatformCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069EAD10C83E41E69CFA6B88 /* PlatformCompatibility.swift */; };
+		80ACD6AE6434482080EA474D /* PlatformCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069EAD10C83E41E69CFA6B88 /* PlatformCompatibility.swift */; };
+		80E461C92C6A4D0EA7DA26E7 /* AddConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AEA12D55448D2043E54EEB /* AddConnectionView.swift */; };
+		AE6A53D0D0F14D21A510FBDC /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02FB3A1F58187535A7434A20 /* AppState.swift */; };
+		9BA999163DF34DD1A887F6F3 /* BackdropHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A15784CA3D10BE58DA67E69 /* BackdropHeader.swift */; };
+		B95D182CE92A4F75A10B4E41 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237FCC0D25C4262103CAEA13 /* BrowserView.swift */; };
+		6F808DA058654498B2429C12 /* BrowserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C0E5923BE6FFCEFCB6C4DC /* BrowserViewModel.swift */; };
+		740E3D75FE0F4D19A43DF1FC /* CastMemberInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FC22FE1CED4FC57316A389B /* CastMemberInfo.swift */; };
+		209D3E4347014C0A91F3F237 /* CollectionFolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36EFA389A4BE5B97FDB88DA4 /* CollectionFolder.swift */; };
+		6473E43BF45E446ABF27B9F1 /* CollectionFolderListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68E11D6C42159C14B59AE87B /* CollectionFolderListView.swift */; };
+		770740C7DC624884843AD8DA /* Color+Vanmo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF16999E0012B66EF9F16C3F /* Color+Vanmo.swift */; };
+		CCC07A899EE14CFF950E50A3 /* ConnectionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FDE885DCDD51B1BC837E421 /* ConnectionModels.swift */; };
+		B29F446922E34138A87F43FB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3672B86EB9D1CDEA999C55B /* ContentView.swift */; };
+		041DF3C779F741FB95F2A9D1 /* CountryMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5142357466F69E4FBA98C44 /* CountryMapper.swift */; };
+		23E6F1A921C240908F6CF6A8 /* DiscPlaylistParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 785C019ED379F73235EE296B /* DiscPlaylistParser.swift */; };
+		B0E057D67074450EBE562F02 /* DominantColorExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75DD80E300987DB0FA023D4B /* DominantColorExtractor.swift */; };
+		885308092A9B45219004D6BA /* EmbyFolderBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94F3DCFB672905D5522C5BC /* EmbyFolderBrowseView.swift */; };
+		8631B9FBF7D54204A9431D8A /* EmbyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DF56CEA135D36E2F995C734 /* EmbyService.swift */; };
+		D4A639E2575E4B01A965A29A /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D3F3AD3CCD5F63E8C40925 /* EmptyStateView.swift */; };
+		49325400CA13449BBFDDAB71 /* FavoritesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FADA4CEAA0809689C8B825 /* FavoritesListView.swift */; };
+		0706CE7951A24A72973F04BD /* FavoritesStackedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE700D28A4ECA3CBDBFB25A /* FavoritesStackedCard.swift */; };
+		FF44087FDCF24B1FB20D96EA /* FetchLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6B604E6D7879BC141483693 /* FetchLimiter.swift */; };
+		14A01C0170DC4AED97FBB18B /* FileNameParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D957843FBE5C974DCBDE4B /* FileNameParser.swift */; };
+		9A1BA71104994CB993791103 /* FilterChipsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */; };
+		9CC4E4AD150E48829ADADE41 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61585942DFE77AC7C9FD50CC /* FlowLayout.swift */; };
+		D7F2C5BEB941475A98ECE3CC /* FolderBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C62F024193701A3ABB1B887 /* FolderBookmark.swift */; };
+		EF2E122D9E99442EB2CBA09E /* HTTPProtocolHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17D44E8B7DE8F7F531D8740F /* HTTPProtocolHandler.swift */; };
+		EBC9AC4C039D4BC3AEC25F53 /* HomeCollectionCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91F6A01D415D2E0A78B794D1 /* HomeCollectionCache.swift */; };
+		AB1BF60D9A4545CB9806F2F1 /* IPTVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F5FEC9AF51B13EF36A7172 /* IPTVService.swift */; };
+		8E0ED091F39F4DFEB44A0862 /* Int64+FileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A521F383F9593A5453CA43 /* Int64+FileSize.swift */; };
+		6351CB3A63DA43F5BDA0E574 /* JellyfinService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73FCD9328997108A87076482 /* JellyfinService.swift */; };
+		0D567AE94BC94F9EBB1EA48C /* KSPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781055690453E6D2950A0933 /* KSPlayerEngine.swift */; };
+		76077411D56046529B857188 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6640160B8471B99B8B34464 /* KeychainManager.swift */; };
+		BD4DDA106E194D93BCFC275C /* LibraryFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D6271C2249F5AA98F16F467 /* LibraryFilters.swift */; };
+		CA9358FCC27A400E9F10881D /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B3D0B1F917828F998055F1 /* LibraryView.swift */; };
+		F3E24CE5BB8D42749EB2AC1B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDAAA9821B6C7B549EC0C654 /* LibraryViewModel.swift */; };
+		E67A635613E04FC6B603C766 /* LoadingIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */; };
+		B9CAC30CF2B84C67BE4A9C22 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EA488509E18DC2C884AAA5 /* LoadingView.swift */; };
+		A9630FBDCA79476DB6F86C79 /* LocalFolderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 280CCDA58FB0544ADF808AD6 /* LocalFolderService.swift */; };
+		3A88E00325E64B8B8926A568 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0820A7D1C7C3A135E3E549 /* Logger.swift */; };
+		422C285FFBBB4545A8E7A987 /* MediaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC3480B949E6965C136DCA2 /* MediaDetailView.swift */; };
+		AD92582A6330416E9E9DD36A /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA6A41E312952F47F072C7E3 /* MediaItem.swift */; };
+		357EAF6D4DB146A1BF4F74DA /* MediaListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2375890C4120A60A9A76B30F /* MediaListRow.swift */; };
+		4327A3D1EB3C42CD97DC5C51 /* MediaScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 334527B3A23E78E2C0D6B055 /* MediaScanner.swift */; };
+		52846A733F464496AA1F5509 /* MediaTitleLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */; };
+		69986EE181BD4CDA930793C3 /* MetadataCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1D2F2767E167CB3EA5F372 /* MetadataCache.swift */; };
+		91A3F6918C764ADCA46D7F8B /* MetadataCacheKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6980490DB3D3A63E200844BA /* MetadataCacheKey.swift */; };
+		6304F7F6F4D842019444B4F9 /* MetadataCacheRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2C70C3AB5A94A31C3089B2E /* MetadataCacheRecord.swift */; };
+		AAC00F5A05EB462896DDE9E7 /* MetadataRefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF5B772ECCB3295AC6F5CCE /* MetadataRefreshCoordinator.swift */; };
+		D21AA47D259E41479D70AEB6 /* MetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D7CB32C26DBB63DECBF2ED8 /* MetadataService.swift */; };
+		EB65963F3A2F4608883ED7D7 /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 255BC9880082B37A6C9F5612 /* NetworkError.swift */; };
+		1DB238DC9A5B4AB58281D1DD /* OnlineSubtitleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC869EEC62D53CCEE7FF2382 /* OnlineSubtitleService.swift */; };
+		35C4F535382E4CCF9EFA7CC0 /* PlaybackRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 565616C3B840D93CC3E938A5 /* PlaybackRecord.swift */; };
+		31A9334D9CEB4E0884A4E2C0 /* PlayerCapabilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61DDDC6CDDA187AA96EB2A3B /* PlayerCapabilityProbe.swift */; };
+		883B892D208E4F7593A11826 /* PlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46008C0FE585AFB0989543DB /* PlayerEngine.swift */; };
+		6829A8FF95464EFA80BADC00 /* PlayerEngineFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */; };
+		86234A316B8742CABA5FA949 /* PlayerProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */; };
+		40B080D9FD054BF38D490C93 /* PlayerState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF351F2AF61293E876B9506A /* PlayerState.swift */; };
+		B0464111C6A64AA48EEC0CD5 /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 162372EE7823659FFCD1E918 /* PlayerView.swift */; };
+		AAC8ADE88BD44B9880B715CA /* PlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96CE2D7094AEA16D95E3050C /* PlayerViewModel.swift */; };
+		0AA2117E8E4349E4BFFF0286 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91EA4FD5A9BAE96FE38BE250 /* PlexService.swift */; };
+		A90B05E5F4784AC18EA02AA7 /* PosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7719C17F340864CF4664CC1 /* PosterCard.swift */; };
+		7FA4E046B177488D9232AC0B /* PrefetchConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = D811B3DC40D7AF1DE7ACD096 /* PrefetchConfig.swift */; };
+		9305204692EC4535AEE7A3EA /* PrefetchError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCC80818A2217DF428A31DB /* PrefetchError.swift */; };
+		CA2AA52CAEAF4E93986AEF9A /* PrefetchProxy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F75AF5215BB06D2E4151CB4A /* PrefetchProxy.swift */; };
+		509980B5019D47238625926F /* PrefetchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9FE3D8BF6B216D29FB14291 /* PrefetchSession.swift */; };
+		A22743A290B04CE68ED622A8 /* PrefetchTemporaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0544E8437F3E7CE1D24715 /* PrefetchTemporaryStore.swift */; };
+		421A80C3A9D44A5CBC2D9AA6 /* RangeCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 597B0E058D9E6F55D17E2D16 /* RangeCache.swift */; };
+		653C317C49DA4C1A9131876A /* RatingBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC6ABD1126A2D309D76CC059 /* RatingBadge.swift */; };
+		4F9B60344A984F1A8C0E81BA /* RemoteFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40C7DCC2190D6425CCC05D2 /* RemoteFetcher.swift */; };
+		D547BDBAF8A94E1DA5C3FAD9 /* RemoteFileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF4EBDC6D0FE1C019C3C404B /* RemoteFileService.swift */; };
+		4D4AD61A0EB942CDBADE4EFA /* SMBService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05B61CB7E7AA5DC184A6CDF5 /* SMBService.swift */; };
+		88C9D036ACD5485488CC886D /* SRTParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = C475BB78C7589F71EA30058D /* SRTParser.swift */; };
+		4758E61E551F437B866036FB /* ScannedLibraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC98BD4B313AA01607BDF35 /* ScannedLibraryListView.swift */; };
+		1B04FEF037BE40358388433B /* ScannedShowDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE1F8087A6FD639B5A2CAA4B /* ScannedShowDetailView.swift */; };
+		696A0DE7C08341CB88789400 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4899D11636AAC1F440051DA /* SearchView.swift */; };
+		5490AA4B94C74902A9088345 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AC850C1907C97654689F25 /* SearchViewModel.swift */; };
+		53BABA83AB684CBC9960E750 /* SecondFloorItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68ADF359717CDE03BB014EA2 /* SecondFloorItemView.swift */; };
+		D869CA9CBF744851B2EF8589 /* SecondFloorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60CF418D9980D92E7E15716C /* SecondFloorView.swift */; };
+		E61DAF042A5046D8B47F6ED3 /* ServiceFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97B2C802C4391AAEDAC4EFD7 /* ServiceFactory.swift */; };
+		C99473BFD9D140BF880ABE60 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */; };
+		DB1785A40B5E4C20BC58ADEA /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DEC87067987F9F73EF86AC /* SettingsViewModel.swift */; };
+		4C921E745AC5463DB3D598BE /* SubtitleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EFFEC6353D013B6D1CADCE8 /* SubtitleManager.swift */; };
+		054877B04DA54C99B3F81AF2 /* SubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B7332CE86F10F0D7D0A3A4 /* SubtitleOverlayView.swift */; };
+		59BC4252E0B0436CB2CC71CC /* SubtitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = B228509B5E7EE777C2444A13 /* SubtitleParser.swift */; };
+		0EE67B6ADFD04B60A463CA8D /* TimeInterval+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD11C496362FE830670827E2 /* TimeInterval+Formatting.swift */; };
+		B9C175811FFA474D8AA13095 /* TrackSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB50A9840B362764031D0025 /* TrackSelectorView.swift */; };
+		26CC2F19E9CF4CB5B85AC3FC /* URL+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6219B4DB4376B9D457F04B /* URL+Extensions.swift */; };
+		84C6EEDC89B24B1B967DA31E /* VTTParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA203DB4D4DA228418D9C0F1 /* VTTParser.swift */; };
+		6C54AF04C99B420F8A7073D2 /* VanmoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7387B492C566DB95D6C62D0C /* VanmoApp.swift */; };
+		A3F6F19DAFC14710AE7F608A /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DEF27EA9A8800BC9E113E74 /* View+Extensions.swift */; };
+		C1CC0C099CF349F2A189B802 /* WebDAVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C900FB34F4BBFFF323A8041B /* WebDAVService.swift */; };
+		F80D48076A974F3B80636E21 /* iCloudSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08234FF3E6FF37B91B2198A7 /* iCloudSyncService.swift */; };
+		5FD5261133D14ECFAF398997 /* OAuthCredential.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A87725EBFBA9E769B49C2EB /* OAuthCredential.swift */; };
+		7C0223030E1A41B388C4771E /* OAuthProviderConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FA84632B3100F245AE174F /* OAuthProviderConfiguration.swift */; };
+		E7BB2E4C5A30423AAD61C906 /* OAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995CDD4F5269B46DB5F835D3 /* OAuthCoordinator.swift */; };
+		FA47B72BD85047DDAFC734E1 /* GoogleDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CADB88B0AD07775D1AB4F4 /* GoogleDriveService.swift */; };
+		2175268FB9B147D182570561 /* OneDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B122FDDCDFCE4FBC521E61D /* OneDriveService.swift */; };
+		C8A0408A5627430C8EFAD2C8 /* BoxDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA4E02E5CA11DDB094886F8 /* BoxDriveService.swift */; };
+		F0B7FC85F1724D0096CB5B8D /* PCloudDriveService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 520F88CCE40D6906CD69765C /* PCloudDriveService.swift */; };
+		11F71D4C161F4CE5A5F3DBB3 /* YandexDiskService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */; };
+		7B169A64C6404488AE847335 /* BaiduNetdiskService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2U3D4E5F6789012345678 /* BaiduNetdiskService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +235,7 @@
 		03DEC87067987F9F73EF86AC /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		05B61CB7E7AA5DC184A6CDF5 /* SMBService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SMBService.swift; sourceTree = "<group>"; };
 		05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = YandexDiskService.swift; sourceTree = "<group>"; };
+		B1A2U3D4E5F6789012345678 /* BaiduNetdiskService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaiduNetdiskService.swift; sourceTree = "<group>"; };
 		08234FF3E6FF37B91B2198A7 /* iCloudSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudSyncService.swift; sourceTree = "<group>"; };
 		0D6271C2249F5AA98F16F467 /* LibraryFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryFilters.swift; sourceTree = "<group>"; };
 		0DF56CEA135D36E2F995C734 /* EmbyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyService.swift; sourceTree = "<group>"; };
@@ -221,6 +337,16 @@
 		FA0544E8437F3E7CE1D24715 /* PrefetchTemporaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrefetchTemporaryStore.swift; sourceTree = "<group>"; };
 		FAE01D009AD30867E0E07D15 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerProgressBar.swift; sourceTree = "<group>"; };
+		4FB8875D30954E588A912E1C /* ModelContainerFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainerFactory.swift; sourceTree = "<group>"; };
+		346D6A996E5649A29ED55148 /* CloudSyncPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncPreferences.swift; sourceTree = "<group>"; };
+		54B0B37ECC274856863E1EC0 /* CloudSyncConflictResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncConflictResolver.swift; sourceTree = "<group>"; };
+		8CA87388BAE34698AEA45F02 /* CloudSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncCoordinator.swift; sourceTree = "<group>"; };
+		5736BDEF39854F38BD38D7CF /* CloudMediaState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudMediaState.swift; sourceTree = "<group>"; };
+		014BA1E49CD2445AA7287C7E /* VanmoMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VanmoMacApp.swift; sourceTree = "<group>"; };
+		069EAD10C83E41E69CFA6B88 /* PlatformCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformCompatibility.swift; sourceTree = "<group>"; };
+		4A7743345B4C4073AAA95A94 /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info-Mac.plist; sourceTree = "<group>"; };
+		5EFC09D51B964605B706C9BA /* Vanmo-Mac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vanmo-Mac.entitlements; sourceTree = "<group>"; };
+		4AF5D71AEF044482BDF22606 /* VanmoMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VanmoMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -243,6 +369,7 @@
 			isa = PBXGroup;
 			children = (
 				2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */,
+			4AF5D71AEF044482BDF22606 /* VanmoMac.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -267,6 +394,7 @@
 			children = (
 				FAE01D009AD30867E0E07D15 /* Assets.xcassets */,
 				8975545DA300E57FD1C133D1 /* Info.plist */,
+				4A7743345B4C4073AAA95A94 /* Info-Mac.plist */,
 				A73A98C67D1020444BFEC4D4 /* loadingSpinner.json */,
 				179A074839A61DF46EB44FA9 /* Fonts */,
 				0D650AD66912B79518250229 /* Localizable */,
@@ -458,6 +586,7 @@
 				02FB3A1F58187535A7434A20 /* AppState.swift */,
 				F3672B86EB9D1CDEA999C55B /* ContentView.swift */,
 				7387B492C566DB95D6C62D0C /* VanmoApp.swift */,
+				014BA1E49CD2445AA7287C7E /* VanmoMacApp.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -505,6 +634,7 @@
 				75DD80E300987DB0FA023D4B /* DominantColorExtractor.swift */,
 				E6640160B8471B99B8B34464 /* KeychainManager.swift */,
 				DA0820A7D1C7C3A135E3E549 /* Logger.swift */,
+				069EAD10C83E41E69CFA6B88 /* PlatformCompatibility.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -552,6 +682,11 @@
 			isa = PBXGroup;
 			children = (
 				08234FF3E6FF37B91B2198A7 /* iCloudSyncService.swift */,
+				4FB8875D30954E588A912E1C /* ModelContainerFactory.swift */,
+				346D6A996E5649A29ED55148 /* CloudSyncPreferences.swift */,
+				54B0B37ECC274856863E1EC0 /* CloudSyncConflictResolver.swift */,
+				8CA87388BAE34698AEA45F02 /* CloudSyncCoordinator.swift */,
+				5736BDEF39854F38BD38D7CF /* CloudMediaState.swift */,
 				334527B3A23E78E2C0D6B055 /* MediaScanner.swift */,
 			);
 			path = Storage;
@@ -603,6 +738,7 @@
 				6AA4E02E5CA11DDB094886F8 /* BoxDriveService.swift */,
 				520F88CCE40D6906CD69765C /* PCloudDriveService.swift */,
 				05D73F0531391B7486D4BDD8 /* YandexDiskService.swift */,
+				B1A2U3D4E5F6789012345678 /* BaiduNetdiskService.swift */,
 			);
 			path = CloudDrive;
 			sourceTree = "<group>";
@@ -643,6 +779,7 @@
 			children = (
 				4B358B3F19A7451D4A44F686 /* Vanmo-Bridging-Header.h */,
 				18EA22E1240358F4E17759AC /* Vanmo.entitlements */,
+				5EFC09D51B964605B706C9BA /* Vanmo-Mac.entitlements */,
 				9ED5893EBB7E41F59F79B35F /* App */,
 				DF171931D4FCCFCE69AF7F76 /* Core */,
 				D248CA7B6BE164A5744F7FB5 /* Features */,
@@ -690,6 +827,32 @@
 			productReference = 2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */;
 			productType = "com.apple.product-type.application";
 		};
+
+		5EF37EF7990D4330A0B483BC /* VanmoMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 500F96997D79490893B55449 /* Build configuration list for PBXNativeTarget "VanmoMac" */;
+			buildPhases = (
+				7B99859630DE444788EF7FBE /* Sources */,
+				DCBAA3A182824BEB9095B3F5 /* Resources */,
+				7887B2EB0F776C4377DC0786 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VanmoMac;
+			packageProductDependencies = (
+				8023341C67DBE97AAEFDD222 /* SWXMLHash */,
+				7224CE03286D3158795CD36F /* Kingfisher */,
+				96C3373D06C4EC5E811543F2 /* KSPlayer */,
+				5A39B9DEAA17BB6049518605 /* SMBClient */,
+				C13966A794B8810C8E1F267D /* Lottie */,
+			);
+			productName = VanmoMac;
+			productReference = 4AF5D71AEF044482BDF22606 /* VanmoMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -700,6 +863,9 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					0F6607F78A5C0B637140BEB4 = {
+						ProvisioningStyle = Automatic;
+					};
+					5EF37EF7990D4330A0B483BC = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -726,12 +892,23 @@
 			projectRoot = "";
 			targets = (
 				0F6607F78A5C0B637140BEB4 /* Vanmo */,
+				5EF37EF7990D4330A0B483BC /* VanmoMac */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		7F48313C315822F7CC82A0FC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6C559DE8C613197CDED94D0C /* Assets.xcassets in Resources */,
+				DDE0739230E75BEA0D4173E5 /* loadingSpinner.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		DCBAA3A182824BEB9095B3F5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -859,6 +1036,13 @@
 				8BB64D8644EE2B2352FB49BC /* View+Extensions.swift in Sources */,
 				826D18F64711A688F69C554F /* WebDAVService.swift in Sources */,
 				C06AA5BFC4A7C5AB3AD907E8 /* iCloudSyncService.swift in Sources */,
+				ACE071B6760848779B4627BF /* ModelContainerFactory.swift in Sources */,
+				2432B34AB4A3410796DBD8D7 /* CloudSyncPreferences.swift in Sources */,
+				82A2F116F20C44299930E178 /* CloudSyncConflictResolver.swift in Sources */,
+				D9D46820F5D34A4FB6DFC6FC /* CloudSyncCoordinator.swift in Sources */,
+				59BC164452B245AF8A41F3BD /* CloudMediaState.swift in Sources */,
+				5AC6E7387B9745B19AB5DD81 /* VanmoMacApp.swift in Sources */,
+				15D29AA4C7304B4BA1549D59 /* PlatformCompatibility.swift in Sources */,
 				09121874750C74A31ADD7636 /* OAuthCredential.swift in Sources */,
 				CF8406050C6AAA259C574260 /* OAuthProviderConfiguration.swift in Sources */,
 				0001FBCFB8B95FEF560068DB /* OAuthCoordinator.swift in Sources */,
@@ -867,6 +1051,121 @@
 				2EDE242DDACFFD72E673A817 /* BoxDriveService.swift in Sources */,
 				A0DE1089A726A6F5CA76471B /* PCloudDriveService.swift in Sources */,
 				4F769D798C519AEB201A519B /* YandexDiskService.swift in Sources */,
+				A8F3C2E1D4B5678901234AB /* BaiduNetdiskService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		7B99859630DE444788EF7FBE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				80E461C92C6A4D0EA7DA26E7 /* AddConnectionView.swift in Sources */,
+				AE6A53D0D0F14D21A510FBDC /* AppState.swift in Sources */,
+				9BA999163DF34DD1A887F6F3 /* BackdropHeader.swift in Sources */,
+				B95D182CE92A4F75A10B4E41 /* BrowserView.swift in Sources */,
+				6F808DA058654498B2429C12 /* BrowserViewModel.swift in Sources */,
+				740E3D75FE0F4D19A43DF1FC /* CastMemberInfo.swift in Sources */,
+				209D3E4347014C0A91F3F237 /* CollectionFolder.swift in Sources */,
+				6473E43BF45E446ABF27B9F1 /* CollectionFolderListView.swift in Sources */,
+				770740C7DC624884843AD8DA /* Color+Vanmo.swift in Sources */,
+				CCC07A899EE14CFF950E50A3 /* ConnectionModels.swift in Sources */,
+				B29F446922E34138A87F43FB /* ContentView.swift in Sources */,
+				041DF3C779F741FB95F2A9D1 /* CountryMapper.swift in Sources */,
+				23E6F1A921C240908F6CF6A8 /* DiscPlaylistParser.swift in Sources */,
+				B0E057D67074450EBE562F02 /* DominantColorExtractor.swift in Sources */,
+				885308092A9B45219004D6BA /* EmbyFolderBrowseView.swift in Sources */,
+				8631B9FBF7D54204A9431D8A /* EmbyService.swift in Sources */,
+				D4A639E2575E4B01A965A29A /* EmptyStateView.swift in Sources */,
+				49325400CA13449BBFDDAB71 /* FavoritesListView.swift in Sources */,
+				0706CE7951A24A72973F04BD /* FavoritesStackedCard.swift in Sources */,
+				FF44087FDCF24B1FB20D96EA /* FetchLimiter.swift in Sources */,
+				14A01C0170DC4AED97FBB18B /* FileNameParser.swift in Sources */,
+				9A1BA71104994CB993791103 /* FilterChipsRow.swift in Sources */,
+				9CC4E4AD150E48829ADADE41 /* FlowLayout.swift in Sources */,
+				D7F2C5BEB941475A98ECE3CC /* FolderBookmark.swift in Sources */,
+				EF2E122D9E99442EB2CBA09E /* HTTPProtocolHandler.swift in Sources */,
+				EBC9AC4C039D4BC3AEC25F53 /* HomeCollectionCache.swift in Sources */,
+				AB1BF60D9A4545CB9806F2F1 /* IPTVService.swift in Sources */,
+				8E0ED091F39F4DFEB44A0862 /* Int64+FileSize.swift in Sources */,
+				6351CB3A63DA43F5BDA0E574 /* JellyfinService.swift in Sources */,
+				0D567AE94BC94F9EBB1EA48C /* KSPlayerEngine.swift in Sources */,
+				76077411D56046529B857188 /* KeychainManager.swift in Sources */,
+				BD4DDA106E194D93BCFC275C /* LibraryFilters.swift in Sources */,
+				CA9358FCC27A400E9F10881D /* LibraryView.swift in Sources */,
+				F3E24CE5BB8D42749EB2AC1B /* LibraryViewModel.swift in Sources */,
+				E67A635613E04FC6B603C766 /* LoadingIndicatorView.swift in Sources */,
+				B9CAC30CF2B84C67BE4A9C22 /* LoadingView.swift in Sources */,
+				A9630FBDCA79476DB6F86C79 /* LocalFolderService.swift in Sources */,
+				3A88E00325E64B8B8926A568 /* Logger.swift in Sources */,
+				422C285FFBBB4545A8E7A987 /* MediaDetailView.swift in Sources */,
+				AD92582A6330416E9E9DD36A /* MediaItem.swift in Sources */,
+				357EAF6D4DB146A1BF4F74DA /* MediaListRow.swift in Sources */,
+				4327A3D1EB3C42CD97DC5C51 /* MediaScanner.swift in Sources */,
+				52846A733F464496AA1F5509 /* MediaTitleLogoView.swift in Sources */,
+				69986EE181BD4CDA930793C3 /* MetadataCache.swift in Sources */,
+				91A3F6918C764ADCA46D7F8B /* MetadataCacheKey.swift in Sources */,
+				6304F7F6F4D842019444B4F9 /* MetadataCacheRecord.swift in Sources */,
+				AAC00F5A05EB462896DDE9E7 /* MetadataRefreshCoordinator.swift in Sources */,
+				D21AA47D259E41479D70AEB6 /* MetadataService.swift in Sources */,
+				EB65963F3A2F4608883ED7D7 /* NetworkError.swift in Sources */,
+				1DB238DC9A5B4AB58281D1DD /* OnlineSubtitleService.swift in Sources */,
+				35C4F535382E4CCF9EFA7CC0 /* PlaybackRecord.swift in Sources */,
+				31A9334D9CEB4E0884A4E2C0 /* PlayerCapabilityProbe.swift in Sources */,
+				883B892D208E4F7593A11826 /* PlayerEngine.swift in Sources */,
+				6829A8FF95464EFA80BADC00 /* PlayerEngineFactory.swift in Sources */,
+				86234A316B8742CABA5FA949 /* PlayerProgressBar.swift in Sources */,
+				40B080D9FD054BF38D490C93 /* PlayerState.swift in Sources */,
+				B0464111C6A64AA48EEC0CD5 /* PlayerView.swift in Sources */,
+				AAC8ADE88BD44B9880B715CA /* PlayerViewModel.swift in Sources */,
+				0AA2117E8E4349E4BFFF0286 /* PlexService.swift in Sources */,
+				A90B05E5F4784AC18EA02AA7 /* PosterCard.swift in Sources */,
+				7FA4E046B177488D9232AC0B /* PrefetchConfig.swift in Sources */,
+				9305204692EC4535AEE7A3EA /* PrefetchError.swift in Sources */,
+				CA2AA52CAEAF4E93986AEF9A /* PrefetchProxy.swift in Sources */,
+				509980B5019D47238625926F /* PrefetchSession.swift in Sources */,
+				A22743A290B04CE68ED622A8 /* PrefetchTemporaryStore.swift in Sources */,
+				421A80C3A9D44A5CBC2D9AA6 /* RangeCache.swift in Sources */,
+				653C317C49DA4C1A9131876A /* RatingBadge.swift in Sources */,
+				4F9B60344A984F1A8C0E81BA /* RemoteFetcher.swift in Sources */,
+				D547BDBAF8A94E1DA5C3FAD9 /* RemoteFileService.swift in Sources */,
+				4D4AD61A0EB942CDBADE4EFA /* SMBService.swift in Sources */,
+				88C9D036ACD5485488CC886D /* SRTParser.swift in Sources */,
+				4758E61E551F437B866036FB /* ScannedLibraryListView.swift in Sources */,
+				1B04FEF037BE40358388433B /* ScannedShowDetailView.swift in Sources */,
+				696A0DE7C08341CB88789400 /* SearchView.swift in Sources */,
+				5490AA4B94C74902A9088345 /* SearchViewModel.swift in Sources */,
+				53BABA83AB684CBC9960E750 /* SecondFloorItemView.swift in Sources */,
+				D869CA9CBF744851B2EF8589 /* SecondFloorView.swift in Sources */,
+				E61DAF042A5046D8B47F6ED3 /* ServiceFactory.swift in Sources */,
+				C99473BFD9D140BF880ABE60 /* SettingsView.swift in Sources */,
+				DB1785A40B5E4C20BC58ADEA /* SettingsViewModel.swift in Sources */,
+				4C921E745AC5463DB3D598BE /* SubtitleManager.swift in Sources */,
+				054877B04DA54C99B3F81AF2 /* SubtitleOverlayView.swift in Sources */,
+				59BC4252E0B0436CB2CC71CC /* SubtitleParser.swift in Sources */,
+				0EE67B6ADFD04B60A463CA8D /* TimeInterval+Formatting.swift in Sources */,
+				B9C175811FFA474D8AA13095 /* TrackSelectorView.swift in Sources */,
+				26CC2F19E9CF4CB5B85AC3FC /* URL+Extensions.swift in Sources */,
+				84C6EEDC89B24B1B967DA31E /* VTTParser.swift in Sources */,
+				6C54AF04C99B420F8A7073D2 /* VanmoApp.swift in Sources */,
+				A3F6F19DAFC14710AE7F608A /* View+Extensions.swift in Sources */,
+				C1CC0C099CF349F2A189B802 /* WebDAVService.swift in Sources */,
+				F80D48076A974F3B80636E21 /* iCloudSyncService.swift in Sources */,
+				5FD5261133D14ECFAF398997 /* OAuthCredential.swift in Sources */,
+				7C0223030E1A41B388C4771E /* OAuthProviderConfiguration.swift in Sources */,
+				E7BB2E4C5A30423AAD61C906 /* OAuthCoordinator.swift in Sources */,
+				FA47B72BD85047DDAFC734E1 /* GoogleDriveService.swift in Sources */,
+				2175268FB9B147D182570561 /* OneDriveService.swift in Sources */,
+				C8A0408A5627430C8EFAD2C8 /* BoxDriveService.swift in Sources */,
+				F0B7FC85F1724D0096CB5B8D /* PCloudDriveService.swift in Sources */,
+				11F71D4C161F4CE5A5F3DBB3 /* YandexDiskService.swift in Sources */,
+				72E5C73395B54AE0A59A5B34 /* ModelContainerFactory.swift in Sources */,
+				506AC7E26B3A444FB2691993 /* CloudSyncPreferences.swift in Sources */,
+				4810234809BE41E88BDE5B5F /* CloudSyncConflictResolver.swift in Sources */,
+				86E948D55D0B4228B35178E9 /* CloudSyncCoordinator.swift in Sources */,
+				641EC4A9DB0140979F3C60D7 /* CloudMediaState.swift in Sources */,
+				7DB91124792240A59C6BB0E4 /* VanmoMacApp.swift in Sources */,
+				80ACD6AE6434482080EA474D /* PlatformCompatibility.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -974,7 +1273,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo-Cloud.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = L775YJ7YS4;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -996,7 +1295,10 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
+				OTHER_SWIFT_FLAGS = (
+					"-DFFMPEG_ENABLED",
+					"-DCLOUDKIT_SYNC_ENABLED",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1074,6 +1376,68 @@
 			};
 			name = Debug;
 		};
+
+		F0E7AE3A8AC74AD1B37A19A2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo-Mac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = L775YJ7YS4;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"FFMPEG_ENABLED=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Vanmo/Resources/Info-Mac.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
+				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		2494DB5E77F6457CBA8E19EF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo-Mac-Cloud.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = L775YJ7YS4;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"FFMPEG_ENABLED=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Vanmo/Resources/Info-Mac.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_SWIFT_FLAGS = (
+					"-DFFMPEG_ENABLED",
+					"-DCLOUDKIT_SYNC_ENABLED",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1091,6 +1455,16 @@
 			buildConfigurations = (
 				ADD14113AB831B4CD66C64B8 /* Debug */,
 				B014DF21DA8B7A1DFB365F13 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+
+		500F96997D79490893B55449 /* Build configuration list for PBXNativeTarget "VanmoMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0E7AE3A8AC74AD1B37A19A2 /* Debug */,
+				2494DB5E77F6457CBA8E19EF /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

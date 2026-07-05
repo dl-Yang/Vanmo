@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+
+#if os(iOS)
 import UIKit
 
 @main
@@ -15,32 +17,18 @@ struct VanmoApp: App {
 
     @StateObject private var appState = AppState()
     @StateObject private var connectionsViewModel = ConnectionsViewModel()
+    @StateObject private var cloudSyncCoordinator = CloudSyncCoordinator.shared
     @UIApplicationDelegateAdaptor(VanmoAppDelegate.self) private var appDelegate
     @AppStorage(ColorTheme.storageKey) private var theme: ColorTheme = .system
 
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            MediaItem.self,
-            SavedConnection.self,
-            PlaybackRecord.self,
-            FolderBookmark.self,
-        ])
-        let modelConfiguration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false
-        )
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    var sharedModelContainer: ModelContainer = ModelContainerFactory.makeSharedContainer()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
                 .environmentObject(connectionsViewModel)
+                .environmentObject(cloudSyncCoordinator)
                 .preferredColorScheme(theme.preferredColorScheme)
                 .id(theme)
         }
@@ -88,3 +76,4 @@ enum AppOrientation {
         }
     }
 }
+#endif

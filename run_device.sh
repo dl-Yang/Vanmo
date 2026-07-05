@@ -338,10 +338,14 @@ echo ""
 echo "✅ 完成"
 if [[ "$INSTALL_ONLY" == false ]]; then
     echo ""
-    echo "查看日志（另开终端）:"
+    echo "查看日志:"
     if [[ "$USE_SIMULATOR" == true ]]; then
         echo "  xcrun simctl spawn ${DEVICE} log stream --predicate 'processImagePath CONTAINS \"Vanmo\"'"
     else
-        echo "  log stream --device ${DEVICE} --predicate 'processImagePath CONTAINS \"Vanmo\"'"
+        echo "  推荐: 打开 Console.app，左侧选中设备，搜索 Vanmo（或 [Debug] 前缀）"
+        echo "  也可: Xcode → Window → Devices and Simulators → 选中设备 → Open Console"
+        echo "  说明: macOS 26 的 log stream 不支持 --device；CLI 采集需 sudo："
+        echo "    sudo log collect --device-udid ${DEVICE} --last 5m --output /tmp/vanmo.logarchive"
+        echo "    log show /tmp/vanmo.logarchive --style compact --predicate 'processImagePath CONTAINS \"Vanmo\"'"
     fi
 fi

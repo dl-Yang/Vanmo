@@ -56,9 +56,7 @@ struct AddConnectionView: View {
 
                 if selectedType.isLocal {
                     localFolderSection
-                } else if selectedType.isOfficialCloudDrive {
-                    officialCloudDriveSection
-                } else if selectedType.isOAuthCloudDrive {
+                } else if selectedType.supportsOAuthLogin {
                     oauthCloudDriveSection
                 } else {
                     remoteServerSection
@@ -324,7 +322,7 @@ struct AddConnectionView: View {
         if selectedType.isLocal {
             return folderBookmark != nil
         }
-        if selectedType.isOAuthCloudDrive {
+        if selectedType.supportsOAuthLogin {
             // 新建走登录按钮直接创建连接；编辑时允许通过"保存"改名。
             return isEditing
         }
@@ -387,7 +385,7 @@ struct AddConnectionView: View {
         case .fnos:
             return "fnOS 按 WebDAV 兼容方式连接：局域网 HTTP 通常为 5005，HTTPS 通常为 5006，路径一般留空；如使用 SMB，请选择 SMB 协议。"
         case .baiduNetdisk:
-            return "百度网盘官方接入保留入口；将仅使用开放平台 OAuth 与官方 API，未配置前不会使用 Cookie、抓包或逆向接口。"
+            return "通过百度网盘开放平台 OAuth 简化模式登录，仅请求 basic,netdisk 权限。Access Token 过期后需重新登录，不支持后台自动续期。"
         case .drive115:
             return "115 网盘需通过开放平台入驻和应用审核；本入口仅保留合规接入提示，当前不使用非官方接口。"
         case .quarkDrive:

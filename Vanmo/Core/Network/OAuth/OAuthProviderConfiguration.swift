@@ -12,6 +12,7 @@ import Foundation
 /// | Box | Client ID + Client Secret | https://app.box.com/developers/console |
 /// | pCloud | Client ID + Client Secret | https://docs.pcloud.com/my_apps/ |
 /// | Yandex.Disk | Client ID + Client Secret | https://oauth.yandex.com |
+/// | 百度网盘 | AppKey（简化模式，无需 Secret） | https://pan.baidu.com/union/console/applist |
 ///
 /// Redirect URI 按 provider 分流：
 /// - Google Drive：iOS OAuth Client ID 派生的反向域名 scheme，`com.googleusercontent.apps.<prefix>:/oauth2redirect`
@@ -67,6 +68,8 @@ enum OAuthProviderConfiguration {
             return ""
         case .yandexDisk:
             return ""
+        case .baiduNetdisk:
+            return "j5nV46HZKiRzYq5TuHdsYN9DYfvk76AL"
         default:
             return ""
         }
@@ -99,6 +102,8 @@ enum OAuthProviderConfiguration {
             return ""
         case .yandexDisk:
             return "cloud_api:disk.read cloud_api:disk.info"
+        case .baiduNetdisk:
+            return "basic,netdisk"
         default:
             return ""
         }
@@ -114,6 +119,11 @@ enum OAuthProviderConfiguration {
         }
     }
 
+    /// 是否走 OAuth 2.0 简化模式（Implicit Grant）：回调 fragment 直接返回 access_token，无 refresh_token。
+    static func usesImplicitGrant(for type: ConnectionType) -> Bool {
+        type.isImplicitOAuthCloudDrive
+    }
+
     static func authorizationEndpoint(for type: ConnectionType) -> URL? {
         switch type {
         case .googleDrive:
@@ -126,6 +136,8 @@ enum OAuthProviderConfiguration {
             return URL(string: "https://my.pcloud.com/oauth2/authorize")
         case .yandexDisk:
             return URL(string: "https://oauth.yandex.com/authorize")
+        case .baiduNetdisk:
+            return URL(string: "https://openapi.baidu.com/oauth/2.0/authorize")
         default:
             return nil
         }
@@ -152,9 +164,11 @@ enum OAuthProviderConfiguration {
         guard !clientID(for: type).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return false
         }
-        // PKCE 公共客户端（Google/OneDrive）不需要 secret；其余走 client secret 模式的网盘
-        // 必须同时配置好 secret，否则登录能启动但 token exchange 必然失败。
-        guard !usesPKCE(for: type) else { return true }
+        // PKCE 公共客户端（Google/OneDrive）与简化模式（百度网盘）不需要 secret；
+        // 其余走 client secret 模式的网盘必须同时配置好 secret，否则 token exchange 必然失败。
+        if usesPKCE(for: type) || usesImplicitGrant(for: type) {
+            return true
+        }
         return !(clientSecret(for: type) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -171,6 +185,8 @@ enum OAuthProviderConfiguration {
             return "需要先在 pCloud 开发者后台注册 App 并填入 Client ID / Client Secret。"
         case .yandexDisk:
             return "需要先在 oauth.yandex.com 注册应用并填入 Client ID / Client Secret。"
+        case .baiduNetdisk:
+            return "需要先在百度网盘开放平台创建应用并填入 AppKey，回调地址登记为 vanmo://oauth/baiduNetdisk。"
         default:
             return "该网盘尚未配置开发者凭据。"
         }

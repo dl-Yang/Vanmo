@@ -40,6 +40,11 @@ final class MediaItem {
     var seriesId: String?
     var sourceConnectionId: UUID?
 
+    /// 是否允许通过 CloudKit 同步播放进度（Emby/Plex/Jellyfin 以服务端为准）。
+    var isProgressCloudSynced: Bool
+    /// 是否允许通过 CloudKit 同步收藏状态（媒体服务器条目以服务端为准）。
+    var isFavoriteCloudSynced: Bool
+
     var audioTracks: [AudioTrackInfo]
     var subtitleTracks: [SubtitleTrackInfo]
 
@@ -70,6 +75,8 @@ final class MediaItem {
         self.lastPlaybackPosition = 0
         self.isWatched = false
         self.isFavorite = false
+        self.isProgressCloudSynced = true
+        self.isFavoriteCloudSynced = true
         self.addedAt = Date()
         self.genres = []
         self.cast = []
@@ -224,6 +231,8 @@ extension ServerMediaItem {
             item.addedAt = dateCreated
         }
         item.isFavorite = isFavoriteOnServer
+        item.isProgressCloudSynced = false
+        item.isFavoriteCloudSynced = false
         return item
     }
 }

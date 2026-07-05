@@ -47,10 +47,10 @@
 
 ### 3. 云同步与多端
 
-- [ ] **CloudKit 全局同步**：用 CloudKit 或 CloudKit-backed SwiftData 同步服务器配置、非 Emby/Plex 播放进度、收藏和书签；密码不得直接进入 CloudKit。
-- [ ] **同步冲突合并**：设计多设备播放进度、收藏状态、书签变更的冲突解决策略和同步触发时机。
-- [ ] **tvOS 适配**：适配 Apple TV 焦点系统、遥控器交互、播放器控制层和媒体库大屏布局。
-- [ ] **macOS 适配**：适配窗口尺寸、键盘快捷键、鼠标悬停、文件访问权限和播放器窗口行为。
+- [x] **CloudKit 全局同步**：已接入 CloudKit-backed SwiftData（`ModelContainerFactory` 本地/云库拆分 + iCloud entitlements），云库同步 `SavedConnection`、文件夹书签与 `CloudMediaState`（非 Emby/Plex/Jellyfin 播放进度/收藏）；`MediaItem` 保留本地库，密码/OAuth 凭据仍仅存 Keychain。
+- [x] **同步冲突合并**：已实现 `CloudSyncConflictResolver` 与 `CloudSyncCoordinator`，覆盖播放进度/收藏/书签/连接配置的 LWW 与去重规则，并在 App 启动、前台恢复和写路径 debounce 后触发合并。
+- [ ] **tvOS 适配**：本轮按确认范围暂不做 tvOS；焦点系统、遥控器交互与大屏布局留待后续。
+- [x] **macOS 适配（基础骨架）**：已新增 `VanmoMac` target、`VanmoMacApp` 入口、macOS entitlements/Info.plist，以及 `ContentView` 等平台呈现隔离；窗口快捷键与完整桌面体验仍待后续细化。
 
 ### 4. 媒体库增强
 

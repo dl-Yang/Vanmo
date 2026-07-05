@@ -2,8 +2,10 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
+    @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -46,18 +48,44 @@ struct ContentView: View {
             .tag(AppTab.settings)
         }
         .tint(.vanmoPrimary)
-        .fullScreenCover(isPresented: $appState.isPlayerPresented) {
-            if let item = appState.currentPlayingItem {
-                PlayerView(item: item)
-            }
-        }
+        .modifier(PlayerPresentationModifier())
         .task {
-            // App 启动后自动重连最近一次连接成功的服务，刷新媒体库。
-            // ConnectionsViewModel 是 App 级别的 @StateObject，跨 ContentView 重建仍能保留
-            // didAttemptAutoReconnect 标志，避免主题切换时重复触发。
             connectionsViewModel.setModelContext(modelContext)
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
+            await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
+                await connectionsViewModel.loadSavedConnections()
+            }
+        }
+    }
+}
+
+private struct PlayerPresentationModifier: ViewModifier {
+    @EnvironmentObject private var appState: AppState
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content
+            .fullScreenCover(isPresented: $appState.isPlayerPresented) {
+                if let item = appState.currentPlayingItem {
+                    PlayerView(item: item)
+                }
+            }
+        #elseif os(macOS)
+        content
+            .sheet(isPresented: $appState.isPlayerPresented) {
+                if let item = appState.currentPlayingItem {
+                    PlayerView(item: item)
+                        .frame(minWidth: 960, minHeight: 540)
+                }
+            }
+        #else
+        content
+        #endif
     }
 }
 
@@ -65,4 +93,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(AppState())
         .environmentObject(ConnectionsViewModel())
+        .environmentObject(CloudSyncCoordinator.shared)
 }

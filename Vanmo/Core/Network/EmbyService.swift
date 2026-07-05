@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 
 final class EmbyService: MediaServerService, MediaSearchProviding {
     let type: ConnectionType
@@ -16,11 +15,10 @@ final class EmbyService: MediaServerService, MediaSearchProviding {
 
     private static let clientName = "Vanmo"
     private static let clientVersion = "1.0.0"
-    /// 与现有 `UIDevice.current.identifierForVendor` 同步访问保持一致；
-    /// 在 Swift 6 严格并发模式下需要主线程隔离,这里和现有代码一起当作已知 trade-off。
+    /// 与现有设备标识访问保持一致；跨平台通过 PlatformDeviceInfo 提供。
     private static var deviceName: String {
-        let model = UIDevice.current.model
-        return model.isEmpty ? "iPhone" : model
+        let model = PlatformDeviceInfo.model
+        return model.isEmpty ? "Vanmo" : model
     }
 
     init(
@@ -412,7 +410,7 @@ final class EmbyService: MediaServerService, MediaSearchProviding {
     }
 
     private var authorizationHeader: String {
-        let deviceId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        let deviceId = PlatformDeviceInfo.deviceIdentifier
         return "MediaBrowser Client=\"\(Self.clientName)\", Device=\"\(Self.deviceName)\", DeviceId=\"\(deviceId)\", Version=\"\(Self.clientVersion)\""
     }
 

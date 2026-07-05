@@ -11,8 +11,10 @@ enum RemoteServiceFactory {
             return WebDAVService()
         case .alist:
             return WebDAVService(type: .alist)
-        case .removedOfficialCloudDrive, .baiduNetdisk, .drive115, .quarkDrive, .mega:
+        case .removedOfficialCloudDrive, .drive115, .quarkDrive, .mega:
             return UnsupportedOfficialCloudDriveService(type: type)
+        case .baiduNetdisk:
+            return BaiduNetdiskService()
         case .googleDrive:
             return GoogleDriveService()
         case .oneDrive:

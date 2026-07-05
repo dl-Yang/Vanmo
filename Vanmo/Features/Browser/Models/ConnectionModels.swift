@@ -121,14 +121,14 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
     /// MEGA 官方无标准 REST+OAuth 接口，需要官方 C++ SDK 深度集成，暂归入此类占位。
     var isOfficialCloudDrive: Bool {
         switch self {
-        case .removedOfficialCloudDrive, .baiduNetdisk, .drive115, .quarkDrive, .mega:
+        case .removedOfficialCloudDrive, .drive115, .quarkDrive, .mega:
             return true
         default:
             return false
         }
     }
 
-    /// 走标准 OAuth 2.0 + REST API 的国际网盘，登录后可完整浏览/播放/下载。
+    /// 走标准 OAuth 2.0 授权码 + REST API 的国际网盘，登录后可完整浏览/播放/下载。
     var isOAuthCloudDrive: Bool {
         switch self {
         case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk:
@@ -138,11 +138,43 @@ enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// 走 OAuth 2.0 简化模式（Implicit Grant）的网盘：授权回调直接返回 access_token，
+    /// 不支持 refresh_token，过期后需用户重新登录。
+    var isImplicitOAuthCloudDrive: Bool {
+        self == .baiduNetdisk
+    }
+
+    /// 是否走 OAuth 登录 UI（授权码或简化模式）。
+    var supportsOAuthLogin: Bool {
+        isOAuthCloudDrive || isImplicitOAuthCloudDrive
+    }
+
     /// 是否需要在每个流媒体 Range 请求上都带 `Authorization: Bearer`（即没有可匿名访问的
     /// 预签名直链）。目前只有 Google Drive 需要；OneDrive/Box/pCloud/Yandex.Disk 的
     /// `streamURL(for:)` 都会直接换取到一段时间内可匿名访问的直链，无需在播放期间持续带 token。
     var requiresBearerStreaming: Bool {
         self == .googleDrive
+    }
+
+    /// 播放期间需要 PrefetchProxy 注入自定义请求头（Bearer 或百度要求的 User-Agent）。
+    var requiresStreamingHeaderProvider: Bool {
+        switch self {
+        case .googleDrive, .baiduNetdisk:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 扫描/入库时不应持久化含 access_token 的直链（如百度 dlink），改用占位 URL，播放前再解析。
+    var usesEphemeralStreamURLs: Bool {
+        self == .baiduNetdisk
+    }
+
+    /// 媒体库占位播放地址：`vanmo://playback/{type}{serverPath}`，不含任何 OAuth 凭据。
+    func catalogPlaybackURL(serverPath: String) -> URL {
+        let normalized = serverPath.hasPrefix("/") ? serverPath : "/\(serverPath)"
+        return URL(string: "vanmo://playback/\(rawValue)\(normalized)")!
     }
 }
 
@@ -212,11 +244,18 @@ final class SavedConnection {
     var username: String?
     var path: String?
     /// 仅 localFolder 使用：security-scoped bookmark，跨 App 重启恢复访问权限。
+    /// 跨设备 CloudKit 同步后通常无法直接复用，新设备需重新授权。
     var bookmarkData: Data?
     var isFavorite: Bool
     var lastConnectedAt: Date?
     var lastSyncedAt: Date?
     var addedAt: Date
+    /// 连接配置最后修改时间，用于 CloudKit 冲突合并。
+    var updatedAt: Date
+    /// 软删除墓碑；CloudKit 同步到其他设备后再物理删除。
+    var deletedAt: Date?
+    /// 最后修改设备标识，辅助调试与 LWW。
+    var lastModifiedDeviceId: String?
 
     init(
         name: String,
@@ -237,6 +276,8 @@ final class SavedConnection {
         self.bookmarkData = bookmarkData
         self.isFavorite = false
         self.addedAt = Date()
+        self.updatedAt = Date()
+        self.lastModifiedDeviceId = CloudSyncDevice.id
     }
 }
 

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
+    @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
 
     var body: some View {
         Form {
+            cloudSyncSection
             playbackSection
             audioSection
             subtitleSection
@@ -20,6 +22,13 @@ struct SettingsView: View {
         .task {
             await viewModel.calculateCacheSize()
             await viewModel.calculateMetadataCacheSize()
+            viewModel.bindCloudSyncCoordinator(cloudSyncCoordinator)
+        }
+        .onChange(of: cloudSyncCoordinator.statusMessage) { _, message in
+            viewModel.cloudSyncStatusMessage = message
+        }
+        .onChange(of: cloudSyncCoordinator.lastSyncAt) { _, _ in
+            viewModel.bindCloudSyncCoordinator(cloudSyncCoordinator)
         }
         .alert("清除缓存", isPresented: $viewModel.showClearCacheAlert) {
             Button("取消", role: .cancel) {}
@@ -48,6 +57,39 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    private var cloudSyncSection: some View {
+        Section {
+            Toggle("iCloud 同步", isOn: Binding(
+                get: { viewModel.cloudSyncEnabled },
+                set: { viewModel.updateCloudSyncEnabled($0, coordinator: cloudSyncCoordinator) }
+            ))
+            .disabled(!CloudSyncAvailability.isCloudKitEnabled)
+
+            if !CloudSyncAvailability.isCloudKitEnabled {
+                Text(CloudSyncAvailability.unavailableMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Text("上次同步")
+                Spacer()
+                Text(viewModel.cloudSyncLastUpdatedText)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let message = viewModel.cloudSyncStatusMessage ?? cloudSyncCoordinator.statusMessage {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Label("云同步", systemImage: "icloud")
+        } footer: {
+            Text("通过 CloudKit 同步服务器配置、非 Emby/Plex 播放进度、收藏和文件夹书签。密码与 OAuth 凭据仍保存在本机 Keychain，不会进入 iCloud。")
+        }
+    }
 
     private var playbackSection: some View {
         Section {
@@ -436,6 +478,7 @@ struct ThemePreviewCard: View {
     NavigationStack {
         SettingsView()
     }
+    .environmentObject(CloudSyncCoordinator.shared)
     .preferredColorScheme(.dark)
 }
 

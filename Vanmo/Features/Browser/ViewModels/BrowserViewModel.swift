@@ -97,7 +97,7 @@ final class ConnectionsViewModel: ObservableObject {
         switch selectedConnection.type {
         case .localFolder, .smb, .webdav, .alist, .fnos:
             return true
-        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk:
+        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk, .baiduNetdisk:
             return true
         default:
             return false
@@ -108,6 +108,7 @@ final class ConnectionsViewModel: ObservableObject {
         guard let context = modelContext else { return }
         do {
             let descriptor = FetchDescriptor<SavedConnection>(
+                predicate: #Predicate { $0.deletedAt == nil },
                 sortBy: [SortDescriptor(\.lastConnectedAt, order: .reverse)]
             )
             savedConnections = try context.fetch(descriptor)
@@ -256,13 +257,17 @@ final class ConnectionsViewModel: ObservableObject {
                 connection.lastSyncedAt = syncStart
                 try? modelContext?.save()
             } else if connection.type != .emby && connection.type != .jellyfin {
-                let scanPath = scanPath ?? connection.path ?? "/"
-                _ = try await scanner.scanRemoteDirectory(
-                    service: service,
-                    path: scanPath,
-                    connectionId: connection.id,
-                    in: context
-                )
+                // 百度网盘登录后仅建立连接并展示文件浏览器；不在 connect 阶段做全量递归扫库。
+                // 实测大目录（如 /来自：iPhone）单目录分页即可超过 1 万条，全库 maxDepth=8 扫描会导致 loading 长时间不结束。
+                if connection.type != .baiduNetdisk {
+                    let scanPath = scanPath ?? connection.path ?? "/"
+                    _ = try await scanner.scanRemoteDirectory(
+                        service: service,
+                        path: scanPath,
+                        connectionId: connection.id,
+                        in: context
+                    )
+                }
             }
 
             // 本地文件夹保持 access，让媒体库里的视频后续可直接播放；
@@ -321,6 +326,8 @@ final class ConnectionsViewModel: ObservableObject {
         }
 
         try? modelContext?.save()
+        CloudSyncCoordinator.shared.markConnectionChanged(connection)
+        CloudSyncCoordinator.shared.requestSync(reason: "connection-created", context: modelContext)
         await loadSavedConnections()
         if let saved = savedConnections.first(where: { $0.id == connection.id }) {
             await selectConnection(saved)
@@ -360,10 +367,12 @@ final class ConnectionsViewModel: ObservableObject {
         connection.username = username
         connection.path = path
         connection.bookmarkData = bookmarkData
+        CloudSyncCoordinator.shared.markConnectionChanged(connection)
         updateFolderBookmarkConnectionNames(for: connection.id, to: name, in: context)
 
         do {
             try context.save()
+            CloudSyncCoordinator.shared.requestSync(reason: "connection-updated", context: context)
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -382,7 +391,7 @@ final class ConnectionsViewModel: ObservableObject {
     /// 并立即触发 `connectAndScan`（实际浏览/取流交给对应网盘的 `RemoteFileService` 实现）。
     @discardableResult
     func beginOAuthConnection(type: ConnectionType, name: String?) async -> Bool {
-        guard type.isOAuthCloudDrive else { return false }
+        guard type.supportsOAuthLogin else { return false }
 
         let connectionId = UUID()
         do {
@@ -406,6 +415,8 @@ final class ConnectionsViewModel: ObservableObject {
 
         modelContext?.insert(connection)
         try? modelContext?.save()
+        CloudSyncCoordinator.shared.markConnectionChanged(connection)
+        CloudSyncCoordinator.shared.requestSync(reason: "oauth-connection-created", context: modelContext)
         await loadSavedConnections()
 
         guard let saved = savedConnections.first(where: { $0.id == connectionId }) else {
@@ -418,7 +429,7 @@ final class ConnectionsViewModel: ObservableObject {
     /// 重新走一遍 OAuth 授权码流程，覆盖写入已有连接的凭据（用于 refresh token 失效等场景）。
     @discardableResult
     func reauthenticateOAuthConnection(_ connection: SavedConnection) async -> Bool {
-        guard connection.type.isOAuthCloudDrive else { return false }
+        guard connection.type.supportsOAuthLogin else { return false }
 
         do {
             let credential = try await OAuthCoordinator.shared.authenticate(type: connection.type)
@@ -439,7 +450,7 @@ final class ConnectionsViewModel: ObservableObject {
         let isMediaServerConnection = connection.type.isMediaServer
 
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
-        if connection.type.isOAuthCloudDrive {
+        if connection.type.supportsOAuthLogin {
             try? OAuthCredentialStore.delete(connectionId: connection.id)
         }
 
@@ -466,6 +477,7 @@ final class ConnectionsViewModel: ObservableObject {
         deleteFolderBookmarks(for: connectionId)
         modelContext?.delete(connection)
         try? modelContext?.save()
+        CloudSyncCoordinator.shared.requestSync(reason: "connection-deleted", context: modelContext)
         connectionStatuses.removeValue(forKey: connectionId)
         connectionErrorMessages.removeValue(forKey: connectionId)
         let deletedSelectedConnection = selectedConnectionID == connectionId
@@ -563,17 +575,18 @@ final class ConnectionsViewModel: ObservableObject {
         if let existing = folderBookmark(connectionId: connection.id, path: file.path) {
             context.delete(existing)
         } else {
-            context.insert(
-                FolderBookmark(
-                    title: folderBookmarkTitle(for: file),
-                    connectionId: connection.id,
-                    connectionName: connection.name,
-                    path: file.path
-                )
+            let bookmark = FolderBookmark(
+                title: folderBookmarkTitle(for: file),
+                connectionId: connection.id,
+                connectionName: connection.name,
+                path: file.path
             )
+            context.insert(bookmark)
+            CloudSyncCoordinator.shared.markFolderBookmarkChanged(bookmark)
         }
         do {
             try context.save()
+            CloudSyncCoordinator.shared.requestSync(reason: "folder-bookmark", context: context)
         } catch {
             VanmoLogger.library.error("[FolderBookmark] Save failed: \(error.localizedDescription)")
         }
@@ -621,7 +634,7 @@ final class ConnectionsViewModel: ObservableObject {
         let targetPath = path
         let descriptor = FetchDescriptor<FolderBookmark>(
             predicate: #Predicate<FolderBookmark> { bookmark in
-                bookmark.connectionId == targetConnectionId && bookmark.path == targetPath
+                bookmark.connectionId == targetConnectionId && bookmark.path == targetPath && bookmark.deletedAt == nil
             }
         )
         return try? context.fetch(descriptor).first
@@ -878,7 +891,7 @@ final class ConnectionsViewModel: ObservableObject {
         if connection.type.isOfficialCloudDrive {
             return "\(connection.type.displayName) 官方接入仍在合规调研中，当前不会使用非官方接口。可先通过 AList/WebDAV 间接连接。"
         }
-        if connection.type.isOAuthCloudDrive {
+        if connection.type.supportsOAuthLogin {
             return "\(connection.type.displayName) 接入尚未就绪：\(error.localizedDescription)"
         }
         if connection.type == .ftp || connection.type == .sftp || connection.type == .nfs || connection.type == .dlna {

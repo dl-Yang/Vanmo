@@ -3,11 +3,11 @@ import CryptoKit
 import Foundation
 import UIKit
 
-/// 通用 OAuth 2.0 授权码流程协调器，服务于走标准 OAuth2 + REST 的国际网盘
-/// （Google Drive / OneDrive / Box / pCloud / Yandex.Disk）。
+/// 通用 OAuth 2.0 协调器，服务于标准授权码流程（Google / OneDrive / Box / pCloud / Yandex.Disk）
+/// 与简化模式 Implicit Grant（百度网盘）。
 ///
 /// 公共客户端（Google / OneDrive）使用 PKCE，不在 App 内嵌 Client Secret；
-/// 其余网盘按其开放平台要求使用 Client Secret 换取 token。
+/// 百度网盘走简化模式，回调 fragment 直接返回 access_token，不支持 refresh。
 @MainActor
 final class OAuthCoordinator: NSObject {
     static let shared = OAuthCoordinator()
@@ -17,7 +17,7 @@ final class OAuthCoordinator: NSObject {
     private override init() {}
 
     func authenticate(type: ConnectionType) async throws -> OAuthCredential {
-        guard type.isOAuthCloudDrive else {
+        guard type.supportsOAuthLogin else {
             throw NetworkError.unsupportedProtocol
         }
         guard OAuthProviderConfiguration.isConfigured(for: type) else {
@@ -26,33 +26,15 @@ final class OAuthCoordinator: NSObject {
             )
         }
 
-        let state = UUID().uuidString
-        let pkce = OAuthProviderConfiguration.usesPKCE(for: type) ? PKCEPair.generate() : nil
-
-        let authorizationURL = try makeAuthorizationURL(type: type, state: state, pkce: pkce)
-        let callbackURL = try await startAuthenticationSession(url: authorizationURL, type: type)
-
-        guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
-              OAuthProviderConfiguration.matchesCallback(components, type: type) else {
-            throw NetworkError.authenticationFailed
+        if OAuthProviderConfiguration.usesImplicitGrant(for: type) {
+            return try await authenticateImplicit(type: type)
         }
-
-        if let errorParam = components.queryItems?.first(where: { $0.name == "error" })?.value {
-            throw NetworkError.connectionFailed("\(type.displayName) 授权失败: \(errorParam)")
-        }
-
-        guard let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
-              !code.isEmpty else {
-            throw NetworkError.authenticationFailed
-        }
-        guard components.queryItems?.first(where: { $0.name == "state" })?.value == state else {
-            throw NetworkError.authenticationFailed
-        }
-
-        return try await exchangeCodeForToken(code: code, type: type, codeVerifier: pkce?.verifier)
+        return try await authenticateAuthorizationCode(type: type)
     }
 
     /// 返回可用的 access token；若已过期则先用 refresh_token 换新并写回 Keychain。
+    ///
+    /// 简化模式网盘（百度）无 refresh_token，过期后直接抛错，需用户重新登录。
     ///
     /// - Parameter forceRefresh: 服务端已经用一个"本地看起来还没过期"的 token 返回 401 时
     ///   （token 被撤销、服务端提前失效、本地过期时间估算不准等），调用方应该传 `true`
@@ -61,6 +43,14 @@ final class OAuthCoordinator: NSObject {
         guard let credential = try OAuthCredentialStore.load(connectionId: connectionId) else {
             throw NetworkError.authenticationFailed
         }
+
+        if OAuthProviderConfiguration.usesImplicitGrant(for: type) {
+            guard !credential.isExpired else {
+                throw NetworkError.connectionFailed("\(type.displayName) 登录已过期，请重新授权登录。")
+            }
+            return credential.accessToken
+        }
+
         guard forceRefresh || credential.isExpired else {
             return credential.accessToken
         }
@@ -95,9 +85,78 @@ final class OAuthCoordinator: NSObject {
         return refreshedCredential
     }
 
-    // MARK: - Authorization URL
+    // MARK: - Authorization Code flow
 
-    private func makeAuthorizationURL(type: ConnectionType, state: String, pkce: PKCEPair?) throws -> URL {
+    private func authenticateAuthorizationCode(type: ConnectionType) async throws -> OAuthCredential {
+        let state = UUID().uuidString
+        let pkce = OAuthProviderConfiguration.usesPKCE(for: type) ? PKCEPair.generate() : nil
+
+        let authorizationURL = try makeAuthorizationCodeURL(type: type, state: state, pkce: pkce)
+        let callbackURL = try await startAuthenticationSession(url: authorizationURL, type: type)
+
+        guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              OAuthProviderConfiguration.matchesCallback(components, type: type) else {
+            throw NetworkError.authenticationFailed
+        }
+
+        if let errorParam = components.queryItems?.first(where: { $0.name == "error" })?.value {
+            throw NetworkError.connectionFailed("\(type.displayName) 授权失败: \(errorParam)")
+        }
+
+        guard let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
+              !code.isEmpty else {
+            throw NetworkError.authenticationFailed
+        }
+        guard components.queryItems?.first(where: { $0.name == "state" })?.value == state else {
+            throw NetworkError.authenticationFailed
+        }
+
+        return try await exchangeCodeForToken(code: code, type: type, codeVerifier: pkce?.verifier)
+    }
+
+    // MARK: - Implicit Grant flow (Baidu)
+
+    private func authenticateImplicit(type: ConnectionType) async throws -> OAuthCredential {
+        let state = UUID().uuidString
+        let authorizationURL = try makeImplicitAuthorizationURL(type: type, state: state)
+        let callbackURL = try await startAuthenticationSession(url: authorizationURL, type: type)
+
+        guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              OAuthProviderConfiguration.matchesCallback(components, type: type) else {
+            throw NetworkError.authenticationFailed
+        }
+
+        let fragmentItems = Self.fragmentQueryItems(from: callbackURL)
+
+        if let errorParam = fragmentItems.first(where: { $0.name == "error" })?.value {
+            throw NetworkError.connectionFailed("\(type.displayName) 授权失败: \(errorParam)")
+        }
+        guard fragmentItems.first(where: { $0.name == "state" })?.value == state else {
+            throw NetworkError.authenticationFailed
+        }
+        guard let accessToken = fragmentItems.first(where: { $0.name == "access_token" })?.value,
+              !accessToken.isEmpty else {
+            throw NetworkError.authenticationFailed
+        }
+
+        let expiresIn = fragmentItems
+            .first(where: { $0.name == "expires_in" })?
+            .value
+            .flatMap(TimeInterval.init) ?? 86_400
+        let scope = fragmentItems.first(where: { $0.name == "scope" })?.value
+
+        return OAuthCredential(
+            provider: type,
+            accessToken: accessToken,
+            refreshToken: "",
+            expiresAt: Date().addingTimeInterval(expiresIn),
+            tokenType: "Bearer",
+            scope: scope,
+            apiHost: nil
+        )
+    }
+
+    private func makeAuthorizationCodeURL(type: ConnectionType, state: String, pkce: PKCEPair?) throws -> URL {
         guard let endpoint = OAuthProviderConfiguration.authorizationEndpoint(for: type) else {
             throw NetworkError.unsupportedProtocol
         }
@@ -117,7 +176,6 @@ final class OAuthCoordinator: NSObject {
             items.append(URLQueryItem(name: "include_granted_scopes", value: "true"))
             items.append(URLQueryItem(name: "prompt", value: "consent"))
         } else if type == .oneDrive {
-            // 使用离线访问以拿到 refresh_token。
             items.append(URLQueryItem(name: "prompt", value: "select_account"))
         }
         if let pkce {
@@ -127,6 +185,23 @@ final class OAuthCoordinator: NSObject {
             items.append(URLQueryItem(name: "access_type", value: "offline"))
         }
         components?.queryItems = items
+        guard let url = components?.url else { throw NetworkError.invalidURL }
+        return url
+    }
+
+    private func makeImplicitAuthorizationURL(type: ConnectionType, state: String) throws -> URL {
+        guard let endpoint = OAuthProviderConfiguration.authorizationEndpoint(for: type) else {
+            throw NetworkError.unsupportedProtocol
+        }
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "response_type", value: "token"),
+            URLQueryItem(name: "client_id", value: OAuthProviderConfiguration.clientID(for: type)),
+            URLQueryItem(name: "redirect_uri", value: OAuthProviderConfiguration.redirectURI(for: type)),
+            URLQueryItem(name: "scope", value: OAuthProviderConfiguration.scope(for: type)),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "display", value: "mobile"),
+        ]
         guard let url = components?.url else { throw NetworkError.invalidURL }
         return url
     }
@@ -216,6 +291,13 @@ final class OAuthCoordinator: NSObject {
             }
         }
     }
+
+    private static func fragmentQueryItems(from url: URL) -> [URLQueryItem] {
+        guard let fragment = url.fragment, !fragment.isEmpty else { return [] }
+        var components = URLComponents()
+        components.query = fragment
+        return components.queryItems ?? []
+    }
 }
 
 extension OAuthCoordinator: ASWebAuthenticationPresentationContextProviding {
@@ -262,12 +344,9 @@ private struct OAuthTokenResponse: Decodable {
     let expiresIn: TimeInterval?
     let tokenType: String?
     let scope: String?
-    /// pCloud 专用：登录返回的数据中心 host（`api.pcloud.com` 或 `eapi.pcloud.com`），
-    /// 其余网盘响应里没有这个字段，解码时会被忽略。
     let hostname: String?
 
     func makeCredential(provider: ConnectionType, fallbackRefreshToken: String, apiHost: String?) -> OAuthCredential {
-        // 部分网盘（如 pCloud）默认不返回 expires_in，视为长期有效（100 年）。
         let expiresIn = expiresIn ?? (100 * 365 * 24 * 3600)
         return OAuthCredential(
             provider: provider,

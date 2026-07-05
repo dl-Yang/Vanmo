@@ -516,13 +516,25 @@ final class LibraryViewModel: ObservableObject {
 
     func toggleFavorite(_ item: MediaItem) {
         item.isFavorite.toggle()
-        try? modelContext?.save()
+        if item.isFavoriteCloudSynced, let context = modelContext {
+            CloudSyncCoordinator.shared.markMediaFavoriteChanged(item, in: context)
+            try? context.save()
+            CloudSyncCoordinator.shared.requestSync(reason: "favorite", context: context)
+        } else {
+            try? modelContext?.save()
+        }
         updateFavoriteSnapshot(afterToggling: item)
     }
 
     func markAsWatched(_ item: MediaItem) {
         item.isWatched = true
-        try? modelContext?.save()
+        if item.isProgressCloudSynced, let context = modelContext {
+            CloudSyncCoordinator.shared.markMediaProgressChanged(item, in: context)
+            try? context.save()
+            CloudSyncCoordinator.shared.requestSync(reason: "watched", context: context)
+        } else {
+            try? modelContext?.save()
+        }
     }
 
     func deleteItem(_ item: MediaItem) {
@@ -620,7 +632,7 @@ final class LibraryViewModel: ObservableObject {
             sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
         )
         folderBookmarks = try context.fetch(descriptor).filter { bookmark in
-            activeConnectionIds.contains(bookmark.connectionId)
+            bookmark.deletedAt == nil && activeConnectionIds.contains(bookmark.connectionId)
         }
     }
 

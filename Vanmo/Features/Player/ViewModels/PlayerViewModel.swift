@@ -57,7 +57,9 @@ final class PlayerViewModel: ObservableObject {
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
     private var discChapters: [Chapter] = []
     private var seekBaseTime: TimeInterval?
+    #if os(iOS)
     private let rateBoostHaptic = UIImpactFeedbackGenerator(style: .medium)
+    #endif
 
     private static let externalSubtitleIDOffset = 10_000
 
@@ -85,9 +87,11 @@ final class PlayerViewModel: ObservableObject {
         (engine as? AVPlayerEngine)?.avPlayer
     }
 
+    #if os(iOS)
     var ksPlayerVideoView: UIView? {
         (engine as? KSPlayerEngine)?.videoView
     }
+    #endif
 
     var canShowPictureInPictureButton: Bool {
         avPlayer != nil || engine is KSPlayerEngine
@@ -193,7 +197,7 @@ final class PlayerViewModel: ObservableObject {
             loadURL = playbackURL
         } else if let registration = await PrefetchProxy.shared.register(
             originalURL: playbackURL,
-            headerProvider: cloudDriveBearerHeaderProvider()
+            headerProvider: cloudDriveStreamingHeaderProvider()
         ) {
             loadURL = registration.url
             prefetchToken = registration.token
@@ -260,7 +264,7 @@ final class PlayerViewModel: ObservableObject {
             predicate: #Predicate { $0.id == connectionId }
         )
         guard let connection = try? modelContext.fetch(descriptor).first,
-              connection.type.isOAuthCloudDrive,
+              connection.type.supportsOAuthLogin,
               !connection.type.requiresBearerStreaming else {
             return url
         }
@@ -283,23 +287,34 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
-    /// 若当前条目来自需要 Bearer token 的 OAuth 网盘（如 Google Drive），返回一个绑定该连接的
-    /// header provider，交给 `PrefetchProxy` 在每次 Range 请求前取最新（必要时自动 refresh）的 access token。
-    private func cloudDriveBearerHeaderProvider() -> (() async -> [String: String])? {
+    /// 若当前条目来自需要自定义请求头的 OAuth 网盘，返回 header provider 交给 PrefetchProxy：
+    /// - Google Drive：动态 Bearer token
+    /// - 百度网盘：固定 User-Agent（dlink 下载/播放要求）
+    private func cloudDriveStreamingHeaderProvider() -> (() async -> [String: String])? {
         guard let modelContext, let connectionId = item.sourceConnectionId else { return nil }
         let descriptor = FetchDescriptor<SavedConnection>(
             predicate: #Predicate { $0.id == connectionId }
         )
         guard let connection = try? modelContext.fetch(descriptor).first,
-              connection.type.requiresBearerStreaming else {
+              connection.type.requiresStreamingHeaderProvider else {
             return nil
         }
-        let type = connection.type
-        return {
-            guard let token = try? await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId) else {
-                return [:]
+
+        switch connection.type {
+        case .googleDrive:
+            let type = connection.type
+            return {
+                guard let token = try? await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId) else {
+                    return [:]
+                }
+                return ["Authorization": "Bearer \(token)"]
             }
-            return ["Authorization": "Bearer \(token)"]
+        case .baiduNetdisk:
+            return {
+                ["User-Agent": BaiduNetdiskService.requiredUserAgent]
+            }
+        default:
+            return nil
         }
     }
 
@@ -1223,8 +1238,12 @@ final class PlayerViewModel: ObservableObject {
             guard !isRateBoosting else { return }
             isRateBoosting = true
             engine.playbackRate = PlayerConfig.clampedRate(PlayerConfig.maximumRate)
+            #if os(iOS)
             rateBoostHaptic.prepare()
             rateBoostHaptic.impactOccurred()
+            #else
+            PlatformHaptics.impactMedium()
+            #endif
         } else {
             guard isRateBoosting else { return }
             isRateBoosting = false
@@ -1290,14 +1309,19 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func saveProgress() {
-        // 直播流没有可续播的进度，跳过以免污染续播记录。
         guard !item.isLiveStream else { return }
         item.lastPlaybackPosition = currentTime
         item.lastPlayedAt = Date()
         if currentTime / max(duration, 1) > 0.9 {
             item.isWatched = true
         }
-        try? item.modelContext?.save()
+        if item.isProgressCloudSynced, let context = item.modelContext {
+            CloudSyncCoordinator.shared.markMediaProgressChanged(item, in: context)
+            try? context.save()
+            CloudSyncCoordinator.shared.requestSync(reason: "playback-progress", context: context)
+        } else {
+            try? item.modelContext?.save()
+        }
     }
 
     private func dismissOverlay<T>(_ keyPath: ReferenceWritableKeyPath<PlayerViewModel, T?>, after: TimeInterval = 1.0) {
