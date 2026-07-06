@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 import VanmoCore
 
 @main
@@ -10,6 +10,9 @@ struct VanmoMacApp: App {
     }
 
     @StateObject private var cloudSyncCoordinator = CloudSyncCoordinator.shared
+    @StateObject private var appState = MacAppState()
+    @StateObject private var libraryViewModel = MacLibraryViewModel()
+    @StateObject private var connectionsViewModel = MacConnectionsViewModel()
 
     var sharedModelContainer: ModelContainer = ModelContainerFactory.makeSharedContainer()
 
@@ -17,6 +20,9 @@ struct VanmoMacApp: App {
         WindowGroup {
             VanmoMacRootView()
                 .environmentObject(cloudSyncCoordinator)
+                .environmentObject(appState)
+                .environmentObject(libraryViewModel)
+                .environmentObject(connectionsViewModel)
                 .frame(minWidth: 960, minHeight: 640)
         }
         .modelContainer(sharedModelContainer)

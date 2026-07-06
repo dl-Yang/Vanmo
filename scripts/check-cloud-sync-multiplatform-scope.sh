@@ -176,9 +176,8 @@ else
   fail "ContentView still contains #if os(macOS) — macOS UI should live in VanmoMac/"
 fi
 
-# 9) VanmoCore 禁止 UI 框架（允许 PlatformDeviceInfo 等条件编译）
-ui_import_hits="$(rg -n '^import (UIKit|AppKit|SwiftUI)' Packages/VanmoCore/Sources/VanmoCore -g '*.swift' \
-  | rg -v 'PlatformDeviceInfo.swift' || true)"
+# 9) VanmoCore 禁止 UI 框架
+ui_import_hits="$(rg -n '^import (UIKit|AppKit|SwiftUI)' Packages/VanmoCore/Sources/VanmoCore -g '*.swift' || true)"
 if [[ -z "$ui_import_hits" ]]; then
   pass "VanmoCore has no unconditional UIKit/AppKit/SwiftUI imports"
 else

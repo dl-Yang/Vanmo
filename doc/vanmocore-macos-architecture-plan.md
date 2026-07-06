@@ -45,7 +45,7 @@ Vanmo/
 
 整个架构转型分为三个递进的阶段，以保证现有 iOS 版本的稳定性不会在重构中途崩溃。
 
-### 阶段一：建立 VanmoCore 与数据模型剥离 (预计 1-2 天)
+### 阶段一：建立 VanmoCore 与数据模型剥离 ~~(预计 1-2 天)~~ ✅ 已完成
 
 **目标**：将所有 SwiftData 模型安全下沉，确保底层数据库无缝过渡。
 
@@ -62,7 +62,7 @@ Vanmo/
    - 解决所有引用报错，编译 iOS Target。
    - 运行真机，验证旧的数据库是否能正常被 `VanmoCore` 接管（只要属性名称类型不变，SwiftData 会自动兼容，数据不会丢失）。
 
-### 阶段二：核心业务逻辑下沉与 UIKit 解耦 (预计 2-3 天)
+### 阶段二：核心业务逻辑下沉与 UIKit 解耦 ~~(预计 2-3 天)~~ ✅ 已完成
 
 **目标**：将网络请求、扫描逻辑和基础解析器移入 `VanmoCore`，并完成与 UIKit 的物理切割。
 
@@ -78,7 +78,7 @@ Vanmo/
 3. **下沉存储与同步控制**：
    - 移动 `MediaScanner`、`CloudSyncCoordinator` 等逻辑层。
 
-### 阶段三：废弃遗留靶点，从零构建 macOS Target (独立推进)
+### 阶段三：废弃遗留靶点，从零构建 macOS Target ~~(独立推进)~~ 🔄 骨架已完成，UI 待开发
 
 **目标**：清理当前半吊子的 macOS 兼容代码，创建真正的纯净版 macOS Target。
 
@@ -121,11 +121,60 @@ Vanmo/
 
 ---
 
-## 4. 下一步行动建议 (First PR)
+## 4. 当前进度（截至 2026-07-06）
 
-建议以一个小切口验证整个链路：
+### 4.1 已完成
 
-1. 手动创建 `Packages/VanmoCore`。
-2. 将不含任何 UI 依赖的最基础模块（如 `ConnectionModels.swift` 和 `PlatformCompatibility.swift` 里的非 UI 逻辑）移入 `VanmoCore`。
-3. 更新 `project.yml`，执行 `xcodegen`，让 iOS 成功依赖 `VanmoCore` 并编译通过。
-4. 这个 PR 成功后，再大规模下移 SwiftData 模型。
+| 阶段 | 状态 | 说明 |
+|---|---|---|
+| **阶段一** | ✅ 已完成 | `Packages/VanmoCore` 已创建；`project.yml` 已注册本地 SPM 依赖；`MediaItem`、`SavedConnection`、`FolderBookmark`、`CloudMediaState`、`PlaybackRecord` 等 `@Model` 已迁入 `VanmoCore/Models`，并补齐 `public` 访问控制与 `public init`。 |
+| **阶段二** | ✅ 已完成 | 网络层（SMB/WebDAV/Emby/Plex/云盘/OAuth）、存储层（`MediaScanner`、`CloudSyncCoordinator`）、元数据、字幕解析、播放器预取等核心逻辑已下沉；`OAuthPresentationContextProvider` 协议已抽象，iOS/macOS 端侧分别注入 Anchor。 |
+| **阶段三（骨架）** | ✅ 已完成 | 独立 `Vanmo-macOS` Target 已建立；`VanmoMac/` 目录含 `VanmoMacApp` + `NavigationSplitView` 骨架；iOS 侧 `#if os(macOS)` 补丁已清理。 |
+| **边界收口** | ✅ 已完成 | `PlatformDeviceInfo` 已移除 `UIKit` 依赖，改用 `Darwin.uname` + `ProcessInfo` + `UserDefaults` 持久化设备标识；`scripts/check-cloud-sync-multiplatform-scope.sh` 全项通过。注意：`deviceIdentifier` 在 iOS 升级后可能与旧版 `identifierForVendor` 不同，Emby/Jellyfin 会视为新设备；Plex 仍使用独立的 `PlexCredentialStore.clientIdentifier`。 |
+
+### 4.2 构建验证结果
+
+| 目标 | 结果 | 备注 |
+|---|---|---|
+| `swift build`（VanmoCore） | ✅ 通过 | |
+| `swift test`（VanmoCoreTests） | ✅ 5/5 通过 | Schema / ConnectionType / Subtitle 等 |
+| `Vanmo-macOS` scheme | ✅ 通过 | Debug / `CODE_SIGNING_ALLOWED=NO` |
+| `Vanmo` iOS scheme | ⚠️ 编译通过，链接后脚本失败 | `Fix KSPlayer Framework Plist` 后置脚本需有效签名身份；与 VanmoCore 迁移无关 |
+
+### 4.3 iOS 端侧保留（符合铁律）
+
+以下模块 intentionally 留在 `Vanmo/`，不重复迁入 `VanmoCore`：
+
+- `Core/Player/` — `PlayerEngine`、`KSPlayerEngine`（UIKit / AVAudioSession / KSPlayer UI）
+- `Core/Subtitle/SubtitleOverlayView.swift` — 字幕渲染视图
+- `Shared/Utilities/PlatformCompatibility.swift` — iOS 触觉反馈
+- `Shared/Network/OAuthPresentationContextProvider+UIKit.swift` — OAuth Window Anchor
+- 全部 `Features/` UI 与 ViewModel
+
+---
+
+## 5. 下一步行动建议
+
+阶段一～三的核心迁移与边界收口已完成。后续按优先级推进：
+
+### 5.1 macOS 原生 UI 开发（阶段三续）
+
+1. **媒体库列表页**：在 `VanmoMac/UI/Library/` 新建 `LibrarySplitView`，复用 `VanmoCore` 的 `LibraryViewModel` 逻辑（或新建 macOS 专属 VM 调用 `MediaScanner` / `CloudSyncCoordinator`）。
+2. **连接浏览页**：在 `VanmoMac/UI/Browser/` 实现 `ConnectionsView` 桌面版，接入 `SavedConnection` + `ServiceFactory`。
+3. **播放器**：在 `VanmoMac/Player/` 基于 `AVPlayerView` / `NSViewRepresentable` 封装 macOS 播放器，依赖 `VanmoCore` 的 `PlayerCoreTypes` 与预取层，不引入 KSPlayer UIKit 模块。
+
+### 5.2 iOS 端侧播放器进一步解耦
+
+1. 将 `PlayerEngine` 协议与 `AVPlayerEngine` 中不含 UIKit 的部分评估是否可下沉到 `VanmoCore/Player/`（当前 `SubtitleContent` 含 `UIImage` 需先抽象为 `Data` / 协议）。
+2. `DominantColorExtractor` 改为接收 `CGImage` / `Data`，去除 `UIImage` 依赖后迁入 `VanmoCore`。
+
+### 5.3 回归测试与真机验证
+
+1. 扩展 `VanmoCoreTests`：增加 `ModelContainerFactory` 内存容器 + CloudKit schema 一致性测试。
+2. iOS 真机运行：验证旧数据库被 `VanmoCore` 接管后数据无丢失；CloudKit 同步在 Release 配置下正常。
+3. macOS Release 配置：验证 `Vanmo-Mac-Cloud.entitlements` 下 SwiftData + CloudKit 双端同步。
+
+### 5.4 CI 集成
+
+1. 将 `scripts/check-cloud-sync-multiplatform-scope.sh` 纳入 CI。
+2. CI 流水线至少覆盖：`swift test`（VanmoCore）+ `Vanmo-macOS` xcodebuild。

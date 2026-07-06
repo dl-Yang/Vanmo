@@ -1,0 +1,92 @@
+import SwiftUI
+
+struct MacHeaderToolbar: View {
+    @EnvironmentObject private var appState: MacAppState
+    @Environment(\.macTheme) private var theme
+
+    let title: String
+    var isEmptyLibrary: Bool = false
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(MacDesignTokens.Typography.headerTitle)
+                .foregroundStyle(theme.primaryText)
+
+            Spacer()
+
+            HStack(spacing: 16) {
+                HStack(spacing: 0) {
+                    segmentButton(mode: .grid, systemImage: "square.grid.2x2")
+                    segmentButton(mode: .list, systemImage: "list.bullet")
+                }
+                .padding(3)
+                .background(theme.segmentedBackground)
+                .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.segmentedControl))
+
+                if !isEmptyLibrary {
+                    Button {
+                        // 排序功能暂未适配
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(theme.secondaryText)
+                            .frame(width: 20, height: 20)
+                    }
+                    .buttonStyle(.plain)
+                    .help("排序（暂未适配）")
+                }
+            }
+        }
+        .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+        .frame(height: MacDesignTokens.Layout.headerHeight)
+        .background(theme.headerBackground)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(theme.headerBorder).frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private func segmentButton(mode: MacLibraryViewMode, systemImage: String) -> some View {
+        let isSelected = appState.viewMode == mode
+        Button {
+            appState.viewMode = mode
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(isSelected ? theme.primaryText : theme.secondaryText)
+                .frame(width: 24, height: 24)
+                .background(isSelected ? theme.segmentedSelectedBackground : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.segmentedSegment))
+                .shadow(color: isSelected ? Color.black.opacity(0.08) : .clear, radius: 1, y: 1)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct MacFilterPills: View {
+    @EnvironmentObject private var appState: MacAppState
+    @Environment(\.macTheme) private var theme
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(MacLibraryFilter.allCases) { filter in
+                    let isSelected = appState.selectedFilter == filter
+                    Button {
+                        appState.selectedFilter = filter
+                    } label: {
+                        Text(filter.title)
+                            .font(MacDesignTokens.Typography.filterPill)
+                            .foregroundStyle(isSelected ? theme.filterSelectedText : theme.filterUnselectedText)
+                            .padding(.horizontal, 16)
+                            .frame(height: MacDesignTokens.Layout.filterPillHeight)
+                            .background(isSelected ? theme.filterSelectedBackground : theme.filterUnselectedBackground)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
