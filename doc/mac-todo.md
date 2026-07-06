@@ -297,11 +297,11 @@ gantt
 
 ### 0.1 应用生命周期接线 — P0，复用度：高 `0-α`
 
-- [ ] 启动时 `CloudSyncCoordinator.performSync(reason: "app-launch")`
-- [ ] 前台恢复时 `performSync(reason: "foreground")` + `loadSavedConnections()`
-- [ ] 启动时 `attemptAutoReconnectIfNeeded()`（从 iOS `ConnectionsViewModel` 移植）
-- [ ] 参考 iOS：`Vanmo/App/ContentView.swift` `.task` / `.onChange(of: scenePhase)`
-- [ ] 修改：`VanmoMac/App/VanmoMacRootView.swift`
+- [x] 启动时 `CloudSyncCoordinator.performSync(reason: "app-launch")`
+- [x] 前台恢复时 `performSync(reason: "foreground")` + `loadSavedConnections()`
+- [x] 启动时 `attemptAutoReconnectIfNeeded()`（从 iOS `ConnectionsViewModel` 移植）
+- [x] 参考 iOS：`Vanmo/App/ContentView.swift` `.task` / `.onChange(of: scenePhase)`
+- [x] 修改：`VanmoMac/App/VanmoMacRootView.swift`
 
 ### 0.2 播放进度持久化 — P0，复用度：高 `0-β`
 
@@ -324,9 +324,9 @@ gantt
 
 ### 0.5 连接删除 — P0，复用度：高 `0-α`
 
-- [ ] 从 iOS 移植 `deleteConnection`（含 Keychain、FolderBookmark、CloudSync 清理）
-- [ ] 侧边栏或浏览页提供删除入口
-- [ ] 修改：`MacConnectionsViewModel.swift`、`MacSidebarView.swift`
+- [x] 从 iOS 移植 `deleteConnection`（含 Keychain、FolderBookmark、CloudSync 清理）
+- [x] 侧边栏或浏览页提供删除入口
+- [x] 修改：`MacConnectionsViewModel.swift`、`MacSidebarView.swift`
 
 **阶段 0 验收标准：**
 - 添加 SMB 连接 → 扫描 → 播放 → 退出 → 重开，Continue Watching 有进度

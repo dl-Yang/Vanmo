@@ -5,7 +5,9 @@ struct VanmoMacRootView: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
+    @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
@@ -28,8 +30,19 @@ struct VanmoMacRootView: View {
                 .macTheme(activeTheme)
                 .presentationBackground(.clear)
         }
-        .onAppear {
+        .task {
             connectionsViewModel.setModelContext(modelContext)
+            await connectionsViewModel.attemptAutoReconnectIfNeeded()
+            await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
+            refreshLibraryAfterConnection()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
+                await connectionsViewModel.loadSavedConnections()
+                refreshLibraryAfterConnection()
+            }
         }
     }
 

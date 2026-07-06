@@ -58,8 +58,13 @@ struct MacSidebarRow: View {
 
 struct MacSidebarView: View {
     @EnvironmentObject private var appState: MacAppState
+    @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
+    @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @Environment(\.macTheme) private var theme
-    @Query(sort: \SavedConnection.name) private var connections: [SavedConnection]
+    @Query(
+        filter: #Predicate<SavedConnection> { $0.deletedAt == nil },
+        sort: \SavedConnection.name
+    ) private var connections: [SavedConnection]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -113,6 +118,13 @@ struct MacSidebarView: View {
                         ) {
                             // 连接浏览功能暂未适配
                         }
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                deleteConnection(connection)
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, MacDesignTokens.Layout.sidebarHorizontalPadding)
@@ -126,6 +138,14 @@ struct MacSidebarView: View {
                 .fill(theme.sidebarBorder)
                 .frame(width: 1)
         }
+    }
+
+    private func deleteConnection(_ connection: SavedConnection) {
+        if appState.selectedMediaItem?.sourceConnectionId == connection.id {
+            appState.closeDetail()
+        }
+        connectionsViewModel.deleteConnection(connection)
+        libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
     }
 }
 

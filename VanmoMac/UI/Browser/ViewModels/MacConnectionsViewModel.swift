@@ -4,16 +4,137 @@ import VanmoCore
 
 @MainActor
 final class MacConnectionsViewModel: ObservableObject {
+    @Published private(set) var savedConnections: [SavedConnection] = []
     @Published private(set) var isLoading = false
     @Published private(set) var loadingMessage = ""
     @Published var showError = false
     @Published var errorMessage = ""
 
     private var modelContext: ModelContext?
+    private var didAttemptAutoReconnect = false
     private var activeLocalServices: [UUID: LocalFolderService] = [:]
 
     func setModelContext(_ context: ModelContext) {
         modelContext = context
+    }
+
+    // MARK: - Load & Auto-Reconnect
+
+    func loadSavedConnections() async {
+        guard let context = modelContext else { return }
+        do {
+            let descriptor = FetchDescriptor<SavedConnection>(
+                predicate: #Predicate { $0.deletedAt == nil },
+                sortBy: [SortDescriptor(\.lastConnectedAt, order: .reverse)]
+            )
+            savedConnections = try context.fetch(descriptor)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    /// 应用启动时尝试自动重连最近一次成功连接过的服务。
+    /// 在整个 App 生命周期内只会触发一次。失败时静默处理，不打扰用户。
+    func attemptAutoReconnectIfNeeded() async {
+        guard !didAttemptAutoReconnect else { return }
+        didAttemptAutoReconnect = true
+
+        if savedConnections.isEmpty {
+            await loadSavedConnections()
+        }
+
+        await restoreLocalFolderAccess()
+
+        guard let target = savedConnections.first(where: { $0.lastConnectedAt != nil }) else {
+            VanmoLogger.network.info("[MacConnections] Auto-reconnect skipped: no previous connection")
+            return
+        }
+
+        VanmoLogger.network.info("[MacConnections] Auto-reconnect to \(target.name)")
+        await connectAndScan(target, showErrorAlert: false)
+    }
+
+    /// 仅打开本地文件夹的 bookmark 并保持 access，不触发扫描。
+    private func restoreLocalFolderAccess() async {
+        for connection in savedConnections where connection.type == .localFolder {
+            guard activeLocalServices[connection.id] == nil else { continue }
+            guard connection.bookmarkData != nil else { continue }
+
+            let service = LocalFolderService()
+            let config = ConnectionConfig(from: connection)
+            do {
+                try await service.connect(config: config)
+                activeLocalServices[connection.id] = service
+                VanmoLogger.network.info("[MacConnections] Restored local access: \(connection.name)")
+            } catch {
+                VanmoLogger.network.error("[MacConnections] Restore local access failed for \(connection.name): \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Delete
+
+    func deleteConnection(_ connection: SavedConnection) {
+        let connectionId = connection.id
+
+        try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
+        if connection.type.supportsOAuthLogin {
+            try? OAuthCredentialStore.delete(connectionId: connection.id)
+        }
+
+        if let active = activeLocalServices.removeValue(forKey: connection.id) {
+            Task { await active.disconnect() }
+        }
+
+        deleteMediaItems(for: connectionId)
+        softDeleteFolderBookmarks(for: connectionId)
+
+        connection.deletedAt = Date()
+        CloudSyncCoordinator.shared.markConnectionChanged(connection)
+        try? modelContext?.save()
+        CloudSyncCoordinator.shared.requestSync(reason: "connection-deleted", context: modelContext)
+
+        Task {
+            await loadSavedConnections()
+        }
+    }
+
+    private func deleteMediaItems(for connectionId: UUID) {
+        guard let context = modelContext else { return }
+
+        do {
+            let descriptor = FetchDescriptor<MediaItem>(
+                predicate: #Predicate<MediaItem> { item in
+                    item.sourceConnectionId == connectionId
+                }
+            )
+            let items = try context.fetch(descriptor)
+            for item in items {
+                context.delete(item)
+            }
+        } catch {
+            VanmoLogger.library.error("[MacConnections] Delete cached media failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func softDeleteFolderBookmarks(for connectionId: UUID) {
+        guard let context = modelContext else { return }
+        let targetConnectionId = connectionId
+        let descriptor = FetchDescriptor<FolderBookmark>(
+            predicate: #Predicate<FolderBookmark> { bookmark in
+                bookmark.connectionId == targetConnectionId && bookmark.deletedAt == nil
+            }
+        )
+        do {
+            let bookmarks = try context.fetch(descriptor)
+            for bookmark in bookmarks {
+                bookmark.deletedAt = Date()
+                CloudSyncCoordinator.shared.markFolderBookmarkChanged(bookmark)
+            }
+        } catch {
+            VanmoLogger.library.error("[MacConnections] Soft-delete folder bookmarks failed: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Save / Update
@@ -48,7 +169,11 @@ final class MacConnectionsViewModel: ObservableObject {
         try? modelContext?.save()
         CloudSyncCoordinator.shared.markConnectionChanged(connection)
         CloudSyncCoordinator.shared.requestSync(reason: "connection-created", context: modelContext)
-        return await connectAndScan(connection)
+        let didConnect = await connectAndScan(connection)
+        if didConnect {
+            await loadSavedConnections()
+        }
+        return didConnect
     }
 
     @discardableResult
@@ -92,7 +217,11 @@ final class MacConnectionsViewModel: ObservableObject {
         }
 
         activeLocalServices.removeValue(forKey: connection.id)
-        return await connectAndScan(connection)
+        let didConnect = await connectAndScan(connection)
+        if didConnect {
+            await loadSavedConnections()
+        }
+        return didConnect
     }
 
     @discardableResult
@@ -123,7 +252,11 @@ final class MacConnectionsViewModel: ObservableObject {
         try? modelContext?.save()
         CloudSyncCoordinator.shared.markConnectionChanged(connection)
         CloudSyncCoordinator.shared.requestSync(reason: "oauth-connection-created", context: modelContext)
-        return await connectAndScan(connection)
+        let didConnect = await connectAndScan(connection)
+        if didConnect {
+            await loadSavedConnections()
+        }
+        return didConnect
     }
 
     @discardableResult
@@ -145,7 +278,10 @@ final class MacConnectionsViewModel: ObservableObject {
     // MARK: - Connect & Scan
 
     @discardableResult
-    func connectAndScan(_ connection: SavedConnection) async -> Bool {
+    func connectAndScan(
+        _ connection: SavedConnection,
+        showErrorAlert: Bool = true
+    ) async -> Bool {
         isLoading = true
         loadingMessage = "连接到 \(connection.name)..."
 
@@ -215,8 +351,10 @@ final class MacConnectionsViewModel: ObservableObject {
             isLoading = false
             return true
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            if showErrorAlert {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
             isLoading = false
             return false
         }
