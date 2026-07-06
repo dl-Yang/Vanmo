@@ -1,8 +1,11 @@
+import SwiftData
 import SwiftUI
 import VanmoCore
 
 struct MacPlayerView: View {
     @EnvironmentObject private var appState: MacAppState
+    @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: MacPlayerViewModel
 
     init(item: MediaItem, startPosition: TimeInterval) {
@@ -29,20 +32,38 @@ struct MacPlayerView: View {
             MacPlayerControlsOverlay(
                 viewModel: viewModel,
                 title: appState.playerItem?.displayTitle ?? appState.playerItem?.title ?? "Player",
-                onClose: {
-                    viewModel.cleanup()
-                    appState.closePlayer()
-                }
+                onClose: closePlayer
             )
         }
         .background(.black)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            await viewModel.onAppear(modelContext: modelContext)
+        }
+        .onDisappear {
+            viewModel.cleanup()
+            reloadLibrary()
+        }
+    }
+
+    private func closePlayer() {
+        viewModel.cleanup()
+        reloadLibrary()
+        appState.closePlayer()
+    }
+
+    private func reloadLibrary() {
+        libraryViewModel.reload(
+            filter: appState.selectedFilter,
+            section: appState.selectedSection
+        )
     }
 }
 
 #Preview {
     MacPlayerView(item: MacPlayerPreviewItem.make(), startPosition: 0)
         .environmentObject(MacAppState())
+        .environmentObject(MacLibraryViewModel())
         .frame(width: 1470, height: 836)
 }
 

@@ -305,17 +305,17 @@ gantt
 
 ### 0.2 播放进度持久化 — P0，复用度：高 `0-β`
 
-- [ ] 关闭播放器时写回 `lastPlaybackPosition` / `lastPlayedAt` / `isWatched`
-- [ ] 触发 `CloudSyncCoordinator.markMediaProgressChanged` + `requestSync`
-- [ ] 参考 iOS：`PlayerViewModel.saveProgress()`
-- [ ] 修改：`VanmoMac/Player/MacPlayerViewModel.swift`、`MacPlayerView.swift`
+- [x] 关闭播放器时写回 `lastPlaybackPosition` / `lastPlayedAt` / `isWatched`
+- [x] 触发 `CloudSyncCoordinator.markMediaProgressChanged` + `requestSync`
+- [x] 参考 iOS：`PlayerViewModel.saveProgress()`
+- [x] 修改：`VanmoMac/Player/MacPlayerViewModel.swift`、`MacPlayerView.swift`
 
 ### 0.3 远程播放 URL 解析 — P0，复用度：高 `0-β`
 
-- [ ] 移植 iOS 云盘流 URL 解析（`resolveCloudDriveStreamURLIfNeeded`）
-- [ ] 接入 `PrefetchRegistration`（当前 `MacPlayerViewModel` 已声明未使用）
-- [ ] OAuth 网盘播放时携带 Bearer token 请求头
-- [ ] 修改：`VanmoMac/Player/MacPlayerViewModel.swift`
+- [x] 移植 iOS 云盘流 URL 解析（`resolveCloudDriveStreamURLIfNeeded`）
+- [x] 接入 `PrefetchRegistration`（当前 `MacPlayerViewModel` 已声明未使用）
+- [x] OAuth 网盘播放时携带 Bearer token 请求头
+- [x] 修改：`VanmoMac/Player/MacPlayerViewModel.swift`
 
 ### 0.4 扫描进度反馈 — P1，复用度：低 `0-γ`
 
