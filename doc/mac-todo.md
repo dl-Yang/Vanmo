@@ -319,8 +319,8 @@ gantt
 
 ### 0.4 扫描进度反馈 — P1，复用度：低 `0-γ`
 
-- [ ] `MacAddConnectionView` 绑定 `isLoading` / `loadingMessage` 展示进度遮罩
-- [ ] 修改：`VanmoMac/UI/Browser/Views/MacAddConnectionView.swift`
+- [x] `MacAddConnectionView` 绑定 `isLoading` / `loadingMessage` 展示进度遮罩
+- [x] 修改：`VanmoMac/UI/Browser/Views/MacAddConnectionView.swift`
 
 ### 0.5 连接删除 — P0，复用度：高 `0-α`
 

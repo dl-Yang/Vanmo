@@ -64,6 +64,11 @@ struct MacAddConnectionView: View {
             RoundedRectangle(cornerRadius: MacDesignTokens.Layout.addConnectionRadius, style: .continuous)
                 .stroke(borderColor, lineWidth: 1)
         }
+        .overlay {
+            if viewModel.isLoading {
+                loadingOverlay
+            }
+        }
         .shadow(color: shadowColor, radius: colorScheme == .dark ? 30 : 20, y: colorScheme == .dark ? 15 : 10)
         .onAppear {
             guard !isEditing else { return }
@@ -440,6 +445,41 @@ struct MacAddConnectionView: View {
                 RoundedRectangle(cornerRadius: 5)
                     .stroke(inputBorder, lineWidth: 1)
             }
+    }
+
+    // MARK: - Loading Overlay
+
+    private var loadingMessageText: String {
+        let trimmed = viewModel.loadingMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "处理中..." : trimmed
+    }
+
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(colorScheme == .dark ? 0.45 : 0.35)
+
+            VStack(spacing: 16) {
+                ProgressView()
+                    .controlSize(.regular)
+
+                Text(loadingMessageText)
+                    .font(.system(size: 13))
+                    .tracking(-0.08)
+                    .foregroundStyle(theme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 240)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            .background(contentBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(dividerColor, lineWidth: 1)
+            }
+            .shadow(color: shadowColor, radius: 8, y: 4)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.addConnectionRadius, style: .continuous))
     }
 
     // MARK: - Theme Colors
