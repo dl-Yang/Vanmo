@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import VanmoCore
 
 /// Emby/Jellyfin 容器条目（Folder / CollectionFolder / Season）的子级浏览页。
 struct EmbyFolderBrowseView: View {
@@ -86,7 +87,7 @@ struct EmbyFolderBrowseView: View {
     }
 
     private func makeChildItem(_ child: ServerMediaItem) -> MediaItem {
-        let item = child.makeMediaItem()
+        let item = ServerMediaItemMapper.makeMediaItem(from: child)
         item.sourceConnectionId = container.sourceConnectionId
         return item
     }

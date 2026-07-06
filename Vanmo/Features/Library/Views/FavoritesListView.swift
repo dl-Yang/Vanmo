@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Kingfisher
+import VanmoCore
 
 struct FavoritesListView: View {
     @Environment(\.modelContext) private var modelContext

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import VanmoCore
 
 struct ConnectionsView: View {
     @Environment(\.modelContext) private var modelContext

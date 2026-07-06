@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 extension View {
     func cardStyle() -> some View {

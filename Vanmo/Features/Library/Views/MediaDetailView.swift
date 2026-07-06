@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Kingfisher
+import VanmoCore
 
 struct MediaDetailView: View {
     @EnvironmentObject private var appState: AppState
@@ -720,7 +721,7 @@ struct MediaDetailView: View {
     }
 
     private func makeCollectionItem(_ collection: ServerMediaItem) -> MediaItem {
-        let collectionItem = collection.makeMediaItem()
+        let collectionItem = ServerMediaItemMapper.makeMediaItem(from: collection)
         collectionItem.sourceConnectionId = item.sourceConnectionId
         return collectionItem
     }

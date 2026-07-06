@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import VanmoCore
 
 struct PlayerProgressBar: View {
     let progress: Double

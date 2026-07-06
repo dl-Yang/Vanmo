@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()

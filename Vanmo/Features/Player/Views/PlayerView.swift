@@ -2,6 +2,7 @@ import SwiftUI
 import AVFoundation
 import AVKit
 import SwiftData
+import VanmoCore
 
 struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss

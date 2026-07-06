@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Kingfisher
+import VanmoCore
 
 struct SearchView: View {
     @Environment(\.modelContext) private var modelContext

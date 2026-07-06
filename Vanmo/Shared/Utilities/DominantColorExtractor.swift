@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import VanmoCore
 
 enum DominantColorExtractor {
     private static let cache = NSCache<NSString, UIColor>()

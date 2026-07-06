@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct FilterChipsRow: View {
     let title: String

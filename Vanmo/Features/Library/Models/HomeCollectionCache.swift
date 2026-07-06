@@ -1,4 +1,5 @@
 import Foundation
+import VanmoCore
 
 struct HomeCollectionCacheSnapshot: Codable, Sendable {
     static let currentSchemaVersion = 1

@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -68,24 +69,12 @@ private struct PlayerPresentationModifier: ViewModifier {
     @EnvironmentObject private var appState: AppState
 
     func body(content: Content) -> some View {
-        #if os(iOS)
         content
             .fullScreenCover(isPresented: $appState.isPlayerPresented) {
                 if let item = appState.currentPlayingItem {
                     PlayerView(item: item)
                 }
             }
-        #elseif os(macOS)
-        content
-            .sheet(isPresented: $appState.isPlayerPresented) {
-                if let item = appState.currentPlayingItem {
-                    PlayerView(item: item)
-                        .frame(minWidth: 960, minHeight: 540)
-                }
-            }
-        #else
-        content
-        #endif
     }
 }
 

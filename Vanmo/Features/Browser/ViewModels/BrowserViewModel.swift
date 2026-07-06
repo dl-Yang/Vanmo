@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import VanmoCore
 
 enum ConnectionStatus {
     case idle

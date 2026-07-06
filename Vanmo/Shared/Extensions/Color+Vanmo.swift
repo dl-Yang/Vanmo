@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 // MARK: - Hex 初始化
 

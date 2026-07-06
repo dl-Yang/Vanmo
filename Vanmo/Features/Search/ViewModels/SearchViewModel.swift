@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import VanmoCore
 
 struct SearchResultSection: Identifiable {
     let id: String
@@ -272,7 +273,7 @@ final class SearchViewModel: ObservableObject {
 
     private func makeRemoteSection(from payload: RemoteSearchPayload) -> SearchResultSection? {
         let serverItems = payload.serverItems.map { serverItem -> SearchResultItem in
-            let item = serverItem.makeMediaItem()
+            let item = ServerMediaItemMapper.makeMediaItem(from: serverItem)
             item.sourceConnectionId = payload.connectionId
             return SearchResultItem(
                 id: "server-\(payload.connectionId.uuidString)-\(serverItem.serverId)",

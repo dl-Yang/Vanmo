@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import VanmoCore
 
 /// CollectionFolder 二级列表页：展示媒体库内的 Movie / Series / Video。
 struct CollectionFolderListView: View {
@@ -187,7 +188,7 @@ struct CollectionFolderListView: View {
                 pageSize: pageSize
             )
             items = page.items.map { serverItem in
-                let item = serverItem.makeMediaItem()
+                let item = ServerMediaItemMapper.makeMediaItem(from: serverItem)
                 item.sourceConnectionId = connection.id
                 return item
             }
@@ -225,7 +226,7 @@ struct CollectionFolderListView: View {
                 pageSize: pageSize
             )
             let newItems = page.items.map { serverItem in
-                let item = serverItem.makeMediaItem()
+                let item = ServerMediaItemMapper.makeMediaItem(from: serverItem)
                 item.sourceConnectionId = connection.id
                 return item
             }

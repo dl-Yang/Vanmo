@@ -1,4 +1,5 @@
 import Foundation
+import VanmoCore
 
 extension TimeInterval {
     var formattedDuration: String {

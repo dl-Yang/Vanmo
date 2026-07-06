@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct FilterFlowLayout: Layout {
     var spacing: CGFloat = 8

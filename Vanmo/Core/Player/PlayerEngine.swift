@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import Combine
 import UIKit
+import VanmoCore
 
 struct SubtitleContent: Equatable {
     var text: String?

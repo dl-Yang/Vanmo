@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct EmptyStateView: View {
     let icon: String

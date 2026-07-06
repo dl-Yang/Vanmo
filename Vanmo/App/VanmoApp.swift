@@ -3,10 +3,12 @@ import SwiftData
 
 #if os(iOS)
 import UIKit
+import VanmoCore
 
 @main
 struct VanmoApp: App {
     init() {
+        OAuthCoordinator.shared.presentationContextProvider = UIKitOAuthPresentationContextProvider.shared
         PrefetchTemporaryStore.cleanupOrphans()
         Task {
             await OnlineSubtitleService.shared.register(OpenSubtitlesProvider())

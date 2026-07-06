@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct SubtitleOverlayView: View {
     let content: SubtitleContent?

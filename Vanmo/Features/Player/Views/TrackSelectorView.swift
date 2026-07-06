@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct TrackSelectorView: View {
     @ObservedObject var viewModel: PlayerViewModel

@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import VanmoCore
 
 struct MediaTitleLogoView: View {
     let title: String

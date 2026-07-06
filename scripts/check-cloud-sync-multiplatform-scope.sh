@@ -34,18 +34,18 @@ else
   fail "Vanmo.entitlements still declares iCloud — Debug signing will fail on personal teams"
 fi
 
-if [[ -f Vanmo/Vanmo-Mac-Cloud.entitlements ]] && \
-   rg -q 'CloudKit' Vanmo/Vanmo-Mac-Cloud.entitlements; then
+if [[ -f VanmoMac/Vanmo-Mac-Cloud.entitlements ]] && \
+   rg -q 'CloudKit' VanmoMac/Vanmo-Mac-Cloud.entitlements; then
   pass "macOS Release Cloud entitlements present"
 else
-  fail "Vanmo-Mac-Cloud.entitlements missing or incomplete"
+  fail "VanmoMac/Vanmo-Mac-Cloud.entitlements missing or incomplete"
 fi
 
-if [[ -f Vanmo/Vanmo-Mac.entitlements ]] && \
-   ! rg -q 'CloudKit' Vanmo/Vanmo-Mac.entitlements 2>/dev/null; then
+if [[ -f VanmoMac/Vanmo-Mac.entitlements ]] && \
+   ! rg -q 'CloudKit' VanmoMac/Vanmo-Mac.entitlements 2>/dev/null; then
   pass "macOS Debug entitlements omit CloudKit"
 else
-  fail "Vanmo-Mac.entitlements should not include CloudKit for Debug builds"
+  fail "VanmoMac/Vanmo-Mac.entitlements should not include CloudKit for Debug builds"
 fi
 
 if rg -q 'Vanmo-Cloud.entitlements' Vanmo.xcodeproj/project.pbxproj && \
@@ -58,42 +58,42 @@ fi
 if [[ -f project.yml ]] && \
    rg -q 'Vanmo-Cloud.entitlements' project.yml && \
    rg -q 'CLOUDKIT_SYNC_ENABLED' project.yml && \
-   rg -q 'Vanmo/Vanmo.entitlements' project.yml; then
-  pass "project.yml preserves Debug/Release CloudKit split"
+   rg -q 'Vanmo/Vanmo.entitlements' project.yml && \
+   rg -q 'VanmoMac/Vanmo-Mac.entitlements' project.yml; then
+  pass "project.yml preserves Debug/Release CloudKit split for iOS and macOS"
 else
   fail "project.yml missing Debug/Release CloudKit configuration"
 fi
 
-if rg -q 'CloudSyncAvailability' Vanmo/Core/Storage/CloudSyncPreferences.swift && \
+if rg -q 'CloudSyncAvailability' Packages/VanmoCore/Sources/VanmoCore/Storage/CloudSyncPreferences.swift && \
    rg -q 'CloudSyncAvailability.isCloudKitEnabled' Vanmo/Features/Settings/Views/SettingsView.swift; then
   pass "Settings reflects CloudKit build availability"
 else
   fail "Settings missing CloudSyncAvailability guard"
 fi
 
-# 2) SwiftData CloudKit container wiring
-if rg -q 'cloudKitDatabase' Vanmo/Core/Storage/ModelContainerFactory.swift && \
-   rg -q 'CloudMediaState' Vanmo/Core/Storage/ModelContainerFactory.swift && \
-   rg -q 'CLOUDKIT_SYNC_ENABLED' Vanmo/Core/Storage/ModelContainerFactory.swift && \
-   rg -q 'ModelContainerFactory.makeSharedContainer' Vanmo/App/VanmoApp.swift Vanmo/App/VanmoMacApp.swift; then
+# 2) SwiftData CloudKit container wiring (VanmoCore + 双端 App 入口)
+if rg -q 'cloudKitDatabase' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
+   rg -q 'CloudMediaState' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
+   rg -q 'CLOUDKIT_SYNC_ENABLED' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
+   rg -q 'ModelContainerFactory.makeSharedContainer' Vanmo/App/VanmoApp.swift VanmoMac/App/VanmoMacApp.swift; then
   pass "CloudKit-backed SwiftData container wired with local/cloud split"
 else
   fail "ModelContainerFactory / app entry not wired for CloudKit split"
 fi
 
-# 3) Sensitive fields must not appear in @Model sync entities
+# 3) Sensitive fields must not appear in @Model sync entities (VanmoCore)
 model_files=(
-  Vanmo/Features/Browser/Models/ConnectionModels.swift
-  Vanmo/Features/Library/Models/MediaItem.swift
-  Vanmo/Features/Library/Models/FolderBookmark.swift
+  Packages/VanmoCore/Sources/VanmoCore/Models/ConnectionModels.swift
+  Packages/VanmoCore/Sources/VanmoCore/Models/MediaItem.swift
+  Packages/VanmoCore/Sources/VanmoCore/Models/FolderBookmark.swift
 )
 model_hits=""
 for file in "${model_files[@]}"; do
-  # 仅检查 @Model class 块内的字段，忽略辅助 struct（如 MediaServerConnectionSnapshot）
   block_hits="$(python3 - "$file" <<'PY'
 import re, sys
 text = open(sys.argv[1], encoding='utf-8').read()
-pattern = re.compile(r'@Model\s*\n(?:final\s+)?class\s+\w+\s*\{.*?\n\}', re.S)
+pattern = re.compile(r'@Model\s*\n(?:public\s+)?(?:final\s+)?class\s+\w+\s*\{.*?\n\}', re.S)
 blocks = pattern.findall(text)
 joined = '\n'.join(blocks)
 hits = []
@@ -117,19 +117,21 @@ fi
 # 4) Media server exclusion in progress/favorite write paths
 if rg -q 'markMediaProgressChanged' Vanmo/Features/Player/ViewModels/PlayerViewModel.swift && \
    rg -q 'markMediaFavoriteChanged' Vanmo/Features/Library/ViewModels/LibraryViewModel.swift && \
-   rg -q 'isProgressCloudSynced = false|isFavoriteCloudSynced = false' Vanmo/Features/Library/Models/MediaItem.swift && \
-   rg -q 'func upsertProgress' Vanmo/Core/Storage/CloudMediaState.swift; then
+   rg -q 'isProgressCloudSynced = false|isFavoriteCloudSynced = false' \
+     Packages/VanmoCore/Sources/VanmoCore/Models/MediaItem.swift \
+     Packages/VanmoCore/Sources/VanmoCore/Mappers/ServerMediaItemMapper.swift && \
+   rg -q 'func upsertProgress' Packages/VanmoCore/Sources/VanmoCore/Storage/CloudMediaState.swift; then
   pass "Media server progress/favorite exclusion hooks present"
 else
   fail "Missing media server exclusion in sync write paths"
 fi
 
-# 5) Sync coordinator + conflict resolver
+# 5) Sync coordinator + conflict resolver (VanmoCore)
 for f in \
-  Vanmo/Core/Storage/CloudSyncCoordinator.swift \
-  Vanmo/Core/Storage/CloudSyncConflictResolver.swift \
-  Vanmo/Core/Storage/CloudSyncPreferences.swift \
-  Vanmo/Core/Storage/CloudMediaState.swift; do
+  Packages/VanmoCore/Sources/VanmoCore/Storage/CloudSyncCoordinator.swift \
+  Packages/VanmoCore/Sources/VanmoCore/Storage/CloudSyncConflictResolver.swift \
+  Packages/VanmoCore/Sources/VanmoCore/Storage/CloudSyncPreferences.swift \
+  Packages/VanmoCore/Sources/VanmoCore/Storage/CloudMediaState.swift; do
   if [[ -f "$f" ]]; then
     pass "Found $(basename "$f")"
   else
@@ -154,34 +156,46 @@ else
   fail "Settings missing iCloud sync section"
 fi
 
-# 8) macOS skeleton markers
-if [[ -f Vanmo/App/VanmoMacApp.swift ]] && rg -q '#if os\(macOS\)' Vanmo/App/VanmoMacApp.swift; then
-  pass "VanmoMacApp macOS entry exists"
+# 8) macOS 独立 target（VanmoMac/，不再依赖 iOS 工程内的 VanmoMacApp）
+if [[ -f VanmoMac/App/VanmoMacApp.swift ]] && \
+   ! [[ -f Vanmo/App/VanmoMacApp.swift ]]; then
+  pass "VanmoMacApp lives in VanmoMac/ and removed from Vanmo/"
 else
-  fail "VanmoMacApp.swift missing or not guarded"
+  fail "VanmoMacApp should be VanmoMac-only (VanmoMac/App/VanmoMacApp.swift)"
 fi
 
-if rg -q '#if os\(macOS\)|#if os\(iOS\)' Vanmo/App/ContentView.swift; then
-  pass "ContentView has platform presentation guards"
+if rg -q 'Vanmo-macOS' Vanmo.xcodeproj/project.pbxproj project.yml; then
+  pass "Xcode project references Vanmo-macOS target"
 else
-  fail "ContentView missing platform guards"
+  fail "Vanmo-macOS target not found in project"
 fi
 
-if rg -q 'VanmoMac' Vanmo.xcodeproj/project.pbxproj; then
-  pass "Xcode project references VanmoMac target"
+if ! rg -q '#if os\(macOS\)' Vanmo/App/ContentView.swift; then
+  pass "iOS ContentView no longer carries macOS presentation patches"
 else
-  fail "VanmoMac target not found in project.pbxproj"
+  fail "ContentView still contains #if os(macOS) — macOS UI should live in VanmoMac/"
 fi
 
-# 10) pbxproj 源文件路径与磁盘一致（PlatformCompatibility 曾误挂在 Prefetch）
+# 9) VanmoCore 禁止 UI 框架（允许 PlatformDeviceInfo 等条件编译）
+ui_import_hits="$(rg -n '^import (UIKit|AppKit|SwiftUI)' Packages/VanmoCore/Sources/VanmoCore -g '*.swift' \
+  | rg -v 'PlatformDeviceInfo.swift' || true)"
+if [[ -z "$ui_import_hits" ]]; then
+  pass "VanmoCore has no unconditional UIKit/AppKit/SwiftUI imports"
+else
+  fail "VanmoCore contains UI framework imports:\n$ui_import_hits"
+fi
+
+# 10) pbxproj 源文件路径与磁盘一致
 if python3 - <<'PY'
 import re
 from pathlib import Path
 text = Path("Vanmo.xcodeproj/project.pbxproj").read_text()
 prefetch = re.search(r'9814B17DA901EBFF609E8477 /\* Prefetch \*/ = \{.*?children = \((.*?)\);', text, re.S)
 utilities = re.search(r'B0D12706C0A3FA280DE62831 /\* Utilities \*/ = \{.*?children = \((.*?)\);', text, re.S)
-assert prefetch and 'PlatformCompatibility' not in prefetch.group(1), 'PlatformCompatibility still under Prefetch'
-assert utilities and 'PlatformCompatibility' in utilities.group(1), 'PlatformCompatibility missing from Utilities'
+if prefetch:
+    assert 'PlatformCompatibility' not in prefetch.group(1), 'PlatformCompatibility still under Prefetch'
+if utilities:
+    assert 'PlatformCompatibility' in utilities.group(1), 'PlatformCompatibility missing from Utilities'
 assert Path('Vanmo/Shared/Utilities/PlatformCompatibility.swift').is_file(), 'PlatformCompatibility.swift missing on disk'
 PY
 then

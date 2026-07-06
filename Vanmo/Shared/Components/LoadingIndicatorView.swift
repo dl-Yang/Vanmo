@@ -2,6 +2,7 @@ import SwiftUI
 
 #if canImport(Lottie)
 import Lottie
+import VanmoCore
 #endif
 
 /// 加载指示器。优先播放 Figma/LottieFiles 设计稿对应的 Lottie 动画 `loadingSpinner`；

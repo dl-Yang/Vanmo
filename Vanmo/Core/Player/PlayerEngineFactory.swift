@@ -1,27 +1,7 @@
 import Foundation
-
-enum SupportedFormat {
-    case native
-    case ffmpeg
-    case discImage
-
-    static func detect(from url: URL) -> SupportedFormat {
-        if MediaFormatProbe.isDiscImage(url) {
-            return .discImage
-        }
-        let ext = url.pathExtension.lowercased()
-        if MediaFormatProbe.nativeVideoExtensions.contains(ext)
-            || MediaFormatProbe.nativeAudioExtensions.contains(ext)
-            // HLS（m3u8/m3u）由 AVFoundation 原生处理，直播自适应码率与稳定性更好。
-            || MediaFormatProbe.playlistExtensions.contains(ext) {
-            return .native
-        }
-        return .ffmpeg
-    }
-}
+import VanmoCore
 
 enum PlayerEngineFactory {
-
     static func engine(for url: URL) -> PlayerEngine {
         let ext = url.pathExtension.lowercased()
         let format = SupportedFormat.detect(from: url)

@@ -2,6 +2,7 @@ import SwiftUI
 import AVFoundation
 import Combine
 import SwiftData
+import VanmoCore
 
 @MainActor
 final class PlayerViewModel: ObservableObject {

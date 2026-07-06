@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import VanmoCore
 
 @MainActor
 final class LibraryViewModel: ObservableObject {
@@ -342,7 +343,7 @@ final class LibraryViewModel: ObservableObject {
                 inFlight -= 1
                 if let page {
                     folderPreviews[key] = page.items.map { serverItem in
-                        let item = serverItem.makeMediaItem()
+                        let item = ServerMediaItemMapper.makeMediaItem(from: serverItem)
                         item.sourceConnectionId = connectionId
                         return item
                     }

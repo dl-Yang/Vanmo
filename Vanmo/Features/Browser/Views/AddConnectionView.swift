@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import VanmoCore
 
 struct AddConnectionView: View {
     @ObservedObject var viewModel: BrowserViewModel

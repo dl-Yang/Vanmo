@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct SecondFloorView: View {
     @EnvironmentObject private var appState: AppState

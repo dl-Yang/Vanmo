@@ -5,6 +5,7 @@ import Combine
 import KSPlayer
 import SwiftUI
 import UIKit
+import VanmoCore
 
 final class KSPlayerEngine: NSObject, PlayerEngine {
 
@@ -74,10 +75,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
 
     // MARK: - Chapters
 
-    var availableChapters: [Chapter] {
+    var availableChapters: [VanmoCore.Chapter] {
         guard let ksChapters = player?.chapters else { return [] }
         return ksChapters.enumerated().map { index, ch in
-            Chapter(
+            VanmoCore.Chapter(
                 id: index,
                 title: ch.title,
                 startTime: CMTime(seconds: ch.start, preferredTimescale: 600),

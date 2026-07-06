@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct RatingBadge: View {
     let rating: Double

@@ -1,5 +1,6 @@
 import SwiftUI
 import Kingfisher
+import VanmoCore
 
 struct FavoritesStackedCard: View {
     struct FavoriteEntry {
