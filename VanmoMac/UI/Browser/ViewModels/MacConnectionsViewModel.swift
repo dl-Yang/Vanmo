@@ -2,17 +2,34 @@ import Foundation
 import SwiftData
 import VanmoCore
 
+enum MacConnectionStatus {
+    case idle
+    case connecting
+    case connected
+    case failed
+}
+
 @MainActor
 final class MacConnectionsViewModel: ObservableObject {
     @Published private(set) var savedConnections: [SavedConnection] = []
     @Published private(set) var isLoading = false
     @Published private(set) var loadingMessage = ""
+    @Published private(set) var connectionErrorMessages: [UUID: String] = [:]
     @Published var showError = false
     @Published var errorMessage = ""
 
     private var modelContext: ModelContext?
     private var didAttemptAutoReconnect = false
     private var activeLocalServices: [UUID: LocalFolderService] = [:]
+    private var connectionStatuses: [UUID: MacConnectionStatus] = [:]
+
+    func connectionStatus(for connection: SavedConnection) -> MacConnectionStatus {
+        connectionStatuses[connection.id] ?? .idle
+    }
+
+    func connectionErrorMessage(for connection: SavedConnection) -> String? {
+        connectionErrorMessages[connection.id]
+    }
 
     func setModelContext(_ context: ModelContext) {
         modelContext = context
@@ -86,6 +103,9 @@ final class MacConnectionsViewModel: ObservableObject {
         if let active = activeLocalServices.removeValue(forKey: connection.id) {
             Task { await active.disconnect() }
         }
+
+        connectionStatuses.removeValue(forKey: connectionId)
+        connectionErrorMessages.removeValue(forKey: connectionId)
 
         deleteMediaItems(for: connectionId)
         softDeleteFolderBookmarks(for: connectionId)
@@ -217,6 +237,8 @@ final class MacConnectionsViewModel: ObservableObject {
         }
 
         activeLocalServices.removeValue(forKey: connection.id)
+        connectionStatuses[connection.id] = .idle
+        connectionErrorMessages.removeValue(forKey: connection.id)
         let didConnect = await connectAndScan(connection)
         if didConnect {
             await loadSavedConnections()
@@ -280,10 +302,14 @@ final class MacConnectionsViewModel: ObservableObject {
     @discardableResult
     func connectAndScan(
         _ connection: SavedConnection,
-        showErrorAlert: Bool = true
+        showErrorAlert: Bool = true,
+        forceFullScan: Bool = false
     ) async -> Bool {
+        connectionStatuses[connection.id] = .connecting
         isLoading = true
-        loadingMessage = "连接到 \(connection.name)..."
+        loadingMessage = forceFullScan
+            ? "全量重扫 \(connection.name)..."
+            : "连接到 \(connection.name)..."
 
         let isLocal = connection.type == .localFolder
 
@@ -309,6 +335,8 @@ final class MacConnectionsViewModel: ObservableObject {
 
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
+            connectionStatuses[connection.id] = .connected
+            connectionErrorMessages.removeValue(forKey: connection.id)
 
             loadingMessage = "扫描媒体文件..."
             guard let context = modelContext else {
@@ -321,7 +349,7 @@ final class MacConnectionsViewModel: ObservableObject {
             if let mediaServer = service as? MediaServerService,
                connection.type != .emby,
                connection.type != .jellyfin {
-                let since = connection.lastSyncedAt
+                let since: Date? = forceFullScan ? nil : connection.lastSyncedAt
                 let syncStart = Date()
                 for try await page in mediaServer.streamMediaItems(since: since, pageSize: 500) {
                     _ = try await scanner.importServerMediaItems(
@@ -351,6 +379,8 @@ final class MacConnectionsViewModel: ObservableObject {
             isLoading = false
             return true
         } catch {
+            connectionStatuses[connection.id] = .failed
+            connectionErrorMessages[connection.id] = error.localizedDescription
             if showErrorAlert {
                 errorMessage = error.localizedDescription
                 showError = true

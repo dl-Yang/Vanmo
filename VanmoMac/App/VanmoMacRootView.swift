@@ -30,6 +30,11 @@ struct VanmoMacRootView: View {
                 .macTheme(activeTheme)
                 .presentationBackground(.clear)
         }
+        .sheet(item: $appState.editingConnection, onDismiss: refreshLibraryAfterConnection) { connection in
+            MacAddConnectionView(viewModel: connectionsViewModel, editingConnection: connection)
+                .macTheme(activeTheme)
+                .presentationBackground(.clear)
+        }
         .task {
             connectionsViewModel.setModelContext(modelContext)
             await connectionsViewModel.attemptAutoReconnectIfNeeded()

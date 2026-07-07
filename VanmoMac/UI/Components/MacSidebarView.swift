@@ -56,6 +56,62 @@ struct MacSidebarRow: View {
     }
 }
 
+struct MacConnectionSidebarRow: View {
+    @Environment(\.macTheme) private var theme
+    @ObservedObject var connectionsViewModel: MacConnectionsViewModel
+
+    let connection: SavedConnection
+    let isSelected: Bool
+    let action: () -> Void
+
+    private var status: MacConnectionStatus {
+        connectionsViewModel.connectionStatus(for: connection)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: connection.type.macSidebarIcon)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 16, height: 16)
+                Text(connection.name)
+                    .font(MacDesignTokens.Typography.sidebarItem)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                statusIndicator
+            }
+            .foregroundStyle(isSelected ? theme.sidebarSelectedText : theme.sidebarItemText)
+            .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
+            .frame(height: MacDesignTokens.Layout.sidebarRowHeight)
+            .background(isSelected ? theme.sidebarSelectedBackground : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius))
+        }
+        .buttonStyle(.plain)
+        .opacity(status == .failed ? 0.5 : 1)
+        .help(failureHelpText)
+    }
+
+    @ViewBuilder
+    private var statusIndicator: some View {
+        switch status {
+        case .connecting:
+            ProgressView()
+                .controlSize(.small)
+        case .failed:
+            Circle()
+                .fill(Color.orange)
+                .frame(width: 6, height: 6)
+        default:
+            EmptyView()
+        }
+    }
+
+    private var failureHelpText: String {
+        guard status == .failed else { return "" }
+        return connectionsViewModel.connectionErrorMessage(for: connection) ?? "连接失败"
+    }
+}
+
 struct MacSidebarView: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
@@ -111,14 +167,29 @@ struct MacSidebarView: View {
                     .padding(.bottom, 8)
 
                     ForEach(connections) { connection in
-                        MacSidebarRow(
-                            title: connection.name,
-                            systemImage: connection.type.macSidebarIcon,
+                        MacConnectionSidebarRow(
+                            connectionsViewModel: connectionsViewModel,
+                            connection: connection,
                             isSelected: false
                         ) {
                             // 连接浏览功能暂未适配
                         }
                         .contextMenu {
+                            Button {
+                                appState.presentEditConnection(connection)
+                            } label: {
+                                Label("编辑", systemImage: "pencil")
+                            }
+                            Button {
+                                syncConnection(connection)
+                            } label: {
+                                Label("同步到媒体库", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            Button {
+                                fullRescanConnection(connection)
+                            } label: {
+                                Label("全量重扫", systemImage: "arrow.clockwise")
+                            }
                             Button(role: .destructive) {
                                 deleteConnection(connection)
                             } label: {
@@ -137,6 +208,20 @@ struct MacSidebarView: View {
             Rectangle()
                 .fill(theme.sidebarBorder)
                 .frame(width: 1)
+        }
+    }
+
+    private func syncConnection(_ connection: SavedConnection) {
+        Task {
+            _ = await connectionsViewModel.connectAndScan(connection)
+            libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
+        }
+    }
+
+    private func fullRescanConnection(_ connection: SavedConnection) {
+        Task {
+            _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
+            libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         }
     }
 
