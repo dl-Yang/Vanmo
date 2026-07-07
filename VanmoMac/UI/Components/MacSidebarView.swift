@@ -136,9 +136,7 @@ struct MacSidebarView: View {
                         MacSidebarRow(
                             title: section.title,
                             systemImage: section.systemImage,
-                            isSelected: appState.contentRoute == .library
-                                && appState.selectedSection == section
-                                && appState.selectedMediaItem == nil
+                            isSelected: isLibrarySectionSelected(section)
                         ) {
                             appState.selectLibrarySection(section)
                         }
@@ -218,6 +216,7 @@ struct MacSidebarView: View {
     private func syncConnection(_ connection: SavedConnection) {
         Task {
             _ = await connectionsViewModel.connectAndScan(connection)
+            await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
             libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         }
     }
@@ -225,6 +224,7 @@ struct MacSidebarView: View {
     private func fullRescanConnection(_ connection: SavedConnection) {
         Task {
             _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
+            await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
             libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         }
     }
@@ -235,7 +235,21 @@ struct MacSidebarView: View {
         }
         appState.clearActiveConnectionIfDeleted(connection.id)
         connectionsViewModel.deleteConnection(connection)
-        libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
+        Task {
+            await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
+            libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
+        }
+    }
+    private func isLibrarySectionSelected(_ section: MacSidebarSection) -> Bool {
+        guard appState.selectedMediaItem == nil else { return false }
+        switch appState.contentRoute {
+        case .library:
+            return appState.selectedSection == section
+        case .libraryFavorites:
+            return section == .favorites
+        default:
+            return false
+        }
     }
 }
 

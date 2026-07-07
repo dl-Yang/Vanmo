@@ -2,7 +2,7 @@
 
 > 基于 Vanmo iOS（`Vanmo/`，约 74 个 Swift 文件）与 VanmoMac（`VanmoMac/`，21 个 Swift 文件）对比整理。  
 > 核心业务逻辑在 `Packages/VanmoCore`，Mac 端以新建 View + 薄 ViewModel 为主，从 iOS 移植业务逻辑而非复制 SwiftUI 视图。  
-> 最后更新：2026-07-07（阶段 0 完成；阶段 1 的 1.1–1.4 完成，1.5 IPTV 延后）
+> 最后更新：2026-07-07（阶段 0 完成；阶段 1 的 1.1–1.4 完成，1.5 IPTV 延后；阶段 2 的 2.1–2.4 完成，2.5 延后）
 
 ---
 
@@ -30,7 +30,7 @@
 | 维度 | iOS | macOS | 差距 |
 |------|-----|-------|------|
 | 应用壳层 / 导航 | TabView 四 Tab | 侧边栏 + 主内容 | 🟡 |
-| 媒体库首页 | 多数据源聚合 | 仅 SwiftData 扁平列表 | 🔴 |
+| 媒体库首页 | 多数据源聚合分区 + 子列表 | 首页 sections + 5 子列表 + 排序/列表切换 | 🟡 |
 | 连接管理 | 添加 + 浏览 + 书签 + IPTV | 添加 + 浏览 + 管理菜单 + 浏览页书签（无首页书签区/IPTV） | 🟡 |
 | 搜索 | 本地 + 远程并发 | 静态占位 UI | 🔴 |
 | 设置 | 完整 8 组 | 无 | 🔴 |
@@ -63,8 +63,9 @@
 |--------|------|
 | ✅ 阶段 0 全部 | 0.1–0.5：生命周期、进度、远程 URL、扫描反馈、连接删除 |
 | ✅ 阶段 1（1.1–1.4） | 浏览 VM、浏览视图、侧边栏路由、连接管理菜单；浏览页文件夹书签 CRUD |
-| ⏸️ 明确延后 | **1.5 IPTV / EPG**（本轮不做） |
-| 🔴 待启动 | 阶段 2（B）、3（E+F）、4A（C）、5（D）、6（收尾） |
+| ✅ 阶段 2（2.1–2.4） | 线 1：B1 VM sections/缓存、B2 首页分区、B3 五个子列表、B4 列表排序 |
+| ⏸️ 明确延后 | **1.5 IPTV / EPG**、**2.5 流派/地区筛选（B5）**（本轮不做） |
+| 🔴 待启动 | 阶段 3（E+F）、4A（C）、5（D）、6（收尾） |
 
 **已解锁：** 0.2+0.3 ✅ → 轨道 C 可全面启动；阶段 0 全完成 ✅ → B / E1 / F / D 骨架可并行；阶段 1 浏览路由 ✅ → E2 可直接规划侧边栏分区（无需再等 A2）。
 
@@ -100,11 +101,11 @@
 
 | 步骤 | 任务 | 并行性 | 工期 | 验收 |
 |------|------|--------|------|------|
-| **B1** | 2.1 扩展 `MacLibraryViewModel`（sections、缓存、排序） | 串行起点 | 3–4 天 | Emby 连接 → sections 非空 |
-| **B2** | 2.2 首页分区 UI（收藏/书签/各连接预览横滑） | 等 B1 | 3–4 天 | 首页结构与 iOS 一致 |
-| **B3** | 2.3 五个子列表 View | **B1 稳定后 5 文件可并行** | 4–5 天 | 分区 → 网格 → 详情 → 播放 |
-| **B4** | 2.4 列表视图 + `MacHeaderToolbar` 排序 | 与 B3 并行 | 2 天 | 网格/列表切换、排序生效 |
-| **B5** | 2.5 流派/地区筛选 | P2，最后 | 1–2 天 | Filter chips 过滤列表 |
+| **B1** | 2.1 扩展 `MacLibraryViewModel`（sections、缓存、排序） | 串行起点 | 3–4 天 | Emby 连接 → sections 非空 | ✅ |
+| **B2** | 2.2 首页分区 UI（收藏/书签/各连接预览横滑） | 等 B1 | 3–4 天 | 首页结构与 iOS 一致 | ✅ |
+| **B3** | 2.3 五个子列表 View | **B1 稳定后 5 文件可并行** | 4–5 天 | 分区 → 网格 → 详情 → 播放 | ✅ |
+| **B4** | 2.4 列表视图 + `MacHeaderToolbar` 排序 | 与 B3 并行 | 2 天 | 网格/列表切换、排序生效 | ✅ |
+| **B5** | 2.5 流派/地区筛选 | P2，最后 | 1–2 天 | Filter chips 过滤列表 | ⏸️ 延后 |
 
 **B3 可拆并行（线 1 有 2 人时）：**
 
@@ -198,7 +199,7 @@ MacSidebarView 分区
 
 | 人 | 线 | 任务链 |
 |----|-----|--------|
-| **甲** | 线 1 | B1 → B2 → B3（可拆 B3-a–e）→ B4 → B5（可选） |
+| **甲** | 线 1 | B1 → B2 → B3 → B4 ✅（B5 延后） |
 | **乙** | 线 2 | C1 → C2/C3/C4/C5（并行）→ C6 → C7（可选） |
 | **丙** | 线 3 | PR-0 → D1 → E1∥F → E2 → D2 → D3；G 随时穿插 |
 
@@ -241,7 +242,7 @@ Week 5: D3 联调 C4/C6 → G CI → MVP 验收
 
 | 线 | 任务 | 阻塞 |
 |----|------|------|
-| **线 1** | B1 `MacLibraryViewModel` 扩展 | 无 |
+| **线 1** | B1 `MacLibraryViewModel` 扩展 | 无（✅ 已完成） |
 | **线 2** | C1 Provider 注册；C2/C3 字幕/选轨 View 骨架 | 无 |
 | **线 3** | G CI；E1 搜索 VM；F 详情（收藏/已看） | PR-0 与 D1 建议第 1–2 天完成 |
 
@@ -516,36 +517,36 @@ private var browserServiceConnectionID: UUID?
 
 ### 2.1 扩展 Library ViewModel — P0，复用度：高
 
-- [ ] 移植 `serverCollectionFolders` / `embyConnectionsById`
-- [ ] 移植 `scannedLibraryFolders` / `scannedConnectionsById`
-- [ ] 移植 `folderBookmarks` / `folderPreviews` / `folderTotalCounts`
-- [ ] 移植 `HomeCollectionCache` 磁盘缓存（启动秒开 + 后台刷新）
-- [ ] 移植 `loadInitialSections(connections:)`（Emby/Jellyfin live 刷新）
-- [ ] 移植排序：`LibrarySortOption`
-- [ ] 修改：`MacLibraryViewModel.swift`
+- [x] 移植 `serverCollectionFolders` / `embyConnectionsById`
+- [x] 移植 `scannedLibraryFolders` / `scannedConnectionsById`
+- [x] 移植 `folderBookmarks` / `folderPreviews` / `folderTotalCounts`
+- [x] 移植 `HomeCollectionCache` 磁盘缓存（启动秒开 + 后台刷新）→ `MacHomeCollectionCache`
+- [x] 移植 `loadInitialSections(connections:)`（Emby/Jellyfin live 刷新）
+- [x] 移植排序：`MacLibrarySortOption`
+- [x] 修改：`MacLibraryViewModel.swift`、`MacConnectionsViewModel.swift`（`librarySyncCompletionID`）
 
 ### 2.2 首页分区 UI — P0
 
-- [ ] 收藏叠卡区（`FavoritesStackedCard` 桌面版）
-- [ ] 文件夹书签横滑区
-- [ ] 各 Emby/Plex/Jellyfin 连接媒体库预览横滑
-- [ ] 各扫描库（SMB/本地等）预览横滑
-- [ ] 库同步状态 Toast（`librarySyncMessage`）
-- [ ] 修改：`MacLibraryHomeView.swift`、`MacMediaCards.swift`
+- [x] 收藏叠卡区（`MacFavoritesStackedCard`）
+- [x] 文件夹书签横滑区
+- [x] 各 Emby/Plex/Jellyfin 连接媒体库预览横滑
+- [x] 各扫描库（SMB/本地等）预览横滑
+- [x] 库同步状态 Toast（`librarySyncMessage`）
+- [x] 修改：`MacLibraryHomeView.swift`、`MacMediaCards.swift`
 
 ### 2.3 子列表页 — P0
 
-- [ ] `MacCollectionFolderListView` — Emby/Jellyfin/Plex Collection 分页网格
-- [ ] `MacScannedLibraryListView` — 扫描库电影/剧集网格
-- [ ] `MacEmbyFolderBrowseView` — 服务端 Folder/Season/BoxSet 子级浏览
-- [ ] `MacScannedShowDetailView` — 扫描库电视剧季/集列表
-- [ ] `MacFavoritesListView` — 收藏列表（搜索/编辑/分页）
+- [x] `MacCollectionFolderListView` — Emby/Jellyfin/Plex Collection 分页网格
+- [x] `MacScannedLibraryListView` — 扫描库电影/剧集网格
+- [x] `MacEmbyFolderBrowseView` — 服务端 Folder/Season/BoxSet 子级浏览
+- [x] `MacScannedShowDetailView` — 扫描库电视剧季/集列表
+- [x] `MacFavoritesListView` — 收藏列表（搜索/分页）
 
 ### 2.4 列表视图 + 排序 — P1
 
-- [ ] 实现 `viewMode == .list` 的 `MacMediaListRow` 布局
-- [ ] `MacHeaderToolbar` 排序按钮接入 `LibrarySortOption`（当前占位「暂未适配」）
-- [ ] 修改：`MacLibraryHomeView.swift`、`MacHeaderToolbar.swift`
+- [x] 实现 `viewMode == .list` 的 `MacMediaListRow` 布局
+- [x] `MacHeaderToolbar` 排序按钮接入 `MacLibrarySortOption`
+- [x] 修改：`MacLibraryHomeView.swift`、`MacHeaderToolbar.swift`、各子列表 View
 
 ### 2.5 流派/地区筛选 — P2
 
@@ -701,8 +702,7 @@ private var browserServiceConnectionID: UUID?
 ### 6.1 文件夹书签 — P1
 
 - [x] 浏览页添加/取消书签（`FolderBookmark` CRUD，已在 1.2 / `MacConnectionsViewModel` 实现）
-- [ ] 首页展示书签区块（依赖 B2）
-- [ ] 点击书签恢复连接并跳转到对应路径
+- [ ] 首页展示书签区块（依赖 B2）→ ✅ B2 已完成；点击跳转连接浏览 ✅
 - [ ] 参考 iOS：`BrowserViewModel` 书签系列方法
 
 ### 6.2 库同步与反馈 — P2
@@ -743,7 +743,7 @@ private var browserServiceConnectionID: UUID?
 |------|---------|------|----------|------|
 | **0** | 门槛 | 生命周期 + 播放闭环 | 1–2 周 | ✅ 已完成 |
 | **1** | A | 连接浏览（1.1–1.4 ✅；1.5 IPTV 延后） | 2–3 周 | ✅ 核心已完成 |
-| **2** | **线 1 / B** | 媒体库首页 parity | 2–3 周 | 🔴 待启动 |
+| **2** | **线 1 / B** | 媒体库首页 parity（2.1–2.4 ✅；2.5 延后） | 2–3 周 | ✅ 核心已完成 |
 | **3** | **线 3 / E+F** | 搜索 + 详情交互 | 1.5–2 周 | 🔴 待启动 |
 | **4A** | **线 2 / C** | 播放器增强（AVPlayer） | 2 周 | 🔴 待启动 |
 | **5** | **线 3 / D** | 设置页 | 1 周 | 🔴 待启动 |
