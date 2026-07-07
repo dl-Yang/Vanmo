@@ -9,10 +9,12 @@ struct MacLibraryHomeView: View {
     @Environment(\.macTheme) private var theme
     @Environment(\.modelContext) private var modelContext
 
-    @State private var syncToastMessage: String?
-
     var body: some View {
         ZStack(alignment: .top) {
+            if appState.selectedSection == .home, !libraryViewModel.isLibraryEmpty {
+                backdropLayer
+            }
+
             VStack(spacing: 0) {
                 MacHeaderToolbar(
                     title: appState.selectedSection.title,
@@ -30,13 +32,6 @@ struct MacLibraryHomeView: View {
                 }
             }
 
-            if let message = connectionsViewModel.librarySyncMessage {
-                syncStatusOverlay(message: message)
-            }
-
-            if let syncToastMessage {
-                syncToast(message: syncToastMessage)
-            }
         }
         .background(theme.appBackground)
         .onAppear {
@@ -47,14 +42,6 @@ struct MacLibraryHomeView: View {
             await libraryViewModel.loadInitialSections(connections: connectionsViewModel.savedConnections)
             libraryViewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)
         }
-        .onChange(of: connectionsViewModel.librarySyncCompletionID) { _, newValue in
-            guard newValue > 0 else { return }
-            Task {
-                await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
-                libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
-                showSyncToast("数据同步完成")
-            }
-        }
         .onChange(of: appState.selectedFilter) { _, newValue in
             libraryViewModel.reload(filter: newValue, section: appState.selectedSection)
         }
@@ -64,6 +51,39 @@ struct MacLibraryHomeView: View {
         .onChange(of: libraryViewModel.sortOption) { _, _ in
             libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         }
+    }
+
+    private var backdropLayer: some View {
+        GeometryReader { geo in
+            ZStack {
+                if let url = heroBackdropURL {
+                    MacRemoteImage(url: url)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                        .blur(radius: 21)
+                        .opacity(0.45)
+                }
+
+                LinearGradient(
+                    stops: [
+                        .init(color: theme.appBackground.opacity(0.30), location: 0),
+                        .init(color: theme.appBackground.opacity(0.80), location: 0.42),
+                        .init(color: theme.appBackground.opacity(0.98), location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    private var heroBackdropURL: URL? {
+        if let item = libraryViewModel.recentlyPlayed.first {
+            return item.backdropURL ?? item.posterURL
+        }
+        return libraryViewModel.favorites.first?.posterURL
     }
 
     private var homeContent: some View {
@@ -317,11 +337,6 @@ struct MacLibraryHomeView: View {
         }
         connectionsViewModel.requestOpenFolderBookmark(bookmark)
         appState.enterConnectionBrowser(connection)
-        Task {
-            if let request = connectionsViewModel.pendingFolderBookmarkNavigation {
-                _ = await connectionsViewModel.openFolderBookmarkRequest(request)
-            }
-        }
     }
 
     private func continueWatchingSubtitle(_ item: MediaItem) -> String {
@@ -339,39 +354,6 @@ struct MacLibraryHomeView: View {
             return "\(item.mediaType.displayName) · \(year)"
         }
         return item.mediaType.displayName
-    }
-
-    private func syncStatusOverlay(message: String) -> some View {
-        HStack {
-            ProgressView()
-                .controlSize(.small)
-            Text(message)
-                .font(.caption)
-                .foregroundStyle(theme.secondaryText)
-        }
-        .padding(12)
-        .background(theme.headerBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .padding(.top, 64)
-    }
-
-    private func syncToast(message: String) -> some View {
-        Text(message)
-            .font(.caption)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(theme.headerBackground)
-            .clipShape(Capsule())
-            .padding(.top, 12)
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    syncToastMessage = nil
-                }
-            }
-    }
-
-    private func showSyncToast(_ message: String) {
-        syncToastMessage = message
     }
 }
 

@@ -9,6 +9,7 @@ final class MacMediaDetailStore: ObservableObject {
     @Published private(set) var collections: [ServerMediaItem] = []
     @Published private(set) var enrichedOverview: String?
     @Published private(set) var enrichedGenres: [String] = []
+    @Published private(set) var logoURL: URL?
     @Published var selectedSeason: Int?
     @Published var isLoadingEpisodes = false
     @Published var isRefreshingMetadata = false
@@ -43,6 +44,21 @@ final class MacMediaDetailStore: ObservableObject {
     func setCollections(_ newCollections: [ServerMediaItem]) {
         guard collections.map(\.serverId) != newCollections.map(\.serverId) else { return }
         collections = newCollections
+    }
+
+    func updateLogo(_ newLogoURL: URL?) {
+        guard logoURL != newLogoURL else { return }
+        logoURL = newLogoURL
+    }
+
+    func prepareForItem(_ item: MediaItem) {
+        updateLogo(item.logoURL)
+        enrichedOverview = nil
+        enrichedGenres = []
+        castMembers = []
+        episodes = []
+        collections = []
+        selectedSeason = nil
     }
 
     func loadCachedMetadata(for item: MediaItem) async {
@@ -226,6 +242,7 @@ final class MacMediaDetailStore: ObservableObject {
 
         let root = (try? await MetadataCache.shared.rootDirectoryURL())
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        updateLogo(record.resolvedLogoURL(rootDirectory: root))
         setCast(record.makeCastDisplays(rootDirectory: root))
 
         if item.mediaType == .tvShow, !record.episodes.isEmpty {

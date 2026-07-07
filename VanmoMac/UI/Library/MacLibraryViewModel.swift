@@ -667,10 +667,6 @@ final class MacLibraryViewModel: ObservableObject {
         switch section {
         case .home:
             break
-        case .movies:
-            items = items.filter { $0.mediaType == .movie }
-        case .tvShows:
-            items = items.filter { $0.mediaType == .tvShow || $0.mediaType == .tvEpisode }
         case .favorites:
             items = items.filter(\.isFavorite)
         }

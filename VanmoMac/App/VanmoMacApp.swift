@@ -85,5 +85,28 @@ struct VanmoMacApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
+
+        MenuBarExtra {
+            if appState.isPlayerPresented {
+                if let title = appState.nowPlayingTitle {
+                    Text(title)
+                        .lineLimit(1)
+                        .font(.headline)
+                }
+
+                Button(appState.isPlayerPlaying ? "暂停" : "播放") {
+                    MacPlayerCommandRouter.post(.macPlayerTogglePlayPause)
+                }
+
+                Button("关闭播放器") {
+                    MacPlayerCommandRouter.post(.macPlayerClose)
+                }
+            } else {
+                Text("未在播放")
+                    .foregroundStyle(.secondary)
+            }
+        } label: {
+            Image(systemName: appState.isPlayerPresented && appState.isPlayerPlaying ? "pause.circle" : "play.circle")
+        }
     }
 }

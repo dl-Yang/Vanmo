@@ -5,6 +5,7 @@ import VanmoCore
 struct MacPlayerView: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
+    @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
     @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: MacPlayerViewModel
     @FocusState private var isFocused: Bool
@@ -15,8 +16,16 @@ struct MacPlayerView: View {
 
     var body: some View {
         ZStack {
-            MacAVPlayerView(player: viewModel.player, videoGravity: viewModel.videoGravity)
+            if viewModel.usesKSPlayer {
+                MacKSPlayerView(
+                    videoView: viewModel.ksVideoView,
+                    scaleMode: viewModel.config.scaleMode
+                )
                 .ignoresSafeArea()
+            } else {
+                MacAVPlayerView(player: viewModel.player, videoGravity: viewModel.videoGravity)
+                    .ignoresSafeArea()
+            }
 
             MacSubtitleOverlayView(
                 text: viewModel.currentSubtitleText,
@@ -49,6 +58,10 @@ struct MacPlayerView: View {
         .focusEffectDisabled()
         .onAppear {
             isFocused = true
+            appState.registerActivePlayer(viewModel)
+        }
+        .onChange(of: viewModel.isPlaying) { _, newValue in
+            appState.syncPlayerPlayingState(newValue)
         }
         .onKeyPress(.space) {
             viewModel.togglePlayPause()
@@ -100,10 +113,14 @@ struct MacPlayerView: View {
             closePlayer()
         }
         .task {
-            await viewModel.onAppear(modelContext: modelContext)
+            await viewModel.onAppear(
+                modelContext: modelContext,
+                connectionsViewModel: connectionsViewModel
+            )
         }
         .onDisappear {
             viewModel.cleanup()
+            appState.unregisterActivePlayer()
             reloadLibrary()
         }
         .sheet(isPresented: $viewModel.showTrackSelector) {
@@ -152,6 +169,7 @@ struct MacPlayerView: View {
     MacPlayerView(item: MacPlayerPreviewItem.make(), startPosition: 0)
         .environmentObject(MacAppState())
         .environmentObject(MacLibraryViewModel())
+        .environmentObject(MacConnectionsViewModel())
         .frame(width: 1470, height: 836)
 }
 

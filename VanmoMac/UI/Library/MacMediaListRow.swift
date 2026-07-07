@@ -84,6 +84,8 @@ struct MacLibraryMediaLayout<GridContent: View, ListContent: View>: View {
 }
 
 struct MacLibraryPosterGrid: View {
+    @EnvironmentObject private var appState: MacAppState
+
     let items: [MediaItem]
     let onSelect: (MediaItem) -> Void
 
@@ -101,6 +103,7 @@ struct MacLibraryPosterGrid: View {
                 ) {
                     onSelect(item)
                 }
+                .macMediaItemContextMenu(for: item)
             }
         }
     }
@@ -114,6 +117,8 @@ struct MacLibraryPosterGrid: View {
 }
 
 struct MacLibraryPosterList: View {
+    @EnvironmentObject private var appState: MacAppState
+
     let items: [MediaItem]
     let onSelect: (MediaItem) -> Void
     var onItemAppear: ((MediaItem) -> Void)?
@@ -128,6 +133,7 @@ struct MacLibraryPosterList: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .macMediaItemContextMenu(for: item)
                 .onAppear {
                     onItemAppear?(item)
                 }

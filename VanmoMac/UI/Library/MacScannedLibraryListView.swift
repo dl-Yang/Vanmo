@@ -108,6 +108,7 @@ struct MacScannedLibraryListView: View {
                     ) {
                         appState.openDetail(item)
                     }
+                    .macMediaItemContextMenu(for: item)
                 }
             case .tvshows:
                 ForEach(shows) { show in

@@ -104,8 +104,11 @@ targets:
     platform: macOS
     dependencies:
       - package: VanmoCore
+      - package: Kingfisher
+      - package: KSPlayer
     sources:
       - path: VanmoMac
+      - path: Vanmo/Shared/Components/MediaTitleLogoView.swift
     resources:
       - path: VanmoMac/Resources/Info-Mac.plist
       - path: VanmoMac/Resources/Assets.xcassets
@@ -114,6 +117,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app.mac
         INFOPLIST_FILE: VanmoMac/Resources/Info-Mac.plist
         GENERATE_INFOPLIST_FILE: false
+        VALIDATE_PRODUCT: NO
         OTHER_SWIFT_FLAGS:
           - "-DFFMPEG_ENABLED"
       configs:
@@ -130,6 +134,43 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.files.user-selected.read-only: true
         com.apple.security.network.client: true
+    postBuildScripts:
+      - name: Fix KSPlayer Framework Plist
+        script: |
+          FRAMEWORKS_DIR="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"
+          if [ ! -d "$FRAMEWORKS_DIR" ]; then
+            exit 0
+          fi
+          for FRAMEWORK in "$FRAMEWORKS_DIR"/*.framework; do
+            [ -d "$FRAMEWORK" ] || continue
+            if [ -f "$FRAMEWORK/Info.plist" ] && [ ! -d "$FRAMEWORK/Versions" ]; then
+              mkdir -p "$FRAMEWORK/Versions/A/Resources"
+              mv "$FRAMEWORK/Info.plist" "$FRAMEWORK/Versions/A/Resources/Info.plist"
+              if [ -d "$FRAMEWORK/Headers" ]; then
+                mv "$FRAMEWORK/Headers" "$FRAMEWORK/Versions/A/Headers"
+              fi
+              if [ -d "$FRAMEWORK/Modules" ]; then
+                mv "$FRAMEWORK/Modules" "$FRAMEWORK/Versions/A/Modules"
+              fi
+              BIN_NAME="$(defaults read "$FRAMEWORK/Versions/A/Resources/Info.plist" CFBundleExecutable 2>/dev/null || basename "$FRAMEWORK" .framework)"
+              if [ -f "$FRAMEWORK/$BIN_NAME" ]; then
+                mv "$FRAMEWORK/$BIN_NAME" "$FRAMEWORK/Versions/A/$BIN_NAME"
+              fi
+              ln -sf A "$FRAMEWORK/Versions/Current"
+              ln -sf Versions/Current/Headers "$FRAMEWORK/Headers" 2>/dev/null || true
+              ln -sf Versions/Current/Modules "$FRAMEWORK/Modules" 2>/dev/null || true
+              ln -sf Versions/Current/Resources "$FRAMEWORK/Resources" 2>/dev/null || true
+              ln -sf Versions/Current/$BIN_NAME "$FRAMEWORK/$BIN_NAME" 2>/dev/null || true
+            fi
+            if [ -f "$FRAMEWORK/Versions/Current/Resources/Info.plist" ] || [ -f "$FRAMEWORK/Resources/Info.plist" ]; then
+              PLIST="${FRAMEWORK}/Versions/Current/Resources/Info.plist"
+              [ -f "$PLIST" ] || PLIST="${FRAMEWORK}/Resources/Info.plist"
+              /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.kintan.ksplayer.$(basename "$FRAMEWORK" .framework | tr '[:upper:]' '[:lower:]')" "$PLIST" 2>/dev/null || true
+            fi
+            if [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+              /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none "$FRAMEWORK"
+            fi
+          done
 
 schemes:
   Vanmo:

@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import VanmoCore
 
 struct VanmoMacRootView: View {
@@ -11,20 +12,46 @@ struct VanmoMacRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
 
+    @State private var syncToastMessage: String?
+    @State private var isDropTargeted = false
+
     var body: some View {
         ZStack {
             HStack(spacing: 0) {
                 MacSidebarView()
                 mainContent
             }
-            .macTheme(activeTheme)
+            .overlay {
+                if isDropTargeted {
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(MacDesignTokens.accentBlue, style: StrokeStyle(lineWidth: 2, dash: [8]))
+                        .padding(12)
+                        .background(Color.black.opacity(0.08))
+                        .allowsHitTesting(false)
+                }
+            }
 
             if appState.isPlayerPresented, let playerItem = appState.playerItem {
                 MacPlayerView(item: playerItem, startPosition: appState.playerStartPosition)
                     .transition(.opacity)
                     .zIndex(1)
             }
+
+            if let message = connectionsViewModel.librarySyncMessage {
+                syncStatusOverlay(message: message)
+            }
+
+            if let syncToastMessage {
+                VStack {
+                    MacLibrarySyncToast(message: syncToastMessage)
+                        .padding(.top, 20)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(2)
+            }
         }
+        .macTheme(activeTheme)
         .animation(.easeInOut(duration: 0.2), value: appState.isPlayerPresented)
         .sheet(isPresented: $appState.isAddConnectionPresented, onDismiss: refreshLibraryAfterConnection) {
             MacAddConnectionView(viewModel: connectionsViewModel)
@@ -61,6 +88,71 @@ struct VanmoMacRootView: View {
                 searchViewModel.search()
             }
         }
+        .onAppear {
+            appState.syncAppearance(with: colorScheme)
+        }
+        .onChange(of: appState.appearanceMode) { _, _ in
+            appState.syncAppearance(with: colorScheme)
+        }
+        .onChange(of: colorScheme) { _, newScheme in
+            appState.syncAppearance(with: newScheme)
+        }
+        .onChange(of: connectionsViewModel.librarySyncCompletionID) { _, newValue in
+            guard newValue > 0 else { return }
+            Task {
+                await refreshLibrarySections()
+                showSyncToast("数据同步完成")
+            }
+        }
+        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+            handleDroppedFiles(providers)
+        }
+    }
+
+    private func syncStatusOverlay(message: String) -> some View {
+        VStack {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(message)
+                    .font(.caption)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: Capsule())
+            .padding(.top, 16)
+            Spacer()
+        }
+        .zIndex(2)
+        .allowsHitTesting(false)
+    }
+
+    private func showSyncToast(_ message: String) {
+        syncToastMessage = message
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            if syncToastMessage == message {
+                syncToastMessage = nil
+            }
+        }
+    }
+
+    private func handleDroppedFiles(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }) else {
+            return false
+        }
+
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            guard let data = item as? Data,
+                  let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                return
+            }
+
+            Task { @MainActor in
+                guard MacLocalFilePlayback.playDroppedURL(url, via: appState) else { return }
+            }
+        }
+
+        return true
     }
 
     private func refreshLibraryAfterConnection() {
@@ -76,7 +168,7 @@ struct VanmoMacRootView: View {
     }
 
     private var activeTheme: MacThemeColors {
-        let isDark = colorScheme == .dark
+        let isDark = appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme)
         if appState.selectedMediaItem == nil, libraryViewModel.isLibraryEmpty {
             return isDark ? .emptyDark : .light
         }

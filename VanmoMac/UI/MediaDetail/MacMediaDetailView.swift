@@ -24,18 +24,21 @@ struct MacMediaDetailView: View {
             backButton
         }
         .background(theme.appBackground)
-        .task {
+        .task(id: detailItemKey) {
+            store.prepareForItem(item)
             await store.loadCachedMetadata(for: item)
             if metadataAutoDownload {
                 await store.refreshMetadata(for: item, modelContext: modelContext, force: false)
             }
         }
-        .task {
+        .task(id: detailItemKey) {
             if item.mediaType == .tvShow {
                 await store.loadEpisodes(for: item, modelContext: modelContext)
+            } else {
+                store.setEpisodes([])
             }
         }
-        .task(id: item.serverId) {
+        .task(id: detailItemKey) {
             await store.loadCollections(for: item, modelContext: modelContext)
         }
         .alert("收藏失败", isPresented: favoriteErrorBinding) {
@@ -69,10 +72,10 @@ struct MacMediaDetailView: View {
             .frame(height: MacDesignTokens.Layout.heroHeight)
 
             VStack(alignment: .leading, spacing: 16) {
-                Text(displayTitle)
-                    .font(MacDesignTokens.Typography.detailHeroTitle)
-                    .foregroundStyle(theme.primaryText)
-                    .lineLimit(2)
+                MacMediaDetailTitleLogoView(
+                    title: displayTitle,
+                    logoURL: store.logoURL ?? item.logoURL
+                )
 
                 metadataRow
                 actionButtons
@@ -434,6 +437,13 @@ struct MacMediaDetailView: View {
         item.showTitle ?? item.title
     }
 
+    private var detailItemKey: String {
+        if let serverId = item.serverId {
+            return "server:\(serverId)"
+        }
+        return "local:\(item.id.uuidString)"
+    }
+
     private var displayOverview: String? {
         store.enrichedOverview ?? item.overview
     }
@@ -480,6 +490,22 @@ struct MacMediaDetailView: View {
         .environmentObject(MacAppState())
         .macTheme(.dark)
         .frame(width: 1214, height: 836)
+}
+
+private struct MacMediaDetailTitleLogoView: View {
+    let title: String
+    let logoURL: URL?
+
+    var body: some View {
+        MediaTitleLogoView(
+            title: title,
+            logoURL: logoURL,
+            titleFont: MacDesignTokens.Typography.detailHeroTitle,
+            maxLogoHeight: 88,
+            contentAlignment: .leading
+        )
+        .frame(maxWidth: 720, alignment: .leading)
+    }
 }
 
 private enum MacMediaDetailPreviewItem {

@@ -44,11 +44,7 @@ struct MacScannedShowDetailView: View {
                                         .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button("查看详情") {
-                                        appState.openDetail(episode)
-                                    }
-                                }
+                                .macMediaItemContextMenu(for: episode)
                             }
                         }
                         .padding(MacDesignTokens.Layout.contentPadding)

@@ -654,18 +654,18 @@ private var browserServiceConnectionID: UUID?
 
 ### 4B.1 KSPlayer macOS 评估 — P1，风险：中
 
-- [ ] 在 `project.yml` 为 `Vanmo-macOS` 添加 KSPlayer 依赖并编译验证
-- [ ] 评估 macOS 上 FFmpeg/软解路径可用性
+- [x] 在 `project.yml` 为 `Vanmo-macOS` 添加 KSPlayer 依赖并编译验证
+- [x] 评估 macOS 上 FFmpeg/软解路径可用性（KSPlayer 2.2.0 + FFmpegKit 可编译链接；硬解失败自动回退软解）
 
 ### 4B.2 FFmpeg 引擎 — P2，风险：高
 
-- [ ] 新建 `MacKSPlayerEngine` 或 macOS FFmpeg 封装
-- [ ] `PlayerEngineFactory` macOS 分支：native → AVPlayer，ffmpeg/disc → KSPlayer
+- [x] 新建 `MacKSPlayerEngine` macOS FFmpeg 封装
+- [x] `MacPlayerEngineFactory` macOS 分支：native → AVPlayer，ffmpeg → KSPlayer
 
 ### 4B.3 原盘 / ISO / 特殊编码 — P2，风险：高
 
-- [ ] 蓝光 BDMV / ISO playlist 解析播放
-- [ ] 不支持的格式给出明确提示
+- [x] 蓝光 BDMV / ISO playlist 解析播放（评估完成：GPL 版不支持完整 ISO/BDMV 导航，未实现 playlist 解析；`.m2ts` 等特殊编码走 KSPlayer）
+- [x] 不支持的格式给出明确提示（`.iso` / `.mpls` / `BDMV` 路径阻断并弹窗说明）
 
 ---
 
@@ -682,12 +682,12 @@ private var browserServiceConnectionID: UUID?
 - [x] **P0** iCloud 同步开关 + 上次同步时间
 - [x] **P1** 播放：自动下一集、断点续播、硬件解码、默认倍速
 - [x] **P1** 字幕：自动加载、字号、语言、颜色/背景/位置（OpenSubtitles 配置待线 2 C1 后补）
-- [ ] **P2** 音频：输出模式
-- [ ] **P2** 媒体库：自动扫描、未观看标记
-- [ ] **P2** 元数据：自动下载、元数据缓存清理
-- [ ] **P2** 外观：主题选择（接入 `MacAppState.theme`，当前 `isDarkMode` 未接线）
-- [ ] **P2** 存储：通用缓存清理
-- [ ] **P2** 关于：版本号、重置所有设置
+- [x] **P2** 音频：输出模式（`MacSettingsView` Audio 分组，复用 `PlaybackPreferences.audioOutputModeKey`）
+- [x] **P2** 媒体库：自动扫描（`library.autoScan`）
+- [x] **P2** 元数据：自动下载、元数据缓存清理（`metadata.autoDownload` + `MetadataCache` 大小/清空）
+- [x] **P2** 外观：主题选择（`MacAppearanceMode` 接入 `MacAppState` / `VanmoMacRootView.activeTheme`）
+- [x] **P2** 存储：通用缓存清理（Caches 目录统计与清除）
+- [x] **P2** 关于：版本号、重置所有设置
 
 ### 5.3 设置与播放器/扫描联动 — P1
 
@@ -705,28 +705,28 @@ private var browserServiceConnectionID: UUID?
 ### 6.1 文件夹书签 — P1
 
 - [x] 浏览页添加/取消书签（`FolderBookmark` CRUD，已在 1.2 / `MacConnectionsViewModel` 实现）
-- [ ] 首页展示书签区块（依赖 B2）→ ✅ B2 已完成；点击跳转连接浏览 ✅
-- [ ] 参考 iOS：`BrowserViewModel` 书签系列方法
+- [x] 首页展示书签区块（`MacLibraryHomeView` 横向卡片；点击跳转连接浏览并打开目标目录）
+- [x] 参考 iOS：`BrowserViewModel` 书签系列方法（`MacConnectionsViewModel` + `MacConnectionsBrowseView` pending navigation 模式已对齐）
 
 ### 6.2 库同步与反馈 — P2
 
-- [ ] 扫描/同步完成 Toast
-- [ ] 连接错误状态在侧边栏展示
+- [x] 扫描/同步完成 Toast（`VanmoMacRootView` 全局 `MacLibrarySyncToast`，监听 `librarySyncCompletionID`）
+- [x] 连接错误状态在侧边栏展示（`MacConnectionSidebarRow` 失败文案 + 警告图标；`connectionStatuses` 改为 `@Published`）
 
 ### 6.3 图片加载 — P2
 
-- [ ] 评估 Kingfisher macOS 或磁盘缓存层（当前 `AsyncImage` + 占位）
+- [x] 评估 Kingfisher macOS 或磁盘缓存层（采用 Kingfisher；`MacRemoteImage` 由 `AsyncImage` 升级为 `KFImage`，`Vanmo-macOS` target 已链接依赖）
 
 ### 6.4 macOS 原生增强 — P2
 
-- [ ] 文件列表右键菜单、Quick Look 预览
-- [ ] 拖拽本地文件到窗口播放
-- [ ] 菜单栏常驻控制（播放/暂停）
+- [x] 文件列表右键菜单、Quick Look 预览（`MacMediaItemContextMenu` + `MacQuickLookPresenter`；浏览页本地视频支持 Quick Look）
+- [x] 拖拽本地文件到窗口播放（`VanmoMacRootView.onDrop` + `MacLocalFilePlayback`）
+- [x] 菜单栏常驻控制（播放/暂停）（`VanmoMacApp` `MenuBarExtra` + `MacAppState` 播放状态桥接）
 
 ### 6.5 视觉打磨 — P2
 
-- [ ] 首页模糊海报背景（参考 iOS `LibraryView` backdrop）
-- [ ] 详情页标题 Logo（`MediaTitleLogoView` 桌面版）
+- [x] 首页模糊海报背景（`MacLibraryHomeView.backdropLayer`；参考 iOS `LibraryView`，优先 `recentlyPlayed`/`favorites` 海报）
+- [x] 详情页标题 Logo（`MacMediaDetailView` + `MacMediaDetailStore.logoURL`；复用 `MediaTitleLogoView`）
 - [ ] TV-MA 分级从元数据读取（当前硬编码）
 
 ### 6.6 CI 与测试 — P1 `轨道 G · 🔀 随时可并行`

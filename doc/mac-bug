@@ -1,0 +1,10 @@
+# Vanmo macOS Bug list
+
+## library
+- 从二级页面返回后自动刷新（不需要自动刷新）
+
+## MediaDetial
+- 重复刷新
+
+## Player
+- 没有显示出字幕

@@ -29,6 +29,7 @@ final class MacPlayerViewModel: ObservableObject {
     @Published private(set) var onlineSubtitleStatusMessage: String?
     @Published var selectedEpisodeSeason: Int?
     @Published var alertMessage: String?
+    @Published private(set) var activeEngineKind: MacPlayerEngineKind = .avFoundation
 
     let player: AVPlayer
 
@@ -38,17 +39,23 @@ final class MacPlayerViewModel: ObservableObject {
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
     private var itemCancellables = Set<AnyCancellable>()
+    private var ksCancellables = Set<AnyCancellable>()
     private var prefetchRegistration: PrefetchRegistration?
     private var didCleanup = false
     private var didSaveProgress = false
     private var legibleOutput: AVPlayerItemLegibleOutput?
     private let legibleHandler = MacLegibleOutputHandler()
     private let externalSubtitleManager = SubtitleManager()
+    private var ksEngine: MacKSPlayerEngine?
     private var activeExternalSubtitleID: Int?
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
     private var embeddedSubtitleActive = false
+    private weak var connectionsViewModel: MacConnectionsViewModel?
 
     private static let externalSubtitleIDOffset = 10_000
+
+    var usesKSPlayer: Bool { activeEngineKind == .ksPlayer }
+    var ksVideoView: NSView? { ksEngine?.videoView }
 
     var canSelectEpisode: Bool {
         !episodeGroups.isEmpty
@@ -75,16 +82,24 @@ final class MacPlayerViewModel: ObservableObject {
         setupPlaybackObservers()
     }
 
-    func onAppear(modelContext: ModelContext) async {
+    func onAppear(modelContext: ModelContext, connectionsViewModel: MacConnectionsViewModel) async {
         self.modelContext = modelContext
+        self.connectionsViewModel = connectionsViewModel
         do {
             try await loadAndPlayCurrentItem()
             await loadEpisodesIfNeeded(modelContext: modelContext)
         } catch is CancellationError {
             return
+        } catch let error as MacPlayerPlaybackError {
+            guard !didCleanup else { return }
+            alertMessage = error.localizedDescription
+            playbackState = .error(error.localizedDescription)
         } catch {
             guard !didCleanup else { return }
             VanmoLogger.player.error("[MacPlayerVM] load failed: \(error.localizedDescription)")
+            if activeEngineKind == .ksPlayer {
+                alertMessage = MacPlayerPlaybackError.ffmpegLoadFailed(error.localizedDescription).localizedDescription
+            }
             playbackState = .error(error.localizedDescription)
         }
     }
@@ -94,15 +109,7 @@ final class MacPlayerViewModel: ObservableObject {
         didCleanup = true
 
         saveProgress()
-
-        if let timeObserver {
-            player.removeTimeObserver(timeObserver)
-            self.timeObserver = nil
-        }
-
-        player.pause()
-        player.replaceCurrentItem(with: nil)
-        legibleOutput = nil
+        stopActiveEngines()
 
         if let registration = prefetchRegistration {
             prefetchRegistration = nil
@@ -127,6 +134,11 @@ final class MacPlayerViewModel: ObservableObject {
     }
 
     func togglePlayPause() {
+        if usesKSPlayer {
+            toggleKSPlayPause()
+            return
+        }
+
         switch playbackState {
         case .playing:
             player.pause()
@@ -160,6 +172,18 @@ final class MacPlayerViewModel: ObservableObject {
     }
 
     private func replayFromBeginning() {
+        if usesKSPlayer {
+            Task {
+                await ksEngine?.seek(to: .zero)
+                ksEngine?.playbackRate = config.playbackRate
+                ksEngine?.play()
+                currentTime = 0
+                playbackState = .playing
+                isPlaying = true
+            }
+            return
+        }
+
         player.pause()
         player.seek(to: .zero) { [weak self] finished in
             guard let self, finished else { return }
@@ -183,19 +207,31 @@ final class MacPlayerViewModel: ObservableObject {
 
     func setVolume(_ value: Double) {
         volume = min(max(value, 0), 1)
-        player.volume = Float(volume)
+        if usesKSPlayer {
+            ksEngine?.setVolume(Float(volume))
+        } else {
+            player.volume = Float(volume)
+        }
     }
 
     func setRate(_ rate: Float) {
         let clamped = PlayerConfig.clampedRate(rate)
         config.playbackRate = clamped
-        if playbackState == .playing {
+        if usesKSPlayer {
+            ksEngine?.playbackRate = clamped
+            if playbackState == .playing {
+                ksEngine?.play()
+            }
+        } else if playbackState == .playing {
             player.rate = clamped
         }
     }
 
     func setScaleMode(_ mode: VideoScaleMode) {
         config.scaleMode = mode
+        if usesKSPlayer {
+            ksEngine?.setScaleMode(mode)
+        }
     }
 
     func selectAudioTrack(_ index: Int) {
@@ -275,10 +311,7 @@ final class MacPlayerViewModel: ObservableObject {
         didSaveProgress = false
 
         await unregisterPrefetchIfNeeded()
-        player.pause()
-        player.replaceCurrentItem(with: nil)
-        legibleOutput = nil
-        itemCancellables.removeAll()
+        stopActiveEngines()
 
         if let mediaItem = episode.mediaItem {
             item = mediaItem
@@ -290,8 +323,15 @@ final class MacPlayerViewModel: ObservableObject {
 
         do {
             try await loadAndPlayCurrentItem()
+        } catch let error as MacPlayerPlaybackError {
+            VanmoLogger.player.error("[MacPlayerVM] episode switch failed: \(error.localizedDescription)")
+            alertMessage = error.localizedDescription
+            playbackState = .error(error.localizedDescription)
         } catch {
             VanmoLogger.player.error("[MacPlayerVM] episode switch failed: \(error.localizedDescription)")
+            if activeEngineKind == .ksPlayer {
+                alertMessage = MacPlayerPlaybackError.ffmpegLoadFailed(error.localizedDescription).localizedDescription
+            }
             playbackState = .error(error.localizedDescription)
         }
     }
@@ -301,18 +341,36 @@ final class MacPlayerViewModel: ObservableObject {
     private func loadAndPlayCurrentItem() async throws {
         try throwIfInactive()
         resetPlaybackMetadata()
+        stopActiveEngines()
 
         await unregisterPrefetchIfNeeded()
         try throwIfInactive()
 
-        let originalURL = await resolveCloudDriveStreamURLIfNeeded(item.fileURL)
+        let resolvedURL = try await resolveSourcePlaybackURLIfNeeded(item.fileURL)
         try throwIfInactive()
+
+        let originalURL = await resolveCloudDriveStreamURLIfNeeded(resolvedURL)
+        try throwIfInactive()
+
+        let engineKind = MacPlayerEngineFactory.engineKind(for: originalURL)
+        switch engineKind {
+        case .unsupportedDisc:
+            throw MacPlayerPlaybackError.unsupportedDiscFormat
+        case .ksPlayer:
+            try await loadWithKSPlayer(originalURL: originalURL)
+        case .avFoundation:
+            try await loadWithAVPlayer(originalURL: originalURL)
+        }
+    }
+
+    private func loadWithAVPlayer(originalURL: URL) async throws {
+        activeEngineKind = .avFoundation
 
         let loadURL: URL
         let headerProvider = cloudDriveStreamingHeaderProvider()
         var usesPrefetch = false
 
-        if originalURL.isFileURL {
+        if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
             loadURL = originalURL
         } else if let registration = await PrefetchProxy.shared.register(
             originalURL: originalURL,
@@ -355,15 +413,7 @@ final class MacPlayerViewModel: ObservableObject {
 
         setupItemObservers(for: playerItem)
 
-        let resumeEnabled = UserDefaults.standard.object(forKey: "playback.resumePlayback") as? Bool ?? true
-        let seekPosition: TimeInterval
-        if initialStartPosition > 0, currentEpisodeID == nil {
-            seekPosition = initialStartPosition
-        } else if resumeEnabled, item.lastPlaybackPosition > 0 {
-            seekPosition = item.lastPlaybackPosition
-        } else {
-            seekPosition = 0
-        }
+        let seekPosition = resolvedStartPosition()
         if seekPosition > 0 {
             seek(toSeconds: seekPosition)
         }
@@ -371,6 +421,177 @@ final class MacPlayerViewModel: ObservableObject {
         player.rate = config.playbackRate
         isPlaying = config.playbackRate > 0
         playbackState = .playing
+    }
+
+    private func loadWithKSPlayer(originalURL: URL) async throws {
+        activeEngineKind = .ksPlayer
+
+        let loadURL: URL
+        let headerProvider = cloudDriveStreamingHeaderProvider()
+        var usesPrefetch = false
+
+        if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
+            loadURL = originalURL
+        } else if let registration = await PrefetchProxy.shared.register(
+            originalURL: originalURL,
+            headerProvider: headerProvider
+        ) {
+            try throwIfInactive()
+            loadURL = registration.url
+            prefetchRegistration = registration
+            usesPrefetch = true
+            VanmoLogger.player.info("[MacPlayerVM] KS using prefetch proxy for remote URL")
+        } else {
+            loadURL = originalURL
+            VanmoLogger.player.info("[MacPlayerVM] KS prefetch unavailable, loading remote URL directly")
+        }
+
+        let headers: [String: String]
+        if usesPrefetch || loadURL.isFileURL {
+            headers = [:]
+        } else {
+            headers = await headerProvider?() ?? [:]
+        }
+
+        let engine = MacKSPlayerEngine()
+        ksEngine = engine
+        setupKSEngineObservers(for: engine)
+        engine.setVolume(Float(volume))
+        engine.setScaleMode(config.scaleMode)
+
+        playbackState = .loading
+        let seekPosition = resolvedStartPosition()
+        let startTime = seekPosition > 0 ? CMTime(seconds: seekPosition, preferredTimescale: 600) : nil
+
+        do {
+            try await engine.load(url: loadURL, headers: headers, startPosition: startTime)
+        } catch {
+            throw MacPlayerPlaybackError.ffmpegLoadFailed(error.localizedDescription)
+        }
+
+        try throwIfInactive()
+
+        if engine.duration.seconds > 0 {
+            duration = engine.duration.seconds
+        } else if item.duration > 0 {
+            duration = item.duration
+        }
+
+        audioTracks = await engine.availableAudioTracks()
+        let embeddedTracks = await engine.availableSubtitleTracks()
+        externalSubtitleTracks = await discoverExternalSubtitleTracks(for: originalURL)
+        subtitleTracks = embeddedTracks + externalSubtitleTracks
+        await applyPreferredSubtitleIfNeeded()
+
+        engine.playbackRate = config.playbackRate
+        engine.play()
+        currentTime = seekPosition
+        isPlaying = true
+        playbackState = .playing
+    }
+
+    private func resolvedStartPosition() -> TimeInterval {
+        let resumeEnabled = UserDefaults.standard.object(forKey: "playback.resumePlayback") as? Bool ?? true
+        if initialStartPosition > 0, currentEpisodeID == nil {
+            return initialStartPosition
+        }
+        if resumeEnabled, item.lastPlaybackPosition > 0 {
+            return item.lastPlaybackPosition
+        }
+        return 0
+    }
+
+    private func stopActiveEngines() {
+        if let timeObserver {
+            player.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        legibleOutput = nil
+        itemCancellables.removeAll()
+        ksCancellables.removeAll()
+        ksEngine?.stop()
+        ksEngine = nil
+    }
+
+    private func toggleKSPlayPause() {
+        guard let ksEngine else { return }
+        switch playbackState {
+        case .playing:
+            ksEngine.pause()
+            playbackState = .paused
+            isPlaying = false
+        case .paused, .ended:
+            if isAtEnd {
+                replayFromBeginning()
+            } else {
+                ksEngine.playbackRate = config.playbackRate
+                ksEngine.play()
+                playbackState = .playing
+                isPlaying = true
+            }
+        default:
+            if isAtEnd {
+                replayFromBeginning()
+            }
+        }
+    }
+
+    private func setupKSEngineObservers(for engine: MacKSPlayerEngine) {
+        ksCancellables.removeAll()
+
+        engine.statePublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state in
+                guard let self else { return }
+                playbackState = state
+                switch state {
+                case .playing:
+                    isPlaying = true
+                case .paused, .ended, .error:
+                    isPlaying = false
+                case .buffering:
+                    break
+                default:
+                    break
+                }
+                if case .ended = state {
+                    handlePlaybackEnded()
+                }
+            }
+            .store(in: &ksCancellables)
+
+        engine.currentTimePublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] time in
+                guard let self else { return }
+                currentTime = time.seconds
+            }
+            .store(in: &ksCancellables)
+
+        engine.durationPublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] time in
+                guard let self, time.seconds.isFinite, time.seconds > 0 else { return }
+                duration = time.seconds
+            }
+            .store(in: &ksCancellables)
+
+        engine.bufferProgressPublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] progress in
+                self?.bufferProgress = progress
+            }
+            .store(in: &ksCancellables)
+
+        engine.subtitleTextPublisher
+            .receive(on: RunLoop.main)
+            .sink { [weak self] text in
+                guard let self, embeddedSubtitleActive, activeExternalSubtitleID == nil else { return }
+                currentSubtitleText = text
+            }
+            .store(in: &ksCancellables)
     }
 
     private func resetPlaybackMetadata() {
@@ -516,6 +737,14 @@ final class MacPlayerViewModel: ObservableObject {
 
     private func seek(toSeconds seconds: TimeInterval) {
         let clamped = min(max(seconds, 0), max(duration, 0))
+        if usesKSPlayer {
+            Task {
+                await ksEngine?.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
+                currentTime = clamped
+                updateExternalSubtitle(at: clamped)
+            }
+            return
+        }
         player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
         currentTime = clamped
         updateExternalSubtitle(at: clamped)
@@ -554,6 +783,10 @@ final class MacPlayerViewModel: ObservableObject {
     }
 
     private func applyAudioTrackSelection(_ index: Int) async {
+        if usesKSPlayer {
+            await ksEngine?.selectAudioTrack(index: index)
+            return
+        }
         guard let playerItem = player.currentItem,
               let group = try? await playerItem.asset.loadMediaSelectionGroup(for: .audible) else { return }
         let options = group.options
@@ -568,13 +801,21 @@ final class MacPlayerViewModel: ObservableObject {
         guard let index else {
             activeExternalSubtitleID = nil
             await externalSubtitleManager.clear()
-            await selectEmbeddedSubtitleTrack(nil)
+            if usesKSPlayer {
+                await ksEngine?.selectSubtitleTrack(index: nil)
+            } else {
+                await selectEmbeddedSubtitleTrack(nil)
+            }
             return true
         }
 
         guard let track = subtitleTracks.first(where: { $0.id == index }) else { return false }
 
         if let fileURL = track.fileURL, !track.isEmbedded {
+            if usesKSPlayer {
+                alertMessage = "Mac KSPlayer 路径暂不支持外挂字幕，请选择内嵌字幕"
+                return false
+            }
             await selectEmbeddedSubtitleTrack(nil)
             switch SubtitleFormat.detect(from: fileURL) {
             case .srt, .vtt:
@@ -600,6 +841,12 @@ final class MacPlayerViewModel: ObservableObject {
 
         activeExternalSubtitleID = nil
         await externalSubtitleManager.clear()
+        if usesKSPlayer {
+            embeddedSubtitleActive = true
+            await ksEngine?.selectSubtitleTrack(index: index)
+            currentSubtitleText = nil
+            return true
+        }
         await selectEmbeddedSubtitleTrack(index)
         embeddedSubtitleActive = true
         return true
@@ -1078,6 +1325,36 @@ final class MacPlayerViewModel: ObservableObject {
     }
 
     // MARK: - Remote URL Resolution
+
+    private func resolveSourcePlaybackURLIfNeeded(_ url: URL) async throws -> URL {
+        guard let connectionsViewModel, let modelContext else {
+            let prepared = MacLocalFilePlayback.prepareLocalFileURL(url)
+            try MacLocalFilePlayback.verifyReadableFile(at: prepared)
+            return prepared
+        }
+
+        do {
+            return try await connectionsViewModel.resolvePlaybackURL(for: item, modelContext: modelContext)
+        } catch let error as MacPlayerPlaybackError {
+            throw error
+        } catch {
+            VanmoLogger.player.error(
+                "[MacPlayerVM] resolve playback URL failed, fallback to cached URL: \(error.localizedDescription)"
+            )
+            let prepared = MacLocalFilePlayback.prepareLocalFileURL(url)
+            try MacLocalFilePlayback.verifyReadableFile(at: prepared)
+            return prepared
+        }
+    }
+
+    private static func shouldBypassPrefetch(for url: URL) -> Bool {
+        switch url.scheme?.lowercased() {
+        case "concat", "smb":
+            return true
+        default:
+            return false
+        }
+    }
 
     private func unregisterPrefetchIfNeeded() async {
         guard let registration = prefetchRegistration else { return }

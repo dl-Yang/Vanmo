@@ -3,8 +3,6 @@ import VanmoCore
 
 enum MacSidebarSection: String, CaseIterable, Identifiable {
     case home
-    case movies
-    case tvShows
     case favorites
 
     var id: String { rawValue }
@@ -12,8 +10,6 @@ enum MacSidebarSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .home: "Home"
-        case .movies: "Movies"
-        case .tvShows: "TV Shows"
         case .favorites: "Favorites"
         }
     }
@@ -21,8 +17,6 @@ enum MacSidebarSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .home: "house"
-        case .movies: "film"
-        case .tvShows: "tv"
         case .favorites: "heart"
         }
     }
@@ -53,6 +47,32 @@ enum MacLibraryViewMode: String {
     case list
 }
 
+enum MacAppearanceMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    static let storageKey = "mac.appearance.mode"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: "跟随系统"
+        case .light: "浅色"
+        case .dark: "深色"
+        }
+    }
+
+    func resolvedIsDark(systemColorScheme: ColorScheme) -> Bool {
+        switch self {
+        case .system: systemColorScheme == .dark
+        case .light: false
+        case .dark: true
+        }
+    }
+}
+
 enum MacContentRoute: Equatable {
     case library
     case libraryFavorites
@@ -67,6 +87,8 @@ enum MacContentRoute: Equatable {
 
 @MainActor
 final class MacAppState: ObservableObject {
+    @AppStorage(MacAppearanceMode.storageKey) var appearanceMode: MacAppearanceMode = .system
+
     @Published var contentRoute: MacContentRoute = .library
     @Published var selectedSection: MacSidebarSection = .home
     @Published var selectedFilter: MacLibraryFilter = .all
@@ -82,9 +104,20 @@ final class MacAppState: ObservableObject {
     @Published var routeCollectionFolder: CollectionFolder?
     @Published var routeConnection: SavedConnection?
     @Published var routeContainerItem: MediaItem?
+    @Published private(set) var isPlayerPlaying = false
+
+    weak var activePlayerViewModel: MacPlayerViewModel?
+
+    var nowPlayingTitle: String? {
+        playerItem?.displayTitle ?? playerItem?.title
+    }
 
     var theme: MacThemeColors {
         isDarkMode ? .dark : .light
+    }
+
+    func syncAppearance(with systemColorScheme: ColorScheme) {
+        isDarkMode = appearanceMode.resolvedIsDark(systemColorScheme: systemColorScheme)
     }
 
     func openDetail(_ item: MediaItem) {
@@ -201,6 +234,21 @@ final class MacAppState: ObservableObject {
         isPlayerPresented = false
         playerItem = nil
         playerStartPosition = 0
+        unregisterActivePlayer()
+    }
+
+    func registerActivePlayer(_ viewModel: MacPlayerViewModel) {
+        activePlayerViewModel = viewModel
+        isPlayerPlaying = viewModel.isPlaying
+    }
+
+    func syncPlayerPlayingState(_ isPlaying: Bool) {
+        isPlayerPlaying = isPlaying
+    }
+
+    func unregisterActivePlayer() {
+        activePlayerViewModel = nil
+        isPlayerPlaying = false
     }
 
     func presentAddConnection() {

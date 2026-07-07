@@ -94,20 +94,28 @@ struct MacConnectionSidebarRow: View {
                 Image(systemName: connection.type.macSidebarIcon)
                     .font(.system(size: 14, weight: .medium))
                     .frame(width: 16, height: 16)
-                Text(connection.name)
-                    .font(MacDesignTokens.Typography.sidebarItem)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(connection.name)
+                        .font(MacDesignTokens.Typography.sidebarItem)
+                        .lineLimit(1)
+                    if status == .failed {
+                        Text("连接失败")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.orange)
+                            .lineLimit(1)
+                    }
+                }
                 Spacer(minLength: 0)
                 statusIndicator
             }
             .foregroundStyle(isSelected ? theme.sidebarSelectedText : theme.sidebarItemText)
             .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
-            .frame(height: MacDesignTokens.Layout.sidebarRowHeight)
+            .frame(minHeight: MacDesignTokens.Layout.sidebarRowHeight)
             .background(isSelected ? theme.sidebarSelectedBackground : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius))
         }
         .buttonStyle(.plain)
-        .opacity(status == .failed ? 0.5 : 1)
+        .opacity(status == .failed ? 0.72 : 1)
         .help(failureHelpText)
     }
 
@@ -118,9 +126,10 @@ struct MacConnectionSidebarRow: View {
             ProgressView()
                 .controlSize(.small)
         case .failed:
-            Circle()
-                .fill(Color.orange)
-                .frame(width: 6, height: 6)
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.orange)
+                .help(failureHelpText)
         default:
             EmptyView()
         }
@@ -266,16 +275,12 @@ struct MacSidebarView: View {
     private func syncConnection(_ connection: SavedConnection) {
         Task {
             _ = await connectionsViewModel.connectAndScan(connection)
-            await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
-            libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         }
     }
 
     private func fullRescanConnection(_ connection: SavedConnection) {
         Task {
             _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
-            await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
-            libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         }
     }
 

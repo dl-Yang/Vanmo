@@ -34,7 +34,7 @@ final class MacConnectionsViewModel: ObservableObject {
     @Published var showError = false
     @Published var errorMessage = ""
 
-    private var connectionStatuses: [UUID: MacConnectionStatus] = [:]
+    @Published private(set) var connectionStatuses: [UUID: MacConnectionStatus] = [:]
     private var modelContext: ModelContext?
     private var didAttemptAutoReconnect = false
     private var browserService: RemoteFileService?
@@ -119,19 +119,91 @@ final class MacConnectionsViewModel: ObservableObject {
     /// 仅打开本地文件夹的 bookmark 并保持 access，不触发扫描。
     private func restoreLocalFolderAccess() async {
         for connection in savedConnections where connection.type == .localFolder {
-            guard activeLocalServices[connection.id] == nil else { continue }
-            guard connection.bookmarkData != nil else { continue }
-
-            let service = LocalFolderService()
-            let config = ConnectionConfig(from: connection)
-            do {
-                try await service.connect(config: config)
-                activeLocalServices[connection.id] = service
-                VanmoLogger.network.info("[MacConnections] Restored local access: \(connection.name)")
-            } catch {
-                VanmoLogger.network.error("[MacConnections] Restore local access failed for \(connection.name): \(error.localizedDescription)")
-            }
+            await ensureLocalFolderAccess(for: connection.id)
         }
+    }
+
+    /// 确保指定本地文件夹连接已恢复 security-scoped 访问。
+    func ensureLocalFolderAccess(for connectionId: UUID) async {
+        guard activeLocalServices[connectionId] == nil else { return }
+        guard let connection = savedConnections.first(where: { $0.id == connectionId }) else {
+            return
+        }
+        await ensureLocalFolderAccess(for: connection)
+    }
+
+    func ensureLocalFolderAccess(for connection: SavedConnection) async {
+        guard activeLocalServices[connection.id] == nil else { return }
+        guard connection.type == .localFolder, connection.bookmarkData != nil else { return }
+
+        let service = LocalFolderService()
+        let config = ConnectionConfig(from: connection)
+        do {
+            try await service.connect(config: config)
+            activeLocalServices[connection.id] = service
+            VanmoLogger.network.info("[MacConnections] Restored local access: \(connection.name)")
+        } catch {
+            VanmoLogger.network.error(
+                "[MacConnections] Restore local access failed for \(connection.name): \(error.localizedDescription)"
+            )
+        }
+    }
+
+    /// 播放前解析/刷新可访问的 stream URL（本地文件夹权限、远程凭据等）。
+    func resolvePlaybackURL(for item: MediaItem, modelContext: ModelContext) async throws -> URL {
+        guard let connectionId = item.sourceConnectionId,
+              let serverPath = item.serverId else {
+            let prepared = MacLocalFilePlayback.prepareLocalFileURL(item.fileURL)
+            try MacLocalFilePlayback.verifyReadableFile(at: prepared)
+            return prepared
+        }
+
+        let connection = savedConnections.first(where: { $0.id == connectionId })
+            ?? (try? modelContext.fetch(
+                FetchDescriptor<SavedConnection>(
+                    predicate: #Predicate { $0.id == connectionId }
+                )
+            ).first)
+
+        guard let connection else {
+            let prepared = MacLocalFilePlayback.prepareLocalFileURL(item.fileURL)
+            try MacLocalFilePlayback.verifyReadableFile(at: prepared)
+            return prepared
+        }
+
+        if connection.type.usesEphemeralStreamURLs {
+            return connection.type.catalogPlaybackURL(serverPath: serverPath)
+        }
+
+        let service = try await playbackFileService(for: connection)
+        let remoteFile = RemoteFile(
+            name: item.originalFileName ?? item.fileURL.lastPathComponent,
+            path: serverPath,
+            size: item.fileSize,
+            isDirectory: false,
+            modifiedDate: nil,
+            type: .video
+        )
+        let url = try await service.streamURL(for: remoteFile)
+
+        if connection.type == .localFolder {
+            let prepared = MacLocalFilePlayback.prepareLocalFileURL(url)
+            try MacLocalFilePlayback.verifyReadableFile(at: prepared)
+            return prepared
+        }
+
+        return url
+    }
+
+    private func playbackFileService(for connection: SavedConnection) async throws -> RemoteFileService {
+        if connection.type == .localFolder {
+            await ensureLocalFolderAccess(for: connection)
+            guard let service = activeLocalServices[connection.id] else {
+                throw NetworkError.connectionFailed("本地文件夹访问未恢复，请在连接页重新选择文件夹")
+            }
+            return service
+        }
+        return try await browserFileService(for: connection)
     }
 
     // MARK: - Delete
@@ -485,6 +557,13 @@ final class MacConnectionsViewModel: ObservableObject {
         }
         let service = try await browserFileService(for: connection)
         return try await service.streamURL(for: file)
+    }
+
+    func previewURL(for file: RemoteFile) async -> URL? {
+        guard selectedConnection?.type == .localFolder, file.isVideo else { return nil }
+        let url = try? await streamURL(for: file)
+        guard let url, url.isFileURL else { return nil }
+        return url
     }
 
     func play(_ file: RemoteFile, via appState: MacAppState) async {

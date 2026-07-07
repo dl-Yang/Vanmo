@@ -26,6 +26,12 @@ struct MacConnectionsBrowseView: View {
         } message: {
             Text(connectionsViewModel.errorMessage)
         }
+        .task {
+            await openPendingFolderBookmarkIfNeeded()
+        }
+        .onChange(of: connectionsViewModel.pendingFolderBookmarkNavigation?.id) { _, _ in
+            Task { await openPendingFolderBookmarkIfNeeded() }
+        }
         .contextMenu {
             connectionContextMenu
         }
@@ -196,7 +202,7 @@ struct MacConnectionsBrowseView: View {
 
             if connectionsViewModel.canBookmarkFoldersInSelectedConnection {
                 Button {
-                    connectionsViewModel.toggleFolderBookmark(file)
+                    toggleFolderBookmark(file)
                 } label: {
                     if connectionsViewModel.isFolderBookmarked(file) {
                         Label("取消书签", systemImage: "bookmark.slash")
@@ -212,6 +218,14 @@ struct MacConnectionsBrowseView: View {
                 Task { await play(file) }
             } label: {
                 Label("播放", systemImage: "play.fill")
+            }
+
+            if connectionsViewModel.selectedConnection?.type == .localFolder {
+                Button {
+                    Task { await quickLook(file) }
+                } label: {
+                    Label("Quick Look 预览", systemImage: "eye")
+                }
             }
         }
 
@@ -322,6 +336,16 @@ struct MacConnectionsBrowseView: View {
         }
     }
 
+    private func openPendingFolderBookmarkIfNeeded() async {
+        guard let request = connectionsViewModel.pendingFolderBookmarkNavigation else { return }
+        _ = await connectionsViewModel.openFolderBookmarkRequest(request)
+    }
+
+    private func toggleFolderBookmark(_ file: RemoteFile) {
+        connectionsViewModel.toggleFolderBookmark(file)
+        libraryViewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)
+    }
+
     private func handleFileTap(_ file: RemoteFile) async {
         if file.isDirectory {
             await connectionsViewModel.openDirectory(file)
@@ -334,9 +358,13 @@ struct MacConnectionsBrowseView: View {
         await connectionsViewModel.play(file, via: appState)
     }
 
+    private func quickLook(_ file: RemoteFile) async {
+        guard let url = await connectionsViewModel.previewURL(for: file) else { return }
+        MacQuickLookPresenter.preview(url)
+    }
+
     private func fullRescanConnection(_ connection: SavedConnection) async {
         _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
-        libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         if connectionsViewModel.selectedConnectionID == connection.id {
             await connectionsViewModel.refreshCurrentDirectory()
         }
