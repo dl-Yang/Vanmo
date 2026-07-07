@@ -55,6 +55,11 @@ enum MacLibraryViewMode: String {
 
 enum MacContentRoute: Equatable {
     case library
+    case libraryFavorites
+    case libraryCollectionFolder(connectionId: UUID, folderId: String)
+    case libraryScannedLibrary(connectionId: UUID, collectionTypeRaw: String)
+    case libraryEmbyFolderBrowse
+    case libraryScannedShowDetail(connectionId: UUID, showTitle: String)
     case connectionBrowser(activeConnectionId: UUID)
 }
 
@@ -71,6 +76,10 @@ final class MacAppState: ObservableObject {
     @Published var playerStartPosition: TimeInterval = 0
     @Published var isAddConnectionPresented = false
     @Published var editingConnection: SavedConnection?
+
+    @Published var routeCollectionFolder: CollectionFolder?
+    @Published var routeConnection: SavedConnection?
+    @Published var routeContainerItem: MediaItem?
 
     var theme: MacThemeColors {
         isDarkMode ? .dark : .light
@@ -93,11 +102,59 @@ final class MacAppState: ObservableObject {
 
     func selectLibrarySection(_ section: MacSidebarSection) {
         selectedSection = section
-        contentRoute = .library
+        clearLibrarySubRouteContext()
+        contentRoute = section == .favorites ? .libraryFavorites : .library
         closeDetail()
     }
 
+    func openFavoritesList() {
+        selectedSection = .favorites
+        clearLibrarySubRouteContext()
+        contentRoute = .libraryFavorites
+        closeDetail()
+    }
+
+    func openCollectionFolderList(folder: CollectionFolder, connection: SavedConnection) {
+        routeCollectionFolder = folder
+        routeConnection = connection
+        contentRoute = .libraryCollectionFolder(connectionId: connection.id, folderId: folder.id)
+        closeDetail()
+    }
+
+    func openScannedLibraryList(connection: SavedConnection, collectionType: EmbyCollectionType) {
+        routeConnection = connection
+        contentRoute = .libraryScannedLibrary(
+            connectionId: connection.id,
+            collectionTypeRaw: collectionType.rawValue
+        )
+        closeDetail()
+    }
+
+    func openEmbyFolderBrowse(container: MediaItem) {
+        routeContainerItem = container
+        contentRoute = .libraryEmbyFolderBrowse
+        closeDetail()
+    }
+
+    func openScannedShowDetail(connection: SavedConnection, showTitle: String) {
+        routeConnection = connection
+        contentRoute = .libraryScannedShowDetail(connectionId: connection.id, showTitle: showTitle)
+        closeDetail()
+    }
+
+    func clearLibrarySubRouteContext() {
+        routeCollectionFolder = nil
+        routeConnection = nil
+        routeContainerItem = nil
+    }
+
+    func backFromLibrarySubRoute() {
+        clearLibrarySubRouteContext()
+        contentRoute = .library
+    }
+
     func enterConnectionBrowser(_ connection: SavedConnection) {
+        clearLibrarySubRouteContext()
         contentRoute = .connectionBrowser(activeConnectionId: connection.id)
         closeDetail()
     }

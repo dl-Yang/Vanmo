@@ -37,21 +37,30 @@ struct VanmoMacRootView: View {
         }
         .task {
             connectionsViewModel.setModelContext(modelContext)
+            libraryViewModel.setModelContext(modelContext)
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
-            refreshLibraryAfterConnection()
+            await refreshLibrarySections()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task {
                 await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
                 await connectionsViewModel.loadSavedConnections()
-                refreshLibraryAfterConnection()
+                await refreshLibrarySections()
             }
         }
     }
 
     private func refreshLibraryAfterConnection() {
+        Task {
+            await refreshLibrarySections()
+        }
+    }
+
+    private func refreshLibrarySections() async {
+        await connectionsViewModel.loadSavedConnections()
+        await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
         libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
     }
 
@@ -69,9 +78,30 @@ struct VanmoMacRootView: View {
             MacMediaDetailView(item: selectedItem)
         } else if case .connectionBrowser = appState.contentRoute {
             MacConnectionsBrowseView()
+        } else if case .libraryFavorites = appState.contentRoute {
+            MacFavoritesListView()
+        } else if case .libraryCollectionFolder = appState.contentRoute,
+                  let folder = appState.routeCollectionFolder,
+                  let connection = appState.routeConnection {
+            MacCollectionFolderListView(folder: folder, connection: connection)
+        } else if case .libraryScannedLibrary = appState.contentRoute,
+                  let connection = appState.routeConnection,
+                  let collectionType = scannedCollectionType {
+            MacScannedLibraryListView(connection: connection, collectionType: collectionType)
+        } else if case .libraryEmbyFolderBrowse = appState.contentRoute,
+                  let container = appState.routeContainerItem {
+            MacEmbyFolderBrowseView(container: container)
+        } else if case let .libraryScannedShowDetail(_, showTitle) = appState.contentRoute,
+                  let connection = appState.routeConnection {
+            MacScannedShowDetailView(connection: connection, showTitle: showTitle)
         } else {
             MacLibraryHomeView()
         }
+    }
+
+    private var scannedCollectionType: EmbyCollectionType? {
+        guard case let .libraryScannedLibrary(_, rawValue) = appState.contentRoute else { return nil }
+        return EmbyCollectionType(raw: rawValue)
     }
 }
 

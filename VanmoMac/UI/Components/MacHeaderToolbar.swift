@@ -2,47 +2,62 @@ import SwiftUI
 
 struct MacHeaderToolbar: View {
     @EnvironmentObject private var appState: MacAppState
+    @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @Environment(\.macTheme) private var theme
 
     let title: String
     var isEmptyLibrary: Bool = false
+    var showsTitle: Bool = true
+    var showsControlsOnly: Bool = false
 
     var body: some View {
         HStack {
-            Text(title)
-                .font(MacDesignTokens.Typography.headerTitle)
-                .foregroundStyle(theme.primaryText)
+            if showsTitle && !showsControlsOnly {
+                Text(title)
+                    .font(MacDesignTokens.Typography.headerTitle)
+                    .foregroundStyle(theme.primaryText)
+            }
 
             Spacer()
 
-            HStack(spacing: 16) {
-                HStack(spacing: 0) {
-                    segmentButton(mode: .grid, systemImage: "square.grid.2x2")
-                    segmentButton(mode: .list, systemImage: "list.bullet")
-                }
-                .padding(3)
-                .background(theme.segmentedBackground)
-                .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.segmentedControl))
-
-                if !isEmptyLibrary {
-                    Button {
-                        // 排序功能暂未适配
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(theme.secondaryText)
-                            .frame(width: 20, height: 20)
-                    }
-                    .buttonStyle(.plain)
-                    .help("排序（暂未适配）")
-                }
+            if !isEmptyLibrary || showsControlsOnly {
+                viewModeAndSortControls
             }
         }
-        .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+        .padding(.horizontal, showsControlsOnly ? 0 : MacDesignTokens.Layout.contentPadding)
         .frame(height: MacDesignTokens.Layout.headerHeight)
-        .background(theme.headerBackground)
+        .background(showsControlsOnly ? Color.clear : theme.headerBackground)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(theme.headerBorder).frame(height: 1)
+            if !showsControlsOnly {
+                Rectangle().fill(theme.headerBorder).frame(height: 1)
+            }
+        }
+    }
+
+    private var viewModeAndSortControls: some View {
+        HStack(spacing: 16) {
+            HStack(spacing: 0) {
+                segmentButton(mode: .grid, systemImage: "square.grid.2x2")
+                segmentButton(mode: .list, systemImage: "list.bullet")
+            }
+            .padding(3)
+            .background(theme.segmentedBackground)
+            .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.segmentedControl))
+
+            Menu {
+                Picker("排序", selection: $libraryViewModel.sortOption) {
+                    ForEach(MacLibrarySortOption.allCases) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(width: 20, height: 20)
+            }
+            .menuStyle(.borderlessButton)
+            .help("排序")
         }
     }
 

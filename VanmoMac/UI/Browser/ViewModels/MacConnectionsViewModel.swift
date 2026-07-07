@@ -9,11 +9,19 @@ enum MacConnectionStatus {
     case failed
 }
 
+struct MacFolderBookmarkNavigationRequest: Identifiable, Equatable {
+    let id = UUID()
+    let connectionId: UUID
+    let path: String
+}
+
 @MainActor
 final class MacConnectionsViewModel: ObservableObject {
     @Published private(set) var savedConnections: [SavedConnection] = []
     @Published private(set) var isLoading = false
     @Published private(set) var loadingMessage = ""
+    @Published private(set) var librarySyncMessage: String?
+    @Published private(set) var librarySyncCompletionID = 0
     @Published private(set) var connectionErrorMessages: [UUID: String] = [:]
     @Published private(set) var selectedConnectionID: UUID?
     @Published private(set) var currentPath = "/"
@@ -22,6 +30,7 @@ final class MacConnectionsViewModel: ObservableObject {
     @Published private(set) var isBrowsingFiles = false
     @Published private(set) var fileBrowserErrorMessage: String?
     @Published private(set) var failedChannelPaths: Set<String> = []
+    @Published private(set) var pendingFolderBookmarkNavigation: MacFolderBookmarkNavigationRequest?
     @Published var showError = false
     @Published var errorMessage = ""
 
@@ -606,8 +615,11 @@ final class MacConnectionsViewModel: ObservableObject {
             try? modelContext?.save()
 
             loadingMessage = "扫描媒体文件..."
+            librarySyncMessage = "正在同步数据..."
             guard let context = modelContext else {
                 isLoading = false
+                librarySyncMessage = nil
+                librarySyncCompletionID += 1
                 return true
             }
 
@@ -644,6 +656,8 @@ final class MacConnectionsViewModel: ObservableObject {
             }
 
             isLoading = false
+            librarySyncMessage = nil
+            librarySyncCompletionID += 1
             return true
         } catch {
             connectionStatuses[connection.id] = .failed
@@ -653,8 +667,48 @@ final class MacConnectionsViewModel: ObservableObject {
                 showError = true
             }
             isLoading = false
+            librarySyncMessage = nil
+            if connection.type.isMediaServer {
+                librarySyncCompletionID += 1
+            }
             return false
         }
+    }
+
+    func requestOpenFolderBookmark(_ bookmark: FolderBookmark) {
+        pendingFolderBookmarkNavigation = MacFolderBookmarkNavigationRequest(
+            connectionId: bookmark.connectionId,
+            path: bookmark.path
+        )
+    }
+
+    func openFolderBookmarkRequest(_ request: MacFolderBookmarkNavigationRequest) async -> Bool {
+        if savedConnections.isEmpty {
+            await loadSavedConnections()
+        }
+
+        guard let connection = savedConnections.first(where: { $0.id == request.connectionId }) else {
+            if pendingFolderBookmarkNavigation?.id == request.id {
+                pendingFolderBookmarkNavigation = nil
+            }
+            return false
+        }
+
+        if selectedConnectionID != connection.id {
+            selectedConnectionID = connection.id
+            currentPath = "/"
+            pathStack = []
+            files = []
+            fileBrowserErrorMessage = nil
+            await disconnectBrowserServiceIfNeeded()
+        }
+
+        pathStack = []
+        let didLoad = await loadDirectory(path: request.path)
+        if pendingFolderBookmarkNavigation?.id == request.id {
+            pendingFolderBookmarkNavigation = nil
+        }
+        return didLoad
     }
 
     // MARK: - Private Helpers
