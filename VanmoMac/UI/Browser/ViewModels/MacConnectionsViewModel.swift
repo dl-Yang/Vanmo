@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 import VanmoCore
 
-enum ConnectionStatus {
+enum MacConnectionStatus {
     case idle
     case connecting
     case connected
@@ -25,7 +25,7 @@ final class MacConnectionsViewModel: ObservableObject {
     @Published var showError = false
     @Published var errorMessage = ""
 
-    private var connectionStatuses: [UUID: ConnectionStatus] = [:]
+    private var connectionStatuses: [UUID: MacConnectionStatus] = [:]
     private var modelContext: ModelContext?
     private var didAttemptAutoReconnect = false
     private var browserService: RemoteFileService?
@@ -39,7 +39,7 @@ final class MacConnectionsViewModel: ObservableObject {
         modelContext = context
     }
 
-    func connectionStatus(for connection: SavedConnection) -> ConnectionStatus {
+    func connectionStatus(for connection: SavedConnection) -> MacConnectionStatus {
         connectionStatuses[connection.id] ?? .idle
     }
 
@@ -273,12 +273,15 @@ final class MacConnectionsViewModel: ObservableObject {
         resetBrowserStateAfterEditing(connection)
         connectionStatuses[connection.id] = .idle
         connectionErrorMessages.removeValue(forKey: connection.id)
-        await loadSavedConnections()
 
-        if selectedConnectionID == connection.id {
-            await loadDirectory(path: currentPath)
+        let didConnect = await connectAndScan(connection)
+        if didConnect {
+            await loadSavedConnections()
+            if selectedConnectionID == connection.id {
+                await loadDirectory(path: currentPath)
+            }
         }
-        return true
+        return didConnect
     }
 
     @discardableResult
@@ -510,7 +513,9 @@ final class MacConnectionsViewModel: ObservableObject {
     ) async -> Bool {
         connectionStatuses[connection.id] = .connecting
         isLoading = true
-        loadingMessage = forceFullScan ? "全量重扫 \(connection.name)..." : "连接到 \(connection.name)..."
+        loadingMessage = forceFullScan
+            ? "全量重扫 \(connection.name)..."
+            : "连接到 \(connection.name)..."
 
         let isLocal = connection.type == .localFolder
 

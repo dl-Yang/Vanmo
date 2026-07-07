@@ -64,6 +64,7 @@ final class MacAppState: ObservableObject {
     @Published var playerItem: MediaItem?
     @Published var playerStartPosition: TimeInterval = 0
     @Published var isAddConnectionPresented = false
+    @Published var editingConnection: SavedConnection?
 
     var theme: MacThemeColors {
         isDarkMode ? .dark : .light
@@ -95,5 +96,13 @@ final class MacAppState: ObservableObject {
 
     func dismissAddConnection() {
         isAddConnectionPresented = false
+    }
+
+    func presentEditConnection(_ connection: SavedConnection) {
+        editingConnection = connection
+    }
+
+    func dismissEditConnection() {
+        editingConnection = nil
     }
 }

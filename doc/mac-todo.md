@@ -468,9 +468,9 @@ private var browserServiceConnectionID: UUID?
 
 ### 1.4 连接管理菜单 — P1
 
-- [ ] 编辑连接：唤起 `MacAddConnectionView(editingConnection:)`
-- [ ] 删除连接、全量重扫上下文菜单
-- [ ] 连接状态指示（连接中/失败）
+- [x] 编辑连接：唤起 `MacAddConnectionView(editingConnection:)`
+- [x] 删除连接、全量重扫上下文菜单
+- [x] 连接状态指示（连接中/失败）
 
 ### 1.5 IPTV 支持 — P1，复用度：高
 
