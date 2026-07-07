@@ -25,6 +25,17 @@ struct MacPlayerControlsOverlay: View {
                     .shadow(color: .black.opacity(0.12), radius: 3, y: 3)
 
                 Spacer()
+
+                if viewModel.canSelectEpisode {
+                    Button("选集") {
+                        viewModel.showEpisodeSelector = true
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.9))
+                }
+
+                rateMenu
+                scaleMenu
             }
             .padding(.horizontal, 32)
             .padding(.top, 32)
@@ -34,6 +45,55 @@ struct MacPlayerControlsOverlay: View {
             controlPanel
                 .padding(.bottom, 40)
         }
+    }
+
+    private var rateMenu: some View {
+        Menu {
+            ForEach(PlayerConfig.availableRates, id: \.self) { rate in
+                Button {
+                    viewModel.setRate(rate)
+                } label: {
+                    HStack {
+                        Text("\(rate, specifier: "%.2g")x")
+                        if viewModel.config.playbackRate == rate {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text("\(viewModel.config.playbackRate, specifier: "%.2g")x")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.12), in: Capsule())
+        }
+        .menuStyle(.borderlessButton)
+    }
+
+    private var scaleMenu: some View {
+        Menu {
+            ForEach(VideoScaleMode.allCases, id: \.self) { mode in
+                Button {
+                    viewModel.setScaleMode(mode)
+                } label: {
+                    HStack {
+                        Label(mode.displayName, systemImage: mode.icon)
+                        if viewModel.config.scaleMode == mode {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: viewModel.config.scaleMode.icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: 32, height: 32)
+                .background(Color.white.opacity(0.12), in: Circle())
+        }
+        .menuStyle(.borderlessButton)
     }
 
     private var controlPanel: some View {
@@ -74,6 +134,9 @@ struct MacPlayerControlsOverlay: View {
             ZStack(alignment: .leading) {
                 Capsule()
                     .fill(Color.white.opacity(0.2))
+                Capsule()
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: proxy.size.width * viewModel.bufferProgress)
                 Capsule()
                     .fill(MacDesignTokens.accentBlue)
                     .frame(width: proxy.size.width * viewModel.progress)
@@ -147,10 +210,15 @@ struct MacPlayerControlsOverlay: View {
 
     private var trailingControls: some View {
         HStack(spacing: 20) {
-            controlIcon("captions.bubble")
-            controlIcon("mic")
-            controlIcon("pip.enter")
-            controlIcon("arrow.up.left.and.arrow.down.right")
+            controlButton("captions.bubble") {
+                viewModel.showTrackSelector = true
+            }
+            controlButton("mic") {
+                viewModel.showTrackSelector = true
+            }
+            controlButton("arrow.up.left.and.arrow.down.right") {
+                viewModel.toggleFullScreen()
+            }
         }
         .frame(width: 280, alignment: .trailing)
     }
@@ -173,10 +241,8 @@ struct MacPlayerControlsOverlay: View {
         .buttonStyle(.plain)
     }
 
-    private func controlIcon(_ systemName: String) -> some View {
-        Button {
-            // 字幕 / 音轨 / PiP / 全屏 功能暂未适配
-        } label: {
+    private func controlButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(.white.opacity(0.8))

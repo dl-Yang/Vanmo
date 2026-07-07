@@ -1,8 +1,8 @@
 # VanmoMac 功能缺失清单与实施计划
 
-> 基于 Vanmo iOS（`Vanmo/`，约 74 个 Swift 文件）与 VanmoMac（`VanmoMac/`，21 个 Swift 文件）对比整理。  
+> 基于 Vanmo iOS（`Vanmo/`，约 74 个 Swift 文件）与 VanmoMac（`VanmoMac/`，约 28 个 Swift 文件）对比整理。  
 > 核心业务逻辑在 `Packages/VanmoCore`，Mac 端以新建 View + 薄 ViewModel 为主，从 iOS 移植业务逻辑而非复制 SwiftUI 视图。  
-> 最后更新：2026-07-07（阶段 0 完成；阶段 1 的 1.1–1.4 完成，1.5 IPTV 延后）
+> 最后更新：2026-07-07（阶段 0 完成；阶段 1 的 1.1–1.4 完成，1.5 IPTV 延后；**阶段 4A / 线 2（C1–C7）✅ 已完成**）
 
 ---
 
@@ -19,7 +19,7 @@
 | 空状态页 | ✅ | `MacLibraryEmptyStateView` |
 | 媒体详情（只读） | ✅ | `MacMediaDetailView` |
 | 连接添加 | ✅ | `MacAddConnectionView` / `MacConnectionsViewModel` |
-| 基础播放器 | ✅ | `MacPlayerView` / `MacPlayerViewModel` / `MacAVPlayerView` |
+| 播放器（AVPlayer 增强） | ✅ | `MacPlayerView` / `MacPlayerViewModel` / `MacAVPlayerView` / `MacSubtitleOverlayView` / `MacTrackSelectorView` / `MacEpisodeSelectorView` / `MacPlayerCommands` |
 | OAuth AppKit Anchor | ✅ | `OAuthPresentationContextProvider+AppKit.swift` |
 | 连接图标资源 | ✅ | `VanmoMac/Resources/Assets.xcassets/MacConn*` |
 
@@ -35,7 +35,7 @@
 | 搜索 | 本地 + 远程并发 | 静态占位 UI | 🔴 |
 | 设置 | 完整 8 组 | 无 | 🔴 |
 | 媒体详情 | 完整交互 + 元数据 + 剧集 | 只读 + 占位按钮 | 🔴 |
-| 播放器 | AVPlayer + KSPlayer | 仅 AVPlayer 基础控制 | 🔴 |
+| 播放器 | AVPlayer + KSPlayer | AVPlayer 字幕/选轨/倍速/全屏/选集 | 🟡 |
 | VanmoCore 复用 | 全面 | 生命周期/播放闭环已接线 | 🟡 |
 
 **估算：** 阶段 0/1 完成后，Mac 距 iOS MVP parity 约 **40–50%** 功能缺口；VanmoCore 已具备大部分逻辑，实施可行性高。
@@ -64,7 +64,8 @@
 | ✅ 阶段 0 全部 | 0.1–0.5：生命周期、进度、远程 URL、扫描反馈、连接删除 |
 | ✅ 阶段 1（1.1–1.4） | 浏览 VM、浏览视图、侧边栏路由、连接管理菜单；浏览页文件夹书签 CRUD |
 | ⏸️ 明确延后 | **1.5 IPTV / EPG**（本轮不做） |
-| 🔴 待启动 | 阶段 2（B）、3（E+F）、4A（C）、5（D）、6（收尾） |
+| ✅ 阶段 4A / 线 2（C） | 4A.1–4A.7：字幕、选轨、在线字幕、倍速/缩放、全屏快捷键、选集/自动下一集、缓冲条 |
+| 🔴 待启动 | 阶段 2（B）、3（E+F）、5（D）、6（收尾）；4B（KSPlayer）可选 |
 
 **已解锁：** 0.2+0.3 ✅ → 轨道 C 可全面启动；阶段 0 全完成 ✅ → B / E1 / F / D 骨架可并行；阶段 1 浏览路由 ✅ → E2 可直接规划侧边栏分区（无需再等 A2）。
 
@@ -119,9 +120,10 @@
 - **iOS 参考：** `LibraryViewModel.swift`、`CollectionFolderListView.swift` 等
 - **验收：** Emby 连接后首页出现媒体库预览分区；点击可进入 Collection 列表 → 详情 → 播放
 
-#### 线 2 — 播放器增强（轨道 C · 阶段 4A）
+#### 线 2 — 播放器增强（轨道 C · 阶段 4A）✅
 
-> **前置：** 0.2 + 0.3 已完成 ✅
+> **前置：** 0.2 + 0.3 已完成 ✅  
+> **状态：** C1–C7 已全部完成（2026-07-07）
 
 | 步骤 | 任务 | 并行性 | 工期 | 验收 |
 |------|------|--------|------|------|
@@ -242,7 +244,7 @@ Week 5: D3 联调 C4/C6 → G CI → MVP 验收
 | 线 | 任务 | 阻塞 |
 |----|------|------|
 | **线 1** | B1 `MacLibraryViewModel` 扩展 | 无 |
-| **线 2** | C1 Provider 注册；C2/C3 字幕/选轨 View 骨架 | 无 |
+| **线 2** | — | C1–C7 ✅ 已完成 | — |
 | **线 3** | G CI；E1 搜索 VM；F 详情（收藏/已看） | PR-0 与 D1 建议第 1–2 天完成 |
 
 **须协调后再动：**
@@ -250,7 +252,7 @@ Week 5: D3 联调 C4/C6 → G CI → MVP 验收
 | 任务 | 阻塞 |
 |------|------|
 | E2 搜索 UI（改 `MacSidebarView`） | 等 D1 侧边栏分区定稿 |
-| D3 播放器偏好联调 | 等 C4 倍速/偏好读取就绪 |
+| D3 播放器偏好联调 | C4 ✅ 已就绪，待线 3 D2 设置 UI |
 | F 季/集完整链路 | 与 B3-d 或 B1 episode 数据联调 |
 
 **MVP 之后按需插队（不在三线主路径）：**
@@ -599,43 +601,43 @@ private var browserServiceConnectionID: UUID?
 
 ### 4A.1 字幕 — P1
 
-- [ ] 新建 `MacSubtitleOverlayView`（SwiftUI/AppKit）
-- [ ] 接入 VanmoCore `SubtitleManager`、SRT/VTT 解析
-- [ ] 读 `@AppStorage` 字幕样式偏好（字号、颜色、位置）
-- [ ] `MacPlayerControlsOverlay` 字幕按钮接线
+- [x] 新建 `MacSubtitleOverlayView`（SwiftUI/AppKit）
+- [x] 接入 VanmoCore `SubtitleManager`、SRT/VTT 解析
+- [x] 读 `@AppStorage` 字幕样式偏好（字号、颜色、位置）
+- [x] `MacPlayerControlsOverlay` 字幕按钮接线
 
 ### 4A.2 音轨/内嵌字幕切换 — P1
 
-- [ ] 新建 `MacTrackSelectorView` sheet
-- [ ] 从 `AVPlayerItem` 读取 `audioTracks` / `subtitleTracks`
+- [x] 新建 `MacTrackSelectorView` sheet
+- [x] 从 `AVPlayerItem` 读取 `audioTracks` / `subtitleTracks`
 
 ### 4A.3 在线字幕 — P1，复用度：高
 
-- [ ] `VanmoMacApp.init` 注册 OpenSubtitles / Shooter / Subhd Provider
-- [ ] 播放器内搜索、下载、加载在线字幕
-- [ ] 参考 iOS：`VanmoApp.swift`、`TrackSelectorView.swift`
+- [x] `VanmoMacApp.init` 注册 OpenSubtitles / Shooter / Subhd Provider
+- [x] 播放器内搜索、下载、加载在线字幕
+- [x] 参考 iOS：`VanmoApp.swift`、`TrackSelectorView.swift`
 
 ### 4A.4 倍速 / 画面缩放 — P1
 
-- [ ] 控制栏倍速选择（读 `playback.defaultRate` 偏好）
-- [ ] `VideoScaleMode` Fit/Fill/Stretch 切换
-- [ ] 读 `@AppStorage` 硬件解码、断点续播、自动下一集偏好
+- [x] 控制栏倍速选择（读 `playback.defaultRate` 偏好）
+- [x] `VideoScaleMode` Fit/Fill/Stretch 切换
+- [x] 读 `@AppStorage` 硬件解码、断点续播、自动下一集偏好
 
 ### 4A.5 全屏 + 键盘快捷键 — P1
 
-- [ ] 全屏：`NSWindow.toggleFullScreen` 或独立播放器窗口
-- [ ] 快捷键：Space 播放暂停，←/→ 跳转，↑/↓ 音量，F 全屏，Esc 关闭
-- [ ] `VanmoMacApp.commands` 扩展
+- [x] 全屏：`NSWindow.toggleFullScreen` 或独立播放器窗口
+- [x] 快捷键：Space 播放暂停，←/→ 跳转，↑/↓ 音量，F 全屏，Esc 关闭
+- [x] `VanmoMacApp.commands` 扩展
 
 ### 4A.6 选集 / 自动下一集 — P1，复用度：高
 
-- [ ] 移植 iOS `episodeGroups` / `currentEpisodeID` 逻辑
-- [ ] 播放结束自动播放下一集（读 `playback.autoPlayNext`）
-- [ ] 新建 `MacEpisodeSelectorView`
+- [x] 移植 iOS `episodeGroups` / `currentEpisodeID` 逻辑
+- [x] 播放结束自动播放下一集（读 `playback.autoPlay`）
+- [x] 新建 `MacEpisodeSelectorView`
 
 ### 4A.7 缓冲进度条 — P2
 
-- [ ] 显示 `bufferProgress`（参考 iOS `PlayerProgressBar`）
+- [x] 显示 `bufferProgress`（参考 iOS `PlayerProgressBar`）
 
 **阶段 4A 验收标准：**
 - 内嵌/外挂字幕可显示与切换
@@ -745,7 +747,7 @@ private var browserServiceConnectionID: UUID?
 | **1** | A | 连接浏览（1.1–1.4 ✅；1.5 IPTV 延后） | 2–3 周 | ✅ 核心已完成 |
 | **2** | **线 1 / B** | 媒体库首页 parity | 2–3 周 | 🔴 待启动 |
 | **3** | **线 3 / E+F** | 搜索 + 详情交互 | 1.5–2 周 | 🔴 待启动 |
-| **4A** | **线 2 / C** | 播放器增强（AVPlayer） | 2 周 | 🔴 待启动 |
+| **4A** | **线 2 / C** | 播放器增强（AVPlayer） | 2 周 | ✅ 已完成 |
 | **5** | **线 3 / D** | 设置页 | 1 周 | 🔴 待启动 |
 | **4B** | 独立 | FFmpeg/KSPlayer（可选） | 1–2 周 | 等 4A |
 | **6** | G+ | 体验打磨 | 持续 | 部分可提前（CI） |
@@ -764,7 +766,7 @@ private var browserServiceConnectionID: UUID?
 2. 可添加 / 浏览 / 播放各协议媒体
 3. 首页结构与服务端库基本对齐
 4. 可搜索、可收藏、进度可续播
-5. 基础字幕 / 倍速 / 全屏可用
+5. 基础字幕 / 倍速 / 全屏 / 自动下一集可用（线 2 ✅）
 6. 关键设置可配置
 
 **v1.1+ 迭代：** FFmpeg 特殊格式、IPTV EPG 精细 UI、文件夹书签、拖拽播放、菜单栏控制等。
