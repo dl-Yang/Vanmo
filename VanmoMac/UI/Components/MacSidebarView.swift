@@ -136,10 +136,11 @@ struct MacSidebarView: View {
                         MacSidebarRow(
                             title: section.title,
                             systemImage: section.systemImage,
-                            isSelected: appState.selectedSection == section && appState.selectedMediaItem == nil
+                            isSelected: appState.contentRoute == .library
+                                && appState.selectedSection == section
+                                && appState.selectedMediaItem == nil
                         ) {
-                            appState.selectedSection = section
-                            appState.closeDetail()
+                            appState.selectLibrarySection(section)
                         }
                     }
 
@@ -170,9 +171,12 @@ struct MacSidebarView: View {
                         MacConnectionSidebarRow(
                             connectionsViewModel: connectionsViewModel,
                             connection: connection,
-                            isSelected: false
+                            isSelected: appState.activeConnectionId == connection.id
                         ) {
-                            // 连接浏览功能暂未适配
+                            appState.enterConnectionBrowser(connection)
+                            Task {
+                                await connectionsViewModel.selectConnection(connection)
+                            }
                         }
                         .contextMenu {
                             Button {
@@ -229,6 +233,7 @@ struct MacSidebarView: View {
         if appState.selectedMediaItem?.sourceConnectionId == connection.id {
             appState.closeDetail()
         }
+        appState.clearActiveConnectionIfDeleted(connection.id)
         connectionsViewModel.deleteConnection(connection)
         libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
     }

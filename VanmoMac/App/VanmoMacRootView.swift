@@ -67,6 +67,8 @@ struct VanmoMacRootView: View {
     private var mainContent: some View {
         if let selectedItem = appState.selectedMediaItem {
             MacMediaDetailView(item: selectedItem)
+        } else if case .connectionBrowser = appState.contentRoute {
+            MacConnectionsBrowseView()
         } else {
             MacLibraryHomeView()
         }

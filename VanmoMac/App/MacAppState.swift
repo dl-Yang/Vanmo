@@ -53,8 +53,14 @@ enum MacLibraryViewMode: String {
     case list
 }
 
+enum MacContentRoute: Equatable {
+    case library
+    case connectionBrowser(activeConnectionId: UUID)
+}
+
 @MainActor
 final class MacAppState: ObservableObject {
+    @Published var contentRoute: MacContentRoute = .library
     @Published var selectedSection: MacSidebarSection = .home
     @Published var selectedFilter: MacLibraryFilter = .all
     @Published var viewMode: MacLibraryViewMode = .grid
@@ -76,6 +82,34 @@ final class MacAppState: ObservableObject {
 
     func closeDetail() {
         selectedMediaItem = nil
+    }
+
+    var activeConnectionId: UUID? {
+        if case let .connectionBrowser(id) = contentRoute {
+            return id
+        }
+        return nil
+    }
+
+    func selectLibrarySection(_ section: MacSidebarSection) {
+        selectedSection = section
+        contentRoute = .library
+        closeDetail()
+    }
+
+    func enterConnectionBrowser(_ connection: SavedConnection) {
+        contentRoute = .connectionBrowser(activeConnectionId: connection.id)
+        closeDetail()
+    }
+
+    func exitConnectionBrowser() {
+        contentRoute = .library
+    }
+
+    func clearActiveConnectionIfDeleted(_ connectionId: UUID) {
+        if activeConnectionId == connectionId {
+            exitConnectionBrowser()
+        }
     }
 
     func play(_ item: MediaItem, from position: TimeInterval = 0) {

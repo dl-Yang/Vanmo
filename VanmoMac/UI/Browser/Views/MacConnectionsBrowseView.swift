@@ -346,6 +346,7 @@ struct MacConnectionsBrowseView: View {
         if appState.selectedMediaItem?.sourceConnectionId == connection.id {
             appState.closeDetail()
         }
+        appState.clearActiveConnectionIfDeleted(connection.id)
         connectionsViewModel.deleteConnection(connection)
         libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
     }
