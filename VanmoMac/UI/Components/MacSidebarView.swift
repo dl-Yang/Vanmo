@@ -5,6 +5,9 @@ import VanmoCore
 struct MacSearchField: View {
     @Environment(\.macTheme) private var theme
 
+    @Binding var text: String
+    var onFocus: () -> Void
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -12,11 +15,28 @@ struct MacSearchField: View {
                 .foregroundStyle(theme.searchPlaceholder)
                 .padding(.leading, 10)
 
-            Text("Search")
+            TextField("Search", text: $text)
+                .textFieldStyle(.plain)
                 .font(.system(size: 14))
-                .foregroundStyle(theme.searchPlaceholder)
+                .foregroundStyle(theme.primaryText)
+                .onSubmit(onFocus)
+                .onChange(of: text) { _, newValue in
+                    if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        onFocus()
+                    }
+                }
 
-            Spacer(minLength: 0)
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.searchPlaceholder)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 8)
+            }
         }
         .frame(height: 28)
         .background(theme.searchBackground)
@@ -116,6 +136,7 @@ struct MacSidebarView: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
+    @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @Environment(\.macTheme) private var theme
     @Query(
         filter: #Predicate<SavedConnection> { $0.deletedAt == nil },
@@ -124,11 +145,21 @@ struct MacSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            
-            MacSearchField()
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-                .padding(.top, 16)
+            MacSearchField(text: $searchViewModel.searchText) {
+                appState.selectSearch()
+                searchViewModel.search()
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+            .padding(.top, 16)
+            .onChange(of: searchViewModel.searchText) { _, newValue in
+                if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if !appState.isSearchActive {
+                        appState.selectSearch()
+                    }
+                    searchViewModel.search()
+                }
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
@@ -205,6 +236,8 @@ struct MacSidebarView: View {
                 .padding(.horizontal, MacDesignTokens.Layout.sidebarHorizontalPadding)
                 .padding(.bottom, 16)
             }
+
+            settingsFooter
         }
         .frame(width: MacDesignTokens.Layout.sidebarWidth)
         .background(theme.sidebarBackground)
@@ -212,6 +245,23 @@ struct MacSidebarView: View {
             Rectangle()
                 .fill(theme.sidebarBorder)
                 .frame(width: 1)
+        }
+    }
+
+    private var settingsFooter: some View {
+        MacSidebarRow(
+            title: "Settings",
+            systemImage: "gearshape",
+            isSelected: appState.isSettingsActive && appState.selectedMediaItem == nil
+        ) {
+            appState.selectSettings()
+        }
+        .padding(.horizontal, MacDesignTokens.Layout.sidebarHorizontalPadding)
+        .padding(.vertical, 12)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(theme.sidebarBorder)
+                .frame(height: 1)
         }
     }
 

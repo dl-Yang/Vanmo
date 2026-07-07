@@ -5,6 +5,7 @@ struct VanmoMacRootView: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
+    @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -37,16 +38,26 @@ struct VanmoMacRootView: View {
         }
         .task {
             connectionsViewModel.setModelContext(modelContext)
+            searchViewModel.setModelContext(modelContext)
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
             refreshLibraryAfterConnection()
+            await connectionsViewModel.loadSavedConnections()
+            searchViewModel.setConnections(connectionsViewModel.savedConnections)
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task {
                 await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
                 await connectionsViewModel.loadSavedConnections()
+                searchViewModel.setConnections(connectionsViewModel.savedConnections)
                 refreshLibraryAfterConnection()
+            }
+        }
+        .onChange(of: connectionsViewModel.savedConnections.map(\.id)) { _, _ in
+            searchViewModel.setConnections(connectionsViewModel.savedConnections)
+            if !searchViewModel.searchText.isEmpty {
+                searchViewModel.search()
             }
         }
     }
@@ -67,10 +78,17 @@ struct VanmoMacRootView: View {
     private var mainContent: some View {
         if let selectedItem = appState.selectedMediaItem {
             MacMediaDetailView(item: selectedItem)
-        } else if case .connectionBrowser = appState.contentRoute {
-            MacConnectionsBrowseView()
         } else {
-            MacLibraryHomeView()
+            switch appState.contentRoute {
+            case .library:
+                MacLibraryHomeView()
+            case .browse:
+                MacConnectionsBrowseView()
+            case .search:
+                MacSearchResultsView()
+            case .settings:
+                MacSettingsView()
+            }
         }
     }
 }
@@ -80,5 +98,6 @@ struct VanmoMacRootView: View {
         .environmentObject(MacAppState())
         .environmentObject(MacLibraryViewModel())
         .environmentObject(MacConnectionsViewModel())
+        .environmentObject(MacSearchViewModel())
         .environmentObject(CloudSyncCoordinator.shared)
 }

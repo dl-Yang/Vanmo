@@ -23,12 +23,37 @@ final class MacPlayerViewModel: ObservableObject {
     private var didCleanup = false
     private var didSaveProgress = false
 
+    private let defaultPlaybackRate: Float
+    private let shouldResumePlayback: Bool
+
     init(item: MediaItem, startPosition: TimeInterval = 0) {
         self.item = item
-        self.startPosition = startPosition
+        self.shouldResumePlayback = UserDefaults.standard.object(forKey: "playback.resumePlayback") as? Bool ?? true
+        let resolvedStartPosition = Self.resolvedStartPosition(
+            item: item,
+            requested: startPosition,
+            resumePlayback: shouldResumePlayback
+        )
+        self.startPosition = resolvedStartPosition
+        self.defaultPlaybackRate = Float(
+            UserDefaults.standard.object(forKey: "playback.defaultRate") as? Double ?? 1.0
+        )
         self.player = AVPlayer()
         player.volume = Float(volume)
+        player.rate = defaultPlaybackRate
         setupPlaybackObservers()
+    }
+
+    private static func resolvedStartPosition(
+        item: MediaItem,
+        requested: TimeInterval,
+        resumePlayback: Bool
+    ) -> TimeInterval {
+        if requested > 0 {
+            return requested
+        }
+        guard resumePlayback else { return 0 }
+        return item.lastPlaybackPosition
     }
 
     func onAppear(modelContext: ModelContext) async {
@@ -86,9 +111,9 @@ final class MacPlayerViewModel: ObservableObject {
             if isAtEnd {
                 replayFromBeginning()
             } else {
-                player.play()
+                player.playImmediately(atRate: defaultPlaybackRate)
                 playbackState = .playing
-                isPlaying = true
+                isPlaying = defaultPlaybackRate > 0
             }
         default:
             if isAtEnd {
@@ -108,8 +133,8 @@ final class MacPlayerViewModel: ObservableObject {
             Task { @MainActor in
                 self.currentTime = 0
                 self.playbackState = .playing
-                self.isPlaying = true
-                self.player.play()
+                self.isPlaying = self.defaultPlaybackRate > 0
+                self.player.playImmediately(atRate: self.defaultPlaybackRate)
             }
         }
     }
@@ -183,8 +208,8 @@ final class MacPlayerViewModel: ObservableObject {
         if startPosition > 0 {
             seek(toSeconds: startPosition)
         }
-        player.play()
-        isPlaying = true
+        player.playImmediately(atRate: defaultPlaybackRate)
+        isPlaying = defaultPlaybackRate > 0
         playbackState = .playing
     }
 

@@ -55,7 +55,9 @@ enum MacLibraryViewMode: String {
 
 enum MacContentRoute: Equatable {
     case library
-    case connectionBrowser(activeConnectionId: UUID)
+    case browse(activeConnectionId: UUID)
+    case search
+    case settings
 }
 
 @MainActor
@@ -85,10 +87,20 @@ final class MacAppState: ObservableObject {
     }
 
     var activeConnectionId: UUID? {
-        if case let .connectionBrowser(id) = contentRoute {
+        if case let .browse(id) = contentRoute {
             return id
         }
         return nil
+    }
+
+    var isSearchActive: Bool {
+        if case .search = contentRoute { return true }
+        return false
+    }
+
+    var isSettingsActive: Bool {
+        if case .settings = contentRoute { return true }
+        return false
     }
 
     func selectLibrarySection(_ section: MacSidebarSection) {
@@ -97,8 +109,18 @@ final class MacAppState: ObservableObject {
         closeDetail()
     }
 
+    func selectSearch() {
+        contentRoute = .search
+        closeDetail()
+    }
+
+    func selectSettings() {
+        contentRoute = .settings
+        closeDetail()
+    }
+
     func enterConnectionBrowser(_ connection: SavedConnection) {
-        contentRoute = .connectionBrowser(activeConnectionId: connection.id)
+        contentRoute = .browse(activeConnectionId: connection.id)
         closeDetail()
     }
 

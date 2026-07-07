@@ -1,11 +1,16 @@
 import SwiftUI
+import SwiftData
 import VanmoCore
 
 struct MacMediaDetailView: View {
     @EnvironmentObject private var appState: MacAppState
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.macTheme) private var theme
+    @AppStorage("metadata.autoDownload") private var metadataAutoDownload = true
 
     let item: MediaItem
+
+    @StateObject private var store = MacMediaDetailStore()
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -19,6 +24,30 @@ struct MacMediaDetailView: View {
             backButton
         }
         .background(theme.appBackground)
+        .task {
+            await store.loadCachedMetadata(for: item)
+            if metadataAutoDownload {
+                await store.refreshMetadata(for: item, modelContext: modelContext, force: false)
+            }
+        }
+        .task {
+            if item.mediaType == .tvShow {
+                await store.loadEpisodes(for: item, modelContext: modelContext)
+            }
+        }
+        .task(id: item.serverId) {
+            await store.loadCollections(for: item, modelContext: modelContext)
+        }
+        .alert("收藏失败", isPresented: favoriteErrorBinding) {
+            Button("确定") {}
+        } message: {
+            Text(store.favoriteErrorMessage ?? "")
+        }
+        .alert("刷新失败", isPresented: refreshErrorBinding) {
+            Button("确定") {}
+        } message: {
+            Text(store.refreshErrorMessage ?? "")
+        }
     }
 
     private var heroSection: some View {
@@ -75,17 +104,18 @@ struct MacMediaDetailView: View {
 
             if item.mediaType == .tvShow {
                 metadataDot
-                metadataChip("TV-MA")
+                metadataChip("TV Show")
                 metadataDot
                 Text(episodeCountText)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(theme.secondaryText)
             }
 
+            let genres = displayGenres
             if !genres.isEmpty {
                 metadataDot
                 HStack(spacing: 8) {
-                    ForEach(genres, id: \.self) { genre in
+                    ForEach(genres.prefix(3), id: \.self) { genre in
                         metadataChip(genre)
                     }
                 }
@@ -96,7 +126,10 @@ struct MacMediaDetailView: View {
     private var actionButtons: some View {
         HStack(spacing: 16) {
             Button {
-                appState.play(item, from: item.lastPlaybackPosition)
+                let startPosition = UserDefaults.standard.bool(forKey: "playback.resumePlayback")
+                    ? item.lastPlaybackPosition
+                    : 0
+                appState.play(item, from: startPosition)
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "play.fill")
@@ -112,16 +145,86 @@ struct MacMediaDetailView: View {
             }
             .buttonStyle(.plain)
 
-            secondaryActionButton(systemImage: "heart")
-            secondaryActionButton(systemImage: "checkmark")
-            secondaryActionButton(systemImage: "ellipsis")
+            favoriteButton
+            watchedButton
+            moreMenu
         }
         .padding(.top, 8)
     }
 
+    private var favoriteButton: some View {
+        Button {
+            Task { await store.toggleFavorite(for: item, modelContext: modelContext) }
+        } label: {
+            ZStack {
+                if store.isUpdatingFavorite {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: item.isFavorite ? "heart.fill" : "heart")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(item.isFavorite ? .red : theme.primaryText)
+                }
+            }
+            .frame(width: 40, height: 40)
+            .background(theme.secondaryButtonBackground)
+            .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isUpdatingFavorite)
+        .help(item.isFavorite ? "取消收藏" : "收藏")
+    }
+
+    private var watchedButton: some View {
+        Button {
+            Task { await store.toggleWatched(for: item, modelContext: modelContext) }
+        } label: {
+            ZStack {
+                if store.isUpdatingWatched {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: item.isWatched ? "checkmark.circle.fill" : "checkmark")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(item.isWatched ? MacDesignTokens.accentBlue : theme.primaryText)
+                }
+            }
+            .frame(width: 40, height: 40)
+            .background(theme.secondaryButtonBackground)
+            .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(store.isUpdatingWatched)
+        .help(item.isWatched ? "标记未看" : "标记已看")
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button {
+                Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) }
+            } label: {
+                Label("刷新元数据", systemImage: "arrow.clockwise")
+            }
+            .disabled(store.isRefreshingMetadata)
+
+            Button {
+                Task { await store.toggleWatched(for: item, modelContext: modelContext) }
+            } label: {
+                Label(item.isWatched ? "标记未看" : "标记已看", systemImage: "checkmark.circle")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(theme.primaryText)
+                .frame(width: 40, height: 40)
+                .background(theme.secondaryButtonBackground)
+                .clipShape(Circle())
+        }
+        .menuStyle(.borderlessButton)
+        .help("更多")
+    }
+
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: 48) {
-            if let overview = item.overview, !overview.isEmpty {
+            if let overview = displayOverview, !overview.isEmpty {
                 Text(overview)
                     .font(.system(size: 16))
                     .foregroundStyle(theme.secondaryText)
@@ -129,6 +232,8 @@ struct MacMediaDetailView: View {
                     .frame(maxWidth: 896, alignment: .leading)
             }
 
+            episodesSection
+            collectionsSection
             castSection
         }
         .padding(.horizontal, MacDesignTokens.Layout.detailContentPadding)
@@ -136,9 +241,120 @@ struct MacMediaDetailView: View {
         .padding(.bottom, 48)
     }
 
+    @ViewBuilder
+    private var episodesSection: some View {
+        if item.mediaType == .tvShow {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Episodes")
+                    .font(MacDesignTokens.Typography.detailSectionTitle)
+                    .foregroundStyle(theme.primaryText)
+
+                if store.isLoadingEpisodes {
+                    ProgressView("加载季集...")
+                        .foregroundStyle(theme.secondaryText)
+                } else if store.episodes.isEmpty {
+                    Text("暂无季集数据")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.secondaryText)
+                } else {
+                    if store.seasonNumbers.count > 1 {
+                        Picker("Season", selection: Binding(
+                            get: { store.selectedSeason ?? store.seasonNumbers.first ?? 1 },
+                            set: { store.selectedSeason = $0 }
+                        )) {
+                            ForEach(store.seasonNumbers, id: \.self) { season in
+                                Text("第 \(season) 季").tag(season)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 400)
+                    }
+
+                    LazyVStack(spacing: 8) {
+                        ForEach(store.currentSeasonEpisodes) { episode in
+                            Button {
+                                let episodeItem = store.makeEpisodeItem(from: episode, show: item)
+                                appState.play(episodeItem)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Text("E\(episode.episodeNumber)")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(theme.secondaryText)
+                                        .frame(width: 32, alignment: .leading)
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(episode.title)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(theme.primaryText)
+                                            .lineLimit(1)
+
+                                        if let overview = episode.overview, !overview.isEmpty {
+                                            Text(overview)
+                                                .font(.caption)
+                                                .foregroundStyle(theme.cardSubtitle)
+                                                .lineLimit(2)
+                                        }
+                                    }
+
+                                    Spacer(minLength: 0)
+
+                                    Image(systemName: "play.circle")
+                                        .foregroundStyle(theme.secondaryText)
+                                }
+                                .padding(12)
+                                .background(theme.secondaryButtonBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var collectionsSection: some View {
+        if !store.collections.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Collections")
+                    .font(MacDesignTokens.Typography.detailSectionTitle)
+                    .foregroundStyle(theme.primaryText)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(store.collections, id: \.serverId) { collection in
+                            Button {
+                                let collectionItem = store.makeCollectionItem(
+                                    collection,
+                                    sourceConnectionId: item.sourceConnectionId
+                                )
+                                appState.openDetail(collectionItem)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    MacRemoteImage(url: collection.posterURL)
+                                        .frame(width: 120, height: 180)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                    Text(collection.title)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(theme.primaryText)
+                                        .lineLimit(2)
+                                        .frame(width: 120, alignment: .leading)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var castSection: some View {
         Group {
-            if !castMembers.isEmpty {
+            let members = castMembers
+            if !members.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Cast & Crew")
                         .font(MacDesignTokens.Typography.detailSectionTitle)
@@ -147,9 +363,9 @@ struct MacMediaDetailView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 24) {
-                            ForEach(Array(castMembers.enumerated()), id: \.offset) { _, member in
+                            ForEach(members) { member in
                                 VStack(spacing: 12) {
-                                    MacRemoteImage(url: member.imageURL)
+                                    MacRemoteImage(url: member.profileURL)
                                         .frame(width: 80, height: 80)
                                         .clipShape(Circle())
 
@@ -158,8 +374,8 @@ struct MacMediaDetailView: View {
                                         .foregroundStyle(theme.primaryText)
                                         .multilineTextAlignment(.center)
 
-                                    if !member.role.isEmpty {
-                                        Text(member.role)
+                                    if let role = member.role, !role.isEmpty {
+                                        Text(role)
                                             .font(.system(size: 12))
                                             .foregroundStyle(theme.cardSubtitle)
                                             .multilineTextAlignment(.center)
@@ -194,20 +410,6 @@ struct MacMediaDetailView: View {
         .padding(.top, 12)
     }
 
-    private func secondaryActionButton(systemImage: String) -> some View {
-        Button {
-            // 收藏 / 已看 / 更多 功能暂未适配
-        } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(theme.primaryText)
-                .frame(width: 40, height: 40)
-                .background(theme.secondaryButtonBackground)
-                .clipShape(Circle())
-        }
-        .buttonStyle(.plain)
-    }
-
     private func metadataChip(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 12, weight: .medium))
@@ -232,17 +434,43 @@ struct MacMediaDetailView: View {
         item.showTitle ?? item.title
     }
 
-    private var genres: [String] {
-        Array(item.genres.prefix(3))
+    private var displayOverview: String? {
+        store.enrichedOverview ?? item.overview
+    }
+
+    private var displayGenres: [String] {
+        store.enrichedGenres.isEmpty ? item.genres : store.enrichedGenres
     }
 
     private var episodeCountText: String {
-        "Episodes"
+        if store.episodes.isEmpty {
+            return "Episodes"
+        }
+        return "\(store.episodes.count) Episodes"
     }
 
-    private var castMembers: [(name: String, role: String, imageURL: URL?)] {
-        item.cast.prefix(5).map { name in
-            (name, "", nil as URL?)
+    private var castMembers: [CastMemberDisplay] {
+        if !store.castMembers.isEmpty {
+            return store.castMembers
+        }
+        return item.cast.prefix(5).map { name in
+            CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
+        }
+    }
+
+    private var favoriteErrorBinding: Binding<Bool> {
+        Binding {
+            store.favoriteErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented { store.favoriteErrorMessage = nil }
+        }
+    }
+
+    private var refreshErrorBinding: Binding<Bool> {
+        Binding {
+            store.refreshErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented { store.refreshErrorMessage = nil }
         }
     }
 }
