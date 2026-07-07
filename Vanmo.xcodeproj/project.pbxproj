@@ -40,6 +40,7 @@
 		46A07DA016A61F9706E11605 /* nfs.png in Resources */ = {isa = PBXBuildFile; fileRef = 1EA73A8F025D2DF849E23FDF /* nfs.png */; };
 		47330A3092F593DB5BCA6784 /* MacRemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8636415210B4191F85B68B7E /* MacRemoteImage.swift */; };
 		482D6C1831D360002E8F3554 /* MacAddConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DF1A09D60750AB882EC5DF1 /* MacAddConnectionView.swift */; };
+		5B0C7D8E9F0A1B2C3D4E5F60 /* MacConnectionsBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1D8E9F0A2B3C4D5E6F7081 /* MacConnectionsBrowseView.swift */; };
 		48904BCF759FB450DC9B92AC /* PlatformCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898928A3506370EB7FCD0FF8 /* PlatformCompatibility.swift */; };
 		49740FB0D4E2989DAAEDA7C3 /* MacAVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA597E508F1FD4192290F715 /* MacAVPlayerView.swift */; };
 		4B135F675D6C38BA06F4803F /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FD915D4042EB1C1A80D05C /* Info-Mac.plist */; };
@@ -154,6 +155,7 @@
 		58FD915D4042EB1C1A80D05C /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		5A64BCC4A5AF212206C6EB3A /* MacPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerView.swift; sourceTree = "<group>"; };
 		60323ABED836DC766B05A32F /* webdav.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = webdav.png; sourceTree = "<group>"; };
+		6C1D8E9F0A2B3C4D5E6F7081 /* MacConnectionsBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacConnectionsBrowseView.swift; sourceTree = "<group>"; };
 		60CF418D9980D92E7E15716C /* SecondFloorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorView.swift; sourceTree = "<group>"; };
 		61585942DFE77AC7C9FD50CC /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		6642F766ABAB198E54EF2CFF /* VanmoCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = VanmoCore; path = Packages/VanmoCore; sourceTree = SOURCE_ROOT; };
@@ -412,6 +414,7 @@
 			isa = PBXGroup;
 			children = (
 				1DF1A09D60750AB882EC5DF1 /* MacAddConnectionView.swift */,
+				6C1D8E9F0A2B3C4D5E6F7081 /* MacConnectionsBrowseView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -925,6 +928,7 @@
 			files = (
 				49740FB0D4E2989DAAEDA7C3 /* MacAVPlayerView.swift in Sources */,
 				482D6C1831D360002E8F3554 /* MacAddConnectionView.swift in Sources */,
+				5B0C7D8E9F0A1B2C3D4E5F60 /* MacConnectionsBrowseView.swift in Sources */,
 				B68EC4B95F8D05BE5E67DD73 /* MacAppState.swift in Sources */,
 				0FF17D988CF0CB2C99AB934A /* MacConnectionTypeGroups.swift in Sources */,
 				2A2B6EB9673A6E70E8E26511 /* MacConnectionsViewModel.swift in Sources */,

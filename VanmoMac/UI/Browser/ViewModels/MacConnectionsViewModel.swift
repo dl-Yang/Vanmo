@@ -52,6 +52,18 @@ final class MacConnectionsViewModel: ObservableObject {
         return savedConnections.first { $0.id == selectedConnectionID }
     }
 
+    var canBookmarkFoldersInSelectedConnection: Bool {
+        guard let selectedConnection else { return false }
+        switch selectedConnection.type {
+        case .localFolder, .smb, .webdav, .alist, .fnos:
+            return true
+        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk, .baiduNetdisk:
+            return true
+        default:
+            return false
+        }
+    }
+
     // MARK: - Load & Auto-Reconnect
 
     func loadSavedConnections() async {
@@ -403,9 +415,11 @@ final class MacConnectionsViewModel: ObservableObject {
     }
 
     func openDirectory(_ file: RemoteFile) async {
-        guard file.isDirectory else { return }
+        guard file.isDirectory, !isBrowsingFiles else { return }
+        let targetPath = normalizedDirectoryPath(file.path)
+        guard targetPath != currentPath else { return }
         let previousPath = currentPath
-        if await loadDirectory(path: file.path) {
+        if await loadDirectory(path: targetPath) {
             pathStack.append(previousPath)
         }
     }
@@ -418,6 +432,14 @@ final class MacConnectionsViewModel: ObservableObject {
         guard let previousPath = pathStack.popLast() else { return }
         if !(await loadDirectory(path: previousPath)) {
             pathStack.append(previousPath)
+        }
+    }
+
+    func navigateToDirectory(_ targetPath: String) async {
+        let normalized = normalizedDirectoryPath(targetPath)
+        guard normalized != currentPath else { return }
+        if await loadDirectory(path: normalized) {
+            pathStack = parentPathsLeading(to: normalized)
         }
     }
 
@@ -500,6 +522,45 @@ final class MacConnectionsViewModel: ObservableObject {
 
     func isChannelPlaybackFailed(_ file: RemoteFile) -> Bool {
         failedChannelPaths.contains(file.path)
+    }
+
+    // MARK: - Folder Bookmarks
+
+    func isFolderBookmarked(_ file: RemoteFile) -> Bool {
+        guard file.isDirectory,
+              let connectionId = selectedConnectionID else {
+            return false
+        }
+        return folderBookmark(connectionId: connectionId, path: file.path) != nil
+    }
+
+    func toggleFolderBookmark(_ file: RemoteFile) {
+        guard file.isDirectory,
+              canBookmarkFoldersInSelectedConnection,
+              let context = modelContext,
+              let connection = selectedConnection else {
+            return
+        }
+
+        if let existing = folderBookmark(connectionId: connection.id, path: file.path) {
+            context.delete(existing)
+        } else {
+            let bookmark = FolderBookmark(
+                title: folderBookmarkTitle(for: file),
+                connectionId: connection.id,
+                connectionName: connection.name,
+                path: file.path
+            )
+            context.insert(bookmark)
+            CloudSyncCoordinator.shared.markFolderBookmarkChanged(bookmark)
+        }
+
+        do {
+            try context.save()
+            CloudSyncCoordinator.shared.requestSync(reason: "folder-bookmark", context: context)
+        } catch {
+            VanmoLogger.library.error("[MacConnections] Folder bookmark save failed: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Connect & Scan
@@ -708,6 +769,46 @@ final class MacConnectionsViewModel: ObservableObject {
 
     private func normalizedDirectoryPath(_ path: String) -> String {
         path.isEmpty ? "/" : path
+    }
+
+    private func parentPathsLeading(to path: String) -> [String] {
+        let normalized = normalizedDirectoryPath(path)
+        guard normalized != "/" else { return [] }
+
+        var segments = normalized.split(separator: "/").map(String.init)
+        guard !segments.isEmpty else { return [] }
+        segments.removeLast()
+
+        guard !segments.isEmpty else { return ["/"] }
+
+        var stack: [String] = ["/"]
+        var current = ""
+        for segment in segments {
+            current = current.isEmpty ? "/\(segment)" : (current as NSString).appendingPathComponent(segment)
+            stack.append(current)
+        }
+        return stack
+    }
+
+    private func folderBookmark(connectionId: UUID, path: String) -> FolderBookmark? {
+        guard let context = modelContext else { return nil }
+        let targetConnectionId = connectionId
+        let targetPath = path
+        let descriptor = FetchDescriptor<FolderBookmark>(
+            predicate: #Predicate<FolderBookmark> { bookmark in
+                bookmark.connectionId == targetConnectionId
+                    && bookmark.path == targetPath
+                    && bookmark.deletedAt == nil
+            }
+        )
+        return try? context.fetch(descriptor).first
+    }
+
+    private func folderBookmarkTitle(for file: RemoteFile) -> String {
+        let trimmed = file.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        let last = (file.path as NSString).lastPathComponent
+        return last.isEmpty ? file.path : last
     }
 
     private func fileSortPredicate(_ lhs: RemoteFile, _ rhs: RemoteFile) -> Bool {

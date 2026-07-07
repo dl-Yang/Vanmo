@@ -455,10 +455,10 @@ private var browserServiceConnectionID: UUID?
 
 ### 1.2 连接文件浏览视图 — P0，复用度：中
 
-- [ ] 新建 `VanmoMac/UI/Browser/Views/MacConnectionsBrowseView.swift`
-- [ ] 面包屑导航 + 文件/文件夹列表
-- [ ] 双击/单击播放视频、进入子目录
-- [ ] 右键菜单：编辑、删除、全量重扫、添加书签
+- [x] 新建 `VanmoMac/UI/Browser/Views/MacConnectionsBrowseView.swift`
+- [x] 面包屑导航 + 文件/文件夹列表
+- [x] 双击/单击播放视频、进入子目录
+- [x] 右键菜单：编辑、删除、全量重扫、添加书签
 
 ### 1.3 侧边栏接线 — P0
 
