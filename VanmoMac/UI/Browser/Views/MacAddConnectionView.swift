@@ -531,6 +531,9 @@ struct MacAddConnectionView: View {
             : false
         port = "\(defaultPort(for: type, useHTTPS: useHTTPS))"
         applyDefaults(for: type)
+        // 若 host 已是带 scheme 无端口的完整 URL，重置默认端口后需重新套用标准端口，
+        // 避免「先粘贴 https://host、后选择 Emby」时端口又被改回 8096。
+        applyHostSchemeDefaults()
         if !type.isLocal {
             folderURL = nil
             folderBookmark = nil
@@ -778,7 +781,10 @@ struct MacAddConnectionView: View {
 
     private func applyHostSchemeDefaults() {
         guard supportsHTTPS(for: selectedType) else { return }
-        guard let components = urlComponents(from: host.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        let trimmed = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let components = urlComponents(from: trimmed) else { return }
+        let hasExplicitScheme = trimmed.lowercased().hasPrefix("http://")
+            || trimmed.lowercased().hasPrefix("https://")
         if components.scheme?.lowercased() == "https" {
             useHTTPS = true
         } else if components.scheme?.lowercased() == "http" {
@@ -786,6 +792,11 @@ struct MacAddConnectionView: View {
         }
         if let componentPort = components.port {
             port = "\(componentPort)"
+        } else if hasExplicitScheme {
+            // 用户粘贴了带 scheme 但不带端口的完整 URL（如 https://emby.example.com）：
+            // 应使用该 scheme 的标准端口（https→443 / http→80），而不是媒体服务器的
+            // 默认端口（如 Emby 8096），否则会拼出 https://host:8096 这类错误地址。
+            port = components.scheme?.lowercased() == "http" ? "80" : "443"
         }
     }
 
