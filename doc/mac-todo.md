@@ -341,10 +341,117 @@ gantt
 
 ### 1.1 扩展 Connections ViewModel — P0，复用度：高
 
-- [ ] 移植 iOS 浏览相关状态：`selectedConnectionID`、`currentPath`、`pathStack`、`files`、`isBrowsingFiles`
-- [ ] 移植方法：`enterConnection`、`navigateTo`、`navigateUp`、`play(RemoteFile)`、`loadDirectory`
-- [ ] 移植连接状态：`ConnectionStatus`、`connectionErrorMessages`
-- [ ] 修改/扩展：`MacConnectionsViewModel.swift`
+- [x] 移植 iOS 浏览相关状态：`selectedConnectionID`、`currentPath`、`pathStack`、`files`、`isBrowsingFiles`
+- [x] 移植方法：`enterConnection`、`navigateTo`、`navigateUp`、`play(RemoteFile)`、`loadDirectory`
+- [x] 移植连接状态：`ConnectionStatus`、`connectionErrorMessages`
+- [x] 修改/扩展：`MacConnectionsViewModel.swift`
+
+#### 执行计划
+
+**目标文件：** `VanmoMac/UI/Browser/ViewModels/MacConnectionsViewModel.swift`
+
+**参考实现：**
+
+| mac-todo 名称 | iOS 源文件 | iOS 实际 API |
+|---|---|---|
+| 浏览状态 | `Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift` | `selectedConnectionID`、`currentPath`、`pathStack`、`files`、`isBrowsingFiles` |
+| 目录方法 | 同上 | `selectConnection`、`openDirectory`、`goBackDirectory`、`loadDirectory` |
+| 连接状态 | 同上 | `ConnectionStatus`、`connectionStatuses`、`connectionErrorMessages` |
+| 播放 | `Vanmo/Features/Browser/Views/BrowserView.swift` | `streamURL(for:)` + 构造 `MediaItem` → `appState.play` |
+
+**共享依赖（无需新建）：** `RemoteFile`、`SavedConnection`、`RemoteFileService`、`RemoteServiceFactory`、`ConnectionConfig`、`FileNameParser`（均在 `Packages/VanmoCore`）；播放入口 `MacAppState.play(_:from:)`（`VanmoMac/App/MacAppState.swift`）。
+
+**当前 Mac 缺口：** 已有连接 CRUD、OAuth、`connectAndScan`、本地文件夹 `activeLocalServices` 缓存；缺少浏览状态、浏览专用 service 生命周期、`ConnectionStatus` 状态机、`streamURL` / `play` 链路。
+
+---
+
+**Step 1 — 补充浏览状态属性**
+
+在 `MacConnectionsViewModel` 增加（对齐 iOS `ConnectionsViewModel` 第 27–36、42–46 行）：
+
+```swift
+@Published private(set) var selectedConnectionID: UUID?
+@Published private(set) var currentPath = "/"
+@Published private(set) var pathStack: [String] = []
+@Published private(set) var files: [RemoteFile] = []
+@Published private(set) var isBrowsingFiles = false
+@Published private(set) var fileBrowserErrorMessage: String?
+private var connectionStatuses: [UUID: ConnectionStatus] = [:]
+@Published private(set) var connectionErrorMessages: [UUID: String] = [:]
+private var browserService: RemoteFileService?
+private var browserServiceConnectionID: UUID?
+```
+
+同文件顶部定义 `ConnectionStatus`（`idle` / `connecting` / `connected` / `failed`），与 iOS 保持一致。增加计算属性 `selectedConnection` 与查询方法 `connectionStatus(for:)`、`connectionErrorMessage(for:)`。
+
+**Step 2 — 移植目录浏览方法**
+
+| mac-todo | 实现方法 | 行为 |
+|---|---|---|
+| `enterConnection` | `selectConnection(_:)` | 切换连接时重置 `currentPath`/`pathStack`/`files`，断开旧 `browserService`，再 `loadDirectory(path: "/")` |
+| `navigateTo` | `openDirectory(_:)` | 仅目录项；`loadDirectory` 成功后把旧路径压入 `pathStack` |
+| `navigateUp` | `goBackDirectory()` | `pathStack.popLast()` 后 `loadDirectory`；失败则回滚栈 |
+| `loadDirectory` | `loadDirectory(path:)` | 通过 `browserFileService` 调 `listDirectory`，排序写入 `files`，更新 `currentPath` |
+
+`loadDirectory` 核心流程：
+
+1. 无 `selectedConnection` → `resetFileBrowser()` 并返回 `false`
+2. `isBrowsingFiles = true`，`connectionStatuses[id] = .connecting`
+3. `browserFileService(for:)` → `listDirectory(path:)` → `files.sorted(by: fileSortPredicate)`
+4. 成功：`.connected`，更新 `lastConnectedAt` 并保存
+5. 失败：清空 `files`，写入 `fileBrowserErrorMessage`，`.failed`
+
+辅助方法一并移植：`normalizedDirectoryPath`、`fileSortPredicate`、`userFacingFileBrowserMessage`、`resetFileBrowser`、`reconcileSelectedConnection`。
+
+**Step 3 — 浏览专用 Service 生命周期**
+
+移植 `browserFileService(for:)` / `disconnectBrowserServiceIfNeeded()`：
+
+- **本地文件夹**：复用已有 `activeLocalServices`，浏览期间**不断开**
+- **远端 / OAuth**：浏览期间保持 `browserService` 长连接；切换连接或 `resetFileBrowser` 时再 `disconnect`
+- **与 `connectAndScan` 分离**：扫描用临时 service，扫完对非本地连接 `disconnect`；浏览用独立 `browserService`，避免互相踩连接
+
+**Step 4 — 扩展 `connectAndScan` 连接状态**
+
+在现有 `connectAndScan` 中写入状态机：
+
+- 开始：`connectionStatuses[id] = .connecting`
+- 成功：`.connected`，清除 `connectionErrorMessages[id]`
+- 失败：`.failed`，写入 `connectionErrorMessages[id] = error.localizedDescription`（`showErrorAlert == false` 时仅写状态，不弹窗）
+
+**Step 5 — 播放 URL 与 `play(RemoteFile)`**
+
+移植 `streamURL(for: RemoteFile)`：通过 `browserFileService` 调 `service.streamURL(for:)`。
+
+`play(RemoteFile)` 对齐 iOS `BrowserView.play`（第 330–369 行）：
+
+1. 若 `connection.type.usesEphemeralStreamURLs`（如百度网盘）→ `catalogPlaybackURL(serverPath:)`
+2. 否则 → `streamURL(for:)`
+3. `FileNameParser.parse(file.name)` 构造 `MediaItem`（标题、类型、季集、年份等）
+4. 设置 `serverId`、`sourceConnectionId`、`originalFileName`、`container`
+5. 调用 `MacAppState.play(item)`
+
+在 VM 中提供 `play(_ file: RemoteFile, via appState: MacAppState)`，将上述逻辑内聚到 ViewModel，供 1.2 浏览视图直接调用。
+
+**Step 6 — 与现有 CRUD 集成**
+
+| 现有方法 | 需补充的浏览态处理 |
+|---|---|
+| `deleteConnection` | 若删除的是 `selectedConnectionID` → `resetFileBrowser()` + `disconnectBrowserServiceIfNeeded()` |
+| `updateConnection` | 编辑后 `activeLocalServices.removeValue` + 若当前选中则重置浏览路径并重新 `loadDirectory` |
+| `loadSavedConnections` | 末尾调用 `reconcileSelectedConnection()`（选中连接已不存在时清空或回退到首个连接） |
+| `saveConnection` / OAuth 成功 | 可选：自动 `selectConnection` 进入浏览（与 iOS 行为对齐） |
+
+**Step 7 — 1.1 验收标准（纯 VM 层，不含 UI）**
+
+- [x] `selectConnection` → `loadDirectory` → `openDirectory` → `goBackDirectory` 状态机正确
+- [x] SMB / WebDAV / 本地文件夹 `listDirectory` 返回排序后的 `files`
+- [x] `streamURL(for:)` 对常见连接类型返回可播放 URL
+- [x] `play(RemoteFile, via:)` 能构造 `MediaItem` 并触发 `MacAppState.play`
+- [x] `connectAndScan` 失败时 `connectionErrorMessages` 有值；成功时 `.connected`
+- [x] 切换连接时旧 `browserService` 正确断开；本地文件夹 access 持续有效
+
+**明确不在 1.1：** `MacConnectionsBrowseView`（1.2）、侧边栏路由（1.3）、连接管理菜单（1.4）、IPTV 完整 UI / EPG 展示（1.5）。
 
 ### 1.2 连接文件浏览视图 — P0，复用度：中
 

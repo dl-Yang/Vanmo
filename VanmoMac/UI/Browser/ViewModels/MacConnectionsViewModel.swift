@@ -2,20 +2,54 @@ import Foundation
 import SwiftData
 import VanmoCore
 
+enum ConnectionStatus {
+    case idle
+    case connecting
+    case connected
+    case failed
+}
+
 @MainActor
 final class MacConnectionsViewModel: ObservableObject {
     @Published private(set) var savedConnections: [SavedConnection] = []
     @Published private(set) var isLoading = false
     @Published private(set) var loadingMessage = ""
+    @Published private(set) var connectionErrorMessages: [UUID: String] = [:]
+    @Published private(set) var selectedConnectionID: UUID?
+    @Published private(set) var currentPath = "/"
+    @Published private(set) var pathStack: [String] = []
+    @Published private(set) var files: [RemoteFile] = []
+    @Published private(set) var isBrowsingFiles = false
+    @Published private(set) var fileBrowserErrorMessage: String?
+    @Published private(set) var failedChannelPaths: Set<String> = []
     @Published var showError = false
     @Published var errorMessage = ""
 
+    private var connectionStatuses: [UUID: ConnectionStatus] = [:]
     private var modelContext: ModelContext?
     private var didAttemptAutoReconnect = false
+    private var browserService: RemoteFileService?
+    private var browserServiceConnectionID: UUID?
+    private var epgLoadID: UUID?
+    /// 仅 localFolder 用：保留正在持有 security-scoped access 的 service 实例，
+    /// 让 App 生命周期内 file:// URL 始终可读，避免播放时权限失效。
     private var activeLocalServices: [UUID: LocalFolderService] = [:]
 
     func setModelContext(_ context: ModelContext) {
         modelContext = context
+    }
+
+    func connectionStatus(for connection: SavedConnection) -> ConnectionStatus {
+        connectionStatuses[connection.id] ?? .idle
+    }
+
+    func connectionErrorMessage(for connection: SavedConnection) -> String? {
+        connectionErrorMessages[connection.id]
+    }
+
+    var selectedConnection: SavedConnection? {
+        guard let selectedConnectionID else { return nil }
+        return savedConnections.first { $0.id == selectedConnectionID }
     }
 
     // MARK: - Load & Auto-Reconnect
@@ -28,6 +62,7 @@ final class MacConnectionsViewModel: ObservableObject {
                 sortBy: [SortDescriptor(\.lastConnectedAt, order: .reverse)]
             )
             savedConnections = try context.fetch(descriptor)
+            reconcileSelectedConnection()
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -87,6 +122,15 @@ final class MacConnectionsViewModel: ObservableObject {
             Task { await active.disconnect() }
         }
 
+        if browserServiceConnectionID == connection.id {
+            let service = browserService
+            browserService = nil
+            browserServiceConnectionID = nil
+            if !(service is LocalFolderService) {
+                Task { await service?.disconnect() }
+            }
+        }
+
         deleteMediaItems(for: connectionId)
         softDeleteFolderBookmarks(for: connectionId)
 
@@ -94,6 +138,14 @@ final class MacConnectionsViewModel: ObservableObject {
         CloudSyncCoordinator.shared.markConnectionChanged(connection)
         try? modelContext?.save()
         CloudSyncCoordinator.shared.requestSync(reason: "connection-deleted", context: modelContext)
+
+        connectionStatuses.removeValue(forKey: connectionId)
+        connectionErrorMessages.removeValue(forKey: connectionId)
+
+        let deletedSelectedConnection = selectedConnectionID == connectionId
+        if deletedSelectedConnection {
+            resetFileBrowser()
+        }
 
         Task {
             await loadSavedConnections()
@@ -169,11 +221,12 @@ final class MacConnectionsViewModel: ObservableObject {
         try? modelContext?.save()
         CloudSyncCoordinator.shared.markConnectionChanged(connection)
         CloudSyncCoordinator.shared.requestSync(reason: "connection-created", context: modelContext)
-        let didConnect = await connectAndScan(connection)
-        if didConnect {
-            await loadSavedConnections()
+        await loadSavedConnections()
+        guard let saved = savedConnections.first(where: { $0.id == connection.id }) else {
+            return false
         }
-        return didConnect
+        await selectConnection(saved)
+        return await connectAndScan(saved)
     }
 
     @discardableResult
@@ -216,12 +269,16 @@ final class MacConnectionsViewModel: ObservableObject {
             return false
         }
 
-        activeLocalServices.removeValue(forKey: connection.id)
-        let didConnect = await connectAndScan(connection)
-        if didConnect {
-            await loadSavedConnections()
+        await resetCachedServiceAfterEditing(connection)
+        resetBrowserStateAfterEditing(connection)
+        connectionStatuses[connection.id] = .idle
+        connectionErrorMessages.removeValue(forKey: connection.id)
+        await loadSavedConnections()
+
+        if selectedConnectionID == connection.id {
+            await loadDirectory(path: currentPath)
         }
-        return didConnect
+        return true
     }
 
     @discardableResult
@@ -252,11 +309,13 @@ final class MacConnectionsViewModel: ObservableObject {
         try? modelContext?.save()
         CloudSyncCoordinator.shared.markConnectionChanged(connection)
         CloudSyncCoordinator.shared.requestSync(reason: "oauth-connection-created", context: modelContext)
-        let didConnect = await connectAndScan(connection)
-        if didConnect {
-            await loadSavedConnections()
+        await loadSavedConnections()
+
+        guard let saved = savedConnections.first(where: { $0.id == connectionId }) else {
+            return false
         }
-        return didConnect
+        await selectConnection(saved)
+        return await connectAndScan(saved)
     }
 
     @discardableResult
@@ -272,7 +331,172 @@ final class MacConnectionsViewModel: ObservableObject {
             return false
         }
 
+        connectionStatuses[connection.id] = .idle
+        connectionErrorMessages.removeValue(forKey: connection.id)
         return await connectAndScan(connection)
+    }
+
+    // MARK: - File Browsing
+
+    func enterConnection(_ connection: SavedConnection) async {
+        await selectConnection(connection)
+    }
+
+    func selectConnection(_ connection: SavedConnection) async {
+        let isSameConnection = selectedConnectionID == connection.id
+        if !isSameConnection {
+            selectedConnectionID = connection.id
+            currentPath = "/"
+            pathStack = []
+            files = []
+            fileBrowserErrorMessage = nil
+            resetIPTVState()
+            await disconnectBrowserServiceIfNeeded()
+        }
+        await loadDirectory(path: currentPath)
+    }
+
+    @discardableResult
+    func loadDirectory(path: String) async -> Bool {
+        guard let connection = selectedConnection else {
+            resetFileBrowser()
+            return false
+        }
+
+        isBrowsingFiles = true
+        fileBrowserErrorMessage = nil
+        connectionStatuses[connection.id] = .connecting
+
+        do {
+            let service = try await browserFileService(for: connection)
+            let normalizedPath = normalizedDirectoryPath(path)
+            let listedFiles = try await service.listDirectory(path: normalizedPath)
+            files = listedFiles.sorted(by: fileSortPredicate)
+            currentPath = normalizedPath
+            connectionStatuses[connection.id] = .connected
+            connectionErrorMessages.removeValue(forKey: connection.id)
+            connection.lastConnectedAt = Date()
+            try? modelContext?.save()
+            isBrowsingFiles = false
+            if connection.type == .iptv {
+                await loadEPGGuide(from: service, connectionID: connection.id)
+            } else {
+                resetIPTVState()
+            }
+            return true
+        } catch {
+            VanmoLogger.network.error("[MacConnections] Failed to browse \(connection.name): \(error.localizedDescription)")
+            files = []
+            fileBrowserErrorMessage = userFacingFileBrowserMessage(for: error, connection: connection)
+            connectionStatuses[connection.id] = .failed
+            connectionErrorMessages[connection.id] = error.localizedDescription
+            isBrowsingFiles = false
+            return false
+        }
+    }
+
+    func navigateTo(_ file: RemoteFile) async {
+        await openDirectory(file)
+    }
+
+    func openDirectory(_ file: RemoteFile) async {
+        guard file.isDirectory else { return }
+        let previousPath = currentPath
+        if await loadDirectory(path: file.path) {
+            pathStack.append(previousPath)
+        }
+    }
+
+    func navigateUp() async {
+        await goBackDirectory()
+    }
+
+    func goBackDirectory() async {
+        guard let previousPath = pathStack.popLast() else { return }
+        if !(await loadDirectory(path: previousPath)) {
+            pathStack.append(previousPath)
+        }
+    }
+
+    func refreshCurrentDirectory() async {
+        if selectedConnection?.type == .iptv {
+            resetIPTVState()
+            await disconnectBrowserServiceIfNeeded()
+        }
+        await loadDirectory(path: currentPath)
+    }
+
+    func scanSelectedConnection(forceFullScan: Bool = false) async -> Bool {
+        guard let selectedConnection else { return false }
+        return await connectAndScan(selectedConnection, forceFullScan: forceFullScan)
+    }
+
+    func scanCurrentDirectory(forceFullScan: Bool = false) async -> Bool {
+        guard let selectedConnection else { return false }
+        return await connectAndScan(
+            selectedConnection,
+            forceFullScan: forceFullScan,
+            scanPath: currentPath
+        )
+    }
+
+    func streamURL(for file: RemoteFile) async throws -> URL {
+        guard let connection = selectedConnection else {
+            throw NetworkError.notConnected
+        }
+        let service = try await browserFileService(for: connection)
+        return try await service.streamURL(for: file)
+    }
+
+    func play(_ file: RemoteFile, via appState: MacAppState) async {
+        guard let connection = selectedConnection else { return }
+
+        do {
+            let url: URL
+            if connection.type.usesEphemeralStreamURLs {
+                url = connection.type.catalogPlaybackURL(serverPath: file.path)
+            } else {
+                url = try await streamURL(for: file)
+            }
+
+            let item: MediaItem
+            if connection.type == .iptv {
+                item = MediaItem(title: file.name, fileURL: url, mediaType: .movie, fileSize: file.size)
+                item.isLiveStream = true
+            } else {
+                let parsed = FileNameParser.parse(file.name)
+                item = MediaItem(
+                    title: parsed.title,
+                    fileURL: url,
+                    mediaType: parsed.isTV ? .tvEpisode : .movie,
+                    fileSize: file.size
+                )
+                item.year = parsed.year
+                item.seasonNumber = parsed.season
+                item.episodeNumber = parsed.episode
+                item.showTitle = parsed.isTV ? parsed.title : nil
+            }
+            item.serverId = file.path
+            item.sourceConnectionId = connection.id
+            item.originalFileName = file.name
+            let ext = (file.name as NSString).pathExtension
+            item.container = ext.isEmpty ? nil : ext.lowercased()
+            appState.play(item)
+        } catch {
+            if connection.type == .iptv {
+                markChannelPlaybackFailed(file)
+            }
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    func markChannelPlaybackFailed(_ file: RemoteFile) {
+        failedChannelPaths.insert(file.path)
+    }
+
+    func isChannelPlaybackFailed(_ file: RemoteFile) -> Bool {
+        failedChannelPaths.contains(file.path)
     }
 
     // MARK: - Connect & Scan
@@ -280,10 +504,13 @@ final class MacConnectionsViewModel: ObservableObject {
     @discardableResult
     func connectAndScan(
         _ connection: SavedConnection,
-        showErrorAlert: Bool = true
+        showErrorAlert: Bool = true,
+        forceFullScan: Bool = false,
+        scanPath: String? = nil
     ) async -> Bool {
+        connectionStatuses[connection.id] = .connecting
         isLoading = true
-        loadingMessage = "连接到 \(connection.name)..."
+        loadingMessage = forceFullScan ? "全量重扫 \(connection.name)..." : "连接到 \(connection.name)..."
 
         let isLocal = connection.type == .localFolder
 
@@ -307,6 +534,8 @@ final class MacConnectionsViewModel: ObservableObject {
                 service = remote
             }
 
+            connectionStatuses[connection.id] = .connected
+            connectionErrorMessages.removeValue(forKey: connection.id)
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
 
@@ -321,7 +550,7 @@ final class MacConnectionsViewModel: ObservableObject {
             if let mediaServer = service as? MediaServerService,
                connection.type != .emby,
                connection.type != .jellyfin {
-                let since = connection.lastSyncedAt
+                let since: Date? = forceFullScan ? nil : connection.lastSyncedAt
                 let syncStart = Date()
                 for try await page in mediaServer.streamMediaItems(since: since, pageSize: 500) {
                     _ = try await scanner.importServerMediaItems(
@@ -334,10 +563,10 @@ final class MacConnectionsViewModel: ObservableObject {
                 try? modelContext?.save()
             } else if connection.type != .emby && connection.type != .jellyfin {
                 if connection.type != .baiduNetdisk {
-                    let scanPath = connection.path ?? "/"
+                    let resolvedScanPath = scanPath ?? connection.path ?? "/"
                     _ = try await scanner.scanRemoteDirectory(
                         service: service,
-                        path: scanPath,
+                        path: resolvedScanPath,
                         connectionId: connection.id,
                         in: context
                     )
@@ -351,6 +580,8 @@ final class MacConnectionsViewModel: ObservableObject {
             isLoading = false
             return true
         } catch {
+            connectionStatuses[connection.id] = .failed
+            connectionErrorMessages[connection.id] = error.localizedDescription
             if showErrorAlert {
                 errorMessage = error.localizedDescription
                 showError = true
@@ -358,5 +589,142 @@ final class MacConnectionsViewModel: ObservableObject {
             isLoading = false
             return false
         }
+    }
+
+    // MARK: - Private Helpers
+
+    private func resetCachedServiceAfterEditing(_ connection: SavedConnection) async {
+        if let active = activeLocalServices.removeValue(forKey: connection.id) {
+            await active.disconnect()
+        }
+
+        if browserServiceConnectionID == connection.id {
+            await disconnectBrowserServiceIfNeeded()
+        }
+    }
+
+    private func resetBrowserStateAfterEditing(_ connection: SavedConnection) {
+        guard selectedConnectionID == connection.id else { return }
+        currentPath = "/"
+        pathStack = []
+        files = []
+        isBrowsingFiles = false
+        fileBrowserErrorMessage = nil
+        resetIPTVState()
+    }
+
+    private func reconcileSelectedConnection() {
+        if savedConnections.isEmpty {
+            resetFileBrowser()
+            return
+        }
+
+        if let selectedConnectionID,
+           savedConnections.contains(where: { $0.id == selectedConnectionID }) {
+            return
+        }
+
+        selectedConnectionID = savedConnections.first?.id
+        currentPath = "/"
+        pathStack = []
+        files = []
+        fileBrowserErrorMessage = nil
+    }
+
+    private func loadEPGGuide(from service: RemoteFileService, connectionID: UUID) async {
+        guard let iptvService = service as? IPTVService else {
+            resetIPTVState()
+            return
+        }
+
+        let loadID = UUID()
+        epgLoadID = loadID
+        _ = await iptvService.fetchEPGGuide()
+        guard epgLoadID == loadID,
+              selectedConnectionID == connectionID,
+              selectedConnection?.type == .iptv else {
+            return
+        }
+        epgLoadID = nil
+    }
+
+    private func resetIPTVState() {
+        epgLoadID = nil
+        failedChannelPaths = []
+    }
+
+    private func resetFileBrowser() {
+        selectedConnectionID = nil
+        currentPath = "/"
+        pathStack = []
+        files = []
+        isBrowsingFiles = false
+        fileBrowserErrorMessage = nil
+        resetIPTVState()
+    }
+
+    private func browserFileService(for connection: SavedConnection) async throws -> RemoteFileService {
+        if browserServiceConnectionID == connection.id, let browserService {
+            return browserService
+        }
+
+        await disconnectBrowserServiceIfNeeded()
+
+        let service: RemoteFileService
+        if connection.type == .localFolder {
+            if let cached = activeLocalServices[connection.id] {
+                service = cached
+            } else {
+                let local = LocalFolderService()
+                try await local.connect(config: ConnectionConfig(from: connection))
+                activeLocalServices[connection.id] = local
+                service = local
+            }
+        } else {
+            let password = try KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+            let remote = RemoteServiceFactory.create(for: connection.type)
+            try await remote.connect(config: ConnectionConfig(from: connection, password: password))
+            service = remote
+        }
+
+        browserService = service
+        browserServiceConnectionID = connection.id
+        return service
+    }
+
+    private func disconnectBrowserServiceIfNeeded() async {
+        guard let browserService else { return }
+        if !(browserService is LocalFolderService) {
+            await browserService.disconnect()
+        }
+        self.browserService = nil
+        browserServiceConnectionID = nil
+    }
+
+    private func normalizedDirectoryPath(_ path: String) -> String {
+        path.isEmpty ? "/" : path
+    }
+
+    private func fileSortPredicate(_ lhs: RemoteFile, _ rhs: RemoteFile) -> Bool {
+        if lhs.isDirectory != rhs.isDirectory {
+            return lhs.isDirectory && !rhs.isDirectory
+        }
+        return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+    }
+
+    private func userFacingFileBrowserMessage(for error: Error, connection: SavedConnection) -> String {
+        if connection.type == .mega {
+            return "MEGA 完整接入需要官方 SDK（端到端加密）支持，当前仅保留入口，暂不可浏览。"
+        }
+        if connection.type.isOfficialCloudDrive {
+            return "\(connection.type.displayName) 官方接入仍在合规调研中，当前不会使用非官方接口。可先通过 AList/WebDAV 间接连接。"
+        }
+        if connection.type.supportsOAuthLogin {
+            return "\(connection.type.displayName) 接入尚未就绪：\(error.localizedDescription)"
+        }
+        if connection.type == .ftp || connection.type == .sftp || connection.type == .nfs || connection.type == .dlna {
+            return "\(connection.type.displayName) 文件浏览暂不可用或该目录为空"
+        }
+        return error.localizedDescription
     }
 }
