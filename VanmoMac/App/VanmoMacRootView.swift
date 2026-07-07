@@ -5,6 +5,7 @@ struct VanmoMacRootView: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
+    @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
@@ -38,8 +39,11 @@ struct VanmoMacRootView: View {
         .task {
             connectionsViewModel.setModelContext(modelContext)
             libraryViewModel.setModelContext(modelContext)
+            searchViewModel.setModelContext(modelContext)
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
+            await connectionsViewModel.loadSavedConnections()
+            searchViewModel.setConnections(connectionsViewModel.savedConnections)
             await refreshLibrarySections()
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -47,7 +51,14 @@ struct VanmoMacRootView: View {
             Task {
                 await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
                 await connectionsViewModel.loadSavedConnections()
+                searchViewModel.setConnections(connectionsViewModel.savedConnections)
                 await refreshLibrarySections()
+            }
+        }
+        .onChange(of: connectionsViewModel.savedConnections.map(\.id)) { _, _ in
+            searchViewModel.setConnections(connectionsViewModel.savedConnections)
+            if !searchViewModel.searchText.isEmpty {
+                searchViewModel.search()
             }
         }
     }
@@ -76,26 +87,37 @@ struct VanmoMacRootView: View {
     private var mainContent: some View {
         if let selectedItem = appState.selectedMediaItem {
             MacMediaDetailView(item: selectedItem)
-        } else if case .connectionBrowser = appState.contentRoute {
-            MacConnectionsBrowseView()
-        } else if case .libraryFavorites = appState.contentRoute {
-            MacFavoritesListView()
-        } else if case .libraryCollectionFolder = appState.contentRoute,
-                  let folder = appState.routeCollectionFolder,
-                  let connection = appState.routeConnection {
-            MacCollectionFolderListView(folder: folder, connection: connection)
-        } else if case .libraryScannedLibrary = appState.contentRoute,
-                  let connection = appState.routeConnection,
-                  let collectionType = scannedCollectionType {
-            MacScannedLibraryListView(connection: connection, collectionType: collectionType)
-        } else if case .libraryEmbyFolderBrowse = appState.contentRoute,
-                  let container = appState.routeContainerItem {
-            MacEmbyFolderBrowseView(container: container)
-        } else if case let .libraryScannedShowDetail(_, showTitle) = appState.contentRoute,
-                  let connection = appState.routeConnection {
-            MacScannedShowDetailView(connection: connection, showTitle: showTitle)
         } else {
-            MacLibraryHomeView()
+            switch appState.contentRoute {
+            case .library:
+                MacLibraryHomeView()
+            case .libraryFavorites:
+                MacFavoritesListView()
+            case .libraryCollectionFolder:
+                if let folder = appState.routeCollectionFolder,
+                   let connection = appState.routeConnection {
+                    MacCollectionFolderListView(folder: folder, connection: connection)
+                }
+            case .libraryScannedLibrary:
+                if let connection = appState.routeConnection,
+                   let collectionType = scannedCollectionType {
+                    MacScannedLibraryListView(connection: connection, collectionType: collectionType)
+                }
+            case .libraryEmbyFolderBrowse:
+                if let container = appState.routeContainerItem {
+                    MacEmbyFolderBrowseView(container: container)
+                }
+            case let .libraryScannedShowDetail(_, showTitle):
+                if let connection = appState.routeConnection {
+                    MacScannedShowDetailView(connection: connection, showTitle: showTitle)
+                }
+            case .connectionBrowser:
+                MacConnectionsBrowseView()
+            case .search:
+                MacSearchResultsView()
+            case .settings:
+                MacSettingsView()
+            }
         }
     }
 
@@ -110,5 +132,6 @@ struct VanmoMacRootView: View {
         .environmentObject(MacAppState())
         .environmentObject(MacLibraryViewModel())
         .environmentObject(MacConnectionsViewModel())
+        .environmentObject(MacSearchViewModel())
         .environmentObject(CloudSyncCoordinator.shared)
 }

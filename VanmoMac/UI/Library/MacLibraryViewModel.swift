@@ -782,10 +782,7 @@ final class MacLibraryViewModel: ObservableObject {
     }
 
     private func currentConnectionsSnapshot() -> [SavedConnection]? {
-        let ids = Set(
-            embyConnectionsById.keys
-                .union(scannedConnectionsById.keys)
-        )
+        let ids = Set(embyConnectionsById.keys).union(scannedConnectionsById.keys)
         guard !ids.isEmpty else { return nil }
         return Array(embyConnectionsById.values) + Array(scannedConnectionsById.values)
     }

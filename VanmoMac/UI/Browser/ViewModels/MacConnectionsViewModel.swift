@@ -107,6 +107,11 @@ final class MacConnectionsViewModel: ObservableObject {
             return
         }
 
+        guard UserDefaults.standard.object(forKey: "library.autoScan") as? Bool ?? true else {
+            VanmoLogger.network.info("[MacConnections] Auto-reconnect skipped: library.autoScan disabled")
+            return
+        }
+
         VanmoLogger.network.info("[MacConnections] Auto-reconnect to \(target.name)")
         await connectAndScan(target, showErrorAlert: false)
     }

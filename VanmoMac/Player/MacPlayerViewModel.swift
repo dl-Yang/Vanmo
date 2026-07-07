@@ -364,7 +364,6 @@ final class MacPlayerViewModel: ObservableObject {
         } else {
             seekPosition = 0
         }
-
         if seekPosition > 0 {
             seek(toSeconds: seekPosition)
         }

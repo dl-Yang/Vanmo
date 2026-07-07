@@ -1,5 +1,10 @@
 ---
+description: 
 alwaysApply: true
 ---
 
 当本轮任务解决后将修改内容输出总结，要求条理清晰，覆盖完全。然后使用 post-task-code-reviewer subagent 审查刚才的变更总结，并把结果交回主模型继续优化。
+
+红线规则：
+- 纯文本计划不进行审查
+- git commit 和 git push 不进行审查

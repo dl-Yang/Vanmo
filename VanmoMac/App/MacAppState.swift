@@ -61,6 +61,8 @@ enum MacContentRoute: Equatable {
     case libraryEmbyFolderBrowse
     case libraryScannedShowDetail(connectionId: UUID, showTitle: String)
     case connectionBrowser(activeConnectionId: UUID)
+    case search
+    case settings
 }
 
 @MainActor
@@ -98,6 +100,16 @@ final class MacAppState: ObservableObject {
             return id
         }
         return nil
+    }
+
+    var isSearchActive: Bool {
+        if case .search = contentRoute { return true }
+        return false
+    }
+
+    var isSettingsActive: Bool {
+        if case .settings = contentRoute { return true }
+        return false
     }
 
     func selectLibrarySection(_ section: MacSidebarSection) {
@@ -151,6 +163,16 @@ final class MacAppState: ObservableObject {
     func backFromLibrarySubRoute() {
         clearLibrarySubRouteContext()
         contentRoute = .library
+    }
+
+    func selectSearch() {
+        contentRoute = .search
+        closeDetail()
+    }
+
+    func selectSettings() {
+        contentRoute = .settings
+        closeDetail()
     }
 
     func enterConnectionBrowser(_ connection: SavedConnection) {

@@ -18,6 +18,7 @@ struct VanmoMacApp: App {
     @StateObject private var appState = MacAppState()
     @StateObject private var libraryViewModel = MacLibraryViewModel()
     @StateObject private var connectionsViewModel = MacConnectionsViewModel()
+    @StateObject private var searchViewModel = MacSearchViewModel()
 
     var sharedModelContainer: ModelContainer = ModelContainerFactory.makeSharedContainer()
 
@@ -28,6 +29,7 @@ struct VanmoMacApp: App {
                 .environmentObject(appState)
                 .environmentObject(libraryViewModel)
                 .environmentObject(connectionsViewModel)
+                .environmentObject(searchViewModel)
                 .frame(minWidth: 960, minHeight: 640)
         }
         .modelContainer(sharedModelContainer)
@@ -74,6 +76,13 @@ struct VanmoMacApp: App {
                     MacPlayerCommandRouter.post(.macPlayerClose)
                 }
                 .keyboardShortcut(.escape, modifiers: [])
+            }
+
+            CommandGroup(after: .appSettings) {
+                Button("Settings...") {
+                    appState.selectSettings()
+                }
+                .keyboardShortcut(",", modifiers: .command)
             }
         }
     }

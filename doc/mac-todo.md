@@ -2,7 +2,7 @@
 
 > 基于 Vanmo iOS（`Vanmo/`，约 74 个 Swift 文件）与 VanmoMac（`VanmoMac/`，约 28 个 Swift 文件）对比整理。  
 > 核心业务逻辑在 `Packages/VanmoCore`，Mac 端以新建 View + 薄 ViewModel 为主，从 iOS 移植业务逻辑而非复制 SwiftUI 视图。  
-> 最后更新：2026-07-07（阶段 0 完成；阶段 1 的 1.1–1.4 完成，1.5 IPTV 延后；**阶段 2 的 2.1–2.4 ✅ 已完成**，2.5 延后；**阶段 4A / 线 2（C1–C7）✅ 已完成**）
+> 最后更新：2026-07-07（阶段 0 完成；阶段 1 的 1.1–1.4 完成，1.5 IPTV 延后；**阶段 2 的 2.1–2.4 ✅ 已完成**，2.5 延后；**阶段 4A / 线 2（C1–C7）✅ 已完成**；**线 3 PR-0→D3 ✅ 已完成**，G 未做）
 
 ---
 
@@ -32,9 +32,9 @@
 | 应用壳层 / 导航 | TabView 四 Tab | 侧边栏 + 主内容 | 🟡 |
 | 媒体库首页 | 多数据源聚合分区 + 子列表 | 首页 sections + 5 子列表 + 排序/列表切换 | 🟡 |
 | 连接管理 | 添加 + 浏览 + 书签 + IPTV | 添加 + 浏览 + 管理菜单 + 浏览页书签（无首页书签区/IPTV） | 🟡 |
-| 搜索 | 本地 + 远程并发 | 静态占位 UI | 🔴 |
-| 设置 | 完整 8 组 | 无 | 🔴 |
-| 媒体详情 | 完整交互 + 元数据 + 剧集 | 只读 + 占位按钮 | 🔴 |
+| 搜索 | 本地 + 远程并发 | 侧边栏搜索 + 分组结果页 | 🟡 |
+| 设置 | 完整 8 组 | P0/P1 分组（iCloud、播放、字幕） | 🟡 |
+| 媒体详情 | 完整交互 + 元数据 + 剧集 | 收藏/已看/元数据/季集/Collections | 🟡 |
 | 播放器 | AVPlayer + KSPlayer | AVPlayer 字幕/选轨/倍速/全屏/选集 | 🟡 |
 | VanmoCore 复用 | 全面 | 生命周期/播放闭环已接线 | 🟡 |
 
@@ -65,8 +65,9 @@
 | ✅ 阶段 1（1.1–1.4） | 浏览 VM、浏览视图、侧边栏路由、连接管理菜单；浏览页文件夹书签 CRUD |
 | ✅ 阶段 2（2.1–2.4） | 线 1：B1 VM sections/缓存、B2 首页分区、B3 五个子列表、B4 列表排序 |
 | ✅ 阶段 4A / 线 2（C） | 4A.1–4A.7：字幕、选轨、在线字幕、倍速/缩放、全屏快捷键、选集/自动下一集、缓冲条 |
+| ✅ 线 3（PR-0→D3） | 路由定稿、搜索 VM/UI、详情交互、设置 P0/P1、偏好联动 |
 | ⏸️ 明确延后 | **1.5 IPTV / EPG**、**2.5 流派/地区筛选（B5）**（本轮不做） |
-| 🔴 待启动 | 阶段 3（E+F）、5（D）、6（收尾）；4B（KSPlayer）可选 |
+| 🔴 待启动 | 6（收尾 / G）；4B（KSPlayer）可选 |
 
 **已解锁：** 0.2+0.3 ✅ → 轨道 C 可全面启动；阶段 0 全完成 ✅ → B / E1 / F / D 骨架可并行；阶段 1 浏览路由 ✅ → E2 可直接规划侧边栏分区（无需再等 A2）。
 
@@ -142,16 +143,16 @@
 
 > **约束：** `MacAppState`、`VanmoMacRootView`、`MacSidebarView` 多任务共用 → **线内须串行 + 分区约定**。
 
-| 步骤 | 任务 | 并行性 | 工期 | 验收 |
-|------|------|--------|------|------|
-| **PR-0** | 扩展路由枚举：`library` / `browse` / `search` / `settings` / `detail` | **三线开工前 1 次合并** | 0.5 天 | 各线只加 case |
-| **D1** | 5.1 设置骨架 + 侧边栏/菜单 Settings 入口 | 线 3 串行起点 | 1–2 天 | 空设置页可打开 |
-| **E1** | 3.1 `MacSearchViewModel`（本地+远程、250ms 防抖） | **与 D1/F 并行**（新建文件） | 2–3 天 | VM 返回分组结果 |
-| **F** | 3.3 详情交互（收藏/已看/元数据/季集/Collections） | **与 E1 并行**（`MacMediaDetailView`） | 4–5 天 | 收藏双端同步；TV 可选集 |
-| **E2** | 3.2 搜索框 + `MacSearchResultsView` | **等 D1 侧边栏分区定稿** | 2 天 | 搜索 → 结果 → 详情 |
-| **D2** | 5.2 P0 iCloud + P1 播放/字幕分组 | 与 E2 可部分并行 | 2–3 天 | key 与 iOS 一致 |
-| **D3** | 5.3 播放器/扫描读偏好 | **等线 2 C4 就绪后联调** | 1–2 天 | 改倍速设置 → 播放器生效 |
-| **G** | 6.6 CI xcodebuild macOS + cloud-sync 脚本 | **随时并行** | 1–2 天 | CI 绿 |
+| 步骤 | 任务 | 并行性 | 工期 | 验收 | 状态 |
+|------|------|--------|------|------|------|
+| **PR-0** | 扩展路由枚举：`library` + 库子路由 / `connectionBrowser` / `search` / `settings` / `detail` | **三线开工前 1 次合并** | 0.5 天 | 各线只加 case | ✅ |
+| **D1** | 5.1 设置骨架 + 侧边栏/菜单 Settings 入口 | 线 3 串行起点 | 1–2 天 | 空设置页可打开 | ✅ |
+| **E1** | 3.1 `MacSearchViewModel`（本地+远程、250ms 防抖） | **与 D1/F 并行**（新建文件） | 2–3 天 | VM 返回分组结果 | ✅ |
+| **F** | 3.3 详情交互（收藏/已看/元数据/季集/Collections） | **与 E1 并行**（`MacMediaDetailView`） | 4–5 天 | 收藏双端同步；TV 可选集 | ✅ |
+| **E2** | 3.2 搜索框 + `MacSearchResultsView` | **等 D1 侧边栏分区定稿** | 2 天 | 搜索 → 结果 → 详情 | ✅ |
+| **D2** | 5.2 P0 iCloud + P1 播放/字幕分组 | 与 E2 可部分并行 | 2–3 天 | key 与 iOS 一致 | ✅ |
+| **D3** | 5.3 播放器/扫描读偏好 | **等线 2 C4 就绪后联调** | 1–2 天 | 改倍速设置 → 播放器生效 | ✅（基础 AVPlayer 路径） |
+| **G** | 6.6 CI xcodebuild macOS + cloud-sync 脚本 | **随时并行** | 1–2 天 | CI 绿 | 🔴 未做 |
 
 **线 3 侧边栏分区约定（线 1 已完成连接区，线 3 只改以下区域）：**
 
@@ -566,28 +567,28 @@ private var browserServiceConnectionID: UUID?
 
 ### 3.1 搜索 ViewModel — P0，复用度：高 `轨道 E`
 
-- [ ] 新建 `MacSearchViewModel`（直接复用/薄封装 iOS `SearchViewModel`）
-- [ ] 本地 SwiftData 搜索 + 远程连接并发搜索（Emby/Plex 等）
-- [ ] 按连接分组：`SearchResultSection`
-- [ ] 防抖 250ms
+- [x] 新建 `MacSearchViewModel`（直接复用/薄封装 iOS `SearchViewModel`）
+- [x] 本地 SwiftData 搜索 + 远程连接并发搜索（Emby/Plex 等）
+- [x] 按连接分组：`SearchResultSection`
+- [x] 防抖 250ms
 
 ### 3.2 搜索 UI — P0 `轨道 E · ⚠️ 与 A2 协调 MacSidebarView`
 
-- [ ] `MacSearchField` 改为可输入 `TextField` + 绑定 `searchText`
-- [ ] 新建 `MacSearchResultsView`（主内容区或搜索结果覆盖层）
-- [ ] 点击结果 → `MacMediaDetailView`
-- [ ] 修改：`MacSidebarView.swift`
+- [x] `MacSearchField` 改为可输入 `TextField` + 绑定 `searchText`
+- [x] 新建 `MacSearchResultsView`（主内容区或搜索结果覆盖层）
+- [x] 点击结果 → `MacMediaDetailView`
+- [x] 修改：`MacSidebarView.swift`
 
 ### 3.3 详情页交互 — P0/P1 `轨道 F · 🔀 可与 A/B/C 并行`
 
-- [ ] 收藏切换 + `CloudSyncCoordinator.markMediaFavoriteChanged`（当前按钮空 action）
-- [ ] 已看标记切换 + 进度云同步
-- [ ] 接入 `MetadataRefreshCoordinator` 元数据刷新
-- [ ] Cast 从元数据缓存读头像与角色名（当前仅 `item.cast` 字符串，无头像）
-- [ ] TV Show 季/集列表 + 选集播放（当前硬编码 `"Episodes"`）
-- [ ] 关联合集（Collections）展示
-- [ ] 更多菜单：刷新元数据、标记已看等
-- [ ] 修改：`MacMediaDetailView.swift`；可选新建 `MacMediaDetailStore.swift`
+- [x] 收藏切换 + `CloudSyncCoordinator.markMediaFavoriteChanged`（当前按钮空 action）
+- [x] 已看标记切换 + 进度云同步
+- [x] 接入 `MetadataRefreshCoordinator` 元数据刷新
+- [x] Cast 从元数据缓存读头像与角色名（当前仅 `item.cast` 字符串，无头像）
+- [x] TV Show 季/集列表 + 选集播放（当前硬编码 `"Episodes"`）
+- [x] 关联合集（Collections）展示
+- [x] 更多菜单：刷新元数据、标记已看等
+- [x] 修改：`MacMediaDetailView.swift`；可选新建 `MacMediaDetailStore.swift`
 
 **阶段 3 验收标准：**
 - 侧边栏搜索可找到本地 + 远程媒体
@@ -672,15 +673,15 @@ private var browserServiceConnectionID: UUID?
 
 ### 5.1 设置视图 — P0
 
-- [ ] 新建 `VanmoMac/UI/Settings/MacSettingsView.swift`
-- [ ] 新建 `MacSettingsViewModel.swift`（复用 iOS `SettingsViewModel` 逻辑与 `@AppStorage` key）
-- [ ] 侧边栏或菜单栏 `Vanmo → Settings…` 入口
+- [x] 新建 `VanmoMac/UI/Settings/MacSettingsView.swift`
+- [x] 新建 `MacSettingsViewModel.swift`（复用 iOS `SettingsViewModel` 逻辑与 `@AppStorage` key）
+- [x] 侧边栏或菜单栏 `Vanmo → Settings…` 入口
 
 ### 5.2 设置分组 — 按优先级
 
-- [ ] **P0** iCloud 同步开关 + 上次同步时间
-- [ ] **P1** 播放：自动下一集、断点续播、硬件解码、默认倍速
-- [ ] **P1** 字幕：自动加载、字号、语言、颜色/背景/位置、OpenSubtitles 配置
+- [x] **P0** iCloud 同步开关 + 上次同步时间
+- [x] **P1** 播放：自动下一集、断点续播、硬件解码、默认倍速
+- [x] **P1** 字幕：自动加载、字号、语言、颜色/背景/位置（OpenSubtitles 配置待线 2 C1 后补）
 - [ ] **P2** 音频：输出模式
 - [ ] **P2** 媒体库：自动扫描、未观看标记
 - [ ] **P2** 元数据：自动下载、元数据缓存清理
@@ -690,8 +691,8 @@ private var browserServiceConnectionID: UUID?
 
 ### 5.3 设置与播放器/扫描联动 — P1
 
-- [ ] 播放器读 `playback.*` / `subtitle.*` 偏好
-- [ ] 扫描读 `library.autoScan` 偏好
+- [x] 播放器读 `playback.*` / `subtitle.*` 偏好（倍速、断点续播；字幕样式 key 已对齐）
+- [x] 扫描读 `library.autoScan` 偏好
 
 **阶段 5 验收标准：**
 - 设置页可配置并与 iOS 共享 `@AppStorage` key（双端偏好一致）
@@ -746,13 +747,13 @@ private var browserServiceConnectionID: UUID?
 | **0** | 门槛 | 生命周期 + 播放闭环 | 1–2 周 | ✅ 已完成 |
 | **1** | A | 连接浏览（1.1–1.4 ✅；1.5 IPTV 延后） | 2–3 周 | ✅ 核心已完成 |
 | **2** | **线 1 / B** | 媒体库首页 parity（2.1–2.4 ✅；2.5 延后） | 2–3 周 | ✅ 核心已完成 |
-| **3** | **线 3 / E+F** | 搜索 + 详情交互 | 1.5–2 周 | 🔴 待启动 |
+| **3** | **线 3 / E+F** | 搜索 + 详情交互 | 1.5–2 周 | ✅ 已完成 |
 | **4A** | **线 2 / C** | 播放器增强（AVPlayer） | 2 周 | ✅ 已完成 |
-| **5** | **线 3 / D** | 设置页 | 1 周 | 🔴 待启动 |
+| **5** | **线 3 / D** | 设置页（P0/P1 + 偏好联动） | 1 周 | ✅ 核心已完成 |
 | **4B** | 独立 | FFmpeg/KSPlayer（可选） | 1–2 周 | 等 4A |
 | **6** | G+ | 体验打磨 | 持续 | 部分可提前（CI） |
 
-**当前最大并行窗口：** **线 3（D/E/F/G）** 为主；线 1（B）与线 2（C）核心已完成，4B / B5 按需延后或可选。
+**当前最大并行窗口：** 三线核心（B / C / D+E+F）均已完成；剩余以 **6（G 体验打磨）** 为主，4B / B5 按需延后或可选。
 
 **MVP 目标日期（三人）：** 约 2026-08-04。
 
