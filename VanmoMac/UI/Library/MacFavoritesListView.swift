@@ -135,7 +135,7 @@ struct MacFavoritesListView: View {
             }
             .buttonStyle(.plain)
 
-            MacHeaderToolbar(title: "收藏", showsTitle: false, showsControlsOnly: true)
+            MacLibraryViewControls()
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
         .frame(height: MacDesignTokens.Layout.headerHeight)

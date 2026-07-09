@@ -88,6 +88,7 @@ enum MacContentRoute: Equatable {
 @MainActor
 final class MacAppState: ObservableObject {
     @AppStorage(MacAppearanceMode.storageKey) var appearanceMode: MacAppearanceMode = .system
+    @AppStorage("mac.sidebarWidth") private var storedSidebarWidth: Double = Double(MacDesignTokens.Layout.sidebarWidth)
 
     @Published var contentRoute: MacContentRoute = .library
     @Published var selectedSection: MacSidebarSection = .home
@@ -101,6 +102,20 @@ final class MacAppState: ObservableObject {
     @Published var isAddConnectionPresented = false
     @Published var editingConnection: SavedConnection?
     @Published var isSidebarExpanded: Bool = true
+
+    var sidebarWidth: CGFloat {
+        get { Self.clampedSidebarWidth(CGFloat(storedSidebarWidth)) }
+        set {
+            let next = Double(Self.clampedSidebarWidth(newValue))
+            guard next != storedSidebarWidth else { return }
+            objectWillChange.send()
+            storedSidebarWidth = next
+        }
+    }
+
+    static func clampedSidebarWidth(_ width: CGFloat) -> CGFloat {
+        min(max(width, MacDesignTokens.Layout.sidebarMinWidth), MacDesignTokens.Layout.sidebarMaxWidth)
+    }
 
     @Published var routeCollectionFolder: CollectionFolder?
     @Published var routeConnection: SavedConnection?

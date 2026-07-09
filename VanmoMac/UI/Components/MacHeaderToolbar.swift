@@ -1,56 +1,11 @@
 import SwiftUI
 
-struct MacHeaderToolbar: View {
+struct MacLibraryViewControls: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @Environment(\.macTheme) private var theme
 
-    let title: String
-    var isEmptyLibrary: Bool = false
-    var showsTitle: Bool = true
-    var showsControlsOnly: Bool = false
-
     var body: some View {
-        HStack {
-            Button {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    appState.isSidebarExpanded.toggle()
-                }
-            } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(theme.primaryText)
-                    .frame(width: 28, height: 28)
-                    .background(Color.clear)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 4)
-            .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
-
-            if showsTitle && !showsControlsOnly {
-                Text(title)
-                    .font(MacDesignTokens.Typography.headerTitle)
-                    .foregroundStyle(theme.primaryText)
-            }
-
-            Spacer()
-
-            if !isEmptyLibrary || showsControlsOnly {
-                viewModeAndSortControls
-            }
-        }
-        .padding(.horizontal, showsControlsOnly ? 0 : MacDesignTokens.Layout.contentPadding)
-        .frame(height: MacDesignTokens.Layout.headerHeight)
-        .background(showsControlsOnly ? Color.clear : theme.headerBackground)
-        .overlay(alignment: .bottom) {
-            if !showsControlsOnly {
-                Rectangle().fill(theme.headerBorder).frame(height: 1)
-            }
-        }
-    }
-
-    private var viewModeAndSortControls: some View {
         HStack(spacing: 16) {
             HStack(spacing: 0) {
                 segmentButton(mode: .grid, systemImage: "square.grid.2x2")
@@ -92,6 +47,56 @@ struct MacHeaderToolbar: View {
                 .shadow(color: isSelected ? Color.black.opacity(0.08) : .clear, radius: 1, y: 1)
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct MacSidebarToggleButton: View {
+    @EnvironmentObject private var appState: MacAppState
+    @Environment(\.macTheme) private var theme
+
+    var body: some View {
+        Button {
+            appState.isSidebarExpanded.toggle()
+        } label: {
+            Image(systemName: "sidebar.left")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(theme.primaryText)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .frame(width: 28, height: 28)
+        .buttonStyle(.plain)
+        .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
+    }
+}
+
+struct MacHeaderToolbar: View {
+    @Environment(\.macTheme) private var theme
+
+    let title: String
+    var isEmptyLibrary: Bool = false
+    var showsTitle: Bool = true
+
+    var body: some View {
+        HStack {
+            if showsTitle {
+                Text(title)
+                    .font(MacDesignTokens.Typography.headerTitle)
+                    .foregroundStyle(theme.primaryText)
+            }
+
+            Spacer()
+
+            if !isEmptyLibrary {
+                MacLibraryViewControls()
+            }
+        }
+        .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+        .frame(height: MacDesignTokens.Layout.headerHeight)
+        .background(theme.headerBackground)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(theme.headerBorder).frame(height: 1)
+        }
     }
 }
 

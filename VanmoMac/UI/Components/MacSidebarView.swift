@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import AppKit
 import VanmoCore
 
 struct MacSearchField: View {
@@ -159,24 +160,25 @@ struct MacSidebarView: View {
         sort: \SavedConnection.name
     ) private var connections: [SavedConnection]
 
+    @State private var dragStartWidth: CGFloat?
+    @State private var liveSidebarWidth: CGFloat?
+    @State private var isResizeHandleHovered = false
+
+    private var displayedSidebarWidth: CGFloat {
+        liveSidebarWidth ?? appState.sidebarWidth
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: MacDesignTokens.Layout.headerHeight)
+            
             MacSearchField(text: $searchViewModel.searchText) {
                 appState.selectSearch()
                 searchViewModel.search()
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
-            .padding(.top, 38) // 为交通灯预留空间
-            .onChange(of: searchViewModel.searchText) { _, newValue in
-                if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    if !appState.isSearchActive {
-                        appState.selectSearch()
-                    }
-                    searchViewModel.search()
-                }
-            }
 
+            Spacer(minLength: 12)
+            
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(MacSidebarSection.allCases) { section in
@@ -253,13 +255,56 @@ struct MacSidebarView: View {
 
             settingsFooter
         }
-        .frame(width: MacDesignTokens.Layout.sidebarWidth)
+        .frame(width: displayedSidebarWidth)
         .background(theme.sidebarBackground)
         .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(theme.sidebarBorder)
-                .frame(width: 1)
+            sidebarResizeHandle
         }
+    }
+
+    private var sidebarResizeHandle: some View {
+        Rectangle()
+            .fill(isResizeHandleHovered || liveSidebarWidth != nil
+                  ? theme.primaryText.opacity(0.28)
+                  : theme.primaryText.opacity(0.08))
+            .frame(width: 1)
+            .overlay {
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: 8)
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        isResizeHandleHovered = hovering
+                        if hovering {
+                            NSCursor.resizeLeftRight.set()
+                        } else if liveSidebarWidth == nil {
+                            NSCursor.arrow.set()
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                if dragStartWidth == nil {
+                                    dragStartWidth = displayedSidebarWidth
+                                }
+                                guard let dragStartWidth else { return }
+                                liveSidebarWidth = MacAppState.clampedSidebarWidth(
+                                    dragStartWidth + value.translation.width
+                                )
+                                NSCursor.resizeLeftRight.set()
+                            }
+                            .onEnded { _ in
+                                if let liveSidebarWidth {
+                                    appState.sidebarWidth = liveSidebarWidth
+                                }
+                                dragStartWidth = nil
+                                self.liveSidebarWidth = nil
+                                if !isResizeHandleHovered {
+                                    NSCursor.arrow.set()
+                                }
+                            }
+                    )
+            }
     }
 
     private var settingsFooter: some View {

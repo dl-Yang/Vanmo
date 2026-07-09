@@ -15,26 +15,25 @@ struct VanmoMacRootView: View {
     @State private var syncToastMessage: String?
     @State private var isDropTargeted = false
 
-    var body: some View {
-        ZStack {
-            // Arc-style full window vibrancy background (using AppKit to make window transparent)
-            MacVibrancyBackground(material: .underWindowBackground, blendingMode: .behindWindow)
-                .ignoresSafeArea()
+    private var isDarkAppearance: Bool {
+        appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme)
+    }
 
+    var body: some View {
+        ZStack() {
+            MacVibrancyBackground(isDark: isDarkAppearance, blendingMode: .behindWindow)
+                .ignoresSafeArea()
+            
             HStack(spacing: 0) {
                 if appState.isSidebarExpanded {
                     MacSidebarView()
                         .transition(.move(edge: .leading))
                 }
-
                 mainContent
                     .background(activeTheme.appBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
                     .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 4)
-                    .padding(.bottom, 12)
-                    .padding(.trailing, 12)
-                    .padding(.leading, appState.isSidebarExpanded ? 0 : 12) // 为折叠侧边栏时的交通灯预留空间
             }
+            .ignoresSafeArea(edges: .top)
             .overlay {
                 if isDropTargeted {
                     RoundedRectangle(cornerRadius: 16)
@@ -64,9 +63,19 @@ struct VanmoMacRootView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .zIndex(2)
             }
+            HStack{
+                MacSidebarToggleButton()
+                    .padding(.bottom, 12)
+            }
+            .ignoresSafeArea(edges: .top)
+            .position(
+                x: MacDesignTokens.Layout.trafficLightsLeadingInset + 10,
+                y: MacDesignTokens.Layout.trafficLightsTopInset + 5)
+            
         }
         .macTheme(activeTheme)
         .animation(.easeInOut(duration: 0.2), value: appState.isPlayerPresented)
+        .animation(.easeInOut(duration: 0.2), value: appState.isSidebarExpanded)
         .sheet(isPresented: $appState.isAddConnectionPresented, onDismiss: refreshLibraryAfterConnection) {
             MacAddConnectionView(viewModel: connectionsViewModel)
                 .macTheme(activeTheme)
@@ -121,6 +130,7 @@ struct VanmoMacRootView: View {
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDroppedFiles(providers)
         }
+
     }
 
     private func syncStatusOverlay(message: String) -> some View {
@@ -182,11 +192,10 @@ struct VanmoMacRootView: View {
     }
 
     private var activeTheme: MacThemeColors {
-        let isDark = appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme)
         if appState.selectedMediaItem == nil, libraryViewModel.isLibraryEmpty {
-            return isDark ? .emptyDark : .light
+            return isDarkAppearance ? .emptyDark : .light
         }
-        return isDark ? .dark : .light
+        return isDarkAppearance ? .dark : .light
     }
 
     @ViewBuilder

@@ -4,6 +4,11 @@ import SwiftUI
 enum MacDesignTokens {
     enum Layout {
         static let sidebarWidth: CGFloat = 256
+        static let sidebarMinWidth: CGFloat = 240
+        static let sidebarMaxWidth: CGFloat = 400
+        /// 交通灯区域宽度，侧边栏顶部控件需从此处起排
+        static let trafficLightsLeadingInset: CGFloat = 78
+        static let trafficLightsTopInset: CGFloat = 8
         static let headerHeight: CGFloat = 56
         static let contentPadding: CGFloat = 24
         static let detailContentPadding: CGFloat = 40

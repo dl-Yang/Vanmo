@@ -4,31 +4,48 @@ import AppKit
 class TransparentWindowVisualEffectView: NSVisualEffectView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        
-        // 关键：将 SwiftUI 默认的 Window 背景设为透明，让毛玻璃效果能够透出桌面
-        if let window = self.window {
-            window.backgroundColor = .clear
-            window.isOpaque = false
-            window.titlebarAppearsTransparent = true
-            window.styleMask.insert(.fullSizeContentView)
-        }
+        configureWindow()
+    }
+
+    func configureWindow() {
+        guard let window else { return }
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.styleMask.insert(.fullSizeContentView)
     }
 }
 
 struct MacVibrancyBackground: NSViewRepresentable {
-    var material: NSVisualEffectView.Material = .underWindowBackground
+    var isDark: Bool
     var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
-    
+
+    private var material: NSVisualEffectView.Material {
+        isDark ? .hudWindow : .underWindowBackground
+    }
+
+    private var preferredAppearance: NSAppearance? {
+        NSAppearance(named: isDark ? .darkAqua : .aqua)
+    }
+
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = TransparentWindowVisualEffectView()
+        apply(to: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        apply(to: nsView)
+        if let transparent = nsView as? TransparentWindowVisualEffectView {
+            transparent.configureWindow()
+        }
+    }
+
+    private func apply(to view: NSVisualEffectView) {
         view.material = material
         view.blendingMode = blendingMode
         view.state = .active
-        return view
-    }
-    
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
-        nsView.blendingMode = blendingMode
+        view.appearance = preferredAppearance
     }
 }

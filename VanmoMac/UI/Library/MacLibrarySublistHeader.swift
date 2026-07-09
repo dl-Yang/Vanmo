@@ -29,7 +29,7 @@ struct MacLibrarySublistHeader: View {
 
             Spacer()
 
-            MacHeaderToolbar(title: title, showsTitle: false, showsControlsOnly: true)
+            MacLibraryViewControls()
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
         .frame(height: MacDesignTokens.Layout.headerHeight)
