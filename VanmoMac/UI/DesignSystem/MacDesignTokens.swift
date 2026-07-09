@@ -18,6 +18,7 @@ enum MacDesignTokens {
         static let posterHeight: CGFloat = 261
         static let posterSpacing: CGFloat = 24
         static let heroHeight: CGFloat = 460
+        static let heroLinearHeight: CGFloat = 200
         static let playerControlPanelWidth: CGFloat = 896
         static let playerControlPanelHeight: CGFloat = 124
         static let playerControlPanelRadius: CGFloat = 32
@@ -93,11 +94,11 @@ struct MacThemeColors {
     let emptyIconBorder: Color
 
     static let light = MacThemeColors(
-        appBackground: Color(red: 245 / 255, green: 245 / 255, blue: 247 / 255),
-        sidebarBackground: Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255).opacity(0.8),
-        sidebarBorder: Color.black.opacity(0.05),
-        headerBackground: Color(red: 245 / 255, green: 245 / 255, blue: 247 / 255).opacity(0.95),
-        headerBorder: Color.black.opacity(0.05),
+        appBackground: Color.white,
+        sidebarBackground: Color.clear,
+        sidebarBorder: Color.clear,
+        headerBackground: Color.clear,
+        headerBorder: Color.clear,
         primaryText: .black,
         secondaryText: Color(red: 54 / 255, green: 65 / 255, blue: 83 / 255),
         tertiaryText: Color(red: 106 / 255, green: 114 / 255, blue: 130 / 255),
@@ -128,11 +129,11 @@ struct MacThemeColors {
     )
 
     static let emptyDark = MacThemeColors(
-        appBackground: Color(red: 5 / 255, green: 6 / 255, blue: 8 / 255),
-        sidebarBackground: Color(red: 21 / 255, green: 21 / 255, blue: 24 / 255).opacity(0.8),
-        sidebarBorder: Color.white.opacity(0.05),
-        headerBackground: Color(red: 5 / 255, green: 6 / 255, blue: 8 / 255).opacity(0.95),
-        headerBorder: Color.white.opacity(0.05),
+        appBackground: Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255),
+        sidebarBackground: Color.clear,
+        sidebarBorder: Color.clear,
+        headerBackground: Color.clear,
+        headerBorder: Color.clear,
         primaryText: .white,
         secondaryText: Color(red: 153 / 255, green: 161 / 255, blue: 175 / 255),
         tertiaryText: Color(red: 106 / 255, green: 114 / 255, blue: 130 / 255),
@@ -164,10 +165,10 @@ struct MacThemeColors {
 
     static let dark = MacThemeColors(
         appBackground: Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255),
-        sidebarBackground: Color(red: 40 / 255, green: 40 / 255, blue: 43 / 255).opacity(0.8),
-        sidebarBorder: Color.white.opacity(0.1),
-        headerBackground: Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255).opacity(0.95),
-        headerBorder: Color.white.opacity(0.08),
+        sidebarBackground: Color.clear,
+        sidebarBorder: Color.clear,
+        headerBackground: Color.clear,
+        headerBorder: Color.clear,
         primaryText: .white,
         secondaryText: Color(red: 209 / 255, green: 213 / 255, blue: 220 / 255),
         tertiaryText: Color(red: 106 / 255, green: 114 / 255, blue: 130 / 255),

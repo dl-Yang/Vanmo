@@ -17,9 +17,23 @@ struct VanmoMacRootView: View {
 
     var body: some View {
         ZStack {
+            // Arc-style full window vibrancy background (using AppKit to make window transparent)
+            MacVibrancyBackground(material: .underWindowBackground, blendingMode: .behindWindow)
+                .ignoresSafeArea()
+
             HStack(spacing: 0) {
-                MacSidebarView()
+                if appState.isSidebarExpanded {
+                    MacSidebarView()
+                        .transition(.move(edge: .leading))
+                }
+
                 mainContent
+                    .background(activeTheme.appBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 4)
+                    .padding(.bottom, 12)
+                    .padding(.trailing, 12)
+                    .padding(.leading, appState.isSidebarExpanded ? 0 : 12) // 为折叠侧边栏时的交通灯预留空间
             }
             .overlay {
                 if isDropTargeted {

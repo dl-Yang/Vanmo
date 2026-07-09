@@ -1,5 +1,6 @@
 import AuthenticationServices
 
+@MainActor
 public protocol OAuthPresentationContextProvider: AnyObject {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor
 }

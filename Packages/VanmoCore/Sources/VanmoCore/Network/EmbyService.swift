@@ -215,8 +215,12 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         }
 
         let base = baseURL(for: config)
+        let ext = (file.name as NSString).pathExtension.lowercased()
+        let streamPath = ext.isEmpty
+            ? "\(apiPrefix)Videos/\(file.path)/stream"
+            : "\(apiPrefix)Videos/\(file.path)/stream.\(ext)"
         var components = URLComponents(
-            url: base.appendingPathComponent("\(apiPrefix)Videos/\(file.path)/stream"),
+            url: base.appendingPathComponent(streamPath),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [

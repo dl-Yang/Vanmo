@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -111,6 +111,7 @@
 		B7A9D4A1B82703BC7469CFD1 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4899D11636AAC1F440051DA /* SearchView.swift */; };
 		B81860158F229AAAC96C7CD5 /* TrackSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB50A9840B362764031D0025 /* TrackSelectorView.swift */; };
 		B9F256A4F6740B73A51EB899 /* MacSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F812470B726A58A1E72EB22C /* MacSearchViewModel.swift */; };
+		BA1C89543FB32850506F8E2E /* MacVibrancyBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 139F05B251538C1EF8D62D68 /* MacVibrancyBackground.swift */; };
 		BAD1D1B6ECFF4573932CFFD0 /* MacLibrarySublistHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9F0A2A3F35B894BD467947 /* MacLibrarySublistHeader.swift */; };
 		BF78F19775778C146B300B1F /* FavoritesStackedCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE700D28A4ECA3CBDBFB25A /* FavoritesStackedCard.swift */; };
 		C0B026066326C5E594DF0C93 /* MediaListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2375890C4120A60A9A76B30F /* MediaListRow.swift */; };
@@ -156,6 +157,7 @@
 		1131E4971B932C656FF9CD37 /* MacQuickLookPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacQuickLookPresenter.swift; sourceTree = "<group>"; };
 		11D51DD94570F0CAC7F040D9 /* MacLibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibraryViewModel.swift; sourceTree = "<group>"; };
 		120E300378E53BD1C48BE3F7 /* MacMediaItemContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaItemContextMenu.swift; sourceTree = "<group>"; };
+		139F05B251538C1EF8D62D68 /* MacVibrancyBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacVibrancyBackground.swift; sourceTree = "<group>"; };
 		162372EE7823659FFCD1E918 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		18EA22E1240358F4E17759AC /* Vanmo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vanmo.entitlements; sourceTree = "<group>"; };
 		1A15784CA3D10BE58DA67E69 /* BackdropHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackdropHeader.swift; sourceTree = "<group>"; };
@@ -172,7 +174,7 @@
 		2808E3F2654CF170151A05FD /* box.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = box.png; sourceTree = "<group>"; };
 		2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDesignTokens.swift; sourceTree = "<group>"; };
 		2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaTitleLogoView.swift; sourceTree = "<group>"; };
-		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F0583048E7F8AAC51FA8D37 /* MacScannedShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedShowDetailView.swift; sourceTree = "<group>"; };
 		39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedLibraryListView.swift; sourceTree = "<group>"; };
 		3A076FE8593DEDD875F5BAA8 /* MacHeaderToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacHeaderToolbar.swift; sourceTree = "<group>"; };
@@ -518,6 +520,7 @@
 				1131E4971B932C656FF9CD37 /* MacQuickLookPresenter.swift */,
 				8636415210B4191F85B68B7E /* MacRemoteImage.swift */,
 				420028D7778B000899098985 /* MacSidebarView.swift */,
+				139F05B251538C1EF8D62D68 /* MacVibrancyBackground.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -948,6 +951,7 @@
 						ProvisioningStyle = Automatic;
 					};
 					0F6607F78A5C0B637140BEB4 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -970,6 +974,7 @@
 				2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				FA882A96481864BE9677FFD2 /* XCLocalSwiftPackageReference "Packages/VanmoCore" */,
 			);
+			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1115,6 +1120,7 @@
 				3327E030E931885C3DF57DEA /* MacSidebarView.swift in Sources */,
 				068CC4178E48140CFD936298 /* MacSubtitleOverlayView.swift in Sources */,
 				45003B26F5BA4EFA4AF8A063 /* MacTrackSelectorView.swift in Sources */,
+				BA1C89543FB32850506F8E2E /* MacVibrancyBackground.swift in Sources */,
 				E0FAC95A6979184AF1A20D19 /* MediaTitleLogoView.swift in Sources */,
 				82A6214ECC9D160B2CE13F35 /* OAuthPresentationContextProvider+AppKit.swift in Sources */,
 				F9BB730433AB44FF7F5CAEC4 /* VanmoMacApp.swift in Sources */,
@@ -1195,7 +1201,9 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
+				OTHER_SWIFT_FLAGS = (
+					"-DFFMPEG_ENABLED",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;
@@ -1271,7 +1279,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = L775YJ7YS4;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",
@@ -1291,7 +1298,9 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
+				OTHER_SWIFT_FLAGS = (
+					"-DFFMPEG_ENABLED",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1305,7 +1314,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = L775YJ7YS4;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",
@@ -1325,7 +1333,10 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
+				OTHER_SWIFT_FLAGS = (
+					"-DFFMPEG_ENABLED",
+					"-DCLOUDKIT_SYNC_ENABLED",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1345,7 +1356,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
+				OTHER_SWIFT_FLAGS = (
+					"-DFFMPEG_ENABLED",
+					"-DCLOUDKIT_SYNC_ENABLED",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;

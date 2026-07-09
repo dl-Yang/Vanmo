@@ -32,6 +32,7 @@ struct VanmoMacApp: App {
                 .environmentObject(searchViewModel)
                 .frame(minWidth: 960, minHeight: 640)
         }
+        .windowStyle(.hiddenTitleBar)
         .modelContainer(sharedModelContainer)
         .defaultSize(width: 1200, height: 800)
         .commands {

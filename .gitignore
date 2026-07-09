@@ -13,6 +13,7 @@ build/
 .build/
 Packages/*
 !Packages/VanmoCore/
+!Packages/VanmoCore/**
 Packages/VanmoCore/.build/
 Packages/VanmoCore/.swiftpm/
 Package.resolved

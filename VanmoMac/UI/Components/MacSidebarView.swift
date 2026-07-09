@@ -91,9 +91,16 @@ struct MacConnectionSidebarRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: connection.type.macSidebarIcon)
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 16, height: 16)
+                if let imageName = connection.type.macSidebarImageName {
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                } else {
+                    Image(systemName: connection.type.macSidebarIcon)
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(width: 16, height: 16)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(connection.name)
                         .font(MacDesignTokens.Typography.sidebarItem)
@@ -160,7 +167,7 @@ struct MacSidebarView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
-            .padding(.top, 16)
+            .padding(.top, 38) // 为交通灯预留空间
             .onChange(of: searchViewModel.searchText) { _, newValue in
                 if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     if !appState.isSearchActive {
@@ -309,6 +316,34 @@ struct MacSidebarView: View {
 }
 
 private extension ConnectionType {
+    var macSidebarImageName: String? {
+        switch self {
+        case .localFolder: return "MacConnLocalFolder"
+        case .smb: return "MacConnSMB"
+        case .ftp: return "MacConnFTP"
+        case .sftp: return "MacConnSFTP"
+        case .webdav: return "MacConnWebDAV"
+        case .alist: return "MacConnAList"
+        case .removedOfficialCloudDrive: return "MacConnAliyunDrive"
+        case .baiduNetdisk: return "MacConnBaiduNetdisk"
+        case .drive115: return "MacConnDrive115"
+        case .quarkDrive: return "MacConnQuarkDrive"
+        case .googleDrive: return "MacConnGoogleDrive"
+        case .oneDrive: return "MacConnOneDrive"
+        case .box: return "MacConnBox"
+        case .pCloudDrive: return "MacConnPCloud"
+        case .yandexDisk: return "MacConnYandexDisk"
+        case .mega: return "MacConnMEGA"
+        case .iptv: return "MacConnIPTV"
+        case .fnos: return "MacConnFnOS"
+        case .nfs: return "MacConnNFS"
+        case .dlna: return "MacConnDLNA"
+        case .plex: return "MacConnPlex"
+        case .emby: return "MacConnEmby"
+        case .jellyfin: return "MacConnJellyfin"
+        }
+    }
+
     var macSidebarIcon: String {
         switch self {
         case .localFolder:

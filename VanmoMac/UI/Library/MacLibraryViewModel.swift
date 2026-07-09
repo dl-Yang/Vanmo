@@ -39,6 +39,15 @@ final class MacLibraryViewModel: ObservableObject {
     private var hasLoadedInitial = false
     private var hasRefreshedLiveThisLaunch = false
     private var hasRestoredHomeCacheThisLaunch = false
+    /// 内部刷新锁（不发布），避免已有缓存时因 isLoadingEmbyHome 抖动触发整页刷新。
+    private var isRefreshingEmbyHome = false
+    /// 当前 live 刷新进行中时，后来的刷新请求合并到这里，结束后补跑一次。
+    private var pendingRefreshFolderPreviews = false
+    private var pendingRefreshConnections: [SavedConnection]?
+    /// 当前进行中的 live 刷新是否会拉取 folder preview。
+    private var isRefreshingFolderPreviews = false
+    /// 本轮 live 刷新是否改动了任一 folder preview / 结构，用于决定是否落盘。
+    private var homeCacheDirtyThisRefresh = false
 
     var orderedEmbyConnections: [SavedConnection] {
         embyConnectionsById.values.sorted {
@@ -67,8 +76,13 @@ final class MacLibraryViewModel: ObservableObject {
 
     func previewItems(for folder: CollectionFolder) -> [MediaItem] {
         let key = folderCacheKey(for: folder)
-        let items = folderPreviews[key] ?? scannedFolderPreviews[key] ?? []
-        return sortedByNewestFirst(items)
+        // Emby live / 磁盘缓存已按服务端 DateCreated Descending 存好，直接返回，避免因
+        // 缺失 addedAt 被 sortedByNewestFirst 反转顺序。
+        if let items = folderPreviews[key] {
+            return items
+        }
+        // 本地扫描预览在写入时已按 newest 切好。
+        return scannedFolderPreviews[key] ?? []
     }
 
     func homeVisibleFolders(for connectionId: UUID) -> [CollectionFolder] {
@@ -102,11 +116,19 @@ final class MacLibraryViewModel: ObservableObject {
 
             if !hasRefreshedLiveThisLaunch {
                 hasRefreshedLiveThisLaunch = true
-                refreshEmbyHomeInBackground(
-                    connections: connections,
-                    in: context,
-                    refreshFolderPreviews: !hasRestoredHomeCacheThisLaunch
-                )
+                if isRefreshingEmbyHome {
+                    // RootView 等路径已在刷新：仅当进行中的刷新不会拉 preview 时才排队补跑。
+                    if !isRefreshingFolderPreviews {
+                        pendingRefreshConnections = connections
+                        pendingRefreshFolderPreviews = true
+                    }
+                } else {
+                    refreshEmbyHomeInBackground(
+                        connections: connections,
+                        in: context,
+                        refreshFolderPreviews: true
+                    )
+                }
             }
 
             hasLoadedInitial = true
@@ -119,12 +141,18 @@ final class MacLibraryViewModel: ObservableObject {
     func refreshAfterLibrarySync(connections: [SavedConnection]) async {
         guard let context = modelContext else { return }
 
+        // 冷启动时 RootView 可能先于 HomeView 触发刷新：先恢复磁盘缓存，避免首屏空白/更旧数据。
+        if !hasRestoredHomeCacheThisLaunch {
+            await restoreHomeCacheIfNeeded(connections: connections)
+        }
+
         do {
             await refreshEmbyAndPersist(
                 connections: connections,
                 in: context,
                 refreshFolderPreviews: true
             )
+            hasRefreshedLiveThisLaunch = true
             try await reloadHighlights(in: context, connections: connections)
             try loadScannedLibraries(connections: connections, in: context)
             try loadFolderBookmarks(connections: connections, in: context)
@@ -193,22 +221,69 @@ final class MacLibraryViewModel: ObservableObject {
         refreshFolderPreviews: Bool = true
     ) async {
         let embyConnections = embyLikeConnections(from: connections)
-        hasConfiguredEmbyConnections = !embyConnections.isEmpty
+        if hasConfiguredEmbyConnections != !embyConnections.isEmpty {
+            hasConfiguredEmbyConnections = !embyConnections.isEmpty
+        }
         guard !embyConnections.isEmpty else {
-            serverCollectionFolders = [:]
-            embyConnectionsById = [:]
-            folderPreviews = [:]
-            folderTotalCounts = [:]
-            serverConnectionErrors = [:]
+            if !serverCollectionFolders.isEmpty { serverCollectionFolders = [:] }
+            if !embyConnectionsById.isEmpty { embyConnectionsById = [:] }
+            if !folderPreviews.isEmpty { folderPreviews = [:] }
+            if !folderTotalCounts.isEmpty { folderTotalCounts = [:] }
+            if !serverConnectionErrors.isEmpty { serverConnectionErrors = [:] }
             await homeCollectionCache.clear()
             return
         }
 
-        if isLoadingEmbyHome { return }
+        if isRefreshingEmbyHome {
+            // 仅当需要补跑 preview，或已有排队任务时，才更新 pending 连接列表。
+            let needsFollowUp = refreshFolderPreviews && !isRefreshingFolderPreviews
+            if needsFollowUp || pendingRefreshConnections != nil {
+                pendingRefreshConnections = connections
+                if needsFollowUp {
+                    pendingRefreshFolderPreviews = true
+                }
+            }
+            return
+        }
 
-        isLoadingEmbyHome = true
-        embyHomeError = nil
-        defer { isLoadingEmbyHome = false }
+        isRefreshingEmbyHome = true
+        isRefreshingFolderPreviews = refreshFolderPreviews
+        homeCacheDirtyThisRefresh = false
+        // 仅在尚无缓存可展示时才把 loading 暴露给 UI，避免整页闪烁。
+        if serverCollectionFolders.isEmpty {
+            isLoadingEmbyHome = true
+        }
+        if embyHomeError != nil {
+            embyHomeError = nil
+        }
+        defer {
+            isRefreshingEmbyHome = false
+            isRefreshingFolderPreviews = false
+            if isLoadingEmbyHome {
+                isLoadingEmbyHome = false
+            }
+            if let pendingConnections = pendingRefreshConnections {
+                let shouldRefreshPreviews = pendingRefreshFolderPreviews
+                pendingRefreshConnections = nil
+                pendingRefreshFolderPreviews = false
+                Task { [weak self] in
+                    guard let self else { return }
+                    await self.refreshEmbyAndPersist(
+                        connections: pendingConnections,
+                        in: context,
+                        refreshFolderPreviews: shouldRefreshPreviews
+                    )
+                    do {
+                        try await self.reloadHighlights(in: context, connections: pendingConnections)
+                        try self.loadScannedLibraries(connections: pendingConnections, in: context)
+                    } catch {
+                        self.errorMessage = error.localizedDescription
+                        self.showError = true
+                    }
+                    self.updateLibraryEmptyState(connections: pendingConnections)
+                }
+            }
+        }
 
         let activeConnectionIds = Set(embyConnections.map(\.id))
         var foldersByServer = serverCollectionFolders.filter { activeConnectionIds.contains($0.key) }
@@ -232,9 +307,12 @@ final class MacLibraryViewModel: ObservableObject {
                 foldersByServer[connection.id] = folders
                 errorsByServer.removeValue(forKey: connection.id)
 
-                serverCollectionFolders[connection.id] = folders
-                embyConnectionsById[connection.id] = connection
-                serverConnectionErrors.removeValue(forKey: connection.id)
+                applyServerFoldersIfChanged(connectionId: connection.id, folders: folders)
+                applyEmbyConnectionIfNeeded(connection)
+                if serverConnectionErrors[connection.id] != nil {
+                    serverConnectionErrors.removeValue(forKey: connection.id)
+                    homeCacheDirtyThisRefresh = true
+                }
 
                 let liveItems = resume + serverFavorites
                 if !liveItems.isEmpty {
@@ -264,9 +342,14 @@ final class MacLibraryViewModel: ObservableObject {
                 connectionsById[connection.id] = connection
                 foldersByServer.removeValue(forKey: connection.id)
                 errorsByServer[connection.id] = error.localizedDescription
-                serverCollectionFolders.removeValue(forKey: connection.id)
-                embyConnectionsById[connection.id] = connection
-                serverConnectionErrors[connection.id] = error.localizedDescription
+                if serverCollectionFolders[connection.id] != nil {
+                    serverCollectionFolders.removeValue(forKey: connection.id)
+                    homeCacheDirtyThisRefresh = true
+                }
+                applyEmbyConnectionIfNeeded(connection)
+                if serverConnectionErrors[connection.id] != error.localizedDescription {
+                    serverConnectionErrors[connection.id] = error.localizedDescription
+                }
                 VanmoLogger.network.error("[MacLibraryHome] refresh failed for \(connection.name): \(error.localizedDescription)")
             }
         }
@@ -274,14 +357,17 @@ final class MacLibraryViewModel: ObservableObject {
         let activeFolderKeys = Set(foldersByServer.values.flatMap { folders in
             folders.map { folderCacheKey(for: $0) }
         })
-        folderPreviews = folderPreviews.filter { activeFolderKeys.contains($0.key) }
-        folderTotalCounts = folderTotalCounts.filter { activeFolderKeys.contains($0.key) }
+        pruneInactiveFolderPreviews(keeping: activeFolderKeys)
+        applyEmbyConnectionsIfChanged(connectionsById)
+        applyServerConnectionErrorsIfChanged(errorsByServer)
+        if embyHomeError != firstError {
+            embyHomeError = firstError
+        }
 
-        serverCollectionFolders = foldersByServer
-        embyConnectionsById = connectionsById
-        serverConnectionErrors = errorsByServer
-        embyHomeError = firstError
-        await persistHomeCache()
+        // 未刷新 preview，或本轮没有任何结构/preview 变化时，不落盘。
+        if refreshFolderPreviews, homeCacheDirtyThisRefresh {
+            await persistHomeCache()
+        }
     }
 
     private func fetchFolderPreviewsConcurrently(
@@ -323,14 +409,21 @@ final class MacLibraryViewModel: ObservableObject {
             for await (key, folderName, page) in group {
                 inFlight -= 1
                 if let page {
-                    folderPreviews[key] = page.items.map { serverItem in
+                    let mapped = page.items.map { serverItem in
                         let item = ServerMediaItemMapper.makeMediaItem(from: serverItem)
                         item.sourceConnectionId = connectionId
                         return item
                     }
-                    folderTotalCounts[key] = page.totalRecordCount
+                    applyFolderPreviewIfChanged(
+                        key: key,
+                        items: mapped,
+                        totalCount: page.totalRecordCount
+                    )
                 } else {
-                    folderPreviews[key] = []
+                    // 请求失败：有旧数据则保留；无旧数据则写入空数组，结束骨架屏。
+                    if folderPreviews[key] == nil {
+                        folderPreviews[key] = []
+                    }
                     VanmoLogger.network.error("[MacLibraryHome] folder preview failed for \(folderName)")
                 }
 
@@ -340,6 +433,129 @@ final class MacLibraryViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// 仅当 preview 内容或总数真正变化时才写入 @Published，避免整页刷新。
+    private func applyFolderPreviewIfChanged(
+        key: String,
+        items: [MediaItem],
+        totalCount: Int?
+    ) {
+        let existingItems = folderPreviews[key]
+        let existingTotal = folderTotalCounts[key]
+        let previewChanged = !arePreviewItemsEquivalent(existingItems, items)
+        let totalChanged = existingTotal != totalCount
+
+        guard previewChanged || totalChanged else {
+            return
+        }
+
+        if previewChanged {
+            folderPreviews[key] = items
+        }
+        if totalChanged {
+            if let totalCount {
+                folderTotalCounts[key] = totalCount
+            } else {
+                folderTotalCounts.removeValue(forKey: key)
+            }
+        }
+        homeCacheDirtyThisRefresh = true
+    }
+
+    private func arePreviewItemsEquivalent(_ lhs: [MediaItem]?, _ rhs: [MediaItem]) -> Bool {
+        guard let lhs else { return false }
+        guard lhs.count == rhs.count else { return false }
+        for (left, right) in zip(lhs, rhs) {
+            if !arePreviewItemsEquivalent(left, right) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private func arePreviewItemsEquivalent(_ lhs: MediaItem, _ rhs: MediaItem) -> Bool {
+        // 忽略 poster 查询串里的 api_key，以及 addedAt 精度差异，
+        // 只按首页可见内容判断是否需要刷新该 folder。
+        // streamURL path 变化仍视为变化，避免长期保留过期直链。
+        lhs.serverId == rhs.serverId
+            && lhs.title == rhs.title
+            && lhs.showTitle == rhs.showTitle
+            && lhs.seasonNumber == rhs.seasonNumber
+            && lhs.episodeNumber == rhs.episodeNumber
+            && lhs.mediaType == rhs.mediaType
+            && posterPath(lhs.posterURL) == posterPath(rhs.posterURL)
+            && streamPath(lhs.fileURL) == streamPath(rhs.fileURL)
+            && lhs.year == rhs.year
+            && lhs.rating == rhs.rating
+            && abs(lhs.lastPlaybackPosition - rhs.lastPlaybackPosition) < 0.5
+            && abs(lhs.duration - rhs.duration) < 0.5
+    }
+
+    private func posterPath(_ url: URL?) -> String {
+        url?.path ?? ""
+    }
+
+    private func streamPath(_ url: URL) -> String {
+        url.path
+    }
+
+    private func applyServerFoldersIfChanged(connectionId: UUID, folders: [CollectionFolder]) {
+        if areFoldersEquivalent(serverCollectionFolders[connectionId], folders) {
+            return
+        }
+        serverCollectionFolders[connectionId] = folders
+        homeCacheDirtyThisRefresh = true
+    }
+
+    private func areFoldersEquivalent(_ lhs: [CollectionFolder]?, _ rhs: [CollectionFolder]) -> Bool {
+        guard let lhs else { return false }
+        guard lhs.count == rhs.count else { return false }
+        return zip(lhs, rhs).allSatisfy { left, right in
+            left.id == right.id
+                && left.name == right.name
+                && left.collectionType == right.collectionType
+                && left.serverConnectionId == right.serverConnectionId
+                && left.serverConnectionName == right.serverConnectionName
+        }
+    }
+
+    private func applyEmbyConnectionIfNeeded(_ connection: SavedConnection) {
+        if embyConnectionsById[connection.id]?.id == connection.id,
+           embyConnectionsById[connection.id]?.name == connection.name {
+            return
+        }
+        embyConnectionsById[connection.id] = connection
+    }
+
+    private func applyEmbyConnectionsIfChanged(_ connectionsById: [UUID: SavedConnection]) {
+        let existingIds = Set(embyConnectionsById.keys)
+        let newIds = Set(connectionsById.keys)
+        guard existingIds != newIds else {
+            for (_, connection) in connectionsById {
+                applyEmbyConnectionIfNeeded(connection)
+            }
+            return
+        }
+        embyConnectionsById = connectionsById
+    }
+
+    private func applyServerConnectionErrorsIfChanged(_ errorsByServer: [UUID: String]) {
+        guard serverConnectionErrors != errorsByServer else { return }
+        serverConnectionErrors = errorsByServer
+    }
+
+    private func pruneInactiveFolderPreviews(keeping activeFolderKeys: Set<String>) {
+        let stalePreviewKeys = folderPreviews.keys.filter { !activeFolderKeys.contains($0) }
+        let staleTotalKeys = folderTotalCounts.keys.filter { !activeFolderKeys.contains($0) }
+        guard !stalePreviewKeys.isEmpty || !staleTotalKeys.isEmpty else { return }
+        for key in stalePreviewKeys {
+            folderPreviews.removeValue(forKey: key)
+        }
+        for key in staleTotalKeys {
+            folderTotalCounts.removeValue(forKey: key)
+        }
+        homeCacheDirtyThisRefresh = true
     }
 
     // MARK: - Home Collection Cache
@@ -352,7 +568,30 @@ final class MacLibraryViewModel: ObservableObject {
             return
         }
 
-        guard let snapshot = await homeCollectionCache.load() else { return }
+        // 已有内存数据或正在拉 preview 时，禁止用磁盘旧缓存覆盖，避免污染即将 persist 的快照。
+        if hasRestoredHomeCacheThisLaunch {
+            return
+        }
+        if isRefreshingEmbyHome && isRefreshingFolderPreviews {
+            return
+        }
+        if !serverCollectionFolders.isEmpty || !folderPreviews.isEmpty {
+            hasRestoredHomeCacheThisLaunch = true
+            return
+        }
+
+        guard let snapshot = await homeCollectionCache.load() else {
+            return
+        }
+
+        // await 之后再次校验，避免挂起期间 live 刷新已写入更新数据却被旧缓存覆盖。
+        if hasRestoredHomeCacheThisLaunch
+            || !serverCollectionFolders.isEmpty
+            || !folderPreviews.isEmpty
+            || (isRefreshingEmbyHome && isRefreshingFolderPreviews) {
+            return
+        }
+
         let activeConnectionsById = Dictionary(uniqueKeysWithValues: embyConnections.map { ($0.id, $0) })
 
         var restoredFoldersByServer: [UUID: [CollectionFolder]] = [:]
@@ -380,9 +619,14 @@ final class MacLibraryViewModel: ObservableObject {
 
             for folderCache in connectionCache.folders {
                 let key = folderCacheKey(connectionId: connection.id, folderId: folderCache.id)
-                restoredPreviewsByFolder[key] = folderCache.preview.map { cache in
+                restoredPreviewsByFolder[key] = folderCache.preview.enumerated().map { index, cache in
                     let item = makePreviewItem(from: cache)
                     item.sourceConnectionId = connection.id
+                    // 旧缓存没有 addedAt：按数组下标补齐，保证「越靠前越新」，
+                    // 即使后续误用 sortedByNewestFirst 也不会把服务端顺序反转。
+                    if cache.addedAt == nil {
+                        item.addedAt = Date(timeIntervalSinceNow: -TimeInterval(index))
+                    }
                     return item
                 }
                 if let totalCount = folderCache.totalCount {
@@ -397,6 +641,17 @@ final class MacLibraryViewModel: ObservableObject {
         folderPreviews = restoredPreviewsByFolder
         folderTotalCounts = restoredTotalCountsByFolder
         hasRestoredHomeCacheThisLaunch = true
+
+        // 旧缓存缺 addedAt：把补齐后的顺序写回磁盘，避免下次启动再踩排序坑。
+        // live 刷新进行中时跳过，交给本轮/下一轮 dirty persist，避免旧快照覆盖新数据。
+        let needsAddedAtBackfill = snapshot.connections.contains { connection in
+            connection.folders.contains { folder in
+                folder.preview.contains { $0.addedAt == nil }
+            }
+        }
+        if needsAddedAtBackfill, !isRefreshingEmbyHome {
+            await persistHomeCache()
+        }
     }
 
     private func makePreviewItem(from cache: MacHomePreviewItemCache) -> MediaItem {
@@ -414,6 +669,9 @@ final class MacLibraryViewModel: ObservableObject {
         item.year = cache.year
         item.rating = cache.rating
         item.lastPlaybackPosition = cache.lastPlaybackPosition
+        if let addedAt = cache.addedAt {
+            item.addedAt = addedAt
+        }
         return item
     }
 
@@ -467,7 +725,8 @@ final class MacLibraryViewModel: ObservableObject {
             rating: item.rating,
             lastPlaybackPosition: item.lastPlaybackPosition,
             duration: item.duration,
-            streamURL: item.fileURL
+            streamURL: item.fileURL,
+            addedAt: item.addedAt
         )
     }
 

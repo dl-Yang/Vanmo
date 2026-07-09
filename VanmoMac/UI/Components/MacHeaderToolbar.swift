@@ -12,6 +12,22 @@ struct MacHeaderToolbar: View {
 
     var body: some View {
         HStack {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    appState.isSidebarExpanded.toggle()
+                }
+            } label: {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(width: 28, height: 28)
+                    .background(Color.clear)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 4)
+            .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
+
             if showsTitle && !showsControlsOnly {
                 Text(title)
                     .font(MacDesignTokens.Typography.headerTitle)

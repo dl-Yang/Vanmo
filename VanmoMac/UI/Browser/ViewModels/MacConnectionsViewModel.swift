@@ -176,8 +176,9 @@ final class MacConnectionsViewModel: ObservableObject {
         }
 
         let service = try await playbackFileService(for: connection)
+        let playbackFileName = resolvedPlaybackFileName(for: item, connectionType: connection.type)
         let remoteFile = RemoteFile(
-            name: item.originalFileName ?? item.fileURL.lastPathComponent,
+            name: playbackFileName,
             path: serverPath,
             size: item.fileSize,
             isDirectory: false,
@@ -193,6 +194,32 @@ final class MacConnectionsViewModel: ObservableObject {
         }
 
         return url
+    }
+
+    private func resolvedPlaybackFileName(for item: MediaItem, connectionType: ConnectionType) -> String {
+        let candidate = item.originalFileName ?? item.fileURL.lastPathComponent
+        guard (candidate as NSString).pathExtension.isEmpty,
+              let resolvedContainer = resolvedPlaybackContainer(for: item, connectionType: connectionType) else {
+            return candidate
+        }
+
+        return "\(candidate).\(resolvedContainer)"
+    }
+
+    private func resolvedPlaybackContainer(for item: MediaItem, connectionType: ConnectionType) -> String? {
+        if let container = item.container?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            let sanitized = container.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+            if !sanitized.isEmpty {
+                return sanitized
+            }
+        }
+
+        switch connectionType {
+        case .emby, .jellyfin:
+            return "mkv"
+        default:
+            return nil
+        }
     }
 
     private func playbackFileService(for connection: SavedConnection) async throws -> RemoteFileService {

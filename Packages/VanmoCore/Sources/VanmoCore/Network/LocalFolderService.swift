@@ -96,6 +96,8 @@ public final class LocalFolderService: RemoteFileService {
             let modified = values?.contentModificationDate
             let fileType: RemoteFileType = isDir ? .directory : .from(filename: url.lastPathComponent)
 
+            guard isDir || fileType == .video else { continue }
+
             let file = RemoteFile(
                 name: url.lastPathComponent,
                 path: url.path,

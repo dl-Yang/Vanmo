@@ -69,7 +69,7 @@ struct MacMediaDetailView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: MacDesignTokens.Layout.heroHeight)
+            .frame(height: MacDesignTokens.Layout.heroLinearHeight)
 
             VStack(alignment: .leading, spacing: 16) {
                 MacMediaDetailTitleLogoView(

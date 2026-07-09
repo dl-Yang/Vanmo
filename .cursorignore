@@ -12,7 +12,11 @@ build/
 
 # Swift Package Manager
 .build/
-Packages/
+Packages/*
+!Packages/VanmoCore/
+!Packages/VanmoCore/**
+Packages/VanmoCore/.build/
+Packages/VanmoCore/.swiftpm/
 Package.resolved
 
 # Other Config

@@ -11,9 +11,6 @@ struct MacLibraryHomeView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            if appState.selectedSection == .home, !libraryViewModel.isLibraryEmpty {
-                backdropLayer
-            }
 
             VStack(spacing: 0) {
                 MacHeaderToolbar(
@@ -51,39 +48,6 @@ struct MacLibraryHomeView: View {
         .onChange(of: libraryViewModel.sortOption) { _, _ in
             libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
         }
-    }
-
-    private var backdropLayer: some View {
-        GeometryReader { geo in
-            ZStack {
-                if let url = heroBackdropURL {
-                    MacRemoteImage(url: url)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .clipped()
-                        .blur(radius: 21)
-                        .opacity(0.45)
-                }
-
-                LinearGradient(
-                    stops: [
-                        .init(color: theme.appBackground.opacity(0.30), location: 0),
-                        .init(color: theme.appBackground.opacity(0.80), location: 0.42),
-                        .init(color: theme.appBackground.opacity(0.98), location: 1),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-    }
-
-    private var heroBackdropURL: URL? {
-        if let item = libraryViewModel.recentlyPlayed.first {
-            return item.backdropURL ?? item.posterURL
-        }
-        return libraryViewModel.favorites.first?.posterURL
     }
 
     private var homeContent: some View {
@@ -237,45 +201,20 @@ struct MacLibraryHomeView: View {
             )
 
             ForEach(folders) { folder in
-                folderRow(folder: folder, connection: connection)
-            }
-        }
-    }
-
-    private func folderRow(folder: CollectionFolder, connection: SavedConnection) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            MacLibrarySectionHeaderRow(
-                title: folder.name,
-                subtitle: folder.collectionType.displayName,
-                actionTitle: "查看全部"
-            ) {
-                openFolderList(folder: folder, connection: connection)
-            }
-
-            folderPreviewContent(folder: folder, connection: connection)
-        }
-    }
-
-    @ViewBuilder
-    private func folderPreviewContent(folder: CollectionFolder, connection: SavedConnection) -> some View {
-        let previewItems = libraryViewModel.previewItems(for: folder)
-        let isLoaded = libraryViewModel.isFolderPreviewLoaded(folder)
-
-        if !isLoaded {
-            MacFolderPreviewSkeletonRow()
-        } else if !previewItems.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(previewItems) { item in
-                        MacPosterCard(
-                            title: item.displayTitle,
-                            subtitle: folderPreviewSubtitle(item),
-                            posterURL: item.posterURL
-                        ) {
-                            openPreviewItem(item, folder: folder, connection: connection)
-                        }
+                MacHomeFolderPreviewRow(
+                    folder: folder,
+                    isLoaded: libraryViewModel.isFolderPreviewLoaded(folder),
+                    previewItems: libraryViewModel.previewItems(for: folder).map {
+                        MacHomePreviewCardModel(item: $0, subtitle: folderPreviewSubtitle($0))
+                    },
+                    onOpenFolder: {
+                        openFolderList(folder: folder, connection: connection)
+                    },
+                    onOpenItem: { model in
+                        openPreviewModel(model, folder: folder, connection: connection)
                     }
-                }
+                )
+                .equatable()
             }
         }
     }
@@ -308,6 +247,22 @@ struct MacLibraryHomeView: View {
         } else {
             appState.openScannedLibraryList(connection: connection, collectionType: folder.collectionType)
         }
+    }
+
+    private func openPreviewModel(
+        _ model: MacHomePreviewCardModel,
+        folder: CollectionFolder,
+        connection: SavedConnection
+    ) {
+        guard let item = libraryViewModel.previewItems(for: folder).first(where: {
+            if let serverId = model.serverId {
+                return $0.serverId == serverId
+            }
+            return $0.title == model.title && $0.posterURL?.path == model.posterPath
+        }) else {
+            return
+        }
+        openPreviewItem(item, folder: folder, connection: connection)
     }
 
     private func openPreviewItem(
@@ -354,6 +309,70 @@ struct MacLibraryHomeView: View {
             return "\(item.mediaType.displayName) · \(year)"
         }
         return item.mediaType.displayName
+    }
+}
+
+private struct MacHomePreviewCardModel: Equatable, Identifiable {
+    let id: String
+    let serverId: String?
+    let title: String
+    let subtitle: String
+    let posterURL: URL?
+    let posterPath: String
+
+    init(item: MediaItem, subtitle: String) {
+        serverId = item.serverId
+        title = item.displayTitle
+        self.subtitle = subtitle
+        posterURL = item.posterURL
+        posterPath = item.posterURL?.path ?? ""
+        id = item.serverId ?? "\(item.title)|\(posterPath)"
+    }
+}
+
+/// 单个媒体库 preview 行。Equatable 后，内容未变的 folder 不会因其它 folder 更新而重绘。
+private struct MacHomeFolderPreviewRow: View, Equatable {
+    let folder: CollectionFolder
+    let isLoaded: Bool
+    let previewItems: [MacHomePreviewCardModel]
+    let onOpenFolder: () -> Void
+    let onOpenItem: (MacHomePreviewCardModel) -> Void
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.folder.id == rhs.folder.id
+            && lhs.folder.name == rhs.folder.name
+            && lhs.folder.collectionType == rhs.folder.collectionType
+            && lhs.isLoaded == rhs.isLoaded
+            && lhs.previewItems == rhs.previewItems
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            MacLibrarySectionHeaderRow(
+                title: folder.name,
+                subtitle: folder.collectionType.displayName,
+                actionTitle: "查看全部",
+                action: onOpenFolder
+            )
+
+            if !isLoaded {
+                MacFolderPreviewSkeletonRow()
+            } else if !previewItems.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(previewItems) { item in
+                            MacPosterCard(
+                                title: item.title,
+                                subtitle: item.subtitle,
+                                posterURL: item.posterURL
+                            ) {
+                                onOpenItem(item)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

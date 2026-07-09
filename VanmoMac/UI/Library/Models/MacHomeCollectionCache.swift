@@ -47,6 +47,8 @@ struct MacHomePreviewItemCache: Codable, Sendable {
     let lastPlaybackPosition: TimeInterval
     let duration: TimeInterval
     let streamURL: URL
+    /// 服务端 DateCreated；缺失时（旧缓存）保持数组原有顺序，不再按 addedAt 重排。
+    let addedAt: Date?
 }
 
 actor MacHomeCollectionCache {
@@ -58,7 +60,9 @@ actor MacHomeCollectionCache {
     func load() -> MacHomeCollectionCacheSnapshot? {
         do {
             let url = try cacheURL(createDirectoryIfNeeded: false)
-            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                return nil
+            }
 
             let data = try Data(contentsOf: url)
             let decoder = JSONDecoder()

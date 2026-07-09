@@ -249,8 +249,6 @@ struct MacConnectionsBrowseView: View {
         }
     }
 
-    // MARK: - States
-
     private var emptySelectionState: some View {
         messageState(
             icon: "externaldrive",

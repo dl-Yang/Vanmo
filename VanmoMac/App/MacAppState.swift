@@ -100,6 +100,7 @@ final class MacAppState: ObservableObject {
     @Published var playerStartPosition: TimeInterval = 0
     @Published var isAddConnectionPresented = false
     @Published var editingConnection: SavedConnection?
+    @Published var isSidebarExpanded: Bool = true
 
     @Published var routeCollectionFolder: CollectionFolder?
     @Published var routeConnection: SavedConnection?
