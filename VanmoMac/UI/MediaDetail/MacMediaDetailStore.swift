@@ -10,6 +10,7 @@ final class MacMediaDetailStore: ObservableObject {
     @Published private(set) var enrichedOverview: String?
     @Published private(set) var enrichedGenres: [String] = []
     @Published private(set) var logoURL: URL?
+    @Published private(set) var backdropURL: URL?
     @Published var selectedSeason: Int?
     @Published var isLoadingEpisodes = false
     @Published var isRefreshingMetadata = false
@@ -51,8 +52,14 @@ final class MacMediaDetailStore: ObservableObject {
         logoURL = newLogoURL
     }
 
+    func updateBackdrop(_ newBackdropURL: URL?) {
+        guard backdropURL != newBackdropURL else { return }
+        backdropURL = newBackdropURL
+    }
+
     func prepareForItem(_ item: MediaItem) {
         updateLogo(item.logoURL)
+        updateBackdrop(item.backdropURL)
         enrichedOverview = nil
         enrichedGenres = []
         castMembers = []
@@ -244,6 +251,12 @@ final class MacMediaDetailStore: ObservableObject {
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
         updateLogo(record.resolvedLogoURL(rootDirectory: root))
         setCast(record.makeCastDisplays(rootDirectory: root))
+
+        let resolvedBackdrop = record.resolvedBackdropURL(rootDirectory: root)
+        if let resolvedBackdrop {
+            item.backdropURL = resolvedBackdrop
+            updateBackdrop(resolvedBackdrop)
+        }
 
         if item.mediaType == .tvShow, !record.episodes.isEmpty {
             if episodes.isEmpty {

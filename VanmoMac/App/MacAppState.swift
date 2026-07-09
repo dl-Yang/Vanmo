@@ -168,13 +168,6 @@ final class MacAppState: ObservableObject {
         closeDetail()
     }
 
-    func openFavoritesList() {
-        selectedSection = .favorites
-        clearLibrarySubRouteContext()
-        contentRoute = .libraryFavorites
-        closeDetail()
-    }
-
     func openCollectionFolderList(folder: CollectionFolder, connection: SavedConnection) {
         routeCollectionFolder = folder
         routeConnection = connection
@@ -211,6 +204,9 @@ final class MacAppState: ObservableObject {
 
     func backFromLibrarySubRoute() {
         clearLibrarySubRouteContext()
+        if contentRoute == .libraryFavorites {
+            selectedSection = .home
+        }
         contentRoute = .library
     }
 

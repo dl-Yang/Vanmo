@@ -69,8 +69,8 @@ struct VanmoMacRootView: View {
             }
             .ignoresSafeArea(edges: .top)
             .position(
-                x: MacDesignTokens.Layout.trafficLightsLeadingInset + 10,
-                y: MacDesignTokens.Layout.trafficLightsTopInset + 5)
+                x: MacDesignTokens.Layout.trafficLightsLeadingInset + 30,
+                y: MacDesignTokens.Layout.trafficLightsTopInset + 7)
             
         }
         .macTheme(activeTheme)

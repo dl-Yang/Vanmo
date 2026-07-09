@@ -263,48 +263,62 @@ struct MacSidebarView: View {
     }
 
     private var sidebarResizeHandle: some View {
-        Rectangle()
-            .fill(isResizeHandleHovered || liveSidebarWidth != nil
-                  ? theme.primaryText.opacity(0.28)
-                  : theme.primaryText.opacity(0.08))
-            .frame(width: 1)
-            .overlay {
+        // Hit target is local; width changes must not feed back into DragGesture
+        // translation, or the sidebar will oscillate while dragging.
+        Color.clear
+            .frame(width: 8)
+            .contentShape(Rectangle())
+            .overlay(alignment: .trailing) {
                 Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 8)
-                    .contentShape(Rectangle())
-                    .onHover { hovering in
-                        isResizeHandleHovered = hovering
-                        if hovering {
+                    .fill(isResizeHandleHovered || liveSidebarWidth != nil
+                          ? theme.primaryText.opacity(0.28)
+                          : theme.primaryText.opacity(0.08))
+                    .frame(width: 1)
+            }
+            .onHover { hovering in
+                isResizeHandleHovered = hovering
+                if hovering {
+                    NSCursor.resizeLeftRight.set()
+                } else if liveSidebarWidth == nil {
+                    NSCursor.arrow.set()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .onChanged { value in
+                        if dragStartWidth == nil {
+                            dragStartWidth = appState.sidebarWidth
+                        }
+                        guard let dragStartWidth else { return }
+                        // Global delta stays stable even as the handle moves with width.
+                        let delta = value.location.x - value.startLocation.x
+                        let nextWidth = MacAppState.clampedSidebarWidth(dragStartWidth + delta)
+                        guard liveSidebarWidth != nextWidth else {
                             NSCursor.resizeLeftRight.set()
-                        } else if liveSidebarWidth == nil {
+                            return
+                        }
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            liveSidebarWidth = nextWidth
+                        }
+                        NSCursor.resizeLeftRight.set()
+                    }
+                    .onEnded { _ in
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            if let liveSidebarWidth {
+                                appState.sidebarWidth = liveSidebarWidth
+                            }
+                            dragStartWidth = nil
+                            self.liveSidebarWidth = nil
+                        }
+                        if !isResizeHandleHovered {
                             NSCursor.arrow.set()
                         }
                     }
-                    .gesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                if dragStartWidth == nil {
-                                    dragStartWidth = displayedSidebarWidth
-                                }
-                                guard let dragStartWidth else { return }
-                                liveSidebarWidth = MacAppState.clampedSidebarWidth(
-                                    dragStartWidth + value.translation.width
-                                )
-                                NSCursor.resizeLeftRight.set()
-                            }
-                            .onEnded { _ in
-                                if let liveSidebarWidth {
-                                    appState.sidebarWidth = liveSidebarWidth
-                                }
-                                dragStartWidth = nil
-                                self.liveSidebarWidth = nil
-                                if !isResizeHandleHovered {
-                                    NSCursor.arrow.set()
-                                }
-                            }
-                    )
-            }
+            )
     }
 
     private var settingsFooter: some View {

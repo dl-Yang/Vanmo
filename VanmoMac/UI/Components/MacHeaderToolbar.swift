@@ -55,18 +55,34 @@ struct MacSidebarToggleButton: View {
     @Environment(\.macTheme) private var theme
 
     var body: some View {
-        Button {
-            appState.isSidebarExpanded.toggle()
-        } label: {
-            Image(systemName: "sidebar.left")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(theme.primaryText)
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
+        HStack(){
+            Button {
+                appState.isSidebarExpanded.toggle()
+            } label: {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .frame(width: 28, height: 28)
+            .buttonStyle(.plain)
+            .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
+            
+            Button {
+                //todo check
+//                appState.contentRoute =
+            } label: {
+                Image(systemName: appState.contentRoute != .library ? "arrowshape.left.fill" : "arrowshape.left")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .frame(width: 28, height: 28)
+            .buttonStyle(.plain)
+            .help("返回上一步")
         }
-        .frame(width: 28, height: 28)
-        .buttonStyle(.plain)
-        .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
     }
 }
 
@@ -86,10 +102,6 @@ struct MacHeaderToolbar: View {
             }
 
             Spacer()
-
-            if !isEmptyLibrary {
-                MacLibraryViewControls()
-            }
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
         .frame(height: MacDesignTokens.Layout.headerHeight)

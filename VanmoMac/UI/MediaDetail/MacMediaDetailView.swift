@@ -55,7 +55,7 @@ struct MacMediaDetailView: View {
 
     private var heroSection: some View {
         ZStack(alignment: .bottomLeading) {
-            MacRemoteImage(url: item.backdropURL ?? item.posterURL)
+            MacRemoteImage(url: store.backdropURL ?? item.backdropURL ?? item.posterURL)
                 .frame(height: MacDesignTokens.Layout.heroHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()

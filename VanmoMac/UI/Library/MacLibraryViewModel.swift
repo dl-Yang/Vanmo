@@ -5,10 +5,6 @@ import VanmoCore
 @MainActor
 final class MacLibraryViewModel: ObservableObject {
     @Published private(set) var recentlyPlayed: [MediaItem] = []
-    @Published private(set) var favorites: [MediaItem] = []
-    @Published private(set) var totalFavoritesCount = 0
-    @Published private(set) var favoriteMovieCount = 0
-    @Published private(set) var favoriteTVShowCount = 0
 
     @Published private(set) var serverCollectionFolders: [UUID: [CollectionFolder]] = [:]
     @Published private(set) var embyConnectionsById: [UUID: SavedConnection] = [:]
@@ -107,7 +103,7 @@ final class MacLibraryViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            try await reloadHighlights(in: context, connections: connections)
+            try await reloadHighlights(in: context)
             try loadScannedLibraries(connections: connections, in: context)
             try loadFolderBookmarks(connections: connections, in: context)
             await restoreHomeCacheIfNeeded(connections: connections)
@@ -153,7 +149,7 @@ final class MacLibraryViewModel: ObservableObject {
                 refreshFolderPreviews: true
             )
             hasRefreshedLiveThisLaunch = true
-            try await reloadHighlights(in: context, connections: connections)
+            try await reloadHighlights(in: context)
             try loadScannedLibraries(connections: connections, in: context)
             try loadFolderBookmarks(connections: connections, in: context)
             updateLibraryEmptyState(connections: connections)
@@ -171,7 +167,7 @@ final class MacLibraryViewModel: ObservableObject {
             refreshFolderPreviews: true
         )
         do {
-            try await reloadHighlights(in: context, connections: connections)
+            try await reloadHighlights(in: context)
             try loadScannedLibraries(connections: connections, in: context)
             try loadFolderBookmarks(connections: connections, in: context)
         } catch {
@@ -274,7 +270,7 @@ final class MacLibraryViewModel: ObservableObject {
                         refreshFolderPreviews: shouldRefreshPreviews
                     )
                     do {
-                        try await self.reloadHighlights(in: context, connections: pendingConnections)
+                        try await self.reloadHighlights(in: context)
                         try self.loadScannedLibraries(connections: pendingConnections, in: context)
                     } catch {
                         self.errorMessage = error.localizedDescription
@@ -743,7 +739,7 @@ final class MacLibraryViewModel: ObservableObject {
                 refreshFolderPreviews: refreshFolderPreviews
             )
             do {
-                try await self.reloadHighlights(in: context, connections: connections)
+                try await self.reloadHighlights(in: context)
                 try self.loadScannedLibraries(connections: connections, in: context)
             } catch {
                 self.errorMessage = error.localizedDescription
@@ -835,22 +831,12 @@ final class MacLibraryViewModel: ObservableObject {
         }
     }
 
-    private func reloadHighlights(
-        in context: ModelContext,
-        connections: [SavedConnection]
-    ) async throws {
-        let snapshot = try await loadHighlightSnapshot(in: context, connections: connections)
+    private func reloadHighlights(in context: ModelContext) async throws {
+        let snapshot = try await loadHighlightSnapshot(in: context)
         recentlyPlayed = snapshot.playedIds.compactMap { context.model(for: $0) as? MediaItem }
-        favorites = snapshot.favoriteIds.compactMap { context.model(for: $0) as? MediaItem }
-        totalFavoritesCount = snapshot.favoriteTotal
-        favoriteMovieCount = snapshot.favoriteMovieCount
-        favoriteTVShowCount = snapshot.favoriteTVShowCount
     }
 
-    private func loadHighlightSnapshot(
-        in context: ModelContext,
-        connections: [SavedConnection]
-    ) async throws -> InitialSnapshot {
+    private func loadHighlightSnapshot(in context: ModelContext) async throws -> InitialSnapshot {
         let container = context.container
         let limit = highlightSectionLimit
         let hiddenConnectionIds = Set(serverConnectionErrors.keys)
@@ -870,14 +856,9 @@ final class MacLibraryViewModel: ObservableObject {
                 sortBy: [SortDescriptor(\.lastPlayedAt, order: .reverse)]
             )
             let playedItems = try bgCtx.fetch(playedDescriptor).filter(isVisibleHighlight)
-            let favoriteItems = try bgCtx.fetch(Self.favoriteDescriptor).filter(isVisibleHighlight)
 
             return InitialSnapshot(
-                playedIds: Array(playedItems.prefix(limit).map(\.persistentModelID)),
-                favoriteIds: Array(favoriteItems.prefix(limit).map(\.persistentModelID)),
-                favoriteTotal: favoriteItems.count,
-                favoriteMovieCount: favoriteItems.filter { $0.mediaType == .movie }.count,
-                favoriteTVShowCount: favoriteItems.filter { $0.mediaType == .tvShow }.count
+                playedIds: Array(playedItems.prefix(limit).map(\.persistentModelID))
             )
         }.value
     }
@@ -889,7 +870,6 @@ final class MacLibraryViewModel: ObservableObject {
         let hasRelevantConnection = !connections.isEmpty
         isLibraryEmpty =
             recentlyPlayed.isEmpty &&
-            favorites.isEmpty &&
             !hasCollectionFolders &&
             !hasScannedLibraryFolders &&
             !hasFolderBookmarks &&
@@ -1052,24 +1032,11 @@ final class MacLibraryViewModel: ObservableObject {
 
     private struct InitialSnapshot: Sendable {
         let playedIds: [PersistentIdentifier]
-        let favoriteIds: [PersistentIdentifier]
-        let favoriteTotal: Int
-        let favoriteMovieCount: Int
-        let favoriteTVShowCount: Int
     }
 
     private nonisolated static var recentlyPlayedPredicate: Predicate<MediaItem> {
         #Predicate<MediaItem> { item in
             item.lastPlayedAt != nil
         }
-    }
-
-    private nonisolated static var favoriteDescriptor: FetchDescriptor<MediaItem> {
-        FetchDescriptor(
-            predicate: #Predicate<MediaItem> { item in
-                item.isFavorite
-            },
-            sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
-        )
     }
 }

@@ -14,7 +14,7 @@ struct MacLibraryHomeView: View {
 
             VStack(spacing: 0) {
                 MacHeaderToolbar(
-                    title: appState.selectedSection.title,
+                    title: MacSidebarSection.home.title,
                     isEmptyLibrary: libraryViewModel.isLibraryEmpty
                 )
 
@@ -22,10 +22,8 @@ struct MacLibraryHomeView: View {
                     MacLibraryEmptyStateView {
                         appState.presentAddConnection()
                     }
-                } else if appState.selectedSection == .home {
-                    homeContent
                 } else {
-                    sectionFilteredContent
+                    homeContent
                 }
             }
 
@@ -57,10 +55,6 @@ struct MacLibraryHomeView: View {
                     continueWatchingSection
                 }
 
-                if libraryViewModel.totalFavoritesCount > 0 {
-                    favoritesSection
-                }
-
                 if !libraryViewModel.folderBookmarks.isEmpty {
                     folderBookmarksSection
                 }
@@ -73,28 +67,6 @@ struct MacLibraryHomeView: View {
             }
             .padding(MacDesignTokens.Layout.contentPadding)
             .padding(.bottom, 32)
-        }
-    }
-
-    private var sectionFilteredContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if appState.selectedSection != .favorites {
-                    MacFilterPills()
-                        .padding(.bottom, 24)
-                }
-
-                MacLibraryMediaLayout(viewMode: appState.viewMode) {
-                    MacLibraryPosterGrid(items: libraryViewModel.sortedSectionItems()) { item in
-                        appState.openDetail(item)
-                    }
-                } listContent: {
-                    MacLibraryPosterList(items: libraryViewModel.sortedSectionItems()) { item in
-                        appState.openDetail(item)
-                    }
-                }
-            }
-            .padding(MacDesignTokens.Layout.contentPadding)
         }
     }
 
@@ -120,17 +92,6 @@ struct MacLibraryHomeView: View {
                     }
                 }
             }
-        }
-    }
-
-    private var favoritesSection: some View {
-        MacFavoritesStackedCard(
-            posterURLs: libraryViewModel.favorites.prefix(3).map(\.posterURL),
-            totalCount: libraryViewModel.totalFavoritesCount,
-            movieCount: libraryViewModel.favoriteMovieCount,
-            tvShowCount: libraryViewModel.favoriteTVShowCount
-        ) {
-            appState.openFavoritesList()
         }
     }
 
