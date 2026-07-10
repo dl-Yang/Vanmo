@@ -22,7 +22,7 @@ struct MacVibrancyBackground: NSViewRepresentable {
     var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
 
     private var material: NSVisualEffectView.Material {
-        isDark ? .hudWindow : .underWindowBackground
+        isDark ? .sidebar : .headerView
     }
 
     private var preferredAppearance: NSAppearance? {

@@ -1,6 +1,8 @@
 import Foundation
 import Security
 
+/// Keychain 读写。使用 Data Protection Keychain（`kSecUseDataProtectionKeychain`），
+/// macOS 上按 Team ID 授权，避免传统 login keychain 按代码签名哈希校验导致反复弹本机密码。
 public final class KeychainManager {
     public static let shared = KeychainManager()
 
@@ -9,18 +11,13 @@ public final class KeychainManager {
     private init() {}
 
     public func save(_ data: Data, for key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-        ]
-
+        var query = baseQuery(account: key)
         SecItemDelete(query as CFDictionary)
 
-        var addQuery = query
-        addQuery[kSecValueData as String] = data
+        query[kSecValueData as String] = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
-        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw KeychainError.saveFailed(status)
         }
@@ -34,17 +31,12 @@ public final class KeychainManager {
     }
 
     public func load(for key: String) throws -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        var query = baseQuery(account: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-
         if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess else {
             throw KeychainError.loadFailed(status)
@@ -58,15 +50,20 @@ public final class KeychainManager {
     }
 
     public func delete(for key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-        ]
+        let query = baseQuery(account: key)
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.deleteFailed(status)
         }
+    }
+
+    private func baseQuery(account: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true,
+        ]
     }
 }
 

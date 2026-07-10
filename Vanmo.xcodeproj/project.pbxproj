@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -954,7 +954,6 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					0DF5C008C42D8CFE972C79FA = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					0F6607F78A5C0B637140BEB4 = {
@@ -981,7 +980,6 @@
 				2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				FA882A96481864BE9677FFD2 /* XCLocalSwiftPackageReference "Packages/VanmoCore" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1072,7 +1070,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "FRAMEWORKS_DIR=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nif [ ! -d \"$FRAMEWORKS_DIR\" ]; then\n  exit 0\nfi\nfor FRAMEWORK in \"$FRAMEWORKS_DIR\"/*.framework; do\n  [ -d \"$FRAMEWORK\" ] || continue\n  if [ -f \"$FRAMEWORK/Info.plist\" ] && [ ! -d \"$FRAMEWORK/Versions\" ]; then\n    mkdir -p \"$FRAMEWORK/Versions/A/Resources\"\n    mv \"$FRAMEWORK/Info.plist\" \"$FRAMEWORK/Versions/A/Resources/Info.plist\"\n    if [ -d \"$FRAMEWORK/Headers\" ]; then\n      mv \"$FRAMEWORK/Headers\" \"$FRAMEWORK/Versions/A/Headers\"\n    fi\n    if [ -d \"$FRAMEWORK/Modules\" ]; then\n      mv \"$FRAMEWORK/Modules\" \"$FRAMEWORK/Versions/A/Modules\"\n    fi\n    BIN_NAME=\"$(defaults read \"$FRAMEWORK/Versions/A/Resources/Info.plist\" CFBundleExecutable 2>/dev/null || basename \"$FRAMEWORK\" .framework)\"\n    if [ -f \"$FRAMEWORK/$BIN_NAME\" ]; then\n      mv \"$FRAMEWORK/$BIN_NAME\" \"$FRAMEWORK/Versions/A/$BIN_NAME\"\n    fi\n    ln -sf A \"$FRAMEWORK/Versions/Current\"\n    ln -sf Versions/Current/Headers \"$FRAMEWORK/Headers\" 2>/dev/null || true\n    ln -sf Versions/Current/Modules \"$FRAMEWORK/Modules\" 2>/dev/null || true\n    ln -sf Versions/Current/Resources \"$FRAMEWORK/Resources\" 2>/dev/null || true\n    ln -sf Versions/Current/$BIN_NAME \"$FRAMEWORK/$BIN_NAME\" 2>/dev/null || true\n  fi\n  if [ -f \"$FRAMEWORK/Versions/Current/Resources/Info.plist\" ] || [ -f \"$FRAMEWORK/Resources/Info.plist\" ]; then\n    PLIST=\"${FRAMEWORK}/Versions/Current/Resources/Info.plist\"\n    [ -f \"$PLIST\" ] || PLIST=\"${FRAMEWORK}/Resources/Info.plist\"\n    /usr/libexec/PlistBuddy -c \"Set :CFBundleIdentifier com.kintan.ksplayer.$(basename \"$FRAMEWORK\" .framework | tr '[:upper:]' '[:lower:]')\" \"$PLIST\" 2>/dev/null || true\n  fi\n  if [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n    /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none \"$FRAMEWORK\"\n  fi\ndone\n";
+			shellScript = "FRAMEWORKS_DIR=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nif [ ! -d \"$FRAMEWORKS_DIR\" ]; then\n  exit 0\nfi\nfor FRAMEWORK in \"$FRAMEWORKS_DIR\"/*.framework; do\n  [ -d \"$FRAMEWORK\" ] || continue\n  if [ -f \"$FRAMEWORK/Info.plist\" ] && [ ! -d \"$FRAMEWORK/Versions\" ]; then\n    mkdir -p \"$FRAMEWORK/Versions/A/Resources\"\n    mv \"$FRAMEWORK/Info.plist\" \"$FRAMEWORK/Versions/A/Resources/Info.plist\"\n    if [ -d \"$FRAMEWORK/Headers\" ]; then\n      mv \"$FRAMEWORK/Headers\" \"$FRAMEWORK/Versions/A/Headers\"\n    fi\n    if [ -d \"$FRAMEWORK/Modules\" ]; then\n      mv \"$FRAMEWORK/Modules\" \"$FRAMEWORK/Versions/A/Modules\"\n    fi\n    BIN_NAME=\"$(defaults read \"$FRAMEWORK/Versions/A/Resources/Info.plist\" CFBundleExecutable 2>/dev/null || basename \"$FRAMEWORK\" .framework)\"\n    if [ -f \"$FRAMEWORK/$BIN_NAME\" ]; then\n      mv \"$FRAMEWORK/$BIN_NAME\" \"$FRAMEWORK/Versions/A/$BIN_NAME\"\n    fi\n    ln -sf A \"$FRAMEWORK/Versions/Current\"\n    ln -sf Versions/Current/Headers \"$FRAMEWORK/Headers\" 2>/dev/null || true\n    ln -sf Versions/Current/Modules \"$FRAMEWORK/Modules\" 2>/dev/null || true\n    ln -sf Versions/Current/Resources \"$FRAMEWORK/Resources\" 2>/dev/null || true\n    ln -sf Versions/Current/$BIN_NAME \"$FRAMEWORK/$BIN_NAME\" 2>/dev/null || true\n  fi\n  if [ -f \"$FRAMEWORK/Versions/Current/Resources/Info.plist\" ] || [ -f \"$FRAMEWORK/Resources/Info.plist\" ]; then\n    PLIST=\"${FRAMEWORK}/Versions/Current/Resources/Info.plist\"\n    [ -f \"$PLIST\" ] || PLIST=\"${FRAMEWORK}/Resources/Info.plist\"\n    /usr/libexec/PlistBuddy -c \"Set :CFBundleIdentifier com.kintan.ksplayer.$(basename \"$FRAMEWORK\" .framework | tr '[:upper:]' '[:lower:]')\" \"$PLIST\" 2>/dev/null || true\n  fi\n  if [ -d \"$FRAMEWORK/Versions\" ] && [ -d \"$FRAMEWORK/_CodeSignature\" ]; then\n    rm -rf \"$FRAMEWORK/_CodeSignature\"\n  fi\n  if [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n    /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none \"$FRAMEWORK\"\n  fi\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1204,15 +1202,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = L775YJ7YS4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "VanmoMac/Resources/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;
@@ -1307,9 +1304,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1342,10 +1337,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1359,16 +1351,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = L775YJ7YS4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "VanmoMac/Resources/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;

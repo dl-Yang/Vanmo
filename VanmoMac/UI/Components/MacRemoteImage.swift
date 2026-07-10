@@ -40,9 +40,8 @@ struct MacRemoteImage: View {
         ZStack{
             Rectangle()
                 .fill(Color.gray.opacity(0.25))
-            Image(systemName: "play.circle.fill")
-                .font(.system(size: 14, weight: .medium))
-                .frame(width: 100, height: 100)
+            Image(systemName: "film")
+                .font(.largeTitle)
                 .contentShape(Rectangle())
         }
     }

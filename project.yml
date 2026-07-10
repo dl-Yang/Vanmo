@@ -91,6 +91,8 @@ targets:
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.vanmo.app
     postBuildScripts:
       - name: Fix KSPlayer Framework Plist
         script: |
@@ -140,6 +142,8 @@ targets:
         com.apple.security.files.user-selected.read-only: true
         com.apple.security.network.client: true
         com.apple.security.network.server: true
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.vanmo.app.mac
     postBuildScripts:
       - name: Fix KSPlayer Framework Plist
         script: |
@@ -172,6 +176,10 @@ targets:
               PLIST="${FRAMEWORK}/Versions/Current/Resources/Info.plist"
               [ -f "$PLIST" ] || PLIST="${FRAMEWORK}/Resources/Info.plist"
               /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.kintan.ksplayer.$(basename "$FRAMEWORK" .framework | tr '[:upper:]' '[:lower:]')" "$PLIST" 2>/dev/null || true
+            fi
+            # Versions 结构下根目录的 _CodeSignature 会导致 codesign: unsealed contents
+            if [ -d "$FRAMEWORK/Versions" ] && [ -d "$FRAMEWORK/_CodeSignature" ]; then
+              rm -rf "$FRAMEWORK/_CodeSignature"
             fi
             if [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
               /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none "$FRAMEWORK"
