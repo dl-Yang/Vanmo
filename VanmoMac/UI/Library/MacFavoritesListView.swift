@@ -104,12 +104,6 @@ struct MacFavoritesListView: View {
 
     private var header: some View {
         HStack {
-            Button {
-                appState.backFromLibrarySubRoute()
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .buttonStyle(.plain)
 
             Text("收藏")
                 .font(MacDesignTokens.Typography.headerTitle)

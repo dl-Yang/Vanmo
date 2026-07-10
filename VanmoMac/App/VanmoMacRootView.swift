@@ -31,7 +31,7 @@ struct VanmoMacRootView: View {
                 }
                 mainContent
                     .background(activeTheme.appBackground)
-                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 4)
+//                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 4)
             }
             .ignoresSafeArea(edges: .top)
             .overlay {

@@ -17,19 +17,15 @@ struct MediaDetailView: View {
     @State private var favoriteErrorMessage: String?
     @State private var activeSheet: MediaDetailSheet?
     @State private var isHeroPosterLoaded = false
-    @State private var ratingStore = MediaDetailRatingStore()
-    @State private var refreshStore = MediaDetailRefreshStore()
-    @State private var castStore = MediaDetailCastStore()
-    @State private var logoStore = MediaDetailLogoStore()
-    @State private var episodesStore = MediaDetailEpisodesStore()
-    @State private var enrichmentStore = MediaDetailEnrichmentStore()
-    @State private var collectionsStore = MediaDetailCollectionsStore()
+    @StateObject private var store = MediaDetailStore()
 
     /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
     private enum PanelState { case collapsed, expanded }
     @State private var panelState: PanelState = .collapsed
     /// 拖拽过程中实时的手势位移
     @State private var dragOffset: CGFloat = 0
+    /// 用户是否已主动操作过面板（拖拽/展开）。一旦交互过，加载完成后不再自动展开。
+    @State private var userDidInteractWithPanel = false
 
     /// 媒体信息布局占屏高比例（不超过 3/4）
     private let panelHeightRatio: CGFloat = 0.75
@@ -82,8 +78,6 @@ struct MediaDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .task {
-            ratingStore.updateRating(item.rating)
-            logoStore.update(item.logoURL)
             let posterURL = displayPosterURL
             async let dominant = DominantColorExtractor.cachedColor(for: posterURL)
             async let accent = DominantColorExtractor.cachedAccentColor(for: posterURL)
@@ -91,22 +85,16 @@ struct MediaDetailView: View {
             dominantColor = d
             accentColor = a
         }
-        .task {
-            if item.mediaType == .tvShow {
-                await loadEpisodes()
-            }
-        }
-        .task(id: item.serverId) {
-            await enrichItemDetailIfNeeded()
-        }
-        .task(id: item.serverId) {
-            await loadCollectionsIfNeeded()
-        }
         .task(id: metadataTaskID) {
-            guard supportsMetadataRefresh else { return }
-            await loadCachedMetadataIfNeeded()
-            if metadataAutoDownload {
-                await refreshMetadata(force: false)
+            await store.load(
+                item: item,
+                modelContext: modelContext,
+                autoDownloadMetadata: metadataAutoDownload
+            )
+            if !userDidInteractWithPanel, panelState == .collapsed {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    panelState = .expanded
+                }
             }
         }
         .alert("收藏失败", isPresented: favoriteErrorBinding) {
@@ -114,7 +102,7 @@ struct MediaDetailView: View {
         } message: {
             Text(favoriteErrorMessage ?? "")
         }
-        .modifier(MediaDetailRefreshErrorPresenter(store: refreshStore))
+        .modifier(MediaDetailRefreshErrorPresenter(store: store))
         .overlay {
             if let sheet = activeSheet {
                 modalOverlay(for: sheet)
@@ -128,6 +116,7 @@ struct MediaDetailView: View {
     private func panelDrag() -> some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { value in
+                userDidInteractWithPanel = true
                 dragOffset = value.translation.height
             }
             .onEnded { value in
@@ -238,21 +227,34 @@ struct MediaDetailView: View {
             VStack(spacing: 12) {
                 MediaDetailTitleLogoView(
                     title: collapsedTitle,
-                    fallbackLogoURL: item.logoURL,
-                    store: logoStore,
+                    logoURL: store.content?.logoURL ?? item.logoURL,
                     collapsedStyle: true,
                     maxLogoHeight: 88
                 )
 
-                MediaDetailMetaRow(
-                    enrichment: enrichmentStore,
-                    episodesStore: episodesStore,
-                    item: item,
-                    style: .collapsed
-                )
+                MediaDetailMetaRow(values: panelMetaValues, style: .collapsed)
             }
             .padding(.bottom, 90)
 
+            collapsedHint
+                .padding(.bottom, 50)
+                .padding(.horizontal, 24)
+        }
+    }
+
+    @ViewBuilder
+    private var collapsedHint: some View {
+        if store.isLoading {
+            VStack(spacing: 8) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.white)
+
+                Text("加载中")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+        } else {
             VStack(spacing: 8) {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 16, weight: .bold))
@@ -265,8 +267,6 @@ struct MediaDetailView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
             }
-            .padding(.bottom, 50)
-            .padding(.horizontal, 24)
         }
     }
 
@@ -289,7 +289,12 @@ struct MediaDetailView: View {
             // 媒体信息内容（展开后内部滚动）
             ScrollView {
                 Group {
-                    if item.mediaType == .tvShow {
+                    if store.isLoading || store.content == nil {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
+                    } else if item.mediaType == .tvShow {
                         tvShowPanelContent
                     } else {
                         moviePanelContent
@@ -336,10 +341,14 @@ struct MediaDetailView: View {
             panelHeader(title: item.displayTitle)
             panelActions(play: { appState.play(item) })
 
-            MediaDetailSynopsisSection(store: enrichmentStore, item: item) { activeSheet = .synopsis }
-            MediaDetailCastSection(store: castStore, enrichment: enrichmentStore, item: item)
-            MediaDetailCollectionsSection(store: collectionsStore, makeItem: makeCollectionItem)
-            MediaDetailDetailsSection(store: enrichmentStore, item: item, directorLabel: "导演")
+            MediaDetailSynopsisSection(overview: displayOverview) { activeSheet = .synopsis }
+            MediaDetailCastSection(members: store.content?.castMembers ?? [])
+            MediaDetailCollectionsSection(collections: store.content?.collections ?? [], makeItem: makeCollectionItem)
+            MediaDetailDetailsSection(
+                director: store.content?.director,
+                genres: displayGenres,
+                directorLabel: "导演"
+            )
         }
     }
 
@@ -347,14 +356,24 @@ struct MediaDetailView: View {
         VStack(alignment: .leading, spacing: 32) {
             panelHeader(title: item.showTitle ?? item.title)
             panelActions(play: {
-                if let ep = episodesStore.nextEpisodeToPlay { playEpisode(ep) }
+                if let ep = store.nextEpisodeToPlay { playEpisode(ep) }
             })
 
-            MediaDetailSynopsisSection(store: enrichmentStore, item: item) { activeSheet = .synopsis }
-            MediaDetailEpisodesSection(store: episodesStore, accentColor: Color.vanmoAccent, onPlay: playEpisode)
-            MediaDetailCastSection(store: castStore, enrichment: enrichmentStore, item: item)
-            MediaDetailCollectionsSection(store: collectionsStore, makeItem: makeCollectionItem)
-            MediaDetailDetailsSection(store: enrichmentStore, item: item, directorLabel: "主创")
+            MediaDetailSynopsisSection(overview: displayOverview) { activeSheet = .synopsis }
+            MediaDetailEpisodesSection(
+                episodes: store.currentSeasonEpisodes,
+                seasonNumbers: store.seasonNumbers,
+                selectedSeason: $store.selectedSeason,
+                accentColor: Color.vanmoAccent,
+                onPlay: playEpisode
+            )
+            MediaDetailCastSection(members: store.content?.castMembers ?? [])
+            MediaDetailCollectionsSection(collections: store.content?.collections ?? [], makeItem: makeCollectionItem)
+            MediaDetailDetailsSection(
+                director: store.content?.director,
+                genres: displayGenres,
+                directorLabel: "主创"
+            )
         }
     }
 
@@ -363,13 +382,31 @@ struct MediaDetailView: View {
     private func panelHeader(title: String) -> some View {
         MediaDetailPanelHeader(
             title: title,
-            item: item,
-            ratingStore: ratingStore,
-            logoStore: logoStore,
-            enrichment: enrichmentStore,
-            episodesStore: episodesStore,
+            rating: store.content?.rating ?? item.rating,
+            logoURL: store.content?.logoURL ?? item.logoURL,
+            metaValues: panelMetaValues,
             starYellow: starYellow
         )
+    }
+
+    /// 元信息行的展示值（年份 / 类型 / 季数或时长），供收起态与 header 共用。
+    private var panelMetaValues: [String] {
+        var values: [String] = []
+        if let year = item.year { values.append("\(year)") }
+        if let genre = displayGenres.first { values.append(genre) }
+        if item.mediaType == .tvShow {
+            if !store.seasonNumbers.isEmpty {
+                values.append("\(store.seasonNumbers.count) 季")
+            }
+        } else if item.duration > 0 {
+            values.append(item.duration.shortDuration)
+        }
+        return values
+    }
+
+    private var displayGenres: [String] {
+        let genres = store.content?.genres ?? []
+        return genres.isEmpty ? item.genres : genres
     }
 
     private func tagView(_ text: String) -> some View {
@@ -387,10 +424,10 @@ struct MediaDetailView: View {
     private func panelActions(play: @escaping () -> Void) -> some View {
         MediaDetailPanelActions(
             accentBlue: accentBlue,
-            store: refreshStore,
-            supportsMetadataRefresh: supportsMetadataRefresh,
+            isRefreshing: store.isRefreshingMetadata,
+            supportsMetadataRefresh: store.supportsMetadataRefresh(for: item, in: modelContext),
             play: play,
-            refresh: { Task { await refreshMetadata(force: true) } }
+            refresh: { Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) } }
         )
     }
 
@@ -449,95 +486,12 @@ struct MediaDetailView: View {
 
     // MARK: - 状态逻辑
 
-    private var supportsMetadataRefresh: Bool {
-        if (try? mediaServerConnectionSnapshot()) != nil {
-            return true
-        }
-        return MetadataRefreshCoordinator.supportsRefresh(for: item)
-    }
-
     private var metadataTaskID: String {
         MetadataCacheKey.from(item).cacheKey
     }
 
     private var collapsedTitle: String {
         item.mediaType == .tvShow ? (item.showTitle ?? item.title) : item.displayTitle
-    }
-
-    private func loadCachedMetadataIfNeeded() async {
-        let key = MetadataCacheKey.from(item)
-        guard let record = await MetadataCache.shared.load(for: key) else { return }
-        await applyRecordToUI(record)
-    }
-
-    @MainActor
-    private func refreshMetadata(force: Bool) async {
-        guard supportsMetadataRefresh else { return }
-        guard !refreshStore.isRefreshingMetadata else { return }
-
-        refreshStore.beginRefreshing()
-        defer { refreshStore.finishRefreshing() }
-
-        do {
-            if let draft = try await MetadataRefreshCoordinator.shared.prepareRefreshDraft(
-                item,
-                force: force,
-                connection: try? mediaServerConnectionSnapshot()
-            ) {
-                await applyRecordToUI(draft)
-                let record = try await MetadataCache.shared.save(draft)
-                await applyRecordToUI(record)
-            } else if let record = await MetadataCache.shared.load(for: MetadataCacheKey.from(item)) {
-                await applyRecordToUI(record)
-            }
-        } catch {
-            refreshStore.failRefreshing(error.localizedDescription)
-        }
-    }
-
-    @MainActor
-    private func applyRecordToUI(_ record: MetadataCacheRecord) async {
-        if let rating = record.rating {
-            ratingStore.updateRating(rating)
-        }
-
-        let root = (try? await MetadataCache.shared.rootDirectoryURL()) ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        let resolvedLogoURL = record.resolvedLogoURL(rootDirectory: root)
-        let castDisplays = record.makeCastDisplays(rootDirectory: root)
-        logoStore.update(resolvedLogoURL)
-        castStore.update(castDisplays)
-
-        await mergeCachedEpisodesIfNeeded(from: record, rootDirectory: root)
-    }
-
-    @MainActor
-    private func mergeCachedEpisodesIfNeeded(from record: MetadataCacheRecord, rootDirectory: URL) async {
-        guard item.mediaType == .tvShow, !record.episodes.isEmpty else { return }
-
-        let cachedByID = Dictionary(uniqueKeysWithValues: record.episodes.map { ($0.id, $0) })
-
-        if episodesStore.episodes.isEmpty {
-            episodesStore.setEpisodes(record.episodes.map { $0.makeEpisodeInfo(rootDirectory: rootDirectory) })
-            return
-        }
-
-        episodesStore.setEpisodes(episodesStore.episodes.map { episode in
-            guard let cached = cachedByID[episode.id] else { return episode }
-            let cachedEpisode = cached.makeEpisodeInfo(rootDirectory: rootDirectory)
-            guard episode.backdropURL == nil, let backdropURL = cachedEpisode.backdropURL else {
-                return episode
-            }
-            return EpisodeInfo(
-                id: episode.id,
-                title: episode.title,
-                seasonNumber: episode.seasonNumber,
-                episodeNumber: episode.episodeNumber,
-                duration: episode.duration,
-                overview: episode.overview,
-                streamURL: episode.streamURL,
-                backdropURL: backdropURL
-            )
-        })
     }
 
     private var favoriteButton: some View {
@@ -574,95 +528,13 @@ struct MediaDetailView: View {
     }
 
     private var displayOverview: String? {
-        enrichmentStore.overview(fallback: item)
+        if let overview = store.content?.overview { return overview }
+        guard let overview = item.overview, !overview.isEmpty else { return nil }
+        return overview
     }
 
     private var displayPosterURL: URL? {
         highResolutionPosterURL(from: item.posterURL)
-    }
-
-    private var shouldEnrichFromServer: Bool {
-        guard enrichmentStore.enrichedItem == nil,
-              let serverId = item.serverId,
-              !serverId.isEmpty,
-              needsServerDetailFields else {
-            return false
-        }
-        if let snapshot = try? mediaServerConnectionSnapshot() {
-            return snapshot.type == .emby || snapshot.type == .jellyfin
-        }
-        return isEmbyOriginItem &&
-            EmbyCredentialStore.baseURL != nil &&
-            EmbyCredentialStore.userId != nil &&
-            EmbyCredentialStore.token != nil
-    }
-
-    private var isEmbyOriginItem: Bool {
-        if item.fileURL.scheme == "vanmo" {
-            switch item.fileURL.host?.lowercased() {
-            case "series", "emby-container", "emby-item":
-                return true
-            default:
-                return false
-            }
-        }
-        guard let baseHost = EmbyCredentialStore.baseURL.flatMap({ URL(string: $0)?.host?.lowercased() }),
-              let itemHost = item.fileURL.host?.lowercased() else {
-            return false
-        }
-        return baseHost == itemHost
-    }
-
-    private var needsServerDetailFields: Bool {
-        item.overview == nil ||
-            item.overview?.isEmpty == true ||
-            item.cast.isEmpty ||
-            item.director == nil ||
-            item.genres.isEmpty ||
-            item.backdropURL == nil
-    }
-
-    private func enrichItemDetailIfNeeded() async {
-        guard shouldEnrichFromServer, let serverId = item.serverId else { return }
-
-        do {
-            if let snapshot = try? mediaServerConnectionSnapshot() {
-                enrichmentStore.enrichedItem = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId, connection: snapshot)
-            } else {
-                enrichmentStore.enrichedItem = try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId)
-            }
-        } catch {
-            VanmoLogger.library.error("[MediaDetail] Failed to enrich item detail: \(error.localizedDescription)")
-        }
-    }
-
-    private func loadCollectionsIfNeeded() async {
-        guard let serverId = item.serverId,
-              item.mediaType != .boxSet else {
-            collectionsStore.setCollections([])
-            return
-        }
-
-        do {
-            if let snapshot = try? mediaServerConnectionSnapshot() {
-                guard snapshot.type == .emby || snapshot.type == .jellyfin else {
-                    collectionsStore.setCollections([])
-                    return
-                }
-                collectionsStore.setCollections(
-                    try await EmbyCollectionsFetcher.fetchCollections(containing: serverId, connection: snapshot)
-                )
-            } else {
-                guard isEmbyOriginItem else {
-                    collectionsStore.setCollections([])
-                    return
-                }
-                collectionsStore.setCollections(try await EmbyCollectionsFetcher.fetchCollections(containing: serverId))
-            }
-        } catch {
-            VanmoLogger.library.error("[MediaDetail] Failed to load collections: \(error.localizedDescription)")
-            collectionsStore.setCollections([])
-        }
     }
 
     private func setFavorite(_ isFavorite: Bool) async {
@@ -726,67 +598,8 @@ struct MediaDetailView: View {
         return collectionItem
     }
 
-    private func loadEpisodes() async {
-        guard let seriesServerId = item.serverId else { return }
-
-        episodesStore.isLoading = true
-        defer { episodesStore.isLoading = false }
-
-        do {
-            let loaded: [EpisodeInfo]
-            switch item.fileURL.host {
-            case "plex-series":
-                if let snapshot = try? mediaServerConnectionSnapshot() {
-                    loaded = try await PlexEpisodeFetcher.fetchEpisodes(
-                        seriesRatingKey: seriesServerId,
-                        connection: snapshot
-                    )
-                } else {
-                    loaded = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
-                }
-            default:
-                if let snapshot = try? mediaServerConnectionSnapshot() {
-                    loaded = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId, connection: snapshot)
-                } else {
-                    loaded = try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
-                }
-            }
-            episodesStore.setEpisodes(loaded)
-            await mergeEpisodeBackdropsFromCache()
-        } catch {
-            VanmoLogger.library.error("[MediaServer] Failed to load episodes: \(error.localizedDescription)")
-            episodesStore.setEpisodes([])
-        }
-    }
-
     private func mediaServerConnectionSnapshot() throws -> MediaServerConnectionSnapshot? {
         try MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
-    }
-
-    @MainActor
-    private func mergeEpisodeBackdropsFromCache() async {
-        let key = MetadataCacheKey.from(item)
-        guard let record = await MetadataCache.shared.load(for: key),
-              !record.episodes.isEmpty else { return }
-
-        let root = (try? await MetadataCache.shared.rootDirectoryURL()) ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        let cachedByID = Dictionary(uniqueKeysWithValues: record.episodes.map { ($0.id, $0) })
-
-        episodesStore.setEpisodes(episodesStore.episodes.map { episode in
-            guard episode.backdropURL == nil, let cached = cachedByID[episode.id] else {
-                return episode
-            }
-            return EpisodeInfo(
-                id: episode.id,
-                title: episode.title,
-                seasonNumber: episode.seasonNumber,
-                episodeNumber: episode.episodeNumber,
-                duration: episode.duration,
-                overview: episode.overview,
-                streamURL: episode.streamURL,
-                backdropURL: cached.makeEpisodeInfo(rootDirectory: root).backdropURL
-            )
-        })
     }
 
     private func initial(for name: String) -> String {
@@ -872,61 +685,32 @@ private enum MediaDetailSheet: Identifiable, Equatable {
     }
 }
 
-@MainActor
-private final class MediaDetailRatingStore: ObservableObject {
-    @Published private(set) var rating: Double?
-
-    func updateRating(_ newRating: Double?) {
-        guard rating != newRating else { return }
-        rating = newRating
-    }
+/// 详情页信息面板的聚合快照：所有异步数据一次性组装，供 UI 单次刷新。
+struct MediaDetailContent {
+    var rating: Double?
+    var logoURL: URL?
+    var overview: String?
+    var genres: [String]
+    var director: String?
+    var castMembers: [CastMemberDisplay]
+    var episodes: [EpisodeInfo]
+    var collections: [ServerMediaItem]
 }
 
 @MainActor
-private final class MediaDetailRefreshStore: ObservableObject {
+final class MediaDetailStore: ObservableObject {
+    @Published private(set) var content: MediaDetailContent?
+    @Published private(set) var isLoading = false
+    @Published var selectedSeason: Int?
     @Published private(set) var isRefreshingMetadata = false
     @Published var refreshErrorMessage: String?
 
-    func beginRefreshing() {
-        guard !isRefreshingMetadata else { return }
-        isRefreshingMetadata = true
-    }
+    private var loadedKey: String?
+    private var loadGeneration = 0
 
-    func finishRefreshing() {
-        guard isRefreshingMetadata else { return }
-        isRefreshingMetadata = false
-    }
+    // MARK: - 派生
 
-    func failRefreshing(_ message: String) {
-        refreshErrorMessage = message
-    }
-}
-
-@MainActor
-private final class MediaDetailCastStore: ObservableObject {
-    @Published private(set) var members: [CastMemberDisplay] = []
-
-    func update(_ newMembers: [CastMemberDisplay]) {
-        guard members != newMembers else { return }
-        members = newMembers
-    }
-}
-
-@MainActor
-private final class MediaDetailLogoStore: ObservableObject {
-    @Published private(set) var logoURL: URL?
-
-    func update(_ newLogoURL: URL?) {
-        guard logoURL != newLogoURL else { return }
-        logoURL = newLogoURL
-    }
-}
-
-@MainActor
-private final class MediaDetailEpisodesStore: ObservableObject {
-    @Published private(set) var episodes: [EpisodeInfo] = []
-    @Published var isLoading = false
-    @Published var selectedSeason: Int?
+    var episodes: [EpisodeInfo] { content?.episodes ?? [] }
 
     var seasonNumbers: [Int] {
         Array(Set(episodes.map(\.seasonNumber))).sorted()
@@ -945,55 +729,286 @@ private final class MediaDetailEpisodesStore: ObservableObject {
             .first
     }
 
-    func setEpisodes(_ newEpisodes: [EpisodeInfo]) {
-        episodes = newEpisodes
+    func supportsMetadataRefresh(for item: MediaItem, in modelContext: ModelContext) -> Bool {
+        if (try? connectionSnapshot(for: item, in: modelContext)) != nil {
+            return true
+        }
+        return MetadataRefreshCoordinator.supportsRefresh(for: item)
     }
-}
 
-@MainActor
-private final class MediaDetailCollectionsStore: ObservableObject {
-    @Published private(set) var collections: [ServerMediaItem] = []
+    // MARK: - Loading
 
-    func setCollections(_ newCollections: [ServerMediaItem]) {
-        guard collections.map(\.serverId) != newCollections.map(\.serverId) else { return }
-        collections = newCollections
+    func load(item: MediaItem, modelContext: ModelContext, autoDownloadMetadata: Bool) async {
+        let key = detailKey(for: item)
+        guard loadedKey != key else { return }
+        loadedKey = key
+        loadGeneration += 1
+        let generation = loadGeneration
+
+        isLoading = true
+        content = nil
+        selectedSeason = nil
+
+        await performAggregate(
+            item: item,
+            modelContext: modelContext,
+            autoDownloadMetadata: autoDownloadMetadata,
+            force: false,
+            generation: generation
+        )
     }
-}
 
-@MainActor
-private final class MediaDetailEnrichmentStore: ObservableObject {
-    @Published var enrichedItem: ServerMediaItem?
+    func refreshMetadata(for item: MediaItem, modelContext: ModelContext, force: Bool) async {
+        guard !isRefreshingMetadata else { return }
+        isRefreshingMetadata = true
+        defer { isRefreshingMetadata = false }
 
-    func overview(fallback: MediaItem) -> String? {
-        let overview = enrichedItem?.overview ?? fallback.overview
+        await performAggregate(
+            item: item,
+            modelContext: modelContext,
+            autoDownloadMetadata: true,
+            force: force,
+            generation: loadGeneration
+        )
+    }
+
+    /// 并行发起全部异步请求，等待全部完成后聚合成一份快照，对 UI 做一次性刷新。
+    /// - Parameter generation: 本次加载代际号，回写前校验，避免旧 item 结果覆盖新 item。
+    private func performAggregate(
+        item: MediaItem,
+        modelContext: ModelContext,
+        autoDownloadMetadata: Bool,
+        force: Bool,
+        generation: Int
+    ) async {
+        async let enrichedTask = fetchEnrichment(item: item, modelContext: modelContext)
+        async let episodesTask = fetchEpisodes(item: item, modelContext: modelContext)
+        async let collectionsTask = fetchCollections(item: item, modelContext: modelContext)
+        async let recordTask = fetchMetadataRecord(
+            item: item,
+            modelContext: modelContext,
+            enabled: autoDownloadMetadata,
+            force: force
+        )
+
+        let enriched = await enrichedTask
+        let loadedEpisodes = await episodesTask
+        let loadedCollections = await collectionsTask
+        let record = await recordTask
+
+        let root = (try? await MetadataCache.shared.rootDirectoryURL())
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+
+        var castMembers = record?.makeCastDisplays(rootDirectory: root) ?? []
+        if castMembers.isEmpty {
+            let names = (enriched?.cast.isEmpty == false) ? (enriched?.cast ?? []) : item.cast
+            castMembers = names.map { CastMemberDisplay(id: $0, name: $0, role: nil, profileURL: nil) }
+        }
+
+        let snapshot = MediaDetailContent(
+            rating: record?.rating ?? item.rating,
+            logoURL: record?.resolvedLogoURL(rootDirectory: root) ?? item.logoURL,
+            overview: resolvedOverview(enriched: enriched, item: item),
+            genres: resolvedGenres(enriched: enriched, item: item),
+            director: resolvedDirector(enriched: enriched, item: item),
+            castMembers: castMembers,
+            episodes: mergedEpisodes(loaded: loadedEpisodes, record: record, item: item, rootDirectory: root),
+            collections: loadedCollections
+        )
+
+        // 代际校验：加载期间若切换到其它 item，丢弃本次结果。
+        guard generation == loadGeneration else { return }
+
+        content = snapshot
+        selectedSeason = Array(Set(snapshot.episodes.map(\.seasonNumber))).sorted().first
+        isLoading = false
+    }
+
+    // MARK: - 并行取数
+
+    private func fetchEnrichment(item: MediaItem, modelContext: ModelContext) async -> ServerMediaItem? {
+        guard shouldEnrichFromServer(item: item, modelContext: modelContext),
+              let serverId = item.serverId else { return nil }
+
+        do {
+            if let snapshot = try? connectionSnapshot(for: item, in: modelContext) {
+                return try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId, connection: snapshot)
+            }
+            return try await EmbyItemDetailFetcher.fetchDetail(itemId: serverId)
+        } catch {
+            VanmoLogger.library.error("[MediaDetail] Failed to enrich item detail: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func fetchEpisodes(item: MediaItem, modelContext: ModelContext) async -> [EpisodeInfo] {
+        guard item.mediaType == .tvShow, let seriesServerId = item.serverId else { return [] }
+
+        do {
+            let snapshot = try? connectionSnapshot(for: item, in: modelContext)
+            switch item.fileURL.host {
+            case "plex-series":
+                if let snapshot {
+                    return try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId, connection: snapshot)
+                }
+                return try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
+            default:
+                if let snapshot {
+                    return try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId, connection: snapshot)
+                }
+                return try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
+            }
+        } catch {
+            VanmoLogger.library.error("[MediaServer] Failed to load episodes: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    private func fetchCollections(item: MediaItem, modelContext: ModelContext) async -> [ServerMediaItem] {
+        guard let serverId = item.serverId, item.mediaType != .boxSet else { return [] }
+
+        do {
+            if let snapshot = try? connectionSnapshot(for: item, in: modelContext) {
+                guard snapshot.type == .emby || snapshot.type == .jellyfin else { return [] }
+                return try await EmbyCollectionsFetcher.fetchCollections(containing: serverId, connection: snapshot)
+            } else if isEmbyOriginItem(item) {
+                return try await EmbyCollectionsFetcher.fetchCollections(containing: serverId)
+            } else {
+                return []
+            }
+        } catch {
+            VanmoLogger.library.error("[MediaDetail] Failed to load collections: \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    private func fetchMetadataRecord(
+        item: MediaItem,
+        modelContext: ModelContext,
+        enabled: Bool,
+        force: Bool
+    ) async -> MetadataCacheRecord? {
+        let key = MetadataCacheKey.from(item)
+        let cached = await MetadataCache.shared.load(for: key)
+
+        guard enabled, supportsMetadataRefresh(for: item, in: modelContext) else { return cached }
+
+        do {
+            if let draft = try await MetadataRefreshCoordinator.shared.prepareRefreshDraft(
+                item,
+                force: force,
+                connection: try? connectionSnapshot(for: item, in: modelContext)
+            ) {
+                return try await MetadataCache.shared.save(draft)
+            }
+            return cached
+        } catch {
+            refreshErrorMessage = error.localizedDescription
+            return cached
+        }
+    }
+
+    private func mergedEpisodes(
+        loaded: [EpisodeInfo],
+        record: MetadataCacheRecord?,
+        item: MediaItem,
+        rootDirectory root: URL
+    ) -> [EpisodeInfo] {
+        guard item.mediaType == .tvShow, let record, !record.episodes.isEmpty else { return loaded }
+
+        if loaded.isEmpty {
+            return record.episodes.map { $0.makeEpisodeInfo(rootDirectory: root) }
+        }
+
+        let cachedByID = Dictionary(uniqueKeysWithValues: record.episodes.map { ($0.id, $0) })
+        return loaded.map { episode in
+            guard episode.backdropURL == nil, let cached = cachedByID[episode.id] else { return episode }
+            let cachedEpisode = cached.makeEpisodeInfo(rootDirectory: root)
+            guard let backdropURL = cachedEpisode.backdropURL else { return episode }
+            return EpisodeInfo(
+                id: episode.id,
+                title: episode.title,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                duration: episode.duration,
+                overview: episode.overview,
+                streamURL: episode.streamURL,
+                backdropURL: backdropURL
+            )
+        }
+    }
+
+    // MARK: - 回退解析
+
+    private func resolvedOverview(enriched: ServerMediaItem?, item: MediaItem) -> String? {
+        let overview = enriched?.overview ?? item.overview
         guard let overview, !overview.isEmpty else { return nil }
         return overview
     }
 
-    func genres(fallback: MediaItem) -> [String] {
-        if let enrichedGenres = enrichedItem?.genres, !enrichedGenres.isEmpty {
-            return enrichedGenres
-        }
-        return fallback.genres
+    private func resolvedGenres(enriched: ServerMediaItem?, item: MediaItem) -> [String] {
+        if let genres = enriched?.genres, !genres.isEmpty { return genres }
+        return item.genres
     }
 
-    func director(fallback: MediaItem) -> String? {
-        if let director = enrichedItem?.director, !director.isEmpty {
-            return director
-        }
-        return fallback.director
+    private func resolvedDirector(enriched: ServerMediaItem?, item: MediaItem) -> String? {
+        if let director = enriched?.director, !director.isEmpty { return director }
+        return item.director
     }
 
-    func cast(fallback: MediaItem) -> [String] {
-        if let cast = enrichedItem?.cast, !cast.isEmpty {
-            return cast
+    // MARK: - 支持
+
+    private func detailKey(for item: MediaItem) -> String {
+        MetadataCacheKey.from(item).cacheKey
+    }
+
+    private func shouldEnrichFromServer(item: MediaItem, modelContext: ModelContext) -> Bool {
+        guard let serverId = item.serverId,
+              !serverId.isEmpty,
+              needsServerDetailFields(item) else {
+            return false
         }
-        return fallback.cast
+        if let snapshot = try? connectionSnapshot(for: item, in: modelContext) {
+            return snapshot.type == .emby || snapshot.type == .jellyfin
+        }
+        return isEmbyOriginItem(item) &&
+            EmbyCredentialStore.baseURL != nil &&
+            EmbyCredentialStore.userId != nil &&
+            EmbyCredentialStore.token != nil
+    }
+
+    private func needsServerDetailFields(_ item: MediaItem) -> Bool {
+        item.overview == nil ||
+            item.overview?.isEmpty == true ||
+            item.cast.isEmpty ||
+            item.director == nil ||
+            item.genres.isEmpty ||
+            item.backdropURL == nil
+    }
+
+    private func isEmbyOriginItem(_ item: MediaItem) -> Bool {
+        if item.fileURL.scheme == "vanmo" {
+            switch item.fileURL.host?.lowercased() {
+            case "series", "emby-container", "emby-item":
+                return true
+            default:
+                return false
+            }
+        }
+        guard let baseHost = EmbyCredentialStore.baseURL.flatMap({ URL(string: $0)?.host?.lowercased() }),
+              let itemHost = item.fileURL.host?.lowercased() else {
+            return false
+        }
+        return baseHost == itemHost
+    }
+
+    private func connectionSnapshot(for item: MediaItem, in modelContext: ModelContext) throws -> MediaServerConnectionSnapshot? {
+        try MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
     }
 }
 
 private struct MediaDetailRefreshErrorPresenter: ViewModifier {
-    @ObservedObject var store: MediaDetailRefreshStore
+    @ObservedObject var store: MediaDetailStore
 
     private var refreshErrorBinding: Binding<Bool> {
         Binding {
@@ -1015,15 +1030,14 @@ private struct MediaDetailRefreshErrorPresenter: ViewModifier {
 
 private struct MediaDetailTitleLogoView: View {
     let title: String
-    let fallbackLogoURL: URL?
-    @ObservedObject var store: MediaDetailLogoStore
+    let logoURL: URL?
     var collapsedStyle = false
     var maxLogoHeight: CGFloat = 72
 
     var body: some View {
         MediaTitleLogoView(
             title: title,
-            logoURL: store.logoURL ?? fallbackLogoURL,
+            logoURL: logoURL,
             collapsedStyle: collapsedStyle,
             maxLogoHeight: maxLogoHeight
         )
@@ -1032,28 +1046,20 @@ private struct MediaDetailTitleLogoView: View {
 
 private struct MediaDetailPanelHeader: View {
     let title: String
-    let item: MediaItem
-    let ratingStore: MediaDetailRatingStore
-    let logoStore: MediaDetailLogoStore
-    let enrichment: MediaDetailEnrichmentStore
-    let episodesStore: MediaDetailEpisodesStore
+    let rating: Double?
+    let logoURL: URL?
+    let metaValues: [String]
     let starYellow: Color
 
     var body: some View {
         VStack(alignment: .center, spacing: 10) {
             MediaDetailTitleLogoView(
                 title: title,
-                fallbackLogoURL: item.logoURL,
-                store: logoStore,
+                logoURL: logoURL,
                 maxLogoHeight: 72
             )
 
-            MediaDetailMetaRow(
-                enrichment: enrichment,
-                episodesStore: episodesStore,
-                item: item,
-                style: .header
-            )
+            MediaDetailMetaRow(values: metaValues, style: .header)
 
             HStack(spacing: 6) {
                 tagView("TV-MA")
@@ -1061,7 +1067,7 @@ private struct MediaDetailPanelHeader: View {
                 tagView("DOLBY")
             }
 
-            MediaDetailRatingRow(store: ratingStore, starYellow: starYellow)
+            MediaDetailRatingRow(rating: rating, starYellow: starYellow)
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
@@ -1080,11 +1086,11 @@ private struct MediaDetailPanelHeader: View {
 }
 
 private struct MediaDetailRatingRow: View {
-    @ObservedObject var store: MediaDetailRatingStore
+    let rating: Double?
     let starYellow: Color
 
     var body: some View {
-        if let rating = store.rating {
+        if let rating {
             HStack(spacing: 6) {
                 Image(systemName: "star.fill")
                     .foregroundStyle(starYellow)
@@ -1104,7 +1110,7 @@ private struct MediaDetailRatingRow: View {
 
 private struct MediaDetailPanelActions: View {
     let accentBlue: Color
-    @ObservedObject var store: MediaDetailRefreshStore
+    let isRefreshing: Bool
     let supportsMetadataRefresh: Bool
     let play: () -> Void
     let refresh: () -> Void
@@ -1136,12 +1142,12 @@ private struct MediaDetailPanelActions: View {
                     } label: {
                         Label("刷新", systemImage: "arrow.clockwise")
                     }
-                    .disabled(store.isRefreshingMetadata)
+                    .disabled(isRefreshing)
                 }
             } label: {
                 circleActionLabel(icon: "ellipsis")
             }
-            .disabled(store.isRefreshingMetadata || !supportsMetadataRefresh)
+            .disabled(isRefreshing || !supportsMetadataRefresh)
         }
     }
 
@@ -1179,22 +1185,9 @@ private struct MediaDetailPanelActions: View {
 }
 
 private struct MediaDetailCastSection: View {
-    @ObservedObject var store: MediaDetailCastStore
-    @ObservedObject var enrichment: MediaDetailEnrichmentStore
-    let item: MediaItem
-
-    private var members: [CastMemberDisplay] {
-        if !store.members.isEmpty {
-            return store.members
-        }
-        return enrichment.cast(fallback: item).map { name in
-            CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
-        }
-    }
+    let members: [CastMemberDisplay]
 
     var body: some View {
-        let members = members
-
         if !members.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 Text("主演")
@@ -1258,11 +1251,11 @@ private struct MediaDetailCastAvatar: View {
 }
 
 private struct MediaDetailCollectionsSection: View {
-    @ObservedObject var store: MediaDetailCollectionsStore
+    let collections: [ServerMediaItem]
     let makeItem: (ServerMediaItem) -> MediaItem
 
     var body: some View {
-        if !store.collections.isEmpty {
+        if !collections.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 Text("合集")
                     .font(.system(size: 18, weight: .bold))
@@ -1270,7 +1263,7 @@ private struct MediaDetailCollectionsSection: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(store.collections, id: \.serverId) { collection in
+                        ForEach(collections, id: \.serverId) { collection in
                             NavigationLink {
                                 EmbyFolderBrowseView(container: makeItem(collection))
                             } label: {
@@ -1322,27 +1315,10 @@ private struct MediaDetailCollectionCard: View {
 private struct MediaDetailMetaRow: View {
     enum Style { case collapsed, header }
 
-    @ObservedObject var enrichment: MediaDetailEnrichmentStore
-    @ObservedObject var episodesStore: MediaDetailEpisodesStore
-    let item: MediaItem
+    let values: [String]
     let style: Style
 
-    private var values: [String] {
-        var values: [String] = []
-        if let year = item.year { values.append("\(year)") }
-        if let genre = enrichment.genres(fallback: item).first { values.append(genre) }
-        if item.mediaType == .tvShow {
-            if !episodesStore.seasonNumbers.isEmpty {
-                values.append("\(episodesStore.seasonNumbers.count) 季")
-            }
-        } else if item.duration > 0 {
-            values.append(item.duration.shortDuration)
-        }
-        return values
-    }
-
     var body: some View {
-        let values = values
         if !values.isEmpty {
             HStack(spacing: style == .collapsed ? 8 : 6) {
                 ForEach(Array(values.enumerated()), id: \.offset) { index, value in
@@ -1364,8 +1340,7 @@ private struct MediaDetailMetaRow: View {
 }
 
 private struct MediaDetailSynopsisSection: View {
-    @ObservedObject var store: MediaDetailEnrichmentStore
-    let item: MediaItem
+    let overview: String?
     let onTap: () -> Void
 
     var body: some View {
@@ -1373,7 +1348,7 @@ private struct MediaDetailSynopsisSection: View {
             Text("简介")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.primary)
-            Text(store.overview(fallback: item) ?? "暂无简介")
+            Text(overview ?? "暂无简介")
                 .font(.system(size: 15))
                 .lineSpacing(4)
                 .foregroundStyle(.secondary)
@@ -1385,14 +1360,11 @@ private struct MediaDetailSynopsisSection: View {
 }
 
 private struct MediaDetailDetailsSection: View {
-    @ObservedObject var store: MediaDetailEnrichmentStore
-    let item: MediaItem
+    let director: String?
+    let genres: [String]
     let directorLabel: String
 
     var body: some View {
-        let director = store.director(fallback: item)
-        let genres = store.genres(fallback: item)
-
         VStack(alignment: .leading, spacing: 12) {
             Text("详情")
                 .font(.system(size: 18, weight: .bold))
@@ -1427,7 +1399,9 @@ private struct MediaDetailDetailsSection: View {
 }
 
 private struct MediaDetailEpisodesSection: View {
-    @ObservedObject var store: MediaDetailEpisodesStore
+    let episodes: [EpisodeInfo]
+    let seasonNumbers: [Int]
+    @Binding var selectedSeason: Int?
     let accentColor: Color
     let onPlay: (EpisodeInfo) -> Void
 
@@ -1438,15 +1412,15 @@ private struct MediaDetailEpisodesSection: View {
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.primary)
 
-                if store.seasonNumbers.count > 1 {
+                if seasonNumbers.count > 1 {
                     Spacer()
                     Menu {
-                        ForEach(store.seasonNumbers, id: \.self) { season in
-                            Button("第 \(season) 季") { store.selectedSeason = season }
+                        ForEach(seasonNumbers, id: \.self) { season in
+                            Button("第 \(season) 季") { selectedSeason = season }
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text("第 \(store.selectedSeason ?? store.seasonNumbers.first ?? 1) 季")
+                            Text("第 \(selectedSeason ?? seasonNumbers.first ?? 1) 季")
                                 .font(.system(size: 14, weight: .semibold))
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 10, weight: .bold))
@@ -1459,12 +1433,7 @@ private struct MediaDetailEpisodesSection: View {
                 }
             }
 
-            if store.isLoading {
-                ProgressView()
-                    .tint(accentColor)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-            } else if store.currentSeasonEpisodes.isEmpty {
+            if episodes.isEmpty {
                 Text("暂无剧集")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
@@ -1472,7 +1441,7 @@ private struct MediaDetailEpisodesSection: View {
                     .padding(.vertical, 24)
             } else {
                 VStack(spacing: 16) {
-                    ForEach(store.currentSeasonEpisodes) { episode in
+                    ForEach(episodes) { episode in
                         episodeRow(episode)
                             .id(episode.id)
                     }

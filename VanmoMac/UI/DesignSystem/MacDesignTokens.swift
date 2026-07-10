@@ -19,8 +19,8 @@ enum MacDesignTokens {
         static let filterPillHeight: CGFloat = 32
         static let continueWatchingWidth: CGFloat = 320
         static let continueWatchingThumbHeight: CGFloat = 180
-        static let posterWidth: CGFloat = 174
-        static let posterHeight: CGFloat = 261
+        static let posterWidth: CGFloat = 174 * 0.7
+        static let posterHeight: CGFloat = 261 * 0.7
         static let posterSpacing: CGFloat = 24
         static let heroHeight: CGFloat = 460
         static let heroLinearHeight: CGFloat = 200

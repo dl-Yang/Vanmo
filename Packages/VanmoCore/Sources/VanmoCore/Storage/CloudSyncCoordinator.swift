@@ -44,14 +44,8 @@ public final class CloudSyncCoordinator: ObservableObject {
             lastSyncAt = now
             CloudSyncPreferences.lastSyncAt = now
             statusMessage = "已同步 (\(reason))"
-            #if DEBUG
-            print("[Debug][CloudSync] merge complete reason=\(reason)")
-            #endif
         } catch {
             statusMessage = "同步失败：\(error.localizedDescription)"
-            #if DEBUG
-            print("[Debug][CloudSync] merge failed reason=\(reason) error=\(error.localizedDescription)")
-            #endif
         }
     }
 

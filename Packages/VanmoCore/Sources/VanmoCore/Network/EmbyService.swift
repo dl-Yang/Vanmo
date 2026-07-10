@@ -66,12 +66,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
             throw NetworkError.connectionFailed(error.localizedDescription)
         }
 
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Auth URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Auth status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Auth body:\n\(EmbyDebugLog.describe(data: data))")
-        #endif
-
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.connectionFailed("Invalid response")
         }
@@ -184,12 +178,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
 
         let (data, response) = try await session.data(for: request)
 
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] List URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] List status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] List body:\n\(EmbyDebugLog.describe(data: data))")
-        #endif
-
         try validateEmbyResponse(response, body: data, context: "list items")
 
         let result = try JSONDecoder().decode(EmbyItemsResponse.self, from: data)
@@ -259,12 +247,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
 
         let (tempURL, response) = try await session.download(for: request)
 
-        #if DEBUG
-        let downloadedSize = (try? FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int64) ?? -1
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Download URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Download status: \((response as? HTTPURLResponse)?.statusCode ?? -1) bytes=\(downloadedSize)")
-        #endif
-
         if let httpResponse = response as? HTTPURLResponse {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 try? FileManager.default.removeItem(at: tempURL)
@@ -311,14 +293,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
 
         let base = baseURL(for: config)
 
-        #if DEBUG
-        if let since {
-            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan mode: INCREMENTAL since \(Self.embyDateFormatter.string(from: since))")
-        } else {
-            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan mode: FULL (no since filter)")
-        }
-        #endif
-
         var startIndex = 0
         var page = 0
         while true {
@@ -351,13 +325,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
             addAuth(to: &request)
 
             let (data, response) = try await session.data(for: request)
-
-            #if DEBUG
-            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan page=\(page) URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan page=\(page) status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-            VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Scan page=\(page) body:\n\(EmbyDebugLog.describe(data: data))")
-            #endif
-
             try validateEmbyResponse(response, body: data, context: "fetch media items")
 
             let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
@@ -465,11 +432,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         addAuth(to: &request)
 
         let (data, response) = try await session.data(for: request)
-
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] UserViews URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] UserViews status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        #endif
 
         try validateEmbyResponse(response, body: data, context: "fetch user views")
 
@@ -655,12 +617,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         addAuth(to: &request)
 
         let (data, response) = try await session.data(for: request)
-
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Set favorite URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] Set favorite status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        #endif
-
         try validateEmbyResponse(response, body: data, context: "set favorite")
     }
 
@@ -679,11 +635,6 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         addAuth(to: &request)
 
         let (data, response) = try await session.data(for: request)
-
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] \(context) URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][\(self.type.displayName)] \(context) status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        #endif
 
         try validateEmbyResponse(response, body: data, context: context)
 
@@ -1485,12 +1436,6 @@ public enum EmbyChildItemsFetcher {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][MediaServer] Children URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][MediaServer] Children status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        VanmoLogger.network.debug("[Debug][MediaServer] Children body:\n\(EmbyDebugLog.describe(data: data))")
-        #endif
-
         try validateEmbyResponse(response, body: data, context: "fetch child items")
 
         let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
@@ -1557,12 +1502,6 @@ public enum EmbyItemDetailFetcher {
         request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][MediaServer] Item detail URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][MediaServer] Item detail status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        VanmoLogger.network.debug("[Debug][MediaServer] Item detail body:\n\(EmbyDebugLog.describe(data: data))")
-        #endif
 
         try validateEmbyResponse(response, body: data, context: "fetch item detail")
 
@@ -1671,11 +1610,6 @@ public enum EmbyCollectionsFetcher {
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][MediaServer] BoxSet URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][MediaServer] BoxSet status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        #endif
-
         try validateEmbyResponse(response, body: data, context: "fetch box sets")
 
         let result = try EmbyService.makeJSONDecoder().decode(EmbyMediaResponse.self, from: data)
@@ -1778,12 +1712,6 @@ public enum EmbyEpisodeFetcher {
         request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
-
-        #if DEBUG
-        VanmoLogger.network.debug("[Debug][MediaServer] Episodes URL: \(EmbyDebugLog.redactURL(url.absoluteString))")
-        VanmoLogger.network.debug("[Debug][MediaServer] Episodes status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-        VanmoLogger.network.debug("[Debug][MediaServer] Episodes body:\n\(EmbyDebugLog.describe(data: data))")
-        #endif
 
         try validateEmbyResponse(response, body: data, context: "fetch episodes")
 

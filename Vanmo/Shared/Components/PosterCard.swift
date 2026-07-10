@@ -51,7 +51,9 @@ struct PosterCard: View {
                     KFImage(posterURL)
                         .placeholder {
                             placeholderView
-                                .overlay(ProgressView().tint(.white))
+                                .overlay {
+                                    LoadingIndicatorView(size: 24)
+                                }
                         }
                         .fade(duration: 0.25)
                         .resizable()

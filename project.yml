@@ -58,6 +58,7 @@ targets:
     resources:
       - path: Vanmo/Resources/Assets.xcassets
       - path: Vanmo/Resources/Info.plist
+      - path: Vanmo/Resources/loadingSpinner.json
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app
@@ -106,12 +107,16 @@ targets:
       - package: VanmoCore
       - package: Kingfisher
       - package: KSPlayer
+      - package: lottie-ios
+        product: Lottie
     sources:
       - path: VanmoMac
       - path: Vanmo/Shared/Components/MediaTitleLogoView.swift
+      - path: Vanmo/Shared/Components/LoadingIndicatorView.swift
     resources:
       - path: VanmoMac/Resources/Info-Mac.plist
       - path: VanmoMac/Resources/Assets.xcassets
+      - path: VanmoMac/Resources/loadingSpinner.json
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app.mac

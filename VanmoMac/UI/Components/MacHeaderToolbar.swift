@@ -55,7 +55,7 @@ struct MacSidebarToggleButton: View {
     @Environment(\.macTheme) private var theme
 
     var body: some View {
-        HStack(){
+        HStack(spacing:0){
             Button {
                 appState.isSidebarExpanded.toggle()
             } label: {
@@ -68,14 +68,14 @@ struct MacSidebarToggleButton: View {
             .frame(width: 28, height: 28)
             .buttonStyle(.plain)
             .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
-            
+           
             Button {
                 //todo check
 //                appState.contentRoute =
             } label: {
-                Image(systemName: appState.contentRoute != .library ? "arrowshape.left.fill" : "arrowshape.left")
+                Image(systemName: "arrow.left")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(theme.primaryText)
+                    .foregroundStyle(appState.contentRoute != .library ? .black : .gray.opacity(0.2))
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }

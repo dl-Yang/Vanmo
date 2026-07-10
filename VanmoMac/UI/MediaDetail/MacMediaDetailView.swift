@@ -16,8 +16,12 @@ struct MacMediaDetailView: View {
         ZStack(alignment: .topLeading) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    heroSection
-                    contentSection
+                    if isContentReady {
+                        heroSection
+                        contentSection
+                    } else {
+                        skeletonView
+                    }
                 }
             }
 
@@ -25,21 +29,11 @@ struct MacMediaDetailView: View {
         }
         .background(theme.appBackground)
         .task(id: detailItemKey) {
-            store.prepareForItem(item)
-            await store.loadCachedMetadata(for: item)
-            if metadataAutoDownload {
-                await store.refreshMetadata(for: item, modelContext: modelContext, force: false)
-            }
-        }
-        .task(id: detailItemKey) {
-            if item.mediaType == .tvShow {
-                await store.loadEpisodes(for: item, modelContext: modelContext)
-            } else {
-                store.setEpisodes([])
-            }
-        }
-        .task(id: detailItemKey) {
-            await store.loadCollections(for: item, modelContext: modelContext)
+            await store.load(
+                item: item,
+                modelContext: modelContext,
+                autoDownloadMetadata: metadataAutoDownload
+            )
         }
         .alert("收藏失败", isPresented: favoriteErrorBinding) {
             Button("确定") {}
@@ -53,9 +47,39 @@ struct MacMediaDetailView: View {
         }
     }
 
+    private var skeletonView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Rectangle()
+                .fill(theme.secondaryButtonBackground)
+                .frame(height: MacDesignTokens.Layout.heroHeight)
+                .frame(maxWidth: .infinity)
+
+            VStack(alignment: .leading, spacing: 24) {
+                skeletonBar(width: 320, height: 32)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    skeletonBar(height: 16)
+                    skeletonBar(height: 16)
+                    skeletonBar(width: 240, height: 16)
+                }
+
+                skeletonBar(width: 180, height: 24)
+            }
+            .padding(.horizontal, MacDesignTokens.Layout.detailContentPadding)
+            .padding(.top, 32)
+        }
+    }
+
+    private func skeletonBar(width: CGFloat? = nil, height: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(theme.secondaryButtonBackground)
+            .frame(maxWidth: width ?? .infinity, alignment: .leading)
+            .frame(height: height)
+    }
+
     private var heroSection: some View {
         ZStack(alignment: .bottomLeading) {
-            MacRemoteImage(url: store.backdropURL ?? item.backdropURL ?? item.posterURL)
+            MacRemoteImage(url: store.content?.backdropURL ?? item.backdropURL ?? item.posterURL)
                 .frame(height: MacDesignTokens.Layout.heroHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()
@@ -74,7 +98,7 @@ struct MacMediaDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MacMediaDetailTitleLogoView(
                     title: displayTitle,
-                    logoURL: store.logoURL ?? item.logoURL
+                    logoURL: store.content?.logoURL ?? item.logoURL
                 )
 
                 metadataRow
@@ -252,10 +276,7 @@ struct MacMediaDetailView: View {
                     .font(MacDesignTokens.Typography.detailSectionTitle)
                     .foregroundStyle(theme.primaryText)
 
-                if store.isLoadingEpisodes {
-                    ProgressView("加载季集...")
-                        .foregroundStyle(theme.secondaryText)
-                } else if store.episodes.isEmpty {
+                if store.currentSeasonEpisodes.isEmpty {
                     Text("暂无季集数据")
                         .font(.subheadline)
                         .foregroundStyle(theme.secondaryText)
@@ -318,7 +339,8 @@ struct MacMediaDetailView: View {
 
     @ViewBuilder
     private var collectionsSection: some View {
-        if !store.collections.isEmpty {
+        let collections = store.content?.collections ?? []
+        if !collections.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Collections")
                     .font(MacDesignTokens.Typography.detailSectionTitle)
@@ -326,7 +348,7 @@ struct MacMediaDetailView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
-                        ForEach(store.collections, id: \.serverId) { collection in
+                        ForEach(collections, id: \.serverId) { collection in
                             Button {
                                 let collectionItem = store.makeCollectionItem(
                                     collection,
@@ -444,24 +466,30 @@ struct MacMediaDetailView: View {
         return "local:\(item.id.uuidString)"
     }
 
+    private var isContentReady: Bool {
+        !store.isLoading && store.content != nil
+    }
+
     private var displayOverview: String? {
-        store.enrichedOverview ?? item.overview
+        store.content?.enrichedOverview ?? item.overview
     }
 
     private var displayGenres: [String] {
-        store.enrichedGenres.isEmpty ? item.genres : store.enrichedGenres
+        let enriched = store.content?.enrichedGenres ?? []
+        return enriched.isEmpty ? item.genres : enriched
     }
 
     private var episodeCountText: String {
-        if store.episodes.isEmpty {
+        let count = store.content?.episodes.count ?? 0
+        if count == 0 {
             return "Episodes"
         }
-        return "\(store.episodes.count) Episodes"
+        return "\(count) Episodes"
     }
 
     private var castMembers: [CastMemberDisplay] {
-        if !store.castMembers.isEmpty {
-            return store.castMembers
+        if let members = store.content?.castMembers, !members.isEmpty {
+            return members
         }
         return item.cast.prefix(5).map { name in
             CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)

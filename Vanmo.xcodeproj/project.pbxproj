@@ -55,10 +55,12 @@
 		49740FB0D4E2989DAAEDA7C3 /* MacAVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA597E508F1FD4192290F715 /* MacAVPlayerView.swift */; };
 		4AB498DB48B747B50389B085 /* MacFavoritesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231BF52C85B85529779336BB /* MacFavoritesListView.swift */; };
 		4B135F675D6C38BA06F4803F /* Info-Mac.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58FD915D4042EB1C1A80D05C /* Info-Mac.plist */; };
+		4B88C61B8F139EB885CDFAB8 /* LoadingIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */; };
 		4D1FF76F2DBB43A073DBFCAF /* PlayerProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */; };
 		4F8C56D3F3B56E7D44BFAA44 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61585942DFE77AC7C9FD50CC /* FlowLayout.swift */; };
 		558D973A7C068676AFC8BBC7 /* FilterChipsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */; };
 		5B2320B08EB85AFDAD074129 /* dlna.png in Resources */ = {isa = PBXBuildFile; fileRef = A0D8D11C5099204A05B18286 /* dlna.png */; };
+		5E684842C9D68BC1AAC3E89E /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = CC22613DF4EB53BCA7154AF5 /* Lottie */; };
 		60FA29961D5E179227A2CCF0 /* MacConnectionsBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEB926F219094145468942FF /* MacConnectionsBrowseView.swift */; };
 		620185FE90C549D7C4FFB9FE /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 813A6A2A76D06C5048FA0176 /* Kingfisher */; };
 		629533D36025C33335AD711A /* EmbyFolderBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C94F3DCFB672905D5522C5BC /* EmbyFolderBrowseView.swift */; };
@@ -138,6 +140,7 @@
 		E6444CC19A56F2EA054167E5 /* MacPlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF13EE778805D51585A39F36 /* MacPlayerViewModel.swift */; };
 		E8761CCFA33636AA4AA9D229 /* SWXMLHash in Frameworks */ = {isa = PBXBuildFile; productRef = 8023341C67DBE97AAEFDD222 /* SWXMLHash */; };
 		EB215A56D1547DDFADF6C4C4 /* iptv.png in Resources */ = {isa = PBXBuildFile; fileRef = 6D6524ADADB8CC750BE7000A /* iptv.png */; };
+		EB758A74342A89D52B40C26B /* loadingSpinner.json in Resources */ = {isa = PBXBuildFile; fileRef = 1FFCF33F1D900A4B2797C123 /* loadingSpinner.json */; };
 		EEE94A8BC9E412841A4FA59F /* SubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B7332CE86F10F0D7D0A3A4 /* SubtitleOverlayView.swift */; };
 		EF67AFEA69D6D34EF1AC1A4E /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B3D0B1F917828F998055F1 /* LibraryView.swift */; };
 		F031D0424EB370CEC07AA037 /* MacScannedLibraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */; };
@@ -167,6 +170,7 @@
 		1EA73A8F025D2DF849E23FDF /* nfs.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = nfs.png; sourceTree = "<group>"; };
 		1EBDB23A4EA8D15C31C200FC /* localFolder_sidebar.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = localFolder_sidebar.png; sourceTree = "<group>"; };
 		1F280E2A3DEE8284306203CA /* MacPlayerCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerCommands.swift; sourceTree = "<group>"; };
+		1FFCF33F1D900A4B2797C123 /* loadingSpinner.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = loadingSpinner.json; sourceTree = "<group>"; };
 		231BF52C85B85529779336BB /* MacFavoritesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacFavoritesListView.swift; sourceTree = "<group>"; };
 		2375890C4120A60A9A76B30F /* MediaListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaListRow.swift; sourceTree = "<group>"; };
 		237FCC0D25C4262103CAEA13 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
@@ -302,6 +306,7 @@
 				7E44F25F6AA133AD56D0B3F2 /* VanmoCore in Frameworks */,
 				620185FE90C549D7C4FFB9FE /* Kingfisher in Frameworks */,
 				3DA356FAEA56446F5326A4F6 /* KSPlayer in Frameworks */,
+				5E684842C9D68BC1AAC3E89E /* Lottie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -424,6 +429,7 @@
 			children = (
 				F7EAF9744D82A3777B67CA4F /* Assets.xcassets */,
 				EC27A159B320F156FA413559 /* Info-Mac.plist */,
+				1FFCF33F1D900A4B2797C123 /* loadingSpinner.json */,
 				E51DAC90345202C71FB5B8D2 /* ConnectionIcons */,
 			);
 			path = Resources;
@@ -906,6 +912,7 @@
 				3DDD5DF152FAA28B5CB74C83 /* VanmoCore */,
 				813A6A2A76D06C5048FA0176 /* Kingfisher */,
 				B5A95C3709D185B61B49F3A2 /* KSPlayer */,
+				CC22613DF4EB53BCA7154AF5 /* Lottie */,
 			);
 			productName = "Vanmo-macOS";
 			productReference = 3FD42C988DBE01B7E1C528BA /* Vanmo-macOS.app */;
@@ -1012,6 +1019,7 @@
 				DF8996C7A702A264A72EE222 /* googleDrive.png in Resources */,
 				EB215A56D1547DDFADF6C4C4 /* iptv.png in Resources */,
 				C8508F0E3622A5D1309715CA /* jellyfin.png in Resources */,
+				EB758A74342A89D52B40C26B /* loadingSpinner.json in Resources */,
 				9EA8C99DA7B3E943A02D77F6 /* localFolder.png in Resources */,
 				2B48C6E456E336E0A5E9836A /* localFolder_sidebar.png in Resources */,
 				D59F902EE7228DE91DADB286 /* mega.png in Resources */,
@@ -1075,6 +1083,7 @@
 			files = (
 				C1830AAC09C0E61B711D11F8 /* Color+Mac.swift in Sources */,
 				03B0F2B61C7AE2F1ADA9FCCF /* Int64+FileSize.swift in Sources */,
+				4B88C61B8F139EB885CDFAB8 /* LoadingIndicatorView.swift in Sources */,
 				49740FB0D4E2989DAAEDA7C3 /* MacAVPlayerView.swift in Sources */,
 				482D6C1831D360002E8F3554 /* MacAddConnectionView.swift in Sources */,
 				B68EC4B95F8D05BE5E67DD73 /* MacAppState.swift in Sources */,
@@ -1558,6 +1567,11 @@
 			productName = KSPlayer;
 		};
 		C13966A794B8810C8E1F267D /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */;
+			productName = Lottie;
+		};
+		CC22613DF4EB53BCA7154AF5 /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */;
 			productName = Lottie;

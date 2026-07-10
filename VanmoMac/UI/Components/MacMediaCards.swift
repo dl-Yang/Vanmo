@@ -68,8 +68,7 @@ struct MacPosterCard: View {
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                    .lineLimit(1)
                     .padding(.top, 12)
 
                 Text(subtitle)
@@ -78,6 +77,7 @@ struct MacPosterCard: View {
                     .padding(.top, 4)
             }
             .frame(width: MacDesignTokens.Layout.posterWidth, alignment: .leading)
+
         }
         .buttonStyle(.plain)
     }

@@ -137,6 +137,7 @@ final class MacAppState: ObservableObject {
     }
 
     func openDetail(_ item: MediaItem) {
+    
         selectedMediaItem = item
     }
 
