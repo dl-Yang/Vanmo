@@ -58,6 +58,8 @@ final class PlayerViewModel: ObservableObject {
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
     private var discChapters: [Chapter] = []
     private var seekBaseTime: TimeInterval?
+    private var playbackSession: EmbyPlaybackSession?
+    private var didReportWatchedToServer = false
     #if os(iOS)
     private let rateBoostHaptic = UIImpactFeedbackGenerator(style: .medium)
     #endif
@@ -129,6 +131,7 @@ final class PlayerViewModel: ObservableObject {
             .sink { [weak self] time in
                 self?.currentTime = time
                 self?.updateExternalSubtitle(at: time)
+                self?.reportPlaybackTimeUpdate(at: time)
             }
             .store(in: &cancellables)
 
@@ -174,6 +177,14 @@ final class PlayerViewModel: ObservableObject {
     func onDisappear(keepingPlaybackActive: Bool = false) {
         VanmoLogger.player.info("[PlayerVM] onDisappear, saving progress at \(self.currentTime)s")
         saveProgress()
+        // 离开播放页时 ViewModel 即将销毁；即便 PiP 保活 AVPlayer，也要结束 Emby 会话，
+        // 避免服务端 Now Playing 悬挂。
+        let stopPosition = currentTime
+        let session = playbackSession
+        playbackSession = nil
+        Task {
+            await session?.stopped(position: stopPosition)
+        }
         guard !keepingPlaybackActive else {
             VanmoLogger.player.info("[PlayerVM] keeping playback alive for Picture in Picture")
             return
@@ -222,9 +233,14 @@ final class PlayerViewModel: ObservableObject {
         VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
         await updateDynamicRangeIfNeeded(for: originalURL)
         loadChapters()
+        preparePlaybackSession()
         VanmoLogger.player.info("[PlayerVM] calling engine.play()")
         engine.play()
         VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
+        let reportPosition = startPosition?.seconds ?? currentTime
+        Task {
+            await playbackSession?.started(position: reportPosition)
+        }
     }
 
     private func resetPlaybackMetadata() {
@@ -325,12 +341,32 @@ final class PlayerViewModel: ObservableObject {
         switch playbackState {
         case .playing:
             engine.pause()
+            Task {
+                await playbackSession?.progress(
+                    position: currentTime,
+                    isPaused: true,
+                    event: .pause
+                )
+            }
         case .paused:
             engine.play()
+            Task {
+                await playbackSession?.progress(
+                    position: currentTime,
+                    isPaused: false,
+                    event: .unpause
+                )
+            }
         case .ended:
             Task {
                 await engine.seek(to: .zero)
                 engine.play()
+                await playbackSession?.progress(
+                    position: 0,
+                    isPaused: false,
+                    event: .unpause,
+                    force: true
+                )
             }
         default:
             break
@@ -342,6 +378,13 @@ final class PlayerViewModel: ObservableObject {
         let clampedTime = max(0, min(time, duration))
         Task {
             await engine.seek(to: CMTime(seconds: clampedTime, preferredTimescale: 600))
+            let isPaused = playbackState == .paused || playbackState == .ended
+            await playbackSession?.progress(
+                position: clampedTime,
+                isPaused: isPaused,
+                event: .seek,
+                force: true
+            )
         }
     }
 
@@ -842,9 +885,14 @@ final class PlayerViewModel: ObservableObject {
         }
 
         saveProgress()
+        let stopPosition = currentTime
+        let previousSession = playbackSession
+        playbackSession = nil
+        await previousSession?.stopped(position: stopPosition)
         engine.stop()
         item = episode.mediaItem ?? makeMediaItem(from: episode)
         currentEpisodeID = episode.id
+        didReportWatchedToServer = false
         showEpisodeSelector = false
 
         do {
@@ -1315,6 +1363,7 @@ final class PlayerViewModel: ObservableObject {
         item.lastPlayedAt = Date()
         if currentTime / max(duration, 1) > 0.9 {
             item.isWatched = true
+            reportWatchedToServerIfNeeded()
         }
         if item.isProgressCloudSynced, let context = item.modelContext {
             CloudSyncCoordinator.shared.markMediaProgressChanged(item, in: context)
@@ -1322,6 +1371,44 @@ final class PlayerViewModel: ObservableObject {
             CloudSyncCoordinator.shared.requestSync(reason: "playback-progress", context: context)
         } else {
             try? item.modelContext?.save()
+        }
+    }
+
+    private func preparePlaybackSession() {
+        let snapshot = try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
+        playbackSession = EmbyPlaybackSession(item: item, connection: snapshot)
+        didReportWatchedToServer = false
+    }
+
+    private func reportPlaybackTimeUpdate(at time: TimeInterval) {
+        guard playbackSession?.isEnabled == true else { return }
+        let isPaused = playbackState == .paused
+        Task {
+            await playbackSession?.progress(
+                position: time,
+                isPaused: isPaused,
+                event: .timeUpdate
+            )
+        }
+    }
+
+    private func reportWatchedToServerIfNeeded() {
+        guard !didReportWatchedToServer else { return }
+        didReportWatchedToServer = true
+        let snapshot = try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
+        let mediaItem = item
+        Task {
+            do {
+                try await EmbyPlayedUpdater.setPlayed(
+                    mediaItem,
+                    isPlayed: true,
+                    connection: snapshot
+                )
+            } catch {
+                VanmoLogger.network.error(
+                    "[EmbyPlayback] mark played failed: \(error.localizedDescription)"
+                )
+            }
         }
     }
 

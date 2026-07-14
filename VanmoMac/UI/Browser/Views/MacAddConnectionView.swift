@@ -141,6 +141,7 @@ struct MacAddConnectionView: View {
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(isSelected ? MacDesignTokens.accentBlue : Color.clear)
+            .contentShape(Rectangle())
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .shadow(
                 color: isSelected ? Color.black.opacity(0.1) : .clear,

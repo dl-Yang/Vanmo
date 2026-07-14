@@ -100,6 +100,18 @@ actor MacHomeCollectionCache {
         }
     }
 
+    func removeConnection(_ connectionId: UUID) {
+        guard let snapshot = load() else { return }
+        let remainingConnections = snapshot.connections.filter { $0.connectionId != connectionId }
+        guard remainingConnections.count != snapshot.connections.count else { return }
+
+        if remainingConnections.isEmpty {
+            clear()
+        } else {
+            save(MacHomeCollectionCacheSnapshot(connections: remainingConnections))
+        }
+    }
+
     private func cacheURL(createDirectoryIfNeeded: Bool) throws -> URL {
         guard let applicationSupportURL = FileManager.default.urls(
             for: .applicationSupportDirectory,

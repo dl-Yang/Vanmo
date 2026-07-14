@@ -63,15 +63,6 @@ struct VanmoMacRootView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .zIndex(2)
             }
-            HStack{
-                MacSidebarToggleButton()
-                    .padding(.bottom, 12)
-            }
-            .ignoresSafeArea(edges: .top)
-            .position(
-                x: MacDesignTokens.Layout.trafficLightsLeadingInset + 30,
-                y: MacDesignTokens.Layout.trafficLightsTopInset + 7)
-            
         }
         .macTheme(activeTheme)
         .animation(.easeInOut(duration: 0.2), value: appState.isPlayerPresented)
@@ -126,6 +117,10 @@ struct VanmoMacRootView: View {
                 await refreshLibrarySections()
                 showSyncToast("数据同步完成")
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in
+            // 持久化到 AppState，避免 Favorites 未挂载时通知丢失。
+            appState.notifyFavoriteDidChange()
         }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDroppedFiles(providers)

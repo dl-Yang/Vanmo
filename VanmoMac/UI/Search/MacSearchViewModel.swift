@@ -43,6 +43,32 @@ final class MacSearchViewModel: ObservableObject {
         }
     }
 
+    /// 删除连接前同步剔除搜索结果中的 MediaItem，避免 detach 后读属性崩溃。
+    func removeResults(forConnectionId connectionId: UUID) {
+        searchTask?.cancel()
+        searchTask = nil
+        searchGeneration = UUID()
+        isSearching = false
+
+        connectionSnapshots.removeAll { $0.id == connectionId }
+        let nextSections = sections.compactMap { section -> SearchResultSection? in
+            let items = section.items.filter { item in
+                guard !item.item.isDeleted else { return false }
+                return item.item.sourceConnectionId != connectionId
+            }
+            guard !items.isEmpty else { return nil }
+            return SearchResultSection(
+                id: section.id,
+                title: section.title,
+                subtitle: section.subtitle,
+                items: items
+            )
+        }
+        sections = nextSections
+        results = nextSections.flatMap { section in section.items.map(\.item) }
+        searchedSourceCount = nextSections.count
+    }
+
     func search() {
         searchTask?.cancel()
         let generation = UUID()

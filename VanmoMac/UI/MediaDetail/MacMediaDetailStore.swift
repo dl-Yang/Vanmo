@@ -20,6 +20,8 @@ final class MacMediaDetailStore: ObservableObject {
     @Published private(set) var isRefreshingMetadata = false
     @Published private(set) var isUpdatingFavorite = false
     @Published private(set) var isUpdatingWatched = false
+    /// 详情心形以 Store 为准：Home 临时 MediaItem 的 isFavorite 不会可靠驱动 SwiftUI 刷新。
+    @Published private(set) var isFavorite = false
     @Published var favoriteErrorMessage: String?
     @Published var refreshErrorMessage: String?
 
@@ -41,6 +43,9 @@ final class MacMediaDetailStore: ObservableObject {
     // MARK: - Loading
 
     func load(item: MediaItem, modelContext: ModelContext, autoDownloadMetadata: Bool) async {
+        // Home 预览项是临时对象，isFavorite 常不准；打开详情时从 SwiftData 对齐。
+        syncFavoriteState(for: item, in: modelContext)
+
         let key = detailKey(for: item)
         guard loadedKey != key else { return }
         loadedKey = key
@@ -100,9 +105,24 @@ final class MacMediaDetailStore: ObservableObject {
         let loadedEpisodes = await episodesTask
         let loadedCollections = await collectionsTask
 
+        // 代际 / 取消 / 已删：回写前丢弃，避免访问已 detach 的 MediaItem 属性。
+        guard generation == loadGeneration, !Task.isCancelled, !item.isDeleted else {
+            if generation == loadGeneration {
+                isLoading = false
+            }
+            return
+        }
+
         let record = networkRecord ?? cacheRecord
         let root = (try? await MetadataCache.shared.rootDirectoryURL())
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
+
+        guard generation == loadGeneration, !Task.isCancelled, !item.isDeleted else {
+            if generation == loadGeneration {
+                isLoading = false
+            }
+            return
+        }
 
         var snapshot = MacMediaDetailContent(
             enrichedOverview: nil,
@@ -142,10 +162,15 @@ final class MacMediaDetailStore: ObservableObject {
 
         // 代际校验：加载期间若切换到其它 item（generation 已递增），丢弃本次结果，
         // 避免旧 item 的快照覆盖新 item，或误清新 item 的骨架态。
-        guard generation == loadGeneration else { return }
+        guard generation == loadGeneration, !item.isDeleted else { return }
 
         content = snapshot
         selectedSeason = Array(Set(snapshot.episodes.map(\.seasonNumber))).sorted().first
+        isLoading = false
+    }
+
+    func invalidate() {
+        loadGeneration += 1
         isLoading = false
     }
 
@@ -263,7 +288,7 @@ final class MacMediaDetailStore: ObservableObject {
         isUpdatingFavorite = true
         defer { isUpdatingFavorite = false }
 
-        let targetFavorite = !item.isFavorite
+        let targetFavorite = !isFavorite
 
         do {
             if item.serverId != nil {
@@ -273,7 +298,11 @@ final class MacMediaDetailStore: ObservableObject {
                     connection: try? mediaServerConnectionSnapshot(for: item, in: modelContext)
                 )
             }
-            item.isFavorite = targetFavorite
+            try persistFavoriteState(
+                for: item,
+                isFavorite: targetFavorite,
+                in: modelContext
+            )
             if item.isFavoriteCloudSynced {
                 CloudSyncCoordinator.shared.markMediaFavoriteChanged(item, in: modelContext)
             }
@@ -281,9 +310,67 @@ final class MacMediaDetailStore: ObservableObject {
             if item.isFavoriteCloudSynced {
                 CloudSyncCoordinator.shared.requestSync(reason: "favorite", context: modelContext)
             }
+            isFavorite = targetFavorite
+            NotificationCenter.default.post(name: .mediaFavoriteDidChange, object: item.id)
         } catch {
             favoriteErrorMessage = error.localizedDescription
         }
+    }
+
+    /// Home 文件夹预览等入口的 MediaItem 可能未插入 SwiftData；仅改内存对象无法被 Favorites 查询到。
+    /// 对齐 iOS `updateStoredFavoriteState`：按 serverId 更新已存记录，必要时 insert。
+    private func persistFavoriteState(
+        for item: MediaItem,
+        isFavorite: Bool,
+        in modelContext: ModelContext
+    ) throws {
+        item.isFavorite = isFavorite
+
+        guard let serverId = item.serverId else {
+            if item.modelContext == nil, isFavorite {
+                modelContext.insert(item)
+            }
+            return
+        }
+
+        let sourceConnectionId = item.sourceConnectionId
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { mediaItem in
+                mediaItem.serverId == serverId &&
+                    mediaItem.sourceConnectionId == sourceConnectionId
+            }
+        )
+        if let storedItem = try modelContext.fetch(descriptor).first {
+            storedItem.isFavorite = isFavorite
+            return
+        }
+
+        if isFavorite {
+            modelContext.insert(item)
+        }
+    }
+
+    /// 将详情页临时 MediaItem 的收藏状态与 SwiftData 中同 serverId 记录对齐。
+    private func syncFavoriteState(for item: MediaItem, in modelContext: ModelContext) {
+        guard let serverId = item.serverId else {
+            isFavorite = item.isFavorite
+            return
+        }
+
+        let sourceConnectionId = item.sourceConnectionId
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { mediaItem in
+                mediaItem.serverId == serverId &&
+                    mediaItem.sourceConnectionId == sourceConnectionId
+            }
+        )
+        guard let storedItem = try? modelContext.fetch(descriptor).first else {
+            isFavorite = item.isFavorite
+            return
+        }
+
+        item.isFavorite = storedItem.isFavorite
+        isFavorite = storedItem.isFavorite
     }
 
     func toggleWatched(for item: MediaItem, modelContext: ModelContext) async {
@@ -297,6 +384,20 @@ final class MacMediaDetailStore: ObservableObject {
             item.lastPlayedAt = Date()
         } else {
             item.lastPlaybackPosition = 0
+        }
+
+        if item.serverId != nil {
+            do {
+                try await EmbyPlayedUpdater.setPlayed(
+                    item,
+                    isPlayed: item.isWatched,
+                    connection: try? mediaServerConnectionSnapshot(for: item, in: modelContext)
+                )
+            } catch {
+                VanmoLogger.network.error(
+                    "[EmbyPlayback] toggle watched failed: \(error.localizedDescription)"
+                )
+            }
         }
 
         if item.isProgressCloudSynced {
@@ -373,4 +474,9 @@ final class MacMediaDetailStore: ObservableObject {
         }
         return baseHost == itemHost
     }
+}
+
+extension Notification.Name {
+    /// 与 iOS 共用通知名字符串。Mac 端 `object` 传 `MediaItem.id`（UUID）；接收方当前忽略 object。
+    static let mediaFavoriteDidChange = Notification.Name("mediaFavoriteDidChange")
 }

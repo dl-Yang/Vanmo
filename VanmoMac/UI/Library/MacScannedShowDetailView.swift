@@ -13,12 +13,13 @@ struct MacScannedShowDetailView: View {
     @State private var episodes: [MediaItem] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var mediaPurgeHandlerId: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
             MacLibrarySublistHeader(
                 title: showTitle,
-                subtitle: "\(connection.name) · \(episodes.count) 集"
+                subtitle: "\(connection.name) · \(aliveEpisodes.count) 集"
             )
 
             Group {
@@ -29,14 +30,14 @@ struct MacScannedShowDetailView: View {
                     Text(errorMessage)
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if episodes.isEmpty {
+                } else if aliveEpisodes.isEmpty {
                     Text("此剧集下没有可显示的分集")
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(episodes) { episode in
+                            ForEach(aliveEpisodes) { episode in
                                 Button {
                                     appState.play(episode)
                                 } label: {
@@ -56,6 +57,23 @@ struct MacScannedShowDetailView: View {
         .task(id: "\(connection.id)-\(showTitle)") {
             loadEpisodes()
         }
+        .onAppear {
+            guard mediaPurgeHandlerId == nil else { return }
+            mediaPurgeHandlerId = appState.registerMediaPurgeHandler { connectionId in
+                guard connectionId == connection.id else { return }
+                episodes = []
+            }
+        }
+        .onDisappear {
+            if let mediaPurgeHandlerId {
+                appState.unregisterMediaPurgeHandler(mediaPurgeHandlerId)
+                self.mediaPurgeHandlerId = nil
+            }
+        }
+    }
+
+    private var aliveEpisodes: [MediaItem] {
+        episodes.filter { !$0.isDeleted }
     }
 
     private func loadEpisodes() {

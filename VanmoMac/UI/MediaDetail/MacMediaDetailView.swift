@@ -11,6 +11,7 @@ struct MacMediaDetailView: View {
     let item: MediaItem
 
     @StateObject private var store = MacMediaDetailStore()
+    @State private var mediaPurgeHandlerId: UUID?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -34,6 +35,18 @@ struct MacMediaDetailView: View {
                 modelContext: modelContext,
                 autoDownloadMetadata: metadataAutoDownload
             )
+        }
+        .onAppear {
+            guard mediaPurgeHandlerId == nil else { return }
+            mediaPurgeHandlerId = appState.registerMediaPurgeHandler { _ in
+                store.invalidate()
+            }
+        }
+        .onDisappear {
+            if let mediaPurgeHandlerId {
+                appState.unregisterMediaPurgeHandler(mediaPurgeHandlerId)
+                self.mediaPurgeHandlerId = nil
+            }
         }
         .alert("收藏失败", isPresented: favoriteErrorBinding) {
             Button("确定") {}
@@ -187,9 +200,9 @@ struct MacMediaDetailView: View {
                 if store.isUpdatingFavorite {
                     ProgressView().controlSize(.small)
                 } else {
-                    Image(systemName: item.isFavorite ? "heart.fill" : "heart")
+                    Image(systemName: store.isFavorite ? "heart.fill" : "heart")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(item.isFavorite ? .red : theme.primaryText)
+                        .foregroundStyle(store.isFavorite ? .red : theme.primaryText)
                 }
             }
             .frame(width: 40, height: 40)
@@ -198,7 +211,7 @@ struct MacMediaDetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(store.isUpdatingFavorite)
-        .help(item.isFavorite ? "取消收藏" : "收藏")
+        .help(store.isFavorite ? "取消收藏" : "收藏")
     }
 
     private var watchedButton: some View {

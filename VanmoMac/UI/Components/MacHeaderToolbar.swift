@@ -82,6 +82,20 @@ struct MacSidebarToggleButton: View {
             .frame(width: 28, height: 28)
             .buttonStyle(.plain)
             .help("返回上一步")
+            
+            Spacer()
+            
+            Button {
+                //todo check
+//                appState.contentRoute =
+            } label: {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("查看下载列表")
         }
     }
 }

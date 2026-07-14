@@ -195,6 +195,32 @@ final class MacLibraryViewModel: ObservableObject {
         }
     }
 
+    /// 删除连接前同步剔除内存中的 MediaItem / 首页缓存，必须在 modelContext.delete + save 之前调用。
+    func removeItems(forConnectionId connectionId: UUID) {
+        recentlyPlayed.removeAll { item in
+            guard !item.isDeleted else { return true }
+            return item.sourceConnectionId == connectionId
+        }
+        sectionItems.removeAll { item in
+            guard !item.isDeleted else { return true }
+            return item.sourceConnectionId == connectionId
+        }
+
+        let keyPrefix = "\(connectionId.uuidString)::"
+        folderPreviews = folderPreviews.filter { !$0.key.hasPrefix(keyPrefix) }
+        folderTotalCounts = folderTotalCounts.filter { !$0.key.hasPrefix(keyPrefix) }
+        scannedFolderPreviews = scannedFolderPreviews.filter { !$0.key.hasPrefix(keyPrefix) }
+        scannedFolderTotalCounts = scannedFolderTotalCounts.filter { !$0.key.hasPrefix(keyPrefix) }
+
+        serverCollectionFolders[connectionId] = nil
+        embyConnectionsById[connectionId] = nil
+        scannedLibraryFolders[connectionId] = nil
+        scannedConnectionsById[connectionId] = nil
+        serverConnectionErrors[connectionId] = nil
+
+        folderBookmarks.removeAll { $0.connectionId == connectionId }
+    }
+
     func reloadSectionItems(filter: MacLibraryFilter, section: MacSidebarSection) {
         guard let modelContext else {
             sectionItems = []
@@ -833,7 +859,10 @@ final class MacLibraryViewModel: ObservableObject {
 
     private func reloadHighlights(in context: ModelContext) async throws {
         let snapshot = try await loadHighlightSnapshot(in: context)
-        recentlyPlayed = snapshot.playedIds.compactMap { context.model(for: $0) as? MediaItem }
+        recentlyPlayed = snapshot.playedIds.compactMap { id -> MediaItem? in
+            guard let item = context.model(for: id) as? MediaItem, !item.isDeleted else { return nil }
+            return item
+        }
     }
 
     private func loadHighlightSnapshot(in context: ModelContext) async throws -> InitialSnapshot {

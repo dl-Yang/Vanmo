@@ -43,6 +43,8 @@ final class MacPlayerViewModel: ObservableObject {
     private var prefetchRegistration: PrefetchRegistration?
     private var didCleanup = false
     private var didSaveProgress = false
+    private var playbackSession: EmbyPlaybackSession?
+    private var didReportWatchedToServer = false
     private var legibleOutput: AVPlayerItemLegibleOutput?
     private let legibleHandler = MacLegibleOutputHandler()
     private let externalSubtitleManager = SubtitleManager()
@@ -109,6 +111,12 @@ final class MacPlayerViewModel: ObservableObject {
         didCleanup = true
 
         saveProgress()
+        let stopPosition = currentTime
+        let session = playbackSession
+        playbackSession = nil
+        Task {
+            await session?.stopped(position: stopPosition)
+        }
         stopActiveEngines()
 
         if let registration = prefetchRegistration {
@@ -144,6 +152,13 @@ final class MacPlayerViewModel: ObservableObject {
             player.pause()
             playbackState = .paused
             isPlaying = false
+            Task {
+                await playbackSession?.progress(
+                    position: currentTime,
+                    isPaused: true,
+                    event: .pause
+                )
+            }
         case .paused, .ended:
             if isAtEnd {
                 replayFromBeginning()
@@ -151,6 +166,13 @@ final class MacPlayerViewModel: ObservableObject {
                 player.rate = config.playbackRate
                 playbackState = .playing
                 isPlaying = true
+                Task {
+                    await playbackSession?.progress(
+                        position: currentTime,
+                        isPaused: false,
+                        event: .unpause
+                    )
+                }
             }
         default:
             if isAtEnd {
@@ -180,6 +202,12 @@ final class MacPlayerViewModel: ObservableObject {
                 currentTime = 0
                 playbackState = .playing
                 isPlaying = true
+                await playbackSession?.progress(
+                    position: 0,
+                    isPaused: false,
+                    event: .unpause,
+                    force: true
+                )
             }
             return
         }
@@ -192,6 +220,12 @@ final class MacPlayerViewModel: ObservableObject {
                 self.player.rate = self.config.playbackRate
                 self.playbackState = .playing
                 self.isPlaying = true
+                await self.playbackSession?.progress(
+                    position: 0,
+                    isPaused: false,
+                    event: .unpause,
+                    force: true
+                )
             }
         }
     }
@@ -310,6 +344,11 @@ final class MacPlayerViewModel: ObservableObject {
         saveProgress()
         didSaveProgress = false
 
+        let stopPosition = currentTime
+        let previousSession = playbackSession
+        playbackSession = nil
+        await previousSession?.stopped(position: stopPosition)
+
         await unregisterPrefetchIfNeeded()
         stopActiveEngines()
 
@@ -319,6 +358,7 @@ final class MacPlayerViewModel: ObservableObject {
             item = makeMediaItem(from: episode)
         }
         currentEpisodeID = episode.id
+        didReportWatchedToServer = false
         showEpisodeSelector = false
 
         do {
@@ -421,6 +461,10 @@ final class MacPlayerViewModel: ObservableObject {
         player.rate = config.playbackRate
         isPlaying = config.playbackRate > 0
         playbackState = .playing
+        preparePlaybackSession()
+        Task {
+            await playbackSession?.started(position: seekPosition)
+        }
     }
 
     private func loadWithKSPlayer(originalURL: URL) async throws {
@@ -488,6 +532,10 @@ final class MacPlayerViewModel: ObservableObject {
         currentTime = seekPosition
         isPlaying = true
         playbackState = .playing
+        preparePlaybackSession()
+        Task {
+            await playbackSession?.started(position: seekPosition)
+        }
     }
 
     private func resolvedStartPosition() -> TimeInterval {
@@ -522,6 +570,13 @@ final class MacPlayerViewModel: ObservableObject {
             ksEngine.pause()
             playbackState = .paused
             isPlaying = false
+            Task {
+                await playbackSession?.progress(
+                    position: currentTime,
+                    isPaused: true,
+                    event: .pause
+                )
+            }
         case .paused, .ended:
             if isAtEnd {
                 replayFromBeginning()
@@ -530,6 +585,13 @@ final class MacPlayerViewModel: ObservableObject {
                 ksEngine.play()
                 playbackState = .playing
                 isPlaying = true
+                Task {
+                    await playbackSession?.progress(
+                        position: currentTime,
+                        isPaused: false,
+                        event: .unpause
+                    )
+                }
             }
         default:
             if isAtEnd {
@@ -567,6 +629,7 @@ final class MacPlayerViewModel: ObservableObject {
             .sink { [weak self] time in
                 guard let self else { return }
                 currentTime = time.seconds
+                reportPlaybackTimeUpdate(at: time.seconds)
             }
             .store(in: &ksCancellables)
 
@@ -704,6 +767,7 @@ final class MacPlayerViewModel: ObservableObject {
                 self.duration = itemDuration
             }
             self.updateExternalSubtitle(at: time.seconds)
+            self.reportPlaybackTimeUpdate(at: time.seconds)
         }
     }
 
@@ -711,6 +775,15 @@ final class MacPlayerViewModel: ObservableObject {
         playbackState = .ended
         isPlaying = false
         saveProgress()
+
+        Task {
+            await playbackSession?.progress(
+                position: currentTime,
+                isPaused: true,
+                event: .pause,
+                force: true
+            )
+        }
 
         let autoPlayNext = UserDefaults.standard.object(forKey: "playback.autoPlay") as? Bool ?? true
         guard autoPlayNext, let next = nextEpisode(after: currentEpisode) else { return }
@@ -742,12 +815,26 @@ final class MacPlayerViewModel: ObservableObject {
                 await ksEngine?.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
                 currentTime = clamped
                 updateExternalSubtitle(at: clamped)
+                await playbackSession?.progress(
+                    position: clamped,
+                    isPaused: playbackState == .paused || playbackState == .ended,
+                    event: .seek,
+                    force: true
+                )
             }
             return
         }
         player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
         currentTime = clamped
         updateExternalSubtitle(at: clamped)
+        Task {
+            await playbackSession?.progress(
+                position: clamped,
+                isPaused: playbackState == .paused || playbackState == .ended,
+                event: .seek,
+                force: true
+            )
+        }
     }
 
     // MARK: - Tracks
@@ -1306,12 +1393,14 @@ final class MacPlayerViewModel: ObservableObject {
 
     private func saveProgress() {
         guard !didSaveProgress, !item.isLiveStream else { return }
+        guard !item.isDeleted else { return }
         didSaveProgress = true
 
         item.lastPlaybackPosition = currentTime
         item.lastPlayedAt = Date()
         if currentTime / max(duration, 1) > 0.9 {
             item.isWatched = true
+            reportWatchedToServerIfNeeded()
         }
 
         let context = modelContext ?? item.modelContext
@@ -1321,6 +1410,44 @@ final class MacPlayerViewModel: ObservableObject {
             CloudSyncCoordinator.shared.requestSync(reason: "playback-progress", context: context)
         } else {
             try? context?.save()
+        }
+    }
+
+    private func preparePlaybackSession() {
+        let snapshot = try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
+        playbackSession = EmbyPlaybackSession(item: item, connection: snapshot)
+        didReportWatchedToServer = false
+    }
+
+    private func reportPlaybackTimeUpdate(at time: TimeInterval) {
+        guard playbackSession?.isEnabled == true else { return }
+        let isPaused = playbackState == .paused
+        Task {
+            await playbackSession?.progress(
+                position: time,
+                isPaused: isPaused,
+                event: .timeUpdate
+            )
+        }
+    }
+
+    private func reportWatchedToServerIfNeeded() {
+        guard !didReportWatchedToServer else { return }
+        didReportWatchedToServer = true
+        let snapshot = try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
+        let mediaItem = item
+        Task {
+            do {
+                try await EmbyPlayedUpdater.setPlayed(
+                    mediaItem,
+                    isPlayed: true,
+                    connection: snapshot
+                )
+            } catch {
+                VanmoLogger.network.error(
+                    "[EmbyPlayback] mark played failed: \(error.localizedDescription)"
+                )
+            }
         }
     }
 

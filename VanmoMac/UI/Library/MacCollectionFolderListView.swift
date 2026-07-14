@@ -17,6 +17,7 @@ struct MacCollectionFolderListView: View {
     @State private var totalRecordCount = 0
     @State private var errorMessage: String?
     @State private var hasLoadedOnce = false
+    @State private var mediaPurgeHandlerId: UUID?
 
     private let pageSize = 50
     private let columns = [
@@ -79,10 +80,23 @@ struct MacCollectionFolderListView: View {
             guard !hasLoadedOnce else { return }
             await loadInitialPage()
         }
+        .onAppear {
+            guard mediaPurgeHandlerId == nil else { return }
+            mediaPurgeHandlerId = appState.registerMediaPurgeHandler { connectionId in
+                guard connectionId == connection.id else { return }
+                items = []
+            }
+        }
+        .onDisappear {
+            if let mediaPurgeHandlerId {
+                appState.unregisterMediaPurgeHandler(mediaPurgeHandlerId)
+                self.mediaPurgeHandlerId = nil
+            }
+        }
     }
 
     private var sortedItems: [MediaItem] {
-        MacLibrarySorting.sorted(items, by: libraryViewModel.sortOption)
+        MacLibrarySorting.sorted(items.filter { !$0.isDeleted }, by: libraryViewModel.sortOption)
     }
 
     private func openItem(_ item: MediaItem) {

@@ -266,6 +266,7 @@ final class MacConnectionsViewModel: ObservableObject {
 
         connectionStatuses.removeValue(forKey: connectionId)
         connectionErrorMessages.removeValue(forKey: connectionId)
+        savedConnections.removeAll { $0.id == connectionId }
 
         let deletedSelectedConnection = selectedConnectionID == connectionId
         if deletedSelectedConnection {
@@ -273,6 +274,7 @@ final class MacConnectionsViewModel: ObservableObject {
         }
 
         Task {
+            await MacHomeCollectionCache.shared.removeConnection(connectionId)
             await loadSavedConnections()
         }
     }
@@ -997,5 +999,33 @@ final class MacConnectionsViewModel: ObservableObject {
             return "\(connection.type.displayName) 文件浏览暂不可用或该目录为空"
         }
         return error.localizedDescription
+    }
+}
+
+@MainActor
+enum MacConnectionDeletion {
+    static func delete(
+        _ connection: SavedConnection,
+        appState: MacAppState,
+        libraryViewModel: MacLibraryViewModel,
+        connectionsViewModel: MacConnectionsViewModel,
+        searchViewModel: MacSearchViewModel
+    ) {
+        let connectionId = connection.id
+        // 先清 UI 引用，再删库，避免 SwiftData detach 后读 mediaType 崩溃。
+        appState.purgeMediaState(for: connectionId)
+        libraryViewModel.removeItems(forConnectionId: connectionId)
+        searchViewModel.removeResults(forConnectionId: connectionId)
+
+        Task { @MainActor in
+            // 让 SwiftUI 先卸掉仍持有 MediaItem 的子路由/详情/播放器视图，再 hard-delete。
+            await Task.yield()
+            connectionsViewModel.deleteConnection(connection)
+            let remainingConnections = connectionsViewModel.savedConnections.filter {
+                $0.id != connectionId && $0.deletedAt == nil
+            }
+            await libraryViewModel.refreshAfterLibrarySync(connections: remainingConnections)
+            libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
+        }
     }
 }

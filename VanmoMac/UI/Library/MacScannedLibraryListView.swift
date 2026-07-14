@@ -15,6 +15,7 @@ struct MacScannedLibraryListView: View {
     @State private var shows: [MacScannedShowSummary] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var mediaPurgeHandlerId: UUID?
 
     private let columns = [
         GridItem(.adaptive(minimum: MacDesignTokens.Layout.posterWidth), spacing: MacDesignTokens.Layout.posterSpacing)
@@ -55,8 +56,22 @@ struct MacScannedLibraryListView: View {
         .task(id: "\(connection.id)-\(collectionType.rawValue)") {
             loadItems()
         }
+        .onAppear {
+            guard mediaPurgeHandlerId == nil else { return }
+            mediaPurgeHandlerId = appState.registerMediaPurgeHandler { connectionId in
+                guard connectionId == connection.id else { return }
+                movies = []
+                shows = []
+            }
+        }
+        .onDisappear {
+            if let mediaPurgeHandlerId {
+                appState.unregisterMediaPurgeHandler(mediaPurgeHandlerId)
+                self.mediaPurgeHandlerId = nil
+            }
+        }
         .onChange(of: libraryViewModel.sortOption) { _, _ in
-            movies = MacLibrarySorting.sorted(movies, by: libraryViewModel.sortOption)
+            movies = MacLibrarySorting.sorted(movies.filter { !$0.isDeleted }, by: libraryViewModel.sortOption)
             shows = sortedShows(shows)
         }
     }
@@ -81,7 +96,7 @@ struct MacScannedLibraryListView: View {
 
     private var isEmpty: Bool {
         switch collectionType {
-        case .movies: movies.isEmpty
+        case .movies: aliveMovies.isEmpty
         case .tvshows: shows.isEmpty
         case .playlists: true
         }
@@ -89,7 +104,7 @@ struct MacScannedLibraryListView: View {
 
     private var loadedCount: Int {
         switch collectionType {
-        case .movies: movies.count
+        case .movies: aliveMovies.count
         case .tvshows: shows.count
         case .playlists: 0
         }
@@ -100,7 +115,7 @@ struct MacScannedLibraryListView: View {
         LazyVGrid(columns: columns, spacing: MacDesignTokens.Layout.posterSpacing) {
             switch collectionType {
             case .movies:
-                ForEach(movies) { item in
+                ForEach(aliveMovies) { item in
                     MacPosterCard(
                         title: item.displayTitle,
                         subtitle: movieSubtitle(item),
@@ -130,7 +145,7 @@ struct MacScannedLibraryListView: View {
     private var contentList: some View {
         switch collectionType {
         case .movies:
-            MacLibraryPosterList(items: movies, onSelect: { appState.openDetail($0) })
+            MacLibraryPosterList(items: aliveMovies, onSelect: { appState.openDetail($0) })
         case .tvshows:
             LazyVStack(spacing: 0) {
                 ForEach(shows) { show in
@@ -158,6 +173,10 @@ struct MacScannedLibraryListView: View {
         case .playlists:
             EmptyView()
         }
+    }
+
+    private var aliveMovies: [MediaItem] {
+        movies.filter { !$0.isDeleted }
     }
 
     private func movieSubtitle(_ item: MediaItem) -> String {

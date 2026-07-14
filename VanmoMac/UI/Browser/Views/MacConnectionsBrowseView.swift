@@ -5,6 +5,7 @@ struct MacConnectionsBrowseView: View {
     @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
+    @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @Environment(\.macTheme) private var theme
 
     var body: some View {
@@ -369,12 +370,13 @@ struct MacConnectionsBrowseView: View {
     }
 
     private func deleteConnection(_ connection: SavedConnection) {
-        if appState.selectedMediaItem?.sourceConnectionId == connection.id {
-            appState.closeDetail()
-        }
-        appState.clearActiveConnectionIfDeleted(connection.id)
-        connectionsViewModel.deleteConnection(connection)
-        libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
+        MacConnectionDeletion.delete(
+            connection,
+            appState: appState,
+            libraryViewModel: libraryViewModel,
+            connectionsViewModel: connectionsViewModel,
+            searchViewModel: searchViewModel
+        )
     }
 }
 

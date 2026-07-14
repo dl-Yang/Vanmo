@@ -35,9 +35,12 @@ struct MacFavoritesListView: View {
     @StateObject private var viewModel = MacFavoritesListViewModel()
     @State private var searchText = ""
     @State private var isSearching = false
+    @State private var mediaPurgeHandlerId: UUID?
 
     private var displayItems: [MediaItem] {
-        let base = MacLibrarySorting.sorted(viewModel.items, by: libraryViewModel.sortOption)
+        // 先过滤已删对象，避免排序/展示时访问 displayTitle、mediaType 触发 SwiftData fault 崩溃。
+        let alive = viewModel.items.filter { !$0.isDeleted }
+        let base = MacLibrarySorting.sorted(alive, by: libraryViewModel.sortOption)
         guard isSearching, !searchText.isEmpty else { return base }
         return base.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
     }
@@ -93,12 +96,29 @@ struct MacFavoritesListView: View {
             }
         }
         .background(theme.appBackground)
-        .task {
+        // Root 将收藏通知写入 favoriteChangeNonce；未挂载期间变更也能在进入时触发 reload。
+        .task(id: appState.favoriteChangeNonce) {
             viewModel.setModelContext(modelContext)
-            await viewModel.loadInitialPage()
+            await viewModel.reload()
+        }
+        .onAppear {
+            guard mediaPurgeHandlerId == nil else { return }
+            mediaPurgeHandlerId = appState.registerMediaPurgeHandler { connectionId in
+                viewModel.removeItems(forConnectionId: connectionId)
+            }
+        }
+        .onDisappear {
+            if let mediaPurgeHandlerId {
+                appState.unregisterMediaPurgeHandler(mediaPurgeHandlerId)
+                self.mediaPurgeHandlerId = nil
+            }
         }
         .onChange(of: viewModel.scope) { _, _ in
             Task { await viewModel.reload() }
+        }
+        .onChange(of: appState.mediaPurgeEvent?.nonce) { _, _ in
+            guard let connectionId = appState.mediaPurgeEvent?.connectionId else { return }
+            viewModel.removeItems(forConnectionId: connectionId)
         }
     }
 
@@ -169,11 +189,6 @@ final class MacFavoritesListViewModel: ObservableObject {
         modelContext = context
     }
 
-    func loadInitialPage() async {
-        guard modelContext != nil, items.isEmpty else { return }
-        await reload()
-    }
-
     func reload() async {
         guard modelContext != nil else { return }
         isLoading = true
@@ -181,11 +196,26 @@ final class MacFavoritesListViewModel: ObservableObject {
 
         do {
             let result = try await fetchNextBatch(startDBOffset: 0)
-            let newItems = result.ids.compactMap { modelContext?.model(for: $0) as? MediaItem }
+            let newItems = result.ids.compactMap { id -> MediaItem? in
+                guard let item = modelContext?.model(for: id) as? MediaItem, !item.isDeleted else { return nil }
+                return item
+            }
             replaceItems(newItems, dbScanned: result.dbScanned, reachedEnd: result.reachedEnd)
         } catch {
             items = []
         }
+    }
+
+    /// 删除连接前同步剔除收藏列表中的 MediaItem。
+    func removeItems(forConnectionId connectionId: UUID) {
+        let remaining = items.filter { item in
+            // 已 detach 的对象只能安全读 isDeleted，不能再读 sourceConnectionId。
+            guard !item.isDeleted else { return false }
+            return item.sourceConnectionId != connectionId
+        }
+        guard remaining.count != items.count else { return }
+        items = remaining
+        loadedItemIDs = Set(remaining.map(\.persistentModelID))
     }
 
     func loadNextPageIfNeeded(currentItem item: MediaItem) async {
@@ -204,7 +234,10 @@ final class MacFavoritesListViewModel: ObservableObject {
 
         do {
             let result = try await fetchNextBatch(startDBOffset: dbOffset)
-            let newItems = result.ids.compactMap { modelContext?.model(for: $0) as? MediaItem }
+            let newItems = result.ids.compactMap { id -> MediaItem? in
+                guard let item = modelContext?.model(for: id) as? MediaItem, !item.isDeleted else { return nil }
+                return item
+            }
             appendItems(newItems)
             dbOffset += result.dbScanned
             hasMore = !result.reachedEnd

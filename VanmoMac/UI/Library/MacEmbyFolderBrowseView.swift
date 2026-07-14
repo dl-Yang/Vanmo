@@ -12,12 +12,13 @@ struct MacEmbyFolderBrowseView: View {
     @State private var children: [ServerMediaItem] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var mediaPurgeHandlerId: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
             MacLibrarySublistHeader(
-                title: container.title,
-                subtitle: container.mediaType.displayName
+                title: container.isDeleted ? "" : container.title,
+                subtitle: container.isDeleted ? "" : container.mediaType.displayName
             )
 
             Group {
@@ -58,12 +59,25 @@ struct MacEmbyFolderBrowseView: View {
             }
         }
         .background(theme.appBackground)
-        .task(id: container.serverId) {
+        .task(id: container.isDeleted ? nil : container.serverId) {
             await loadChildren()
+        }
+        .onAppear {
+            guard mediaPurgeHandlerId == nil else { return }
+            mediaPurgeHandlerId = appState.registerMediaPurgeHandler { _ in
+                children = []
+            }
+        }
+        .onDisappear {
+            if let mediaPurgeHandlerId {
+                appState.unregisterMediaPurgeHandler(mediaPurgeHandlerId)
+                self.mediaPurgeHandlerId = nil
+            }
         }
     }
 
     private func openChild(_ child: ServerMediaItem) {
+        guard !container.isDeleted else { return }
         let item = makeChildItem(child)
         switch item.mediaType {
         case .folder, .collectionFolder, .season, .boxSet:
@@ -78,6 +92,11 @@ struct MacEmbyFolderBrowseView: View {
     }
 
     private func loadChildren() async {
+        guard !container.isDeleted else {
+            children = []
+            isLoading = false
+            return
+        }
         guard let parentId = container.serverId else {
             errorMessage = "缺少服务器条目 ID"
             isLoading = false
@@ -103,7 +122,9 @@ struct MacEmbyFolderBrowseView: View {
 
     private func makeChildItem(_ child: ServerMediaItem) -> MediaItem {
         let item = ServerMediaItemMapper.makeMediaItem(from: child)
-        item.sourceConnectionId = container.sourceConnectionId
+        if !container.isDeleted {
+            item.sourceConnectionId = container.sourceConnectionId
+        }
         return item
     }
 }

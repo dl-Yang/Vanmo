@@ -71,6 +71,7 @@ struct MacSidebarRow: View {
             .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
             .frame(height: MacDesignTokens.Layout.sidebarRowHeight)
             .background(isSelected ? theme.sidebarSelectedBackground : Color.clear)
+            .contentShape(Rectangle())
             .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius))
         }
         .buttonStyle(.plain)
@@ -120,6 +121,7 @@ struct MacConnectionSidebarRow: View {
             .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
             .frame(minHeight: MacDesignTokens.Layout.sidebarRowHeight)
             .background(isSelected ? theme.sidebarSelectedBackground : Color.clear)
+            .contentShape(Rectangle())
             .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius))
         }
         .buttonStyle(.plain)
@@ -170,7 +172,11 @@ struct MacSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: MacDesignTokens.Layout.headerHeight)
+//            Spacer(minLength: MacDesignTokens.Layout.headerHeight)
+            MacSidebarToggleButton()
+                .padding(.bottom, 12)
+                .padding(.leading, MacDesignTokens.Layout.trafficLightsLeadingInset + 5)
+                .padding(.top,2)
             
             MacSearchField(text: $searchViewModel.searchText) {
                 appState.selectSearch()
@@ -351,15 +357,13 @@ struct MacSidebarView: View {
     }
 
     private func deleteConnection(_ connection: SavedConnection) {
-        if appState.selectedMediaItem?.sourceConnectionId == connection.id {
-            appState.closeDetail()
-        }
-        appState.clearActiveConnectionIfDeleted(connection.id)
-        connectionsViewModel.deleteConnection(connection)
-        Task {
-            await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
-            libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
-        }
+        MacConnectionDeletion.delete(
+            connection,
+            appState: appState,
+            libraryViewModel: libraryViewModel,
+            connectionsViewModel: connectionsViewModel,
+            searchViewModel: searchViewModel
+        )
     }
     private func isLibrarySectionSelected(_ section: MacSidebarSection) -> Bool {
         guard appState.selectedMediaItem == nil else { return false }

@@ -536,6 +536,22 @@ final class LibraryViewModel: ObservableObject {
         } else {
             try? modelContext?.save()
         }
+
+        guard item.serverId != nil else { return }
+        let snapshot = try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
+        Task {
+            do {
+                try await EmbyPlayedUpdater.setPlayed(
+                    item,
+                    isPlayed: true,
+                    connection: snapshot
+                )
+            } catch {
+                VanmoLogger.network.error(
+                    "[EmbyPlayback] mark watched failed: \(error.localizedDescription)"
+                )
+            }
+        }
     }
 
     func deleteItem(_ item: MediaItem) {

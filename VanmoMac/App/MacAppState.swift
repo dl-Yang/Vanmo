@@ -85,6 +85,16 @@ enum MacContentRoute: Equatable {
     case settings
 }
 
+struct MacMediaPurgeEvent: Equatable {
+    let connectionId: UUID
+    let nonce: UUID
+
+    init(connectionId: UUID) {
+        self.connectionId = connectionId
+        self.nonce = UUID()
+    }
+}
+
 @MainActor
 final class MacAppState: ObservableObject {
     @AppStorage(MacAppearanceMode.storageKey) var appearanceMode: MacAppearanceMode = .system
@@ -121,6 +131,13 @@ final class MacAppState: ObservableObject {
     @Published var routeConnection: SavedConnection?
     @Published var routeContainerItem: MediaItem?
     @Published private(set) var isPlayerPlaying = false
+    /// 删除连接前发出，供收藏等本地 StateObject 在下一帧清理。
+    @Published private(set) var mediaPurgeEvent: MacMediaPurgeEvent?
+    /// 任意入口收藏变更后递增；Favorites 未挂载时也能在下次进入时强制 reload。
+    @Published private(set) var favoriteChangeNonce = UUID()
+
+    /// 同步 purge 回调（删除前立刻执行），避免仅依赖 onChange 时序。
+    private var mediaPurgeHandlers: [UUID: (UUID) -> Void] = [:]
 
     weak var activePlayerViewModel: MacPlayerViewModel?
 
@@ -143,6 +160,10 @@ final class MacAppState: ObservableObject {
 
     func closeDetail() {
         selectedMediaItem = nil
+    }
+
+    func notifyFavoriteDidChange() {
+        favoriteChangeNonce = UUID()
     }
 
     var activeConnectionId: UUID? {
@@ -232,9 +253,68 @@ final class MacAppState: ObservableObject {
     }
 
     func clearActiveConnectionIfDeleted(_ connectionId: UUID) {
+        purgeMediaState(for: connectionId)
+    }
+
+    /// 删除连接前同步清空所有可能持有该连接 MediaItem 的 UI 状态，避免 SwiftData detach 后读属性崩溃。
+    func purgeMediaState(for connectionId: UUID) {
+        if let item = selectedMediaItem, item.isDeleted || item.sourceConnectionId == connectionId {
+            closeDetail()
+        }
+
+        if let item = playerItem, item.isDeleted || item.sourceConnectionId == connectionId {
+            closePlayer()
+        }
+
+        if editingConnection?.id == connectionId {
+            dismissEditConnection()
+        }
+
+        let shouldExitSubRoute: Bool = {
+            switch contentRoute {
+            case let .libraryCollectionFolder(id, _),
+                 let .libraryScannedLibrary(id, _),
+                 let .libraryScannedShowDetail(id, _):
+                return id == connectionId
+            case .libraryEmbyFolderBrowse:
+                if let container = routeContainerItem,
+                   container.isDeleted || container.sourceConnectionId == connectionId {
+                    return true
+                }
+                return routeConnection?.id == connectionId
+            default:
+                if routeConnection?.id == connectionId { return true }
+                if let container = routeContainerItem,
+                   container.isDeleted || container.sourceConnectionId == connectionId {
+                    return true
+                }
+                return false
+            }
+        }()
+
+        if shouldExitSubRoute {
+            backFromLibrarySubRoute()
+        }
+
         if activeConnectionId == connectionId {
             exitConnectionBrowser()
         }
+
+        for handler in mediaPurgeHandlers.values {
+            handler(connectionId)
+        }
+        mediaPurgeEvent = MacMediaPurgeEvent(connectionId: connectionId)
+    }
+
+    @discardableResult
+    func registerMediaPurgeHandler(_ handler: @escaping (UUID) -> Void) -> UUID {
+        let id = UUID()
+        mediaPurgeHandlers[id] = handler
+        return id
+    }
+
+    func unregisterMediaPurgeHandler(_ id: UUID) {
+        mediaPurgeHandlers.removeValue(forKey: id)
     }
 
     func play(_ item: MediaItem, from position: TimeInterval = 0) {
@@ -244,6 +324,7 @@ final class MacAppState: ObservableObject {
     }
 
     func closePlayer() {
+        activePlayerViewModel?.cleanup()
         isPlayerPresented = false
         playerItem = nil
         playerStartPosition = 0

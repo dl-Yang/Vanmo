@@ -620,6 +620,156 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         try validateEmbyResponse(response, body: data, context: "set favorite")
     }
 
+    /// 上报播放开始（Playback Check-in）。
+    public func reportPlaybackStarted(
+        itemId: String,
+        mediaSourceId: String? = nil,
+        positionTicks: Int64,
+        playSessionId: String
+    ) async throws {
+        try await postPlaybackCheckIn(
+            path: "\(apiPrefix)Sessions/Playing",
+            body: playbackCheckInBody(
+                itemId: itemId,
+                mediaSourceId: mediaSourceId,
+                positionTicks: positionTicks,
+                playSessionId: playSessionId,
+                isPaused: false,
+                eventName: nil
+            ),
+            context: "report playback started"
+        )
+    }
+
+    /// 上报播放进度。
+    public func reportPlaybackProgress(
+        itemId: String,
+        mediaSourceId: String? = nil,
+        positionTicks: Int64,
+        isPaused: Bool,
+        eventName: String,
+        playSessionId: String
+    ) async throws {
+        try await postPlaybackCheckIn(
+            path: "\(apiPrefix)Sessions/Playing/Progress",
+            body: playbackCheckInBody(
+                itemId: itemId,
+                mediaSourceId: mediaSourceId,
+                positionTicks: positionTicks,
+                playSessionId: playSessionId,
+                isPaused: isPaused,
+                eventName: eventName
+            ),
+            context: "report playback progress"
+        )
+    }
+
+    /// 上报播放结束。
+    public func reportPlaybackStopped(
+        itemId: String,
+        mediaSourceId: String? = nil,
+        positionTicks: Int64,
+        playSessionId: String
+    ) async throws {
+        try await postPlaybackCheckIn(
+            path: "\(apiPrefix)Sessions/Playing/Stopped",
+            body: playbackCheckInBody(
+                itemId: itemId,
+                mediaSourceId: mediaSourceId,
+                positionTicks: positionTicks,
+                playSessionId: playSessionId,
+                isPaused: false,
+                eventName: nil
+            ),
+            context: "report playback stopped"
+        )
+    }
+
+    /// 标记条目已看 / 未看。
+    public func setPlayed(itemId: String, isPlayed: Bool) async throws {
+        guard isConnected, let config, let token = accessToken, let userId else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Users/\(userId)/PlayedItems/\(itemId)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "api_key", value: token)]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = isPlayed ? "POST" : "DELETE"
+        request.timeoutInterval = 15
+        addAuth(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+        try validateEmbyResponse(response, body: data, context: "set played")
+    }
+
+    /// 秒 → Emby ticks（1s = 10_000_000 ticks）。
+    public static func positionTicks(fromSeconds seconds: TimeInterval) -> Int64 {
+        Int64((max(0, seconds) * 10_000_000.0).rounded())
+    }
+
+    private func playbackCheckInBody(
+        itemId: String,
+        mediaSourceId: String?,
+        positionTicks: Int64,
+        playSessionId: String,
+        isPaused: Bool,
+        eventName: String?
+    ) -> [String: Any] {
+        var body: [String: Any] = [
+            "ItemId": itemId,
+            "MediaSourceId": mediaSourceId ?? itemId,
+            "PositionTicks": positionTicks,
+            "PlaySessionId": playSessionId,
+            "CanSeek": true,
+            "PlayMethod": "DirectPlay",
+            "IsPaused": isPaused,
+        ]
+        if let eventName {
+            body["EventName"] = eventName
+        }
+        return body
+    }
+
+    private func postPlaybackCheckIn(
+        path: String,
+        body: [String: Any],
+        context: String
+    ) async throws {
+        guard isConnected, let config, let token = accessToken else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent(path),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "api_key", value: token)]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        addAuth(to: &request)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await session.data(for: request)
+        try validateEmbyResponse(response, body: data, context: context)
+    }
+
     private func fetchItemsPage(
         components: URLComponents,
         baseURL: URL,
