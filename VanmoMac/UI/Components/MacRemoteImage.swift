@@ -39,7 +39,7 @@ struct MacRemoteImage: View {
     private var placeholder: some View {
         ZStack{
             Rectangle()
-                .fill(Color.gray.opacity(0.25))
+                .fill(Color.white)
             Image(systemName: "film")
                 .font(.largeTitle)
                 .contentShape(Rectangle())

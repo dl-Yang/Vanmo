@@ -1800,7 +1800,7 @@ public enum EmbyCollectionsFetcher {
     }
 }
 
-public struct EpisodeInfo: Identifiable {
+public struct EpisodeInfo: Identifiable, Sendable {
     public let id: String
     public let title: String
     public let seasonNumber: Int
@@ -1816,38 +1816,128 @@ public struct EpisodeInfo: Identifiable {
     }
 }
 
+public struct EpisodePage: Sendable {
+    public let items: [EpisodeInfo]
+    public let totalRecordCount: Int
+
+    public init(items: [EpisodeInfo], totalRecordCount: Int) {
+        self.items = items
+        self.totalRecordCount = totalRecordCount
+    }
+}
+
+/// 季信息。`serverId` 为服务端季 ID（Emby Season Id / Plex season ratingKey）。
+public struct SeasonInfo: Identifiable, Sendable {
+    public var id: Int { seasonNumber }
+    public let seasonNumber: Int
+    public let serverId: String?
+
+    public init(seasonNumber: Int, serverId: String? = nil) {
+        self.seasonNumber = seasonNumber
+        self.serverId = serverId
+    }
+}
+
 public enum EmbyEpisodeFetcher {
     public static func fetchEpisodes(seriesId: String, connection: MediaServerConnectionSnapshot) async throws -> [EpisodeInfo] {
         let service = try await EmbyConnectionHelper.connect(connection)
         defer { Task { await service.disconnect() } }
-        return try await fetchEpisodes(seriesId: seriesId, context: service.makeSessionContext())
+        return try await fetchAllEpisodes(seriesId: seriesId, context: service.makeSessionContext())
     }
 
     public static func fetchEpisodes(seriesId: String) async throws -> [EpisodeInfo] {
+        try await fetchAllEpisodes(seriesId: seriesId, context: try credentialContext())
+    }
+
+    private static func fetchAllEpisodes(seriesId: String, context: EmbySessionContext) async throws -> [EpisodeInfo] {
+        var all: [EpisodeInfo] = []
+        var startIndex = 0
+        let pageSize = 200
+        while true {
+            let page = try await fetchEpisodesPage(
+                seriesId: seriesId,
+                season: nil,
+                startIndex: startIndex,
+                pageSize: pageSize,
+                context: context
+            )
+            all.append(contentsOf: page.items)
+            startIndex += page.items.count
+            if page.items.isEmpty || startIndex >= page.totalRecordCount {
+                break
+            }
+        }
+        return all
+    }
+
+    public static func fetchSeasons(
+        seriesId: String,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> [SeasonInfo] {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await fetchSeasons(seriesId: seriesId, context: service.makeSessionContext())
+    }
+
+    public static func fetchSeasons(seriesId: String) async throws -> [SeasonInfo] {
+        try await fetchSeasons(seriesId: seriesId, context: try credentialContext())
+    }
+
+    public static func fetchEpisodesPage(
+        seriesId: String,
+        season: Int,
+        startIndex: Int,
+        pageSize: Int,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> EpisodePage {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await fetchEpisodesPage(
+            seriesId: seriesId,
+            season: season,
+            startIndex: startIndex,
+            pageSize: pageSize,
+            context: service.makeSessionContext()
+        )
+    }
+
+    public static func fetchEpisodesPage(
+        seriesId: String,
+        season: Int,
+        startIndex: Int,
+        pageSize: Int
+    ) async throws -> EpisodePage {
+        try await fetchEpisodesPage(
+            seriesId: seriesId,
+            season: season,
+            startIndex: startIndex,
+            pageSize: pageSize,
+            context: try credentialContext()
+        )
+    }
+
+    private static func credentialContext() throws -> EmbySessionContext {
         guard let baseURLStr = EmbyCredentialStore.baseURL,
               let token = EmbyCredentialStore.token,
               let baseURL = URL(string: baseURLStr) else {
             throw NetworkError.notConnected
         }
-        return try await fetchEpisodes(
-            seriesId: seriesId,
-            context: EmbySessionContext(
-                type: EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby,
-                baseURL: baseURL,
-                apiPrefix: EmbyCredentialStore.apiPrefix,
-                token: token,
-                userId: EmbyCredentialStore.userId ?? ""
-            )
+        return EmbySessionContext(
+            type: EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby,
+            baseURL: baseURL,
+            apiPrefix: EmbyCredentialStore.apiPrefix,
+            token: token,
+            userId: EmbyCredentialStore.userId ?? ""
         )
     }
 
-    private static func fetchEpisodes(seriesId: String, context: EmbySessionContext) async throws -> [EpisodeInfo] {
+    private static func fetchSeasons(seriesId: String, context: EmbySessionContext) async throws -> [SeasonInfo] {
         var components = URLComponents(
-            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Shows/\(seriesId)/Episodes"),
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Shows/\(seriesId)/Seasons"),
             resolvingAgainstBaseURL: false
         )!
         components.queryItems = [
-            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags"),
+            URLQueryItem(name: "Fields", value: "IndexNumber"),
             URLQueryItem(name: "api_key", value: context.token),
         ]
 
@@ -1855,56 +1945,110 @@ public enum EmbyEpisodeFetcher {
             throw NetworkError.invalidURL
         }
 
-        VanmoLogger.network.info("[MediaServer] Fetching episodes for series \(seriesId)")
+        VanmoLogger.network.info("[MediaServer] Fetching seasons for series \(seriesId)")
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
 
         let (data, response) = try await URLSession.shared.data(for: request)
+        try validateEmbyResponse(response, body: data, context: "fetch seasons")
 
+        let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
+        let seasons = result.items.compactMap { item -> SeasonInfo? in
+            guard let number = item.indexNumber else { return nil }
+            return SeasonInfo(seasonNumber: number, serverId: item.id)
+        }
+        .sorted { $0.seasonNumber < $1.seasonNumber }
+
+        VanmoLogger.network.info("[MediaServer] Fetched \(seasons.count) seasons for series \(seriesId)")
+        return seasons
+    }
+
+    private static func fetchEpisodesPage(
+        seriesId: String,
+        season: Int?,
+        startIndex: Int,
+        pageSize: Int,
+        context: EmbySessionContext
+    ) async throws -> EpisodePage {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Shows/\(seriesId)/Episodes"),
+            resolvingAgainstBaseURL: false
+        )!
+        var queryItems = [
+            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags,ImageTags"),
+            URLQueryItem(name: "StartIndex", value: String(startIndex)),
+            URLQueryItem(name: "Limit", value: String(pageSize)),
+            URLQueryItem(name: "api_key", value: context.token),
+        ]
+        if let season {
+            queryItems.insert(URLQueryItem(name: "Season", value: String(season)), at: 0)
+        }
+        components.queryItems = queryItems
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        let seasonLabel = season.map(String.init) ?? "all"
+        VanmoLogger.network.info(
+            "[MediaServer] Fetching episodes series=\(seriesId) season=\(seasonLabel) start=\(startIndex) limit=\(pageSize)"
+        )
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
         try validateEmbyResponse(response, body: data, context: "fetch episodes")
 
         let result = try JSONDecoder().decode(EmbyMediaResponse.self, from: data)
-        VanmoLogger.network.info("[MediaServer] Fetched \(result.items.count) episodes for series \(seriesId)")
+        let items = result.items.compactMap { mapEpisode($0, context: context) }
 
-        return result.items.compactMap { item -> EpisodeInfo? in
-            guard let season = item.parentIndexNumber,
-                  let episode = item.indexNumber else { return nil }
+        VanmoLogger.network.info(
+            "[MediaServer] Fetched \(items.count) episodes (total=\(result.totalRecordCount)) series=\(seriesId) season=\(seasonLabel)"
+        )
 
-            let duration: TimeInterval = if let ticks = item.runTimeTicks {
-                Double(ticks) / 10_000_000.0
-            } else {
-                0
-            }
+        return EpisodePage(items: items, totalRecordCount: result.totalRecordCount)
+    }
 
-            let baseURLStr = context.baseURL.absoluteString
-            let streamURL = URL(
-                string: "\(baseURLStr)/\(context.apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(context.token)"
-            )!
+    private static func mapEpisode(_ item: EmbyMediaDetail, context: EmbySessionContext) -> EpisodeInfo? {
+        guard let season = item.parentIndexNumber,
+              let episode = item.indexNumber else { return nil }
 
-            let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
-                URL(
-                    string: "\(baseURLStr)/\(context.apiPrefix)Items/\(item.id)/Images/Backdrop?maxWidth=1280&quality=80&api_key=\(context.token)"
-                )
-            } else if item.imageTags?.primary != nil {
-                URL(
-                    string: "\(baseURLStr)/\(context.apiPrefix)Items/\(item.id)/Images/Primary?maxWidth=1280&quality=80&api_key=\(context.token)"
-                )
-            } else {
-                nil
-            }
-
-            return EpisodeInfo(
-                id: item.id,
-                title: item.name,
-                seasonNumber: season,
-                episodeNumber: episode,
-                duration: duration,
-                overview: item.overview,
-                streamURL: streamURL,
-                backdropURL: backdropURL
-            )
+        let duration: TimeInterval = if let ticks = item.runTimeTicks {
+            Double(ticks) / 10_000_000.0
+        } else {
+            0
         }
+
+        let baseURLStr = context.baseURL.absoluteString
+        let streamURL = URL(
+            string: "\(baseURLStr)/\(context.apiPrefix)Videos/\(item.id)/stream?static=true&api_key=\(context.token)"
+        )!
+
+        let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
+            URL(
+                string: "\(baseURLStr)/\(context.apiPrefix)Items/\(item.id)/Images/Backdrop?maxWidth=1280&quality=80&api_key=\(context.token)"
+            )
+        } else if item.imageTags?.primary != nil {
+            URL(
+                string: "\(baseURLStr)/\(context.apiPrefix)Items/\(item.id)/Images/Primary?maxWidth=1280&quality=80&api_key=\(context.token)"
+            )
+        } else {
+            nil
+        }
+
+        return EpisodeInfo(
+            id: item.id,
+            title: item.name,
+            seasonNumber: season,
+            episodeNumber: episode,
+            duration: duration,
+            overview: item.overview,
+            streamURL: streamURL,
+            backdropURL: backdropURL
+        )
     }
 }

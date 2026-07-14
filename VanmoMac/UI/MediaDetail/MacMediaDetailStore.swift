@@ -8,7 +8,7 @@ struct MacMediaDetailContent {
     var logoURL: URL?
     var backdropURL: URL?
     var castMembers: [CastMemberDisplay]
-    var episodes: [EpisodeInfo]
+    var seasons: [SeasonInfo]
     var collections: [ServerMediaItem]
 }
 
@@ -16,7 +16,12 @@ struct MacMediaDetailContent {
 final class MacMediaDetailStore: ObservableObject {
     @Published private(set) var content: MacMediaDetailContent?
     @Published private(set) var isLoading = false
-    @Published var selectedSeason: Int?
+    @Published private(set) var selectedSeason: Int?
+    @Published private(set) var seasonEpisodes: [EpisodeInfo] = []
+    @Published private(set) var isLoadingEpisodes = false
+    @Published private(set) var isLoadingMoreEpisodes = false
+    @Published private(set) var hasMoreEpisodes = false
+    @Published private(set) var episodeTotalCount = 0
     @Published private(set) var isRefreshingMetadata = false
     @Published private(set) var isUpdatingFavorite = false
     @Published private(set) var isUpdatingWatched = false
@@ -27,17 +32,19 @@ final class MacMediaDetailStore: ObservableObject {
 
     private var loadedKey: String?
     private var loadGeneration = 0
+    private var episodeStartIndex = 0
+    private var episodeLoadGeneration = 0
+    private var metadataCacheRecord: MetadataCacheRecord?
+    private var metadataRootDirectory: URL?
+
+    private let episodePageSize = 20
 
     var seasonNumbers: [Int] {
-        Array(Set((content?.episodes ?? []).map(\.seasonNumber))).sorted()
+        (content?.seasons ?? []).map(\.seasonNumber)
     }
 
     var currentSeasonEpisodes: [EpisodeInfo] {
-        let episodes = content?.episodes ?? []
-        let season = selectedSeason ?? seasonNumbers.first ?? 1
-        return episodes
-            .filter { $0.seasonNumber == season }
-            .sorted { $0.episodeNumber < $1.episodeNumber }
+        seasonEpisodes
     }
 
     // MARK: - Loading
@@ -54,7 +61,7 @@ final class MacMediaDetailStore: ObservableObject {
 
         isLoading = true
         content = nil
-        selectedSeason = nil
+        resetEpisodePagingState()
 
         await performAggregate(
             item: item,
@@ -79,6 +86,17 @@ final class MacMediaDetailStore: ObservableObject {
         )
     }
 
+    func selectSeason(_ season: Int, item: MediaItem, modelContext: ModelContext) async {
+        guard selectedSeason != season else { return }
+        selectedSeason = season
+        await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
+    }
+
+    func loadMoreEpisodes(item: MediaItem, modelContext: ModelContext) async {
+        guard hasMoreEpisodes, !isLoadingMoreEpisodes, !isLoadingEpisodes else { return }
+        await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: false)
+    }
+
     /// 并行发起全部异步请求，等待全部完成后聚合成一份快照，对 UI 做一次性刷新。
     /// - Parameter generation: 本次加载的代际号，回写前校验，避免旧 item 的结果覆盖新 item。
     private func performAggregate(
@@ -97,12 +115,12 @@ final class MacMediaDetailStore: ObservableObject {
             enabled: autoDownloadMetadata,
             force: force
         )
-        async let episodesTask = fetchEpisodes(item: item, modelContext: modelContext)
+        async let seasonsTask = fetchSeasons(item: item, modelContext: modelContext)
         async let collectionsTask = fetchCollections(item: item, modelContext: modelContext)
 
         let cacheRecord = await cacheRecordTask
         let networkRecord = await networkRecordTask
-        let loadedEpisodes = await episodesTask
+        var loadedSeasons = await seasonsTask
         let loadedCollections = await collectionsTask
 
         // 代际 / 取消 / 已删：回写前丢弃，避免访问已 detach 的 MediaItem 属性。
@@ -124,13 +142,20 @@ final class MacMediaDetailStore: ObservableObject {
             return
         }
 
+        metadataCacheRecord = record
+        metadataRootDirectory = root
+
+        if loadedSeasons.isEmpty, let record, item.mediaType == .tvShow {
+            loadedSeasons = seasonInfos(from: record)
+        }
+
         var snapshot = MacMediaDetailContent(
             enrichedOverview: nil,
             enrichedGenres: [],
             logoURL: item.logoURL,
             backdropURL: item.backdropURL,
             castMembers: [],
-            episodes: loadedEpisodes,
+            seasons: loadedSeasons,
             collections: loadedCollections
         )
 
@@ -152,12 +177,6 @@ final class MacMediaDetailStore: ObservableObject {
                 snapshot.backdropURL = resolvedBackdrop
                 item.backdropURL = resolvedBackdrop
             }
-            snapshot.episodes = mergedEpisodes(
-                loaded: loadedEpisodes,
-                record: record,
-                item: item,
-                rootDirectory: root
-            )
         }
 
         // 代际校验：加载期间若切换到其它 item（generation 已递增），丢弃本次结果，
@@ -165,13 +184,38 @@ final class MacMediaDetailStore: ObservableObject {
         guard generation == loadGeneration, !item.isDeleted else { return }
 
         content = snapshot
-        selectedSeason = Array(Set(snapshot.episodes.map(\.seasonNumber))).sorted().first
+        let previousSeason = selectedSeason
+        if let previousSeason, loadedSeasons.contains(where: { $0.seasonNumber == previousSeason }) {
+            selectedSeason = previousSeason
+        } else {
+            selectedSeason = loadedSeasons.first?.seasonNumber
+        }
         isLoading = false
+
+        if item.mediaType == .tvShow, selectedSeason != nil {
+            await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
+        }
     }
 
     func invalidate() {
         loadGeneration += 1
+        episodeLoadGeneration += 1
         isLoading = false
+        isLoadingEpisodes = false
+        isLoadingMoreEpisodes = false
+    }
+
+    private func resetEpisodePagingState() {
+        episodeLoadGeneration += 1
+        selectedSeason = nil
+        seasonEpisodes = []
+        isLoadingEpisodes = false
+        isLoadingMoreEpisodes = false
+        hasMoreEpisodes = false
+        episodeTotalCount = 0
+        episodeStartIndex = 0
+        metadataCacheRecord = nil
+        metadataRootDirectory = nil
     }
 
     // MARK: - Parallel fetch helpers
@@ -201,7 +245,7 @@ final class MacMediaDetailStore: ObservableObject {
         }
     }
 
-    private func fetchEpisodes(item: MediaItem, modelContext: ModelContext) async -> [EpisodeInfo] {
+    private func fetchSeasons(item: MediaItem, modelContext: ModelContext) async -> [SeasonInfo] {
         guard item.mediaType == .tvShow, let seriesServerId = item.serverId else { return [] }
 
         do {
@@ -209,24 +253,160 @@ final class MacMediaDetailStore: ObservableObject {
             switch item.fileURL.host {
             case "plex-series":
                 if let snapshot {
-                    return try await PlexEpisodeFetcher.fetchEpisodes(
+                    return try await PlexEpisodeFetcher.fetchSeasons(
                         seriesRatingKey: seriesServerId,
                         connection: snapshot
                     )
                 }
-                return try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
+                return try await PlexEpisodeFetcher.fetchSeasons(seriesRatingKey: seriesServerId)
             default:
                 if let snapshot {
-                    return try await EmbyEpisodeFetcher.fetchEpisodes(
+                    return try await EmbyEpisodeFetcher.fetchSeasons(
                         seriesId: seriesServerId,
                         connection: snapshot
                     )
                 }
-                return try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: seriesServerId)
+                return try await EmbyEpisodeFetcher.fetchSeasons(seriesId: seriesServerId)
             }
         } catch {
-            VanmoLogger.library.error("[MacMediaDetail] Failed to load episodes: \(error.localizedDescription)")
+            VanmoLogger.library.error("[MacMediaDetail] Failed to load seasons: \(error.localizedDescription)")
             return []
+        }
+    }
+
+    private func loadSeasonEpisodes(item: MediaItem, modelContext: ModelContext, reset: Bool) async {
+        guard item.mediaType == .tvShow else { return }
+        guard let season = selectedSeason else { return }
+
+        if reset {
+            episodeLoadGeneration += 1
+            seasonEpisodes = []
+            episodeStartIndex = 0
+            episodeTotalCount = 0
+            hasMoreEpisodes = false
+            isLoadingEpisodes = true
+            isLoadingMoreEpisodes = false
+        } else {
+            guard hasMoreEpisodes, !isLoadingMoreEpisodes, !isLoadingEpisodes else { return }
+            isLoadingMoreEpisodes = true
+        }
+
+        let generation = episodeLoadGeneration
+        let startIndex = reset ? 0 : episodeStartIndex
+
+        defer {
+            if generation == episodeLoadGeneration {
+                isLoadingEpisodes = false
+                isLoadingMoreEpisodes = false
+            }
+        }
+
+        do {
+            let page = try await fetchEpisodesPage(
+                item: item,
+                modelContext: modelContext,
+                season: season,
+                startIndex: startIndex,
+                pageSize: episodePageSize
+            )
+
+            guard generation == episodeLoadGeneration, !item.isDeleted else { return }
+
+            let merged = mergeEpisodeBackdrops(page.items, for: item)
+            if reset {
+                seasonEpisodes = merged
+            } else {
+                let existingIDs = Set(seasonEpisodes.map(\.id))
+                seasonEpisodes.append(contentsOf: merged.filter { !existingIDs.contains($0.id) })
+            }
+
+            episodeStartIndex = startIndex + page.items.count
+            episodeTotalCount = max(page.totalRecordCount, episodeStartIndex)
+            // 满页则继续；末页不足 pageSize，或 totalSize 回退哨兵耗尽后自然停
+            hasMoreEpisodes = page.items.count >= episodePageSize
+                && episodeStartIndex < page.totalRecordCount
+        } catch {
+            VanmoLogger.library.error("[MacMediaDetail] Failed to load season episodes: \(error.localizedDescription)")
+            guard generation == episodeLoadGeneration else { return }
+
+            if reset, let fallback = cachedEpisodes(for: season, item: item), !fallback.isEmpty {
+                seasonEpisodes = fallback
+                episodeStartIndex = fallback.count
+                episodeTotalCount = fallback.count
+                hasMoreEpisodes = false
+            } else if reset {
+                seasonEpisodes = []
+                episodeTotalCount = 0
+                hasMoreEpisodes = false
+            }
+            // loadMore 失败保留 hasMore，便于再次滚动重试
+        }
+    }
+
+    private func fetchEpisodesPage(
+        item: MediaItem,
+        modelContext: ModelContext,
+        season: Int,
+        startIndex: Int,
+        pageSize: Int
+    ) async throws -> EpisodePage {
+        guard let seriesServerId = item.serverId else {
+            throw NetworkError.notConnected
+        }
+
+        let snapshot = try? mediaServerConnectionSnapshot(for: item, in: modelContext)
+
+        switch item.fileURL.host {
+        case "plex-series":
+            if let seasonKey = content?.seasons.first(where: { $0.seasonNumber == season })?.serverId {
+                if let snapshot {
+                    return try await PlexEpisodeFetcher.fetchEpisodesPage(
+                        seasonRatingKey: seasonKey,
+                        seasonNumber: season,
+                        startIndex: startIndex,
+                        pageSize: pageSize,
+                        connection: snapshot
+                    )
+                }
+                return try await PlexEpisodeFetcher.fetchEpisodesPage(
+                    seasonRatingKey: seasonKey,
+                    seasonNumber: season,
+                    startIndex: startIndex,
+                    pageSize: pageSize
+                )
+            }
+
+            // cache 季列表无 ratingKey 时回退：拉全量再按季切片
+            let all: [EpisodeInfo]
+            if let snapshot {
+                all = try await PlexEpisodeFetcher.fetchEpisodes(
+                    seriesRatingKey: seriesServerId,
+                    connection: snapshot
+                )
+            } else {
+                all = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
+            }
+            let filtered = all
+                .filter { $0.seasonNumber == season }
+                .sorted { $0.episodeNumber < $1.episodeNumber }
+            let slice = Array(filtered.dropFirst(startIndex).prefix(pageSize))
+            return EpisodePage(items: slice, totalRecordCount: filtered.count)
+        default:
+            if let snapshot {
+                return try await EmbyEpisodeFetcher.fetchEpisodesPage(
+                    seriesId: seriesServerId,
+                    season: season,
+                    startIndex: startIndex,
+                    pageSize: pageSize,
+                    connection: snapshot
+                )
+            }
+            return try await EmbyEpisodeFetcher.fetchEpisodesPage(
+                seriesId: seriesServerId,
+                season: season,
+                startIndex: startIndex,
+                pageSize: pageSize
+            )
         }
     }
 
@@ -248,21 +428,34 @@ final class MacMediaDetailStore: ObservableObject {
         }
     }
 
-    private func mergedEpisodes(
-        loaded: [EpisodeInfo],
-        record: MetadataCacheRecord,
-        item: MediaItem,
-        rootDirectory root: URL
-    ) -> [EpisodeInfo] {
-        guard item.mediaType == .tvShow, !record.episodes.isEmpty else {
+    private func seasonInfos(from record: MetadataCacheRecord) -> [SeasonInfo] {
+        Array(Set(record.episodes.map(\.seasonNumber)))
+            .sorted()
+            .map { SeasonInfo(seasonNumber: $0) }
+    }
+
+    private func cachedEpisodes(for season: Int, item: MediaItem) -> [EpisodeInfo]? {
+        guard let record = metadataCacheRecord,
+              let root = metadataRootDirectory,
+              item.mediaType == .tvShow,
+              !record.episodes.isEmpty else {
+            return nil
+        }
+        return record.episodes
+            .filter { $0.seasonNumber == season }
+            .map { $0.makeEpisodeInfo(rootDirectory: root) }
+            .sorted { $0.episodeNumber < $1.episodeNumber }
+    }
+
+    private func mergeEpisodeBackdrops(_ loaded: [EpisodeInfo], for item: MediaItem) -> [EpisodeInfo] {
+        guard let record = metadataCacheRecord,
+              let root = metadataRootDirectory,
+              item.mediaType == .tvShow,
+              !record.episodes.isEmpty else {
             return loaded
         }
 
-        if loaded.isEmpty {
-            return record.episodes.map { $0.makeEpisodeInfo(rootDirectory: root) }
-        }
-
-        let cachedByID = Dictionary(uniqueKeysWithValues: record.episodes.map { ($0.id, $0) })
+        let cachedByID = Dictionary(record.episodes.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
         return loaded.map { episode in
             guard episode.backdropURL == nil, let cached = cachedByID[episode.id] else {
                 return episode

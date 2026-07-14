@@ -782,16 +782,64 @@ public enum PlexEpisodeFetcher {
     }
 
     public static func fetchEpisodes(seriesRatingKey: String) async throws -> [EpisodeInfo] {
+        try await fetchEpisodes(seriesRatingKey: seriesRatingKey, context: try credentialContext())
+    }
+
+    public static func fetchSeasons(
+        seriesRatingKey: String,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> [SeasonInfo] {
+        let service = PlexService()
+        try await service.connect(config: connection.config)
+        defer { Task { await service.disconnect() } }
+        return try await fetchSeasons(seriesRatingKey: seriesRatingKey, context: service.makeSessionContext())
+    }
+
+    public static func fetchSeasons(seriesRatingKey: String) async throws -> [SeasonInfo] {
+        try await fetchSeasons(seriesRatingKey: seriesRatingKey, context: try credentialContext())
+    }
+
+    public static func fetchEpisodesPage(
+        seasonRatingKey: String,
+        seasonNumber: Int,
+        startIndex: Int,
+        pageSize: Int,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> EpisodePage {
+        let service = PlexService()
+        try await service.connect(config: connection.config)
+        defer { Task { await service.disconnect() } }
+        return try await fetchEpisodesPage(
+            seasonRatingKey: seasonRatingKey,
+            seasonNumber: seasonNumber,
+            startIndex: startIndex,
+            pageSize: pageSize,
+            context: service.makeSessionContext()
+        )
+    }
+
+    public static func fetchEpisodesPage(
+        seasonRatingKey: String,
+        seasonNumber: Int,
+        startIndex: Int,
+        pageSize: Int
+    ) async throws -> EpisodePage {
+        try await fetchEpisodesPage(
+            seasonRatingKey: seasonRatingKey,
+            seasonNumber: seasonNumber,
+            startIndex: startIndex,
+            pageSize: pageSize,
+            context: try credentialContext()
+        )
+    }
+
+    private static func credentialContext() throws -> PlexSessionContext {
         guard let baseURLStr = PlexCredentialStore.baseURL,
               let token = PlexCredentialStore.token,
               let baseURL = URL(string: baseURLStr) else {
             throw NetworkError.notConnected
         }
-
-        return try await fetchEpisodes(
-            seriesRatingKey: seriesRatingKey,
-            context: PlexSessionContext(baseURL: baseURL, token: token)
-        )
+        return PlexSessionContext(baseURL: baseURL, token: token)
     }
 
     private static func fetchEpisodes(
@@ -817,40 +865,137 @@ public enum PlexEpisodeFetcher {
         try validatePlexResponse(response, body: data, context: "fetch episodes")
 
         let result = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
-        let episodes = (result.mediaContainer.metadata ?? []).compactMap { meta -> EpisodeInfo? in
-            guard meta.type == "episode",
-                  let key = meta.ratingKey,
-                  let season = meta.parentIndex,
-                  let ep = meta.index,
-                  let part = meta.media?.first?.part?.first,
-                  let partKey = part.key else { return nil }
-
-            let duration: TimeInterval = if let ms = meta.duration {
-                Double(ms) / 1000.0
-            } else {
-                0
-            }
-
-            let baseURLStr = context.baseURL.absoluteString
-            let stream = URL(string: "\(baseURLStr)\(partKey)?X-Plex-Token=\(context.token)")!
-
-            let backdropURL: URL? = (meta.art ?? meta.thumb).flatMap { path in
-                URL(string: "\(baseURLStr)\(path)?X-Plex-Token=\(context.token)")
-            }
-
-            return EpisodeInfo(
-                id: key,
-                title: meta.title,
-                seasonNumber: season,
-                episodeNumber: ep,
-                duration: duration,
-                overview: meta.summary,
-                streamURL: stream,
-                backdropURL: backdropURL
-            )
+        let episodes = (result.mediaContainer.metadata ?? []).compactMap { meta in
+            mapEpisode(meta, seasonNumberOverride: nil, context: context)
         }
 
         VanmoLogger.network.info("[Plex] Fetched \(episodes.count) episodes for series \(seriesRatingKey)")
         return episodes
+    }
+
+    private static func fetchSeasons(
+        seriesRatingKey: String,
+        context: PlexSessionContext
+    ) async throws -> [SeasonInfo] {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("library/metadata/\(seriesRatingKey)/children"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: context.token)]
+
+        guard let url = components.url else { throw NetworkError.invalidURL }
+
+        VanmoLogger.network.info("[Plex] Fetching seasons for series \(seriesRatingKey)")
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(PlexCredentialStore.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validatePlexResponse(response, body: data, context: "fetch seasons")
+
+        let result = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
+        let seasons = (result.mediaContainer.metadata ?? []).compactMap { meta -> SeasonInfo? in
+            guard meta.type == "season",
+                  let key = meta.ratingKey,
+                  let number = meta.index else { return nil }
+            return SeasonInfo(seasonNumber: number, serverId: key)
+        }
+        .sorted { $0.seasonNumber < $1.seasonNumber }
+
+        VanmoLogger.network.info("[Plex] Fetched \(seasons.count) seasons for series \(seriesRatingKey)")
+        return seasons
+    }
+
+    private static func fetchEpisodesPage(
+        seasonRatingKey: String,
+        seasonNumber: Int,
+        startIndex: Int,
+        pageSize: Int,
+        context: PlexSessionContext
+    ) async throws -> EpisodePage {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("library/metadata/\(seasonRatingKey)/children"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "X-Plex-Container-Start", value: String(startIndex)),
+            URLQueryItem(name: "X-Plex-Container-Size", value: String(pageSize)),
+            URLQueryItem(name: "X-Plex-Token", value: context.token),
+        ]
+
+        guard let url = components.url else { throw NetworkError.invalidURL }
+
+        VanmoLogger.network.info(
+            "[Plex] Fetching episodes seasonKey=\(seasonRatingKey) season=\(seasonNumber) start=\(startIndex) limit=\(pageSize)"
+        )
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(PlexCredentialStore.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validatePlexResponse(response, body: data, context: "fetch season episodes")
+
+        let result = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
+        let items = (result.mediaContainer.metadata ?? []).compactMap { meta in
+            mapEpisode(meta, seasonNumberOverride: seasonNumber, context: context)
+        }
+        let total: Int
+        if let totalSize = result.mediaContainer.totalSize {
+            total = totalSize
+        } else if items.count >= pageSize {
+            // totalSize 缺失时用「再多一页」哨兵，避免满页却被当成最后一页
+            total = startIndex + items.count + 1
+        } else {
+            total = startIndex + items.count
+        }
+
+        VanmoLogger.network.info(
+            "[Plex] Fetched \(items.count) episodes (total=\(total)) seasonKey=\(seasonRatingKey)"
+        )
+
+        return EpisodePage(items: items, totalRecordCount: total)
+    }
+
+    private static func mapEpisode(
+        _ meta: PlexMetadata,
+        seasonNumberOverride: Int?,
+        context: PlexSessionContext
+    ) -> EpisodeInfo? {
+        guard meta.type == "episode",
+              let key = meta.ratingKey,
+              let ep = meta.index,
+              let part = meta.media?.first?.part?.first,
+              let partKey = part.key else { return nil }
+
+        let season = seasonNumberOverride ?? meta.parentIndex
+        guard let season else { return nil }
+
+        let duration: TimeInterval = if let ms = meta.duration {
+            Double(ms) / 1000.0
+        } else {
+            0
+        }
+
+        let baseURLStr = context.baseURL.absoluteString
+        let stream = URL(string: "\(baseURLStr)\(partKey)?X-Plex-Token=\(context.token)")!
+
+        let backdropURL: URL? = (meta.art ?? meta.thumb).flatMap { path in
+            URL(string: "\(baseURLStr)\(path)?X-Plex-Token=\(context.token)")
+        }
+
+        return EpisodeInfo(
+            id: key,
+            title: meta.title,
+            seasonNumber: season,
+            episodeNumber: ep,
+            duration: duration,
+            overview: meta.summary,
+            streamURL: stream,
+            backdropURL: backdropURL
+        )
     }
 }

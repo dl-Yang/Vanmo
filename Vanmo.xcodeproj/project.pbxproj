@@ -178,7 +178,7 @@
 		2808E3F2654CF170151A05FD /* box.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = box.png; sourceTree = "<group>"; };
 		2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDesignTokens.swift; sourceTree = "<group>"; };
 		2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaTitleLogoView.swift; sourceTree = "<group>"; };
-		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F0583048E7F8AAC51FA8D37 /* MacScannedShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedShowDetailView.swift; sourceTree = "<group>"; };
 		39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedLibraryListView.swift; sourceTree = "<group>"; };
 		3A076FE8593DEDD875F5BAA8 /* MacHeaderToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacHeaderToolbar.swift; sourceTree = "<group>"; };
@@ -397,6 +397,7 @@
 				ABB1277459ADB58B16AE80D3 /* Vanmo-Mac-Cloud.entitlements */,
 				71988436A2BE54CD8F1B9240 /* Vanmo-Mac.entitlements */,
 				7DB3F5A4A74702FDE075935A /* App */,
+				C2D274BEEFDCEEFD74F5BF35 /* Debug */,
 				BF1D4228ED14E518DBC1CE71 /* Player */,
 				2FB2C1DEF5A6262D0413316B /* Resources */,
 				EF87CD5C79570DA682ABF3D4 /* Shared */,
@@ -734,6 +735,13 @@
 			path = Player;
 			sourceTree = "<group>";
 		};
+		C2D274BEEFDCEEFD74F5BF35 /* Debug */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Debug;
+			sourceTree = "<group>";
+		};
 		C4F6306D5A35C99BE819D9F9 /* Library */ = {
 			isa = PBXGroup;
 			children = (
@@ -898,6 +906,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = B7FBEDB4F0B23F058433D8EA /* Build configuration list for PBXNativeTarget "Vanmo-macOS" */;
 			buildPhases = (
+				6B49B9462B1EAE5A100A1CE5 /* Sanitize KSPlayer Frameworks */,
 				0EA76AAA0D323FB221780CDC /* Sources */,
 				87A3C2039462B79230C95F49 /* Resources */,
 				11C4D0ED6C81B1972E5304BC /* Frameworks */,
@@ -954,10 +963,10 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					0DF5C008C42D8CFE972C79FA = {
+						DevelopmentTeam = L775YJ7YS4;
 						ProvisioningStyle = Automatic;
 					};
 					0F6607F78A5C0B637140BEB4 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -1036,6 +1045,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		6B49B9462B1EAE5A100A1CE5 /* Sanitize KSPlayer Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Sanitize KSPlayer Frameworks";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Xcode 会并行 CodeSign embedded frameworks，早于 postBuild Fix 脚本。\n# 增量构建前先清掉根目录 _CodeSignature / 断链，避免 unsealed contents。\nFRAMEWORKS_DIR=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nif [ ! -d \"$FRAMEWORKS_DIR\" ]; then\n  exit 0\nfi\nfor FRAMEWORK in \"$FRAMEWORKS_DIR\"/*.framework; do\n  [ -d \"$FRAMEWORK\" ] || continue\n  [ -d \"$FRAMEWORK/Versions\" ] || continue\n  rm -rf \"$FRAMEWORK/_CodeSignature\"\n  for ENTRY in \"$FRAMEWORK\"/*; do\n    [ -L \"$ENTRY\" ] || continue\n    [ -e \"$ENTRY\" ] || rm -f \"$ENTRY\"\n  done\ndone\n";
+		};
 		B2AFDE599AF39B2D637347B5 /* Fix KSPlayer Framework Plist */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -1056,6 +1084,7 @@
 		};
 		E17699843D9863DFBABCE867 /* Fix KSPlayer Framework Plist */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -1070,7 +1099,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "FRAMEWORKS_DIR=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nif [ ! -d \"$FRAMEWORKS_DIR\" ]; then\n  exit 0\nfi\nfor FRAMEWORK in \"$FRAMEWORKS_DIR\"/*.framework; do\n  [ -d \"$FRAMEWORK\" ] || continue\n  if [ -f \"$FRAMEWORK/Info.plist\" ] && [ ! -d \"$FRAMEWORK/Versions\" ]; then\n    mkdir -p \"$FRAMEWORK/Versions/A/Resources\"\n    mv \"$FRAMEWORK/Info.plist\" \"$FRAMEWORK/Versions/A/Resources/Info.plist\"\n    if [ -d \"$FRAMEWORK/Headers\" ]; then\n      mv \"$FRAMEWORK/Headers\" \"$FRAMEWORK/Versions/A/Headers\"\n    fi\n    if [ -d \"$FRAMEWORK/Modules\" ]; then\n      mv \"$FRAMEWORK/Modules\" \"$FRAMEWORK/Versions/A/Modules\"\n    fi\n    BIN_NAME=\"$(defaults read \"$FRAMEWORK/Versions/A/Resources/Info.plist\" CFBundleExecutable 2>/dev/null || basename \"$FRAMEWORK\" .framework)\"\n    if [ -f \"$FRAMEWORK/$BIN_NAME\" ]; then\n      mv \"$FRAMEWORK/$BIN_NAME\" \"$FRAMEWORK/Versions/A/$BIN_NAME\"\n    fi\n    ln -sf A \"$FRAMEWORK/Versions/Current\"\n    ln -sf Versions/Current/Headers \"$FRAMEWORK/Headers\" 2>/dev/null || true\n    ln -sf Versions/Current/Modules \"$FRAMEWORK/Modules\" 2>/dev/null || true\n    ln -sf Versions/Current/Resources \"$FRAMEWORK/Resources\" 2>/dev/null || true\n    ln -sf Versions/Current/$BIN_NAME \"$FRAMEWORK/$BIN_NAME\" 2>/dev/null || true\n  fi\n  if [ -f \"$FRAMEWORK/Versions/Current/Resources/Info.plist\" ] || [ -f \"$FRAMEWORK/Resources/Info.plist\" ]; then\n    PLIST=\"${FRAMEWORK}/Versions/Current/Resources/Info.plist\"\n    [ -f \"$PLIST\" ] || PLIST=\"${FRAMEWORK}/Resources/Info.plist\"\n    /usr/libexec/PlistBuddy -c \"Set :CFBundleIdentifier com.kintan.ksplayer.$(basename \"$FRAMEWORK\" .framework | tr '[:upper:]' '[:lower:]')\" \"$PLIST\" 2>/dev/null || true\n  fi\n  if [ -d \"$FRAMEWORK/Versions\" ] && [ -d \"$FRAMEWORK/_CodeSignature\" ]; then\n    rm -rf \"$FRAMEWORK/_CodeSignature\"\n  fi\n  if [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n    /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none \"$FRAMEWORK\"\n  fi\ndone\n";
+			shellScript = "FRAMEWORKS_DIR=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nif [ ! -d \"$FRAMEWORKS_DIR\" ]; then\n  exit 0\nfi\nfor FRAMEWORK in \"$FRAMEWORKS_DIR\"/*.framework; do\n  [ -d \"$FRAMEWORK\" ] || continue\n  if [ -f \"$FRAMEWORK/Info.plist\" ] && [ ! -d \"$FRAMEWORK/Versions\" ]; then\n    mkdir -p \"$FRAMEWORK/Versions/A/Resources\"\n    mv \"$FRAMEWORK/Info.plist\" \"$FRAMEWORK/Versions/A/Resources/Info.plist\"\n    if [ -d \"$FRAMEWORK/Headers\" ]; then\n      mv \"$FRAMEWORK/Headers\" \"$FRAMEWORK/Versions/A/Headers\"\n    fi\n    if [ -d \"$FRAMEWORK/Modules\" ]; then\n      mv \"$FRAMEWORK/Modules\" \"$FRAMEWORK/Versions/A/Modules\"\n    fi\n    BIN_NAME=\"$(defaults read \"$FRAMEWORK/Versions/A/Resources/Info.plist\" CFBundleExecutable 2>/dev/null || basename \"$FRAMEWORK\" .framework)\"\n    if [ -f \"$FRAMEWORK/$BIN_NAME\" ]; then\n      mv \"$FRAMEWORK/$BIN_NAME\" \"$FRAMEWORK/Versions/A/$BIN_NAME\"\n    fi\n    ln -sf A \"$FRAMEWORK/Versions/Current\"\n    # 仅在目标存在时创建根目录符号链接；断链会被 codesign 视为 unsealed contents\n    [ -e \"$FRAMEWORK/Versions/Current/Headers\" ] && ln -sf Versions/Current/Headers \"$FRAMEWORK/Headers\"\n    [ -e \"$FRAMEWORK/Versions/Current/Modules\" ] && ln -sf Versions/Current/Modules \"$FRAMEWORK/Modules\"\n    [ -e \"$FRAMEWORK/Versions/Current/Resources\" ] && ln -sf Versions/Current/Resources \"$FRAMEWORK/Resources\"\n    [ -e \"$FRAMEWORK/Versions/Current/$BIN_NAME\" ] && ln -sf \"Versions/Current/$BIN_NAME\" \"$FRAMEWORK/$BIN_NAME\"\n  fi\n  if [ -f \"$FRAMEWORK/Versions/Current/Resources/Info.plist\" ] || [ -f \"$FRAMEWORK/Resources/Info.plist\" ]; then\n    PLIST=\"${FRAMEWORK}/Versions/Current/Resources/Info.plist\"\n    [ -f \"$PLIST\" ] || PLIST=\"${FRAMEWORK}/Resources/Info.plist\"\n    /usr/libexec/PlistBuddy -c \"Set :CFBundleIdentifier com.kintan.ksplayer.$(basename \"$FRAMEWORK\" .framework | tr '[:upper:]' '[:lower:]')\" \"$PLIST\" 2>/dev/null || true\n  fi\n  if [ -d \"$FRAMEWORK/Versions\" ]; then\n    # 根目录 _CodeSignature / 断链符号链接都会触发: unsealed contents present in the root directory\n    rm -rf \"$FRAMEWORK/_CodeSignature\"\n    for ENTRY in \"$FRAMEWORK\"/*; do\n      [ -L \"$ENTRY\" ] || continue\n      [ -e \"$ENTRY\" ] || rm -f \"$ENTRY\"\n    done\n  fi\n  if [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ] && [ \"${EXPANDED_CODE_SIGN_IDENTITY}\" != \"-\" ]; then\n    /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --timestamp=none \"$FRAMEWORK\"\n  fi\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1285,6 +1314,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = L775YJ7YS4;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",
@@ -1318,6 +1348,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = L775YJ7YS4;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",

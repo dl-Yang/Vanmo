@@ -263,7 +263,7 @@ struct MacMediaDetailView: View {
     }
 
     private var contentSection: some View {
-        VStack(alignment: .leading, spacing: 48) {
+        VStack(alignment: .leading, spacing: 28) {
             if let overview = displayOverview, !overview.isEmpty {
                 Text(overview)
                     .font(.system(size: 16))
@@ -285,69 +285,103 @@ struct MacMediaDetailView: View {
     private var episodesSection: some View {
         if item.mediaType == .tvShow {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Episodes")
-                    .font(MacDesignTokens.Typography.detailSectionTitle)
-                    .foregroundStyle(theme.primaryText)
-
-                if store.currentSeasonEpisodes.isEmpty {
-                    Text("暂无季集数据")
-                        .font(.subheadline)
-                        .foregroundStyle(theme.secondaryText)
-                } else {
+                
+                HStack{
+                    Text("剧集")
+                        .font(MacDesignTokens.Typography.detailSectionTitle)
+                        .foregroundStyle(theme.primaryText)
+                    
                     if store.seasonNumbers.count > 1 {
-                        Picker("Season", selection: Binding(
+                        Picker("", selection: Binding(
                             get: { store.selectedSeason ?? store.seasonNumbers.first ?? 1 },
-                            set: { store.selectedSeason = $0 }
+                            set: { season in
+                                Task {
+                                    await store.selectSeason(season, item: item, modelContext: modelContext)
+                                }
+                            }
                         )) {
                             ForEach(store.seasonNumbers, id: \.self) { season in
                                 Text("第 \(season) 季").tag(season)
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 400)
+                        .pickerStyle(.automatic)
                     }
+                }
 
-                    LazyVStack(spacing: 8) {
-                        ForEach(store.currentSeasonEpisodes) { episode in
-                            Button {
-                                let episodeItem = store.makeEpisodeItem(from: episode, show: item)
-                                appState.play(episodeItem)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Text("E\(episode.episodeNumber)")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(theme.secondaryText)
-                                        .frame(width: 32, alignment: .leading)
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(episode.title)
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(theme.primaryText)
-                                            .lineLimit(1)
-
-                                        if let overview = episode.overview, !overview.isEmpty {
-                                            Text(overview)
-                                                .font(.caption)
-                                                .foregroundStyle(theme.cardSubtitle)
-                                                .lineLimit(2)
+                if store.isLoadingEpisodes && store.currentSeasonEpisodes.isEmpty {
+                    LoadingIndicatorView()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 24)
+//                    ProgressView()
+//                        .frame(maxWidth: .infinity, alignment: .leading)
+//                        .padding(.vertical, 24)
+                } else if store.currentSeasonEpisodes.isEmpty {
+                    Text("暂无季集数据")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.secondaryText)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(alignment: .center, spacing: 16) {
+                            ForEach(store.currentSeasonEpisodes) { episode in
+                                episodeCard(episode)
+                                    .onAppear {
+                                        Task {
+                                            await loadMoreEpisodesIfNeeded(current: episode)
                                         }
                                     }
-
-                                    Spacer(minLength: 0)
-
-                                    Image(systemName: "play.circle")
-                                        .foregroundStyle(theme.secondaryText)
-                                }
-                                .padding(12)
-                                .background(theme.secondaryButtonBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .buttonStyle(.plain)
+
+                            if store.hasMoreEpisodes || store.isLoadingMoreEpisodes {
+                                LoadingIndicatorView()
+                                    .frame(width: 44, height: 112)
+                                    .onAppear {
+                                        Task {
+                                            await store.loadMoreEpisodes(item: item, modelContext: modelContext)
+                                        }
+                                    }
+                            }
                         }
+                        .padding(.horizontal,15)
                     }
+                    .frame(height: 172)
                 }
             }
         }
+    }
+
+    private func episodeCard(_ episode: EpisodeInfo) -> some View {
+        Button {
+            let episodeItem = store.makeEpisodeItem(from: episode, show: item)
+            appState.play(episodeItem)
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack {
+                    if let backdropURL = episode.backdropURL {
+                        MacRemoteImage(url: backdropURL)
+                    } else {
+                        theme.secondaryButtonBackground
+                    }
+                }
+                .frame(width: 200, height: 112)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 4)
+
+                Text(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : "\(episode.episodeNumber) \(episode.title)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(2)
+                    .frame(width: 200, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func loadMoreEpisodesIfNeeded(current episode: EpisodeInfo) async {
+        guard store.hasMoreEpisodes, !store.isLoadingMoreEpisodes, !store.isLoadingEpisodes else { return }
+        let episodes = store.currentSeasonEpisodes
+        guard let index = episodes.firstIndex(where: { $0.id == episode.id }) else { return }
+        guard index >= episodes.count - 4 else { return }
+        await store.loadMoreEpisodes(item: item, modelContext: modelContext)
     }
 
     @ViewBuilder
@@ -493,11 +527,11 @@ struct MacMediaDetailView: View {
     }
 
     private var episodeCountText: String {
-        let count = store.content?.episodes.count ?? 0
+        let count = store.episodeTotalCount
         if count == 0 {
             return "Episodes"
         }
-        return "\(count) Episodes"
+        return "本季 \(count) 集"
     }
 
     private var castMembers: [CastMemberDisplay] {
