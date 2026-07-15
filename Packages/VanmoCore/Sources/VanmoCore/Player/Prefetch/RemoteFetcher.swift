@@ -155,6 +155,16 @@ public final class RemoteFetcher {
         return try await session.data(for: request)
     }
 
+    /// 下载指定 Range 到系统临时文件。下载管理器使用此接口兼容忽略 Range、直接返回
+    /// 整文件的服务器，避免把大型视频一次性载入内存。
+    public func downloadFile(forInclusiveRange range: ClosedRange<Int64>) async throws -> (URL, URLResponse) {
+        var request = URLRequest(url: cleanURL)
+        request.setValue("bytes=\(range.lowerBound)-\(range.upperBound)", forHTTPHeaderField: "Range")
+        request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+        await apply(to: &request)
+        return try await session.download(for: request)
+    }
+
     public static func parseContentRangeTotal(_ header: String) -> Int64? {
         let parts = header.split(separator: "/", maxSplits: 1).map(String.init)
         guard parts.count == 2 else { return nil }

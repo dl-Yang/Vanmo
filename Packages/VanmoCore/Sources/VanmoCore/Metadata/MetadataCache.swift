@@ -114,7 +114,11 @@ public actor MetadataCache {
                                 overview: episode.overview,
                                 streamURL: episode.streamURL,
                                 backdropLocalPath: relative,
-                                backdropRemoteURL: episode.backdropRemoteURL
+                                backdropRemoteURL: episode.backdropRemoteURL,
+                                fileSize: episode.fileSize,
+                                originalFileName: episode.originalFileName,
+                                container: episode.container,
+                                remotePath: episode.remotePath
                             )
                         } catch {
                             VanmoLogger.metadata.error("[MetadataCache] episode backdrop download failed: \(error.localizedDescription)")

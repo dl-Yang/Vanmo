@@ -7,6 +7,7 @@ struct ContentView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
+    @EnvironmentObject private var downloadManager: DownloadManager
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -40,6 +41,8 @@ struct ContentView: View {
                         switch route {
                         case .appearance:
                             AppearanceSettingsView()
+                        case .downloads:
+                            DownloadManagementView()
                         }
                     }
             }
@@ -52,14 +55,20 @@ struct ContentView: View {
         .modifier(PlayerPresentationModifier())
         .task {
             connectionsViewModel.setModelContext(modelContext)
+            downloadManager.configure(modelContext: modelContext)
+            await downloadManager.restoreAndResume()
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
         }
         .onChange(of: scenePhase) { _, newPhase in
-            guard newPhase == .active else { return }
             Task {
-                await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
-                await connectionsViewModel.loadSavedConnections()
+                if newPhase == .active {
+                    downloadManager.resume()
+                    await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
+                    await connectionsViewModel.loadSavedConnections()
+                } else if newPhase == .background {
+                    await downloadManager.suspend()
+                }
             }
         }
     }
@@ -83,4 +92,5 @@ private struct PlayerPresentationModifier: ViewModifier {
         .environmentObject(AppState())
         .environmentObject(ConnectionsViewModel())
         .environmentObject(CloudSyncCoordinator.shared)
+        .environmentObject(DownloadManager.shared)
 }

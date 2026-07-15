@@ -5,6 +5,7 @@ import VanmoCore
 
 struct MediaDetailView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var downloadManager: DownloadManager
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -17,6 +18,9 @@ struct MediaDetailView: View {
     @State private var favoriteErrorMessage: String?
     @State private var activeSheet: MediaDetailSheet?
     @State private var isHeroPosterLoaded = false
+    @State private var isDownloadPickerPresented = false
+    @State private var selectedDownloadEpisodes: [String: EpisodeInfo] = [:]
+    @State private var downloadErrorMessage: String?
     @StateObject private var store = MediaDetailStore()
 
     /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
@@ -103,6 +107,30 @@ struct MediaDetailView: View {
             Text(favoriteErrorMessage ?? "")
         }
         .modifier(MediaDetailRefreshErrorPresenter(store: store))
+        .sheet(isPresented: $isDownloadPickerPresented) {
+            EpisodeDownloadPicker(
+                episodes: store.currentSeasonEpisodes,
+                seasonNumbers: store.seasonNumbers,
+                selectedSeason: store.selectedSeason,
+                selectedEpisodes: $selectedDownloadEpisodes,
+                isLoading: store.isLoadingEpisodes || store.isLoadingMoreEpisodes,
+                onSelectSeason: { season in
+                    Task {
+                        await store.selectSeason(season, item: item, modelContext: modelContext)
+                        await loadAllEpisodesForDownload()
+                    }
+                },
+                onConfirm: enqueueSelectedEpisodes
+            )
+        }
+        .alert("下载失败", isPresented: Binding(
+            get: { downloadErrorMessage != nil },
+            set: { if !$0 { downloadErrorMessage = nil } }
+        )) {
+            Button("确定") {}
+        } message: {
+            Text(downloadErrorMessage ?? "")
+        }
         .overlay {
             if let sheet = activeSheet {
                 modalOverlay(for: sheet)
@@ -443,6 +471,7 @@ struct MediaDetailView: View {
             isRefreshing: store.isRefreshingMetadata,
             supportsMetadataRefresh: store.supportsMetadataRefresh(for: item, in: modelContext),
             play: play,
+            download: beginDownload,
             refresh: { Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) } }
         )
     }
@@ -606,6 +635,66 @@ struct MediaDetailView: View {
         episodeItem.seriesId = item.serverId ?? item.seriesId
         episodeItem.sourceConnectionId = item.sourceConnectionId
         appState.play(episodeItem)
+    }
+
+    private func beginDownload() {
+        if item.mediaType == .tvShow {
+            selectedDownloadEpisodes.removeAll()
+            isDownloadPickerPresented = true
+            Task { await loadAllEpisodesForDownload() }
+        } else {
+            Task {
+                do {
+                    let request = try DownloadRequestFactory.make(
+                        from: item,
+                        connectionType: try sourceConnectionType()
+                    )
+                    try await downloadManager.enqueue(request)
+                } catch {
+                    downloadErrorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func loadAllEpisodesForDownload() async {
+        var remainingPages = 100
+        while store.hasMoreEpisodes, remainingPages > 0 {
+            await store.loadMoreEpisodes(item: item, modelContext: modelContext)
+            remainingPages -= 1
+        }
+    }
+
+    private func enqueueSelectedEpisodes() {
+        let episodes = selectedDownloadEpisodes.values.sorted {
+            ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber)
+        }
+        guard !episodes.isEmpty else { return }
+        Task {
+            do {
+                let connectionType = try sourceConnectionType()
+                for episode in episodes {
+                    let request = try DownloadRequestFactory.make(
+                        from: episode,
+                        show: item,
+                        connectionType: connectionType
+                    )
+                    try await downloadManager.enqueue(request)
+                }
+                isDownloadPickerPresented = false
+                selectedDownloadEpisodes.removeAll()
+            } catch {
+                downloadErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func sourceConnectionType() throws -> ConnectionType? {
+        guard let connectionId = item.sourceConnectionId else { return nil }
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        return try modelContext.fetch(descriptor).first?.type
     }
 
     private func makeCollectionItem(_ collection: ServerMediaItem) -> MediaItem {
@@ -1143,7 +1232,11 @@ final class MediaDetailStore: ObservableObject {
                 duration: episode.duration,
                 overview: episode.overview,
                 streamURL: episode.streamURL,
-                backdropURL: backdropURL
+                backdropURL: backdropURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath
             )
         }
     }
@@ -1323,6 +1416,7 @@ private struct MediaDetailPanelActions: View {
     let isRefreshing: Bool
     let supportsMetadataRefresh: Bool
     let play: () -> Void
+    let download: () -> Void
     let refresh: () -> Void
 
     var body: some View {
@@ -1343,7 +1437,7 @@ private struct MediaDetailPanelActions: View {
             }
             .buttonStyle(.plain)
 
-            circleAction(icon: "icon_download", isSystem: false) {}
+            circleAction(icon: "icon_download", isSystem: false, action: download)
 
             Menu {
                 if supportsMetadataRefresh {
@@ -1391,6 +1485,96 @@ private struct MediaDetailPanelActions: View {
             circleActionLabel(icon: icon, isSystem: isSystem)
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct EpisodeDownloadPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let episodes: [EpisodeInfo]
+    let seasonNumbers: [Int]
+    let selectedSeason: Int?
+    @Binding var selectedEpisodes: [String: EpisodeInfo]
+    let isLoading: Bool
+    let onSelectSeason: (Int) -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Picker("季", selection: Binding(
+                        get: { selectedSeason ?? seasonNumbers.first ?? 1 },
+                        set: onSelectSeason
+                    )) {
+                        ForEach(seasonNumbers, id: \.self) { season in
+                            Text("第 \(season) 季").tag(season)
+                        }
+                    }
+                    Button(allCurrentSeasonSelected ? "取消全选本季" : "全选本季") {
+                        toggleCurrentSeason()
+                    }
+                }
+
+                Section("选择剧集") {
+                    ForEach(episodes) { episode in
+                        Button {
+                            toggle(episode)
+                        } label: {
+                            HStack {
+                                Image(systemName: selectedEpisodes[episode.id] == nil ? "circle" : "checkmark.circle.fill")
+                                    .foregroundStyle(selectedEpisodes[episode.id] == nil ? .secondary : Color.vanmoAccent)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("第 \(episode.episodeNumber) 集 · \(episode.title)")
+                                        .foregroundStyle(.primary)
+                                    if episode.duration > 0 {
+                                        Text(episode.duration.shortDuration)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("选择下载剧集")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
+                        .disabled(selectedEpisodes.isEmpty || isLoading)
+                }
+            }
+        }
+    }
+
+    private var allCurrentSeasonSelected: Bool {
+        !episodes.isEmpty && episodes.allSatisfy { selectedEpisodes[$0.id] != nil }
+    }
+
+    private func toggle(_ episode: EpisodeInfo) {
+        if selectedEpisodes[episode.id] == nil {
+            selectedEpisodes[episode.id] = episode
+        } else {
+            selectedEpisodes.removeValue(forKey: episode.id)
+        }
+    }
+
+    private func toggleCurrentSeason() {
+        if allCurrentSeasonSelected {
+            episodes.forEach { selectedEpisodes.removeValue(forKey: $0.id) }
+        } else {
+            episodes.forEach { selectedEpisodes[$0.id] = $0 }
+        }
     }
 }
 

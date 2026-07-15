@@ -263,7 +263,11 @@ public actor MetadataRefreshCoordinator {
             overview: episode.overview,
             streamURL: episode.streamURL,
             backdropLocalPath: nil,
-            backdropRemoteURL: episode.backdropURL
+            backdropRemoteURL: episode.backdropURL,
+            fileSize: episode.fileSize,
+            originalFileName: episode.originalFileName,
+            container: episode.container,
+            remotePath: episode.remotePath
         )
     }
 

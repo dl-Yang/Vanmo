@@ -1809,10 +1809,29 @@ public struct EpisodeInfo: Identifiable, Sendable {
     public let overview: String?
     public let streamURL: URL
     public let backdropURL: URL?
+    public let fileSize: Int64
+    public let originalFileName: String?
+    public let container: String?
+    public let remotePath: String?
 
-    public init(id: String, title: String, seasonNumber: Int, episodeNumber: Int, duration: TimeInterval, overview: String?, streamURL: URL, backdropURL: URL?) {
+    public init(
+        id: String,
+        title: String,
+        seasonNumber: Int,
+        episodeNumber: Int,
+        duration: TimeInterval,
+        overview: String?,
+        streamURL: URL,
+        backdropURL: URL?,
+        fileSize: Int64 = 0,
+        originalFileName: String? = nil,
+        container: String? = nil,
+        remotePath: String? = nil
+    ) {
         self.id = id; self.title = title; self.seasonNumber = seasonNumber; self.episodeNumber = episodeNumber
         self.duration = duration; self.overview = overview; self.streamURL = streamURL; self.backdropURL = backdropURL
+        self.fileSize = fileSize; self.originalFileName = originalFileName; self.container = container
+        self.remotePath = remotePath
     }
 }
 
@@ -1977,7 +1996,7 @@ public enum EmbyEpisodeFetcher {
             resolvingAgainstBaseURL: false
         )!
         var queryItems = [
-            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags,ImageTags"),
+            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags,ImageTags,MediaSources"),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
             URLQueryItem(name: "Limit", value: String(pageSize)),
             URLQueryItem(name: "api_key", value: context.token),
@@ -2040,6 +2059,7 @@ public enum EmbyEpisodeFetcher {
             nil
         }
 
+        let source = item.mediaSources?.first
         return EpisodeInfo(
             id: item.id,
             title: item.name,
@@ -2048,7 +2068,11 @@ public enum EmbyEpisodeFetcher {
             duration: duration,
             overview: item.overview,
             streamURL: streamURL,
-            backdropURL: backdropURL
+            backdropURL: backdropURL,
+            fileSize: source?.size ?? 0,
+            originalFileName: source?.path.flatMap(EmbyService.extractFileName(from:)),
+            container: source?.container,
+            remotePath: item.id
         )
     }
 }

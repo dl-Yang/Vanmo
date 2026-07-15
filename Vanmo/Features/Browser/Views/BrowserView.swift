@@ -6,6 +6,7 @@ struct ConnectionsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var viewModel: ConnectionsViewModel
+    @EnvironmentObject private var downloadManager: DownloadManager
 
     /// 当前正在浏览的连接 ID。nil = 显示连接列表根页（Files-Light）；
     /// 非 nil = 进入该连接的文件 / 文件夹浏览页（Files-Folders(-Videos)-Light）。
@@ -224,6 +225,14 @@ struct ConnectionsView: View {
                 } label: {
                     Label("播放", systemImage: "play.fill")
                 }
+                if let connection = viewModel.selectedConnection,
+                   DownloadEligibility.isEligible(file: file, connectionType: connection.type) {
+                    Button {
+                        Task { await download(file, connection: connection) }
+                    } label: {
+                        Label("下载", systemImage: "arrow.down.circle")
+                    }
+                }
             }
         }
     }
@@ -363,6 +372,20 @@ struct ConnectionsView: View {
             if isIPTVBrowsing {
                 viewModel.markChannelPlaybackFailed(file)
             }
+            viewModel.errorMessage = error.localizedDescription
+            viewModel.showError = true
+        }
+    }
+
+    private func download(_ file: RemoteFile, connection: SavedConnection) async {
+        do {
+            let request = try DownloadRequestFactory.make(
+                from: file,
+                connectionId: connection.id,
+                connectionType: connection.type
+            )
+            try await downloadManager.enqueue(request)
+        } catch {
             viewModel.errorMessage = error.localizedDescription
             viewModel.showError = true
         }

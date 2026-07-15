@@ -163,6 +163,55 @@ public final class SMBService: RemoteFileService {
         }
     }
 
+    /// 从本地部分文件的实际长度继续读取 SMB 文件，供用户下载队列跨启动恢复。
+    public func downloadResuming(
+        file: RemoteFile,
+        to localURL: URL,
+        progress: @escaping (Int64, Int64) -> Void
+    ) async throws {
+        guard isConnected, let client else { throw NetworkError.notConnected }
+        let (shareName, subpath) = splitSharePath(file.path)
+        guard !shareName.isEmpty else { throw NetworkError.invalidURL }
+        try await ensureConnected(to: shareName, on: client)
+
+        if !FileManager.default.fileExists(atPath: localURL.path) {
+            FileManager.default.createFile(atPath: localURL.path, contents: nil)
+        }
+        let attributes = try? FileManager.default.attributesOfItem(atPath: localURL.path)
+        var offset = (attributes?[.size] as? NSNumber)?.uint64Value ?? 0
+        let expectedSize = file.size > 0 ? UInt64(file.size) : UInt64.max
+        if offset > expectedSize {
+            let handle = try FileHandle(forWritingTo: localURL)
+            try handle.truncate(atOffset: 0)
+            try handle.close()
+            offset = 0
+        }
+
+        let reader = client.fileReader(path: subpath)
+        defer { Task { try? await reader.close() } }
+        let destination = try FileHandle(forWritingTo: localURL)
+        defer { try? destination.close() }
+        try destination.seekToEnd()
+
+        let chunkSize: UInt32 = 4 * 1_024 * 1_024
+        while offset < expectedSize {
+            try Task.checkCancellation()
+            let remaining = expectedSize == UInt64.max
+                ? UInt64(chunkSize)
+                : min(UInt64(chunkSize), expectedSize - offset)
+            let data = try await reader.read(offset: offset, length: UInt32(remaining))
+            guard !data.isEmpty else { break }
+            try destination.write(contentsOf: data)
+            offset += UInt64(data.count)
+            progress(Int64(offset), file.size)
+        }
+        try destination.synchronize()
+
+        if file.size > 0, offset < UInt64(file.size) {
+            throw NetworkError.transferFailed("SMB 下载提前结束")
+        }
+    }
+
     // MARK: - Private
 
     private func ensureConnected(to share: String, on client: SMBClient) async throws {

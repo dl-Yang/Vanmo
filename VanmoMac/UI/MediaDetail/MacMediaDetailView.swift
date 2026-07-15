@@ -4,6 +4,7 @@ import VanmoCore
 
 struct MacMediaDetailView: View {
     @EnvironmentObject private var appState: MacAppState
+    @EnvironmentObject private var downloadManager: DownloadManager
     @Environment(\.modelContext) private var modelContext
     @Environment(\.macTheme) private var theme
     @AppStorage("metadata.autoDownload") private var metadataAutoDownload = true
@@ -12,6 +13,9 @@ struct MacMediaDetailView: View {
 
     @StateObject private var store = MacMediaDetailStore()
     @State private var mediaPurgeHandlerId: UUID?
+    @State private var isDownloadPickerPresented = false
+    @State private var selectedDownloadEpisodes: [String: EpisodeInfo] = [:]
+    @State private var downloadErrorMessage: String?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -57,6 +61,30 @@ struct MacMediaDetailView: View {
             Button("确定") {}
         } message: {
             Text(store.refreshErrorMessage ?? "")
+        }
+        .alert("下载失败", isPresented: Binding(
+            get: { downloadErrorMessage != nil },
+            set: { if !$0 { downloadErrorMessage = nil } }
+        )) {
+            Button("确定") {}
+        } message: {
+            Text(downloadErrorMessage ?? "")
+        }
+        .sheet(isPresented: $isDownloadPickerPresented) {
+            MacEpisodeDownloadPicker(
+                episodes: store.currentSeasonEpisodes,
+                seasonNumbers: store.seasonNumbers,
+                selectedSeason: store.selectedSeason,
+                selectedEpisodes: $selectedDownloadEpisodes,
+                isLoading: store.isLoadingEpisodes || store.isLoadingMoreEpisodes,
+                onSelectSeason: { season in
+                    Task {
+                        await store.selectSeason(season, item: item, modelContext: modelContext)
+                        await loadAllEpisodesForDownload()
+                    }
+                },
+                onConfirm: enqueueSelectedEpisodes
+            )
         }
     }
 
@@ -186,6 +214,7 @@ struct MacMediaDetailView: View {
             .buttonStyle(.plain)
 
             favoriteButton
+            downloadButton
             watchedButton
             moreMenu
         }
@@ -212,6 +241,19 @@ struct MacMediaDetailView: View {
         .buttonStyle(.plain)
         .disabled(store.isUpdatingFavorite)
         .help(store.isFavorite ? "取消收藏" : "收藏")
+    }
+
+    private var downloadButton: some View {
+        Button(action: beginDownload) {
+            Image(systemName: "arrow.down")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(theme.primaryText)
+                .frame(width: 40, height: 40)
+                .background(theme.secondaryButtonBackground)
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(item.mediaType == .tvShow ? "选择剧集下载" : "下载")
     }
 
     private var watchedButton: some View {
@@ -558,13 +600,164 @@ struct MacMediaDetailView: View {
             if !isPresented { store.refreshErrorMessage = nil }
         }
     }
+
+    private func beginDownload() {
+        if item.mediaType == .tvShow {
+            selectedDownloadEpisodes.removeAll()
+            isDownloadPickerPresented = true
+            Task { await loadAllEpisodesForDownload() }
+        } else {
+            Task {
+                do {
+                    let request = try DownloadRequestFactory.make(
+                        from: item,
+                        connectionType: try sourceConnectionType()
+                    )
+                    try await downloadManager.enqueue(request)
+                } catch {
+                    downloadErrorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func loadAllEpisodesForDownload() async {
+        var remainingPages = 100
+        while store.hasMoreEpisodes, remainingPages > 0 {
+            await store.loadMoreEpisodes(item: item, modelContext: modelContext)
+            remainingPages -= 1
+        }
+    }
+
+    private func enqueueSelectedEpisodes() {
+        let episodes = selectedDownloadEpisodes.values.sorted {
+            ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber)
+        }
+        guard !episodes.isEmpty else { return }
+        Task {
+            do {
+                let connectionType = try sourceConnectionType()
+                for episode in episodes {
+                    let request = try DownloadRequestFactory.make(
+                        from: episode,
+                        show: item,
+                        connectionType: connectionType
+                    )
+                    try await downloadManager.enqueue(request)
+                }
+                isDownloadPickerPresented = false
+                selectedDownloadEpisodes.removeAll()
+            } catch {
+                downloadErrorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func sourceConnectionType() throws -> ConnectionType? {
+        guard let connectionId = item.sourceConnectionId else { return nil }
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        return try modelContext.fetch(descriptor).first?.type
+    }
 }
 
 #Preview {
     MacMediaDetailView(item: MacMediaDetailPreviewItem.make())
         .environmentObject(MacAppState())
+        .environmentObject(DownloadManager.shared)
         .macTheme(.dark)
         .frame(width: 1214, height: 836)
+}
+
+private struct MacEpisodeDownloadPicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let episodes: [EpisodeInfo]
+    let seasonNumbers: [Int]
+    let selectedSeason: Int?
+    @Binding var selectedEpisodes: [String: EpisodeInfo]
+    let isLoading: Bool
+    let onSelectSeason: (Int) -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("选择下载剧集")
+                    .font(.title2.bold())
+                Spacer()
+                Picker("季", selection: Binding(
+                    get: { selectedSeason ?? seasonNumbers.first ?? 1 },
+                    set: onSelectSeason
+                )) {
+                    ForEach(seasonNumbers, id: \.self) { season in
+                        Text("第 \(season) 季").tag(season)
+                    }
+                }
+                .frame(width: 120)
+            }
+            .padding()
+
+            HStack {
+                Button(allCurrentSeasonSelected ? "取消全选本季" : "全选本季") {
+                    toggleCurrentSeason()
+                }
+                Spacer()
+                if isLoading { ProgressView().controlSize(.small) }
+            }
+            .padding(.horizontal)
+
+            List {
+                ForEach(Array(episodes.enumerated()), id: \.offset) { _, episode in
+                    Button {
+                        toggle(episode)
+                    } label: {
+                        HStack {
+                            Image(systemName: selectedEpisodes[episode.id] == nil ? "circle" : "checkmark.circle.fill")
+                            Text("第 \(episode.episodeNumber) 集 · \(episode.title)")
+                            Spacer()
+                            if episode.duration > 0 {
+                                Text(MacFormatters.formatDuration(episode.duration))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button("取消") { dismiss() }
+                Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(selectedEpisodes.isEmpty || isLoading)
+            }
+            .padding()
+        }
+        .frame(minWidth: 520, minHeight: 480)
+    }
+
+    private var allCurrentSeasonSelected: Bool {
+        !episodes.isEmpty && episodes.allSatisfy { selectedEpisodes[$0.id] != nil }
+    }
+
+    private func toggle(_ episode: EpisodeInfo) {
+        if selectedEpisodes[episode.id] == nil {
+            selectedEpisodes[episode.id] = episode
+        } else {
+            selectedEpisodes.removeValue(forKey: episode.id)
+        }
+    }
+
+    private func toggleCurrentSeason() {
+        if allCurrentSeasonSelected {
+            episodes.forEach { selectedEpisodes.removeValue(forKey: $0.id) }
+        } else {
+            episodes.forEach { selectedEpisodes[$0.id] = $0 }
+        }
+    }
 }
 
 private struct MacMediaDetailTitleLogoView: View {

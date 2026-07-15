@@ -16,6 +16,40 @@ public struct CachedEpisodeInfo: Codable, Sendable, Identifiable {
     public let streamURL: URL
     public let backdropLocalPath: String?
     public let backdropRemoteURL: URL?
+    public let fileSize: Int64?
+    public let originalFileName: String?
+    public let container: String?
+    public let remotePath: String?
+
+    public init(
+        id: String,
+        title: String,
+        seasonNumber: Int,
+        episodeNumber: Int,
+        duration: TimeInterval,
+        overview: String?,
+        streamURL: URL,
+        backdropLocalPath: String?,
+        backdropRemoteURL: URL?,
+        fileSize: Int64? = nil,
+        originalFileName: String? = nil,
+        container: String? = nil,
+        remotePath: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
+        self.duration = duration
+        self.overview = overview
+        self.streamURL = streamURL
+        self.backdropLocalPath = backdropLocalPath
+        self.backdropRemoteURL = backdropRemoteURL
+        self.fileSize = fileSize
+        self.originalFileName = originalFileName
+        self.container = container
+        self.remotePath = remotePath
+    }
 
     public func makeEpisodeInfo(rootDirectory: URL) -> EpisodeInfo {
         let backdropURL: URL?
@@ -33,7 +67,11 @@ public struct CachedEpisodeInfo: Codable, Sendable, Identifiable {
             duration: duration,
             overview: overview,
             streamURL: streamURL,
-            backdropURL: backdropURL
+            backdropURL: backdropURL,
+            fileSize: fileSize ?? 0,
+            originalFileName: originalFileName,
+            container: container,
+            remotePath: remotePath
         )
     }
 }

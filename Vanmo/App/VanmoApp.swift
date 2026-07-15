@@ -20,6 +20,7 @@ struct VanmoApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var connectionsViewModel = ConnectionsViewModel()
     @StateObject private var cloudSyncCoordinator = CloudSyncCoordinator.shared
+    @StateObject private var downloadManager = DownloadManager.shared
     @UIApplicationDelegateAdaptor(VanmoAppDelegate.self) private var appDelegate
     @AppStorage(ColorTheme.storageKey) private var theme: ColorTheme = .system
 
@@ -31,6 +32,7 @@ struct VanmoApp: App {
                 .environmentObject(appState)
                 .environmentObject(connectionsViewModel)
                 .environmentObject(cloudSyncCoordinator)
+                .environmentObject(downloadManager)
                 .preferredColorScheme(theme.preferredColorScheme)
                 .id(theme)
         }

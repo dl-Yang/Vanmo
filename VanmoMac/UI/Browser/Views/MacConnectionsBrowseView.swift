@@ -6,6 +6,7 @@ struct MacConnectionsBrowseView: View {
     @EnvironmentObject private var appState: MacAppState
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @EnvironmentObject private var searchViewModel: MacSearchViewModel
+    @EnvironmentObject private var downloadManager: DownloadManager
     @Environment(\.macTheme) private var theme
 
     var body: some View {
@@ -221,6 +222,15 @@ struct MacConnectionsBrowseView: View {
                 Label("播放", systemImage: "play.fill")
             }
 
+            if let connection = connectionsViewModel.selectedConnection,
+               DownloadEligibility.isEligible(file: file, connectionType: connection.type) {
+                Button {
+                    Task { await download(file, connection: connection) }
+                } label: {
+                    Label("下载", systemImage: "arrow.down.circle")
+                }
+            }
+
             if connectionsViewModel.selectedConnection?.type == .localFolder {
                 Button {
                     Task { await quickLook(file) }
@@ -355,6 +365,20 @@ struct MacConnectionsBrowseView: View {
 
     private func play(_ file: RemoteFile) async {
         await connectionsViewModel.play(file, via: appState)
+    }
+
+    private func download(_ file: RemoteFile, connection: SavedConnection) async {
+        do {
+            let request = try DownloadRequestFactory.make(
+                from: file,
+                connectionId: connection.id,
+                connectionType: connection.type
+            )
+            try await downloadManager.enqueue(request)
+        } catch {
+            connectionsViewModel.errorMessage = error.localizedDescription
+            connectionsViewModel.showError = true
+        }
     }
 
     private func quickLook(_ file: RemoteFile) async {

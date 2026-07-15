@@ -19,6 +19,7 @@ struct VanmoMacApp: App {
     @StateObject private var libraryViewModel = MacLibraryViewModel()
     @StateObject private var connectionsViewModel = MacConnectionsViewModel()
     @StateObject private var searchViewModel = MacSearchViewModel()
+    @StateObject private var downloadManager = DownloadManager.shared
 
     var sharedModelContainer: ModelContainer = ModelContainerFactory.makeSharedContainer()
 
@@ -30,6 +31,7 @@ struct VanmoMacApp: App {
                 .environmentObject(libraryViewModel)
                 .environmentObject(connectionsViewModel)
                 .environmentObject(searchViewModel)
+                .environmentObject(downloadManager)
                 .frame(minWidth: 960, minHeight: 640)
         }
         .windowStyle(.hiddenTitleBar)
@@ -86,6 +88,15 @@ struct VanmoMacApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
+
+        WindowGroup("下载", id: "downloads") {
+            MacDownloadManagementView()
+                .environmentObject(downloadManager)
+                .environmentObject(appState)
+                .frame(minWidth: 560, minHeight: 480)
+        }
+        .modelContainer(sharedModelContainer)
+        .defaultSize(width: 680, height: 620)
 
         MenuBarExtra {
             if appState.isPlayerPresented {

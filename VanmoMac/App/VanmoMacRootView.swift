@@ -8,6 +8,7 @@ struct VanmoMacRootView: View {
     @EnvironmentObject private var connectionsViewModel: MacConnectionsViewModel
     @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
+    @EnvironmentObject private var downloadManager: DownloadManager
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
@@ -81,6 +82,8 @@ struct VanmoMacRootView: View {
             connectionsViewModel.setModelContext(modelContext)
             libraryViewModel.setModelContext(modelContext)
             searchViewModel.setModelContext(modelContext)
+            downloadManager.configure(modelContext: modelContext)
+            await downloadManager.restoreAndResume()
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
             await connectionsViewModel.loadSavedConnections()
@@ -88,12 +91,16 @@ struct VanmoMacRootView: View {
             await refreshLibrarySections()
         }
         .onChange(of: scenePhase) { _, newPhase in
-            guard newPhase == .active else { return }
             Task {
-                await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
-                await connectionsViewModel.loadSavedConnections()
-                searchViewModel.setConnections(connectionsViewModel.savedConnections)
-                await refreshLibrarySections()
+                if newPhase == .active {
+                    downloadManager.resume()
+                    await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
+                    await connectionsViewModel.loadSavedConnections()
+                    searchViewModel.setConnections(connectionsViewModel.savedConnections)
+                    await refreshLibrarySections()
+                } else if newPhase == .background {
+                    await downloadManager.suspend()
+                }
             }
         }
         .onChange(of: connectionsViewModel.savedConnections.map(\.id)) { _, _ in

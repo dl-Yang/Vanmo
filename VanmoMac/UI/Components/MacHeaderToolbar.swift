@@ -53,6 +53,7 @@ struct MacLibraryViewControls: View {
 struct MacSidebarToggleButton: View {
     @EnvironmentObject private var appState: MacAppState
     @Environment(\.macTheme) private var theme
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         HStack(spacing:0){
@@ -70,8 +71,7 @@ struct MacSidebarToggleButton: View {
             .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
            
             Button {
-                //todo check
-//                appState.contentRoute =
+                openWindow(id: "downloads")
             } label: {
                 Image(systemName: "arrow.left")
                     .font(.system(size: 14, weight: .medium))

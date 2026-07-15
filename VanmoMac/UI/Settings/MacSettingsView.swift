@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import VanmoCore
 
@@ -5,6 +6,8 @@ struct MacSettingsView: View {
     @StateObject private var viewModel = MacSettingsViewModel()
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
     @EnvironmentObject private var appState: MacAppState
+    @EnvironmentObject private var downloadManager: DownloadManager
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.macTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
 
@@ -224,6 +227,20 @@ struct MacSettingsView: View {
 
     private var storageSection: some View {
         settingsSection(title: "Storage", systemImage: "internaldrive") {
+            settingsRow(label: "下载位置", value: downloadManager.destination.rootPath)
+
+            HStack {
+                Button("下载管理") {
+                    openWindow(id: "downloads")
+                }
+                Button("选择下载目录") {
+                    chooseDownloadDirectory()
+                }
+                Button("恢复默认目录") {
+                    downloadManager.useDefaultDirectory()
+                }
+            }
+
             settingsRow(label: "缓存大小", value: viewModel.cacheSize)
 
             Button("清除缓存") {
@@ -273,12 +290,167 @@ struct MacSettingsView: View {
                 .foregroundStyle(theme.secondaryText)
         }
     }
+
+    private func chooseDownloadDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "选择"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try downloadManager.setCustomDirectory(url)
+        } catch {
+            let alert = NSAlert(error: error)
+            alert.runModal()
+        }
+    }
+}
+
+struct MacDownloadManagementView: View {
+    @EnvironmentObject private var downloadManager: DownloadManager
+    @EnvironmentObject private var appState: MacAppState
+    @Environment(\.macTheme) private var theme
+    @State private var selection: Set<UUID> = []
+    @State private var confirmsDeletion = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("下载")
+                    .font(.title2.bold())
+                Spacer()
+                if !selection.isEmpty {
+                    Button("删除所选", role: .destructive) {
+                        confirmsDeletion = true
+                    }
+                }
+            }
+            .padding()
+
+            if downloadManager.tasks.isEmpty {
+                ContentUnavailableView("暂无下载", systemImage: "arrow.down.circle")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List(downloadManager.tasks, selection: $selection) { task in
+                    MacDownloadTaskRow(
+                        task: task,
+                        play: { play(task) },
+                        reveal: { reveal(task) },
+                        retry: { Task { await downloadManager.retry(task.id) } }
+                    )
+                    .tag(task.id)
+                }
+            }
+        }
+        .background(theme.appBackground)
+        .confirmationDialog("删除选中的下载？", isPresented: $confirmsDeletion) {
+            Button("删除文件和记录", role: .destructive) {
+                Task {
+                    await downloadManager.delete(selection)
+                    selection.removeAll()
+                }
+            }
+            Button("取消", role: .cancel) {}
+        }
+    }
+
+    private func play(_ task: DownloadTaskSnapshot) {
+        guard task.status == .completed,
+              let url = try? downloadManager.completedFileURL(for: task.id),
+              FileManager.default.fileExists(atPath: url.path) else { return }
+        let item = MediaItem(
+            title: task.request.displayTitle,
+            fileURL: url,
+            mediaType: task.request.mediaType,
+            fileSize: task.totalBytes
+        )
+        item.showTitle = task.request.showTitle
+        item.seasonNumber = task.request.seasonNumber
+        item.episodeNumber = task.request.episodeNumber
+        item.episodeTitle = task.request.episodeTitle
+        appState.play(item)
+    }
+
+    private func reveal(_ task: DownloadTaskSnapshot) {
+        guard let url = try? downloadManager.completedFileURL(for: task.id) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+}
+
+private struct MacDownloadTaskRow: View {
+    let task: DownloadTaskSnapshot
+    let play: () -> Void
+    let reveal: () -> Void
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: task.status == .completed ? "checkmark.circle.fill" : "arrow.down.circle")
+                .foregroundStyle(task.status == .failed ? .red : .blue)
+                .font(.title2)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(task.request.displayTitle)
+                    .font(.headline)
+                    .lineLimit(1)
+                HStack {
+                    Text(statusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if task.totalBytes > 0 {
+                        Text(ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if task.status == .queued || task.status == .downloading {
+                    ProgressView(value: task.totalBytes > 0 ? task.progress : nil)
+                }
+                if let errorMessage = task.errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            Spacer()
+            if task.status == .completed {
+                Button("播放", action: play)
+                Button {
+                    reveal()
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .help("在 Finder 中显示")
+            } else if task.status == .failed {
+                Button("重新下载", action: retry)
+            }
+        }
+        .padding(.vertical, 6)
+        .contextMenu {
+            if task.status == .completed {
+                Button("播放", action: play)
+                Button("在 Finder 中显示", action: reveal)
+            } else if task.status == .failed {
+                Button("重新下载", action: retry)
+            }
+        }
+    }
+
+    private var statusText: String {
+        switch task.status {
+        case .queued: return "等待中"
+        case .downloading: return task.totalBytes > 0 ? "\(Int(task.progress * 100))%" : "下载中"
+        case .completed: return "已完成"
+        case .failed: return "下载失败"
+        }
+    }
 }
 
 #Preview {
     MacSettingsView()
         .environmentObject(CloudSyncCoordinator.shared)
         .environmentObject(MacAppState())
+        .environmentObject(DownloadManager.shared)
         .macTheme(.dark)
         .frame(width: 800, height: 900)
 }

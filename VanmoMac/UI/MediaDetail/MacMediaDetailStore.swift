@@ -469,7 +469,11 @@ final class MacMediaDetailStore: ObservableObject {
                 duration: episode.duration,
                 overview: episode.overview,
                 streamURL: episode.streamURL,
-                backdropURL: cachedEpisode.backdropURL
+                backdropURL: cachedEpisode.backdropURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath
             )
         }
     }

@@ -995,7 +995,11 @@ public enum PlexEpisodeFetcher {
             duration: duration,
             overview: meta.summary,
             streamURL: stream,
-            backdropURL: backdropURL
+            backdropURL: backdropURL,
+            fileSize: part.size ?? 0,
+            originalFileName: part.file.flatMap(PlexService.extractFileName(from:)),
+            container: part.container,
+            remotePath: partKey
         )
     }
 }

@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
 /// Settings tab 内的导航路由。
 enum SettingsRoute: Hashable {
     case appearance
+    case downloads
 }
 
 enum AppTab: Int, CaseIterable {
