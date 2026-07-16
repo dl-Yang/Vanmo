@@ -35,6 +35,7 @@ public enum DownloadError: LocalizedError {
 
 public struct DownloadRequest: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
+    public let postUrl: URL?
     public let sourceConnectionId: UUID?
     public let connectionType: ConnectionType?
     public let remotePath: String
@@ -51,6 +52,7 @@ public struct DownloadRequest: Codable, Hashable, Identifiable, Sendable {
     public init(
         id: UUID = UUID(),
         sourceConnectionId: UUID?,
+        postUrl: URL? = nil,
         connectionType: ConnectionType?,
         remotePath: String,
         sourceFileURL: URL? = nil,
@@ -76,6 +78,7 @@ public struct DownloadRequest: Codable, Hashable, Identifiable, Sendable {
         self.seasonNumber = seasonNumber
         self.episodeNumber = episodeNumber
         self.episodeTitle = episodeTitle
+        self.postUrl = postUrl
     }
 
     public var sourceKey: String {

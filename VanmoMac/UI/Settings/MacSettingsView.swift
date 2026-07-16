@@ -310,40 +310,34 @@ struct MacSettingsView: View {
 struct MacDownloadManagementView: View {
     @EnvironmentObject private var downloadManager: DownloadManager
     @EnvironmentObject private var appState: MacAppState
-    @Environment(\.macTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selection: Set<UUID> = []
     @State private var confirmsDeletion = false
 
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("下载")
-                    .font(.title2.bold())
-                Spacer()
-                if !selection.isEmpty {
-                    Button("删除所选", role: .destructive) {
-                        confirmsDeletion = true
-                    }
-                }
-            }
-            .padding()
+    private var theme: MacThemeColors {
+        appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme) ? .dark : .light
+    }
 
-            if downloadManager.tasks.isEmpty {
-                ContentUnavailableView("暂无下载", systemImage: "arrow.down.circle")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(downloadManager.tasks, selection: $selection) { task in
-                    MacDownloadTaskRow(
-                        task: task,
-                        play: { play(task) },
-                        reveal: { reveal(task) },
-                        retry: { Task { await downloadManager.retry(task.id) } }
-                    )
-                    .tag(task.id)
+    private var isDark: Bool {
+        appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme)
+    }
+
+    var body: some View {
+        ZStack {
+            MacVibrancyBackground(isDark: isDark, blendingMode: .behindWindow)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                headerBar
+
+                if downloadManager.tasks.isEmpty {
+                    emptyState
+                } else {
+                    taskList
                 }
             }
         }
-        .background(theme.appBackground)
+        .macTheme(theme)
         .confirmationDialog("删除选中的下载？", isPresented: $confirmsDeletion) {
             Button("删除文件和记录", role: .destructive) {
                 Task {
@@ -353,6 +347,136 @@ struct MacDownloadManagementView: View {
             }
             Button("取消", role: .cancel) {}
         }
+    }
+
+    private var headerBar: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("下载")
+                    .font(MacDesignTokens.Typography.sectionTitle)
+                    .foregroundStyle(theme.primaryText)
+                Text(summaryText)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(theme.secondaryText)
+            }
+
+            Spacer(minLength: 12)
+
+            if !selection.isEmpty {
+                deleteSelectionButton
+            }
+        }
+        .padding(.leading, MacDesignTokens.Layout.trafficLightsLeadingInset)
+        .padding(.trailing, MacDesignTokens.Layout.downloadContentPadding)
+        .padding(.top, MacDesignTokens.Layout.trafficLightsTopInset + 12)
+        .padding(.bottom, 16)
+    }
+
+    @ViewBuilder
+    private var deleteSelectionButton: some View {
+        let label = "删除所选 (\(selection.count))"
+        if #available(macOS 26.0, *) {
+            Button(label, role: .destructive) {
+                confirmsDeletion = true
+            }
+            .buttonStyle(.glass)
+            .controlSize(.regular)
+            .tint(.red)
+        } else {
+            Button(label, role: .destructive) {
+                confirmsDeletion = true
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+        }
+    }
+
+    private var summaryText: String {
+        let total = downloadManager.tasks.count
+        guard total > 0 else { return "暂无任务" }
+        let active = downloadManager.tasks.filter {
+            $0.status == .downloading || $0.status == .queued
+        }.count
+        let failed = downloadManager.tasks.filter { $0.status == .failed }.count
+        if active > 0 {
+            return "\(total) 项 · \(active) 进行中"
+        }
+        if failed > 0 {
+            return "\(total) 项 · \(failed) 失败"
+        }
+        return "\(total) 项 · 全部完成"
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 20) {
+            Spacer(minLength: 0)
+
+            emptyIcon
+                .padding(.bottom, 8)
+
+            Text("暂无下载")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(theme.primaryText)
+
+            Text("从媒体详情或文件浏览器发起下载后，任务会显示在这里。")
+                .font(.system(size: 13))
+                .foregroundStyle(theme.secondaryText)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 280)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.bottom, 40)
+    }
+
+    private var emptyIcon: some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        return ZStack {
+            if #available(macOS 26.0, *) {
+                Color.clear
+                    .frame(width: 88, height: 88)
+                    .glassEffect(.regular.tint(MacDesignTokens.accentBlue.opacity(0.18)), in: shape)
+            } else {
+                shape
+                    .fill(theme.emptyIconBackground)
+                    .frame(width: 88, height: 88)
+                    .overlay {
+                        shape.stroke(theme.emptyIconBorder, lineWidth: 1)
+                    }
+            }
+
+            Image(systemName: "arrow.down.circle")
+                .font(.system(size: 34, weight: .light))
+                .foregroundStyle(MacDesignTokens.accentBlue)
+        }
+    }
+
+    private var taskList: some View {
+        List(selection: $selection) {
+            ForEach(downloadManager.tasks) { task in
+                MacDownloadTaskRow(
+                    task: task,
+                    isSelected: selection.contains(task.id),
+                    isDark: isDark,
+                    play: { play(task) },
+                    reveal: { reveal(task) },
+                    retry: { Task { await downloadManager.retry(task.id) } }
+                )
+                .tag(task.id)
+                .listRowInsets(EdgeInsets(
+                    top: 6,
+                    leading: MacDesignTokens.Layout.downloadContentPadding,
+                    bottom: 6,
+                    trailing: MacDesignTokens.Layout.downloadContentPadding
+                ))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .scrollIndicators(.automatic)
     }
 
     private func play(_ task: DownloadTaskSnapshot) {
@@ -379,53 +503,64 @@ struct MacDownloadManagementView: View {
 }
 
 private struct MacDownloadTaskRow: View {
+    @Environment(\.macTheme) private var theme
+
     let task: DownloadTaskSnapshot
+    let isSelected: Bool
+    let isDark: Bool
     let play: () -> Void
     let reveal: () -> Void
     let retry: () -> Void
 
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: MacDesignTokens.Radius.downloadCard, style: .continuous)
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: task.status == .completed ? "checkmark.circle.fill" : "arrow.down.circle")
-                .foregroundStyle(task.status == .failed ? .red : .blue)
-                .font(.title2)
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: MacDesignTokens.Layout.downloadRowSpacing) {
+            poster
+
+            VStack(alignment: .leading, spacing: 8) {
                 Text(task.request.displayTitle)
-                    .font(.headline)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
-                HStack {
-                    Text(statusText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if task.totalBytes > 0 {
-                        Text(ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    statusBadge
+                    if let detailText {
+                        Text(detailText)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(theme.secondaryText)
+                            .lineLimit(1)
                     }
                 }
+
                 if task.status == .queued || task.status == .downloading {
                     ProgressView(value: task.totalBytes > 0 ? task.progress : nil)
+                        .tint(MacDesignTokens.accentBlue)
+                        .controlSize(.small)
                 }
+
                 if let errorMessage = task.errorMessage {
                     Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(MacDesignTokens.ratingRed)
+                        .lineLimit(2)
                 }
             }
-            Spacer()
-            if task.status == .completed {
-                Button("播放", action: play)
-                Button {
-                    reveal()
-                } label: {
-                    Image(systemName: "folder")
-                }
-                .help("在 Finder 中显示")
-            } else if task.status == .failed {
-                Button("重新下载", action: retry)
-            }
+
+            Spacer(minLength: 8)
+
+            actionButtons
         }
-        .padding(.vertical, 6)
+        .padding(14)
+        .background { cardBackground }
+        .overlay {
+            cardShape
+                .strokeBorder(borderColor, lineWidth: 1)
+        }
+        .contentShape(cardShape)
         .contextMenu {
             if task.status == .completed {
                 Button("播放", action: play)
@@ -436,21 +571,157 @@ private struct MacDownloadTaskRow: View {
         }
     }
 
+    private var poster: some View {
+        MacRemoteImage(url: task.request.postUrl)
+            .frame(
+                width: MacDesignTokens.Layout.downloadWidth,
+                height: MacDesignTokens.Layout.downloadHeight
+            )
+            .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.downloadPoster, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: MacDesignTokens.Radius.downloadPoster, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(isDark ? 0.18 : 0.08), lineWidth: 1)
+            }
+    }
+
+    private var statusBadge: some View {
+        Text(statusText)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(statusForeground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(statusTint, in: Capsule())
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        if task.status == .completed {
+            if #available(macOS 26.0, *) {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Button("播放", action: play)
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.small)
+                            .tint(MacDesignTokens.accentBlue)
+
+                        Button(action: reveal) {
+                            Image(systemName: "folder")
+                        }
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
+                        .help("在 Finder 中显示")
+                    }
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Button("播放", action: play)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    Button(action: reveal) {
+                        Image(systemName: "folder")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("在 Finder 中显示")
+                }
+            }
+        } else if task.status == .failed {
+            if #available(macOS 26.0, *) {
+                Button("重新下载", action: retry)
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+                    .tint(MacDesignTokens.accentBlue)
+            } else {
+                Button("重新下载", action: retry)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cardBackground: some View {
+        let tint = isSelected
+            ? MacDesignTokens.accentBlue.opacity(isDark ? 0.22 : 0.12)
+            : (isDark ? Color.white.opacity(0.06) : Color.white.opacity(0.55))
+
+        if #available(macOS 26.0, *) {
+            Color.clear
+                .glassEffect(.regular.tint(tint), in: cardShape)
+        } else {
+            cardShape
+                .fill(isSelected ? MacDesignTokens.accentBlue.opacity(0.1) : theme.secondaryButtonBackground)
+                .background(.ultraThinMaterial, in: cardShape)
+        }
+    }
+
+    private var borderColor: Color {
+        if isSelected {
+            return MacDesignTokens.accentBlue.opacity(0.45)
+        }
+        return isDark ? Color.white.opacity(0.08) : Color.black.opacity(0.06)
+    }
+
+    private var detailText: String? {
+        if let season = task.request.seasonNumber, let episode = task.request.episodeNumber {
+            var parts = ["S\(season)E\(episode)"]
+            if let episodeTitle = task.request.episodeTitle, !episodeTitle.isEmpty {
+                parts.append(episodeTitle)
+            }
+            return parts.joined(separator: " · ")
+        }
+        if task.totalBytes > 0 {
+            if task.status == .downloading || task.status == .queued {
+                let received = ByteCountFormatter.string(fromByteCount: task.receivedBytes, countStyle: .file)
+                let total = ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file)
+                return "\(received) / \(total)"
+            }
+            return ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file)
+        }
+        return nil
+    }
+
     private var statusText: String {
         switch task.status {
         case .queued: return "等待中"
         case .downloading: return task.totalBytes > 0 ? "\(Int(task.progress * 100))%" : "下载中"
         case .completed: return "已完成"
-        case .failed: return "下载失败"
+        case .failed: return "失败"
+        }
+    }
+
+    private var statusTint: Color {
+        switch task.status {
+        case .queued: return theme.secondaryText.opacity(0.2)
+        case .downloading: return MacDesignTokens.accentBlue.opacity(0.28)
+        case .completed: return Color.green.opacity(0.28)
+        case .failed: return MacDesignTokens.ratingRed.opacity(0.28)
+        }
+    }
+
+    private var statusForeground: Color {
+        switch task.status {
+        case .queued: return theme.secondaryText
+        case .downloading: return MacDesignTokens.accentBlue
+        case .completed: return Color.green
+        case .failed: return MacDesignTokens.ratingRed
         }
     }
 }
 
-#Preview {
+#Preview("Settings") {
     MacSettingsView()
         .environmentObject(CloudSyncCoordinator.shared)
         .environmentObject(MacAppState())
         .environmentObject(DownloadManager.shared)
         .macTheme(.dark)
         .frame(width: 800, height: 900)
+}
+
+#Preview("Downloads") {
+    MacDownloadManagementView()
+        .environmentObject(MacAppState())
+        .environmentObject(DownloadManager.shared)
+        .macTheme(.dark)
+        .frame(width: 720, height: 640)
 }

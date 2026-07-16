@@ -32,6 +32,10 @@ enum MacDesignTokens {
         static let addConnectionSidebarWidth: CGFloat = 220
         static let addConnectionContentWidth: CGFloat = 500
         static let addConnectionRadius: CGFloat = 10
+        static let downloadWidth: CGFloat = 96
+        static let downloadHeight: CGFloat = 54
+        static let downloadRowSpacing: CGFloat = 12
+        static let downloadContentPadding: CGFloat = 20
     }
 
     enum Radius {
@@ -40,6 +44,8 @@ enum MacDesignTokens {
         static let segmentedSegment: CGFloat = 6
         static let poster: CGFloat = 12
         static let continueWatching: CGFloat = 12
+        static let downloadCard: CGFloat = 16
+        static let downloadPoster: CGFloat = 10
         static let chip: CGFloat = 6
         static let circularButton: CGFloat = 20
         static let playButton: CGFloat = 22

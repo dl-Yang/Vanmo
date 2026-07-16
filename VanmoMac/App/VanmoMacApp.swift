@@ -93,10 +93,11 @@ struct VanmoMacApp: App {
             MacDownloadManagementView()
                 .environmentObject(downloadManager)
                 .environmentObject(appState)
-                .frame(minWidth: 560, minHeight: 480)
+                .frame(minWidth: 600, minHeight: 520)
         }
+        .windowStyle(.hiddenTitleBar)
         .modelContainer(sharedModelContainer)
-        .defaultSize(width: 680, height: 620)
+        .defaultSize(width: 720, height: 640)
 
         MenuBarExtra {
             if appState.isPlayerPresented {

@@ -88,12 +88,20 @@ struct MacMediaDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var skeletonView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Rectangle()
-                .fill(theme.secondaryButtonBackground)
-                .frame(height: MacDesignTokens.Layout.heroHeight)
-                .frame(maxWidth: .infinity)
+            Group {
+                if #available(macOS 26.0, *) {
+                    Color.clear
+                        .glassEffect(.regular.tint(theme.secondaryButtonBackground), in: Rectangle())
+                } else {
+                    Rectangle()
+                        .fill(theme.secondaryButtonBackground)
+                }
+            }
+            .frame(height: MacDesignTokens.Layout.heroHeight)
+            .frame(maxWidth: .infinity)
 
             VStack(alignment: .leading, spacing: 24) {
                 skeletonBar(width: 320, height: 32)
@@ -192,13 +200,55 @@ struct MacMediaDetailView: View {
     }
 
     private var actionButtons: some View {
-        HStack(spacing: 16) {
-            Button {
-                let startPosition = UserDefaults.standard.bool(forKey: "playback.resumePlayback")
-                    ? item.lastPlaybackPosition
-                    : 0
-                appState.play(item, from: startPosition)
-            } label: {
+        Group {
+            if #available(macOS 26.0, *) {
+                GlassEffectContainer(spacing: 16) {
+                    HStack(spacing: 16) {
+                        playButton
+                        favoriteButton
+                        downloadButton
+                        watchedButton
+                        moreMenu
+                    }
+                }
+            } else {
+                HStack(spacing: 16) {
+                    playButton
+                    favoriteButton
+                    downloadButton
+                    watchedButton
+                    moreMenu
+                }
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private var playButton: some View {
+        let action = {
+            let startPosition = UserDefaults.standard.bool(forKey: "playback.resumePlayback")
+                ? item.lastPlaybackPosition
+                : 0
+            appState.play(item, from: startPosition)
+        }
+
+        if #available(macOS 26.0, *) {
+            Button(action: action) {
+                HStack(spacing: 8) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Play")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .padding(.horizontal, 16)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(MacDesignTokens.accentBlue)
+            .controlSize(.large)
+            .buttonBorderShape(.capsule)
+        } else {
+            Button(action: action) {
                 HStack(spacing: 8) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 16, weight: .semibold))
@@ -212,74 +262,122 @@ struct MacMediaDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.playButton))
             }
             .buttonStyle(.plain)
-
-            favoriteButton
-            downloadButton
-            watchedButton
-            moreMenu
         }
-        .padding(.top, 8)
     }
 
+    @ViewBuilder
     private var favoriteButton: some View {
-        Button {
-            Task { await store.toggleFavorite(for: item, modelContext: modelContext) }
-        } label: {
-            ZStack {
-                if store.isUpdatingFavorite {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: store.isFavorite ? "heart.fill" : "heart")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(store.isFavorite ? .red : theme.primaryText)
+        let isFav = store.isFavorite
+        let action: () -> Void = { Task { await store.toggleFavorite(for: item, modelContext: modelContext) } }
+
+        Group {
+            if #available(macOS 26.0, *) {
+                Button(action: action) {
+                    if store.isUpdatingFavorite {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: isFav ? "heart.fill" : "heart")
+                            .font(.system(size: 16, weight: .medium))
+                    }
                 }
+                .buttonStyle(.glass)
+                .tint(isFav ? Color.red : Color.primary)
+                .controlSize(.large)
+                .buttonBorderShape(.circle)
+            } else {
+                Button(action: action) {
+                    ZStack {
+                        if store.isUpdatingFavorite {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: isFav ? "heart.fill" : "heart")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(isFav ? .red : theme.primaryText)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
+                    .background(theme.secondaryButtonBackground)
+                    .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .frame(width: 40, height: 40)
-            .background(theme.secondaryButtonBackground)
-            .clipShape(Circle())
         }
-        .buttonStyle(.plain)
         .disabled(store.isUpdatingFavorite)
-        .help(store.isFavorite ? "取消收藏" : "收藏")
+        .help(isFav ? "取消收藏" : "收藏")
     }
 
+    @ViewBuilder
     private var downloadButton: some View {
-        Button(action: beginDownload) {
-            Image(systemName: "arrow.down")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(theme.primaryText)
-                .frame(width: 40, height: 40)
-                .background(theme.secondaryButtonBackground)
-                .clipShape(Circle())
+        let action = beginDownload
+
+        Group {
+            if #available(macOS 26.0, *) {
+                Button(action: action) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 16, weight: .medium))
+                }
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .buttonBorderShape(.circle)
+            } else {
+                Button(action: action) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(theme.primaryText)
+                        .frame(width: 40, height: 40)
+                        .background(theme.secondaryButtonBackground)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
         .help(item.mediaType == .tvShow ? "选择剧集下载" : "下载")
     }
 
+    @ViewBuilder
     private var watchedButton: some View {
-        Button {
-            Task { await store.toggleWatched(for: item, modelContext: modelContext) }
-        } label: {
-            ZStack {
-                if store.isUpdatingWatched {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: item.isWatched ? "checkmark.circle.fill" : "checkmark")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(item.isWatched ? MacDesignTokens.accentBlue : theme.primaryText)
+        let isWatched = item.isWatched
+        let action: () -> Void = { Task { await store.toggleWatched(for: item, modelContext: modelContext) } }
+
+        Group {
+            if #available(macOS 26.0, *) {
+                Button(action: action) {
+                    if store.isUpdatingWatched {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: isWatched ? "checkmark.circle.fill" : "checkmark")
+                            .font(.system(size: 16, weight: .medium))
+                    }
                 }
+                .buttonStyle(.glass)
+                .tint(isWatched ? MacDesignTokens.accentBlue : Color.primary)
+                .controlSize(.large)
+                .buttonBorderShape(.circle)
+            } else {
+                Button(action: action) {
+                    ZStack {
+                        if store.isUpdatingWatched {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: isWatched ? "checkmark.circle.fill" : "checkmark")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(isWatched ? MacDesignTokens.accentBlue : theme.primaryText)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
+                    .background(theme.secondaryButtonBackground)
+                    .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
             }
-            .frame(width: 40, height: 40)
-            .background(theme.secondaryButtonBackground)
-            .clipShape(Circle())
         }
-        .buttonStyle(.plain)
         .disabled(store.isUpdatingWatched)
-        .help(item.isWatched ? "标记未看" : "标记已看")
+        .help(isWatched ? "标记未看" : "标记已看")
     }
 
+    @ViewBuilder
     private var moreMenu: some View {
-        Menu {
+        let menuContent = Group {
             Button {
                 Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) }
             } label: {
@@ -292,16 +390,34 @@ struct MacMediaDetailView: View {
             } label: {
                 Label(item.isWatched ? "标记未看" : "标记已看", systemImage: "checkmark.circle")
             }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(theme.primaryText)
-                .frame(width: 40, height: 40)
-                .background(theme.secondaryButtonBackground)
-                .clipShape(Circle())
         }
-        .menuStyle(.borderlessButton)
-        .help("更多")
+
+        if #available(macOS 26.0, *) {
+            Menu {
+                menuContent
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .menuStyle(.borderlessButton)
+            .buttonStyle(.glass)
+            .controlSize(.large)
+            .buttonBorderShape(.circle)
+            .help("更多")
+        } else {
+            Menu {
+                menuContent
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(theme.primaryText)
+                    .frame(width: 40, height: 40)
+                    .background(theme.secondaryButtonBackground)
+                    .clipShape(Circle())
+            }
+            .menuStyle(.borderlessButton)
+            .help("更多")
+        }
     }
 
     private var contentSection: some View {
@@ -504,38 +620,67 @@ struct MacMediaDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var backButton: some View {
-        Button {
-            appState.closeDetail()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "chevron.left")
-                Text("Back")
-                    .font(.system(size: 14, weight: .medium))
+        let action = { appState.closeDetail() }
+        
+        Group {
+            if #available(macOS 26.0, *) {
+                Button(action: action) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .buttonStyle(.glass)
+                .controlSize(.regular)
+                .buttonBorderShape(.capsule)
+            } else {
+                Button(action: action) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left")
+                        Text("Back")
+                            .font(.system(size: 14, weight: .medium))
+                    }
+                    .foregroundStyle(theme.primaryText)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(theme.secondaryButtonBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
             }
-            .foregroundStyle(theme.primaryText)
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .background(theme.secondaryButtonBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
         .padding(.top, 12)
     }
 
+    @ViewBuilder
     private func metadataChip(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(theme.chipText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(theme.chipBackground)
-            .overlay {
-                RoundedRectangle(cornerRadius: MacDesignTokens.Radius.chip)
-                    .stroke(theme.chipBorder, lineWidth: 1)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.chip))
+        if #available(macOS 26.0, *) {
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.chipText)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background {
+                    Color.clear.glassEffect(.regular.tint(theme.chipBackground), in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.chip))
+                }
+        } else {
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.chipText)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(theme.chipBackground)
+                .overlay {
+                    RoundedRectangle(cornerRadius: MacDesignTokens.Radius.chip)
+                        .stroke(theme.chipBorder, lineWidth: 1)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.chip))
+        }
     }
 
     private var metadataDot: some View {
@@ -730,9 +875,16 @@ private struct MacEpisodeDownloadPicker: View {
             HStack {
                 Spacer()
                 Button("取消") { dismiss() }
-                Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(selectedEpisodes.isEmpty || isLoading)
+                if #available(macOS 26.0, *) {
+                    Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
+                        .buttonStyle(.glassProminent)
+                        .tint(MacDesignTokens.accentBlue)
+                        .disabled(selectedEpisodes.isEmpty || isLoading)
+                } else {
+                    Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(selectedEpisodes.isEmpty || isLoading)
+                }
             }
             .padding()
         }
