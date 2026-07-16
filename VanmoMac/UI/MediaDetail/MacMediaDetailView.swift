@@ -29,8 +29,6 @@ struct MacMediaDetailView: View {
                     }
                 }
             }
-
-            backButton
         }
         .background(theme.appBackground)
         .task(id: detailItemKey) {
@@ -281,7 +279,7 @@ struct MacMediaDetailView: View {
                     }
                 }
                 .buttonStyle(.glass)
-                .tint(isFav ? Color.red : Color.primary)
+//                .tint(isFav ? Color.red : Color.primary)
                 .controlSize(.large)
                 .buttonBorderShape(.circle)
             } else {
@@ -350,7 +348,7 @@ struct MacMediaDetailView: View {
                     }
                 }
                 .buttonStyle(.glass)
-                .tint(isWatched ? MacDesignTokens.accentBlue : Color.primary)
+//                .tint(isWatched ? MacDesignTokens.accentBlue : Color.primary)
                 .controlSize(.large)
                 .buttonBorderShape(.circle)
             } else {
@@ -618,43 +616,6 @@ struct MacMediaDetailView: View {
                 }
             }
         }
-    }
-
-    @ViewBuilder
-    private var backButton: some View {
-        let action = { appState.closeDetail() }
-        
-        Group {
-            if #available(macOS 26.0, *) {
-                Button(action: action) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .padding(.horizontal, 4)
-                }
-                .buttonStyle(.glass)
-                .controlSize(.regular)
-                .buttonBorderShape(.capsule)
-            } else {
-                Button(action: action) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    .foregroundStyle(theme.primaryText)
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
-                    .background(theme.secondaryButtonBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .padding(.top, 12)
     }
 
     @ViewBuilder

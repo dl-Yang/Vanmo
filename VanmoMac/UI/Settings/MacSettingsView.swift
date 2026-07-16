@@ -313,6 +313,7 @@ struct MacDownloadManagementView: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var selection: Set<UUID> = []
     @State private var confirmsDeletion = false
+    @State private var isSelectionMode = false
 
     private var theme: MacThemeColors {
         appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme) ? .dark : .light
@@ -342,7 +343,10 @@ struct MacDownloadManagementView: View {
             Button("删除文件和记录", role: .destructive) {
                 Task {
                     await downloadManager.delete(selection)
-                    selection.removeAll()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        selection.removeAll()
+                        isSelectionMode = false
+                    }
                 }
             }
             Button("取消", role: .cancel) {}
@@ -362,8 +366,42 @@ struct MacDownloadManagementView: View {
 
             Spacer(minLength: 12)
 
-            if !selection.isEmpty {
-                deleteSelectionButton
+            if isSelectionMode {
+                if !selection.isEmpty {
+                    deleteSelectionButton
+                }
+
+                let allSelected = !downloadManager.tasks.isEmpty && selection.count == downloadManager.tasks.count
+                Button(allSelected ? "取消全选" : "全选") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        if allSelected {
+                            selection.removeAll()
+                        } else {
+                            selection = Set(downloadManager.tasks.map { $0.id })
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                Button("取消") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        isSelectionMode = false
+                        selection.removeAll()
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+            } else {
+                if !downloadManager.tasks.isEmpty {
+                    Button("选择") {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isSelectionMode = true
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                }
             }
         }
         .padding(.leading, MacDesignTokens.Layout.trafficLightsLeadingInset)
@@ -453,15 +491,23 @@ struct MacDownloadManagementView: View {
     }
 
     private var taskList: some View {
-        List(selection: $selection) {
+        List {
             ForEach(downloadManager.tasks) { task in
                 MacDownloadTaskRow(
                     task: task,
                     isSelected: selection.contains(task.id),
+                    isSelectionMode: isSelectionMode,
                     isDark: isDark,
                     play: { play(task) },
                     reveal: { reveal(task) },
-                    retry: { Task { await downloadManager.retry(task.id) } }
+                    retry: { Task { await downloadManager.retry(task.id) } },
+                    toggleSelection: {
+                        if selection.contains(task.id) {
+                            selection.remove(task.id)
+                        } else {
+                            selection.insert(task.id)
+                        }
+                    }
                 )
                 .tag(task.id)
                 .listRowInsets(EdgeInsets(
@@ -507,10 +553,12 @@ private struct MacDownloadTaskRow: View {
 
     let task: DownloadTaskSnapshot
     let isSelected: Bool
+    let isSelectionMode: Bool
     let isDark: Bool
     let play: () -> Void
     let reveal: () -> Void
     let retry: () -> Void
+    let toggleSelection: () -> Void
 
     private var cardShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: MacDesignTokens.Radius.downloadCard, style: .continuous)
@@ -518,6 +566,14 @@ private struct MacDownloadTaskRow: View {
 
     var body: some View {
         HStack(spacing: MacDesignTokens.Layout.downloadRowSpacing) {
+            if isSelectionMode {
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(isSelected ? MacDesignTokens.accentBlue : theme.secondaryText.opacity(0.5))
+                    .padding(.leading, 8)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
             poster
 
             VStack(alignment: .leading, spacing: 8) {
@@ -552,7 +608,10 @@ private struct MacDownloadTaskRow: View {
 
             Spacer(minLength: 8)
 
-            actionButtons
+            if !isSelectionMode {
+                actionButtons
+                    .transition(.opacity)
+            }
         }
         .padding(14)
         .background { cardBackground }
@@ -561,6 +620,11 @@ private struct MacDownloadTaskRow: View {
                 .strokeBorder(borderColor, lineWidth: 1)
         }
         .contentShape(cardShape)
+        .onTapGesture {
+            if isSelectionMode {
+                toggleSelection()
+            }
+        }
         .contextMenu {
             if task.status == .completed {
                 Button("播放", action: play)
