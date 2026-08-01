@@ -253,7 +253,7 @@ final class SearchViewModel: ObservableObject {
         for file in files {
             do {
                 try Task.checkCancellation()
-                let streamURL = try await service.streamURL(for: file)
+                let streamURL = PlaybackURLResolver.storageURL(for: file, service: service)
                 hits.append(
                     RemoteFileHit(
                         name: file.name,

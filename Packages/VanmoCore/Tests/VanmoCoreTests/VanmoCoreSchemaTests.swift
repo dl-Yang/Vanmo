@@ -13,6 +13,16 @@ final class VanmoCoreSchemaTests: XCTestCase {
         XCTAssertEqual(ConnectionType.webdav.defaultPort, 80)
         XCTAssertTrue(ConnectionType.googleDrive.supportsOAuthLogin)
         XCTAssertFalse(ConnectionType.smb.supportsOAuthLogin)
+        XCTAssertTrue(ConnectionType.googleDrive.requiresManualDirectorySync)
+        XCTAssertTrue(ConnectionType.baiduNetdisk.requiresManualDirectorySync)
+        XCTAssertTrue(ConnectionType.smb.requiresManualDirectorySync)
+        XCTAssertTrue(ConnectionType.webdav.requiresManualDirectorySync)
+        XCTAssertTrue(ConnectionType.localFolder.requiresManualDirectorySync)
+        XCTAssertFalse(ConnectionType.emby.requiresManualDirectorySync)
+        XCTAssertFalse(ConnectionType.jellyfin.requiresManualDirectorySync)
+        XCTAssertFalse(ConnectionType.plex.requiresManualDirectorySync)
+        XCTAssertFalse(ConnectionType.iptv.requiresManualDirectorySync)
+        XCTAssertFalse(ConnectionType.dlna.requiresManualDirectorySync)
     }
 
     func testRemoteFileTypeFromFilename() {

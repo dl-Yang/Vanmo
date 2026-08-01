@@ -10,6 +10,8 @@ struct VanmoApp: App {
     init() {
         OAuthCoordinator.shared.presentationContextProvider = UIKitOAuthPresentationContextProvider.shared
         PrefetchTemporaryStore.cleanupOrphans()
+        MediaProbeBootstrap.configure()
+        ScanBackgroundTask.register()
         Task {
             await OnlineSubtitleService.shared.register(OpenSubtitlesProvider())
             await OnlineSubtitleService.shared.register(ShooterSubtitleProvider())

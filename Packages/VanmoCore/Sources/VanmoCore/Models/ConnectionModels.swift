@@ -149,6 +149,17 @@ public enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendabl
         isOAuthCloudDrive || isImplicitOAuthCloudDrive
     }
 
+    /// connect 后仅建立连接与浏览；须用户选定目录后手动触发递归同步入库（Infuse Favorite 模型）。
+    /// 媒体服务器（Plex/Emby/Jellyfin）与 IPTV/DLNA 仍保留原有 connect 同步行为。
+    public var requiresManualDirectorySync: Bool {
+        switch self {
+        case .emby, .jellyfin, .plex, .iptv, .dlna:
+            return false
+        default:
+            return true
+        }
+    }
+
     /// 是否需要在每个流媒体 Range 请求上都带 `Authorization: Bearer`（即没有可匿名访问的
     /// 预签名直链）。目前只有 Google Drive 需要；OneDrive/Box/pCloud/Yandex.Disk 的
     /// `streamURL(for:)` 都会直接换取到一段时间内可匿名访问的直链，无需在播放期间持续带 token。
@@ -296,6 +307,12 @@ public struct RemoteFile: Identifiable, Hashable, Sendable {
     public var logoURL: URL? = nil
     /// IPTV EPG 关联 ID（来自 EXTINF 的 tvg-id），仅 IPTV 来源填充。
     public var tvgId: String? = nil
+    /// 协议提供的稳定文件 ID（如云盘 fileId）。
+    public var stableId: String? = nil
+    /// WebDAV/云盘 etag 或版本号。
+    public var contentVersion: String? = nil
+    /// 远端 MIME 类型（若协议提供）。
+    public var mimeType: String? = nil
 
     public init(
         name: String,
@@ -306,7 +323,10 @@ public struct RemoteFile: Identifiable, Hashable, Sendable {
         type: RemoteFileType,
         groupTitle: String? = nil,
         logoURL: URL? = nil,
-        tvgId: String? = nil
+        tvgId: String? = nil,
+        stableId: String? = nil,
+        contentVersion: String? = nil,
+        mimeType: String? = nil
     ) {
         self.name = name
         self.path = path
@@ -317,6 +337,9 @@ public struct RemoteFile: Identifiable, Hashable, Sendable {
         self.groupTitle = groupTitle
         self.logoURL = logoURL
         self.tvgId = tvgId
+        self.stableId = stableId
+        self.contentVersion = contentVersion
+        self.mimeType = mimeType
     }
 
     public var isVideo: Bool { type == .video }

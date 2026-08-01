@@ -7,6 +7,7 @@ public enum ModelContainerFactory {
     public static let localSchema = Schema([
         MediaItem.self,
         PlaybackRecord.self,
+        ScanJobRecord.self,
     ])
 
     public static let cloudSchema = Schema([
@@ -21,6 +22,7 @@ public enum ModelContainerFactory {
         PlaybackRecord.self,
         FolderBookmark.self,
         CloudMediaState.self,
+        ScanJobRecord.self,
     ])
 
     /// 共享 SwiftData 容器：

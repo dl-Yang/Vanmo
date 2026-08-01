@@ -33,6 +33,8 @@ struct MacLibraryHomeView: View {
             libraryViewModel.setModelContext(modelContext)
         }
         .task {
+            // loadInitialSections 内部有 hasLoadedInitial guard，重活只在冷启动执行一次；
+            // 连接/书签刷新轻量且带等价保护，内容不变不会触发重绘。
             await connectionsViewModel.loadSavedConnections()
             await libraryViewModel.loadInitialSections(connections: connectionsViewModel.savedConnections)
             libraryViewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)

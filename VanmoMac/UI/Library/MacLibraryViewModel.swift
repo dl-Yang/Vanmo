@@ -32,6 +32,8 @@ final class MacLibraryViewModel: ObservableObject {
     private let folderPreviewPageSize = 12
     private let homeCollectionCache = MacHomeCollectionCache.shared
     private var modelContext: ModelContext?
+    /// 本次启动是否已完成初始加载；refreshAfterLibrarySync/loadInitialSections 成功后置位，
+    /// 避免冷启动 RootView 与 HomeView 两条路径重复加载。
     private var hasLoadedInitial = false
     private var hasRefreshedLiveThisLaunch = false
     private var hasRestoredHomeCacheThisLaunch = false
@@ -107,7 +109,6 @@ final class MacLibraryViewModel: ObservableObject {
             try loadScannedLibraries(connections: connections, in: context)
             try loadFolderBookmarks(connections: connections, in: context)
             await restoreHomeCacheIfNeeded(connections: connections)
-            reloadSectionItems(filter: .all, section: .home)
             updateLibraryEmptyState(connections: connections)
 
             if !hasRefreshedLiveThisLaunch {
@@ -134,7 +135,7 @@ final class MacLibraryViewModel: ObservableObject {
         }
     }
 
-    func refreshAfterLibrarySync(connections: [SavedConnection]) async {
+    func refreshAfterLibrarySync(connections: [SavedConnection], refreshEmbyLive: Bool = true) async {
         guard let context = modelContext else { return }
 
         // 冷启动时 RootView 可能先于 HomeView 触发刷新：先恢复磁盘缓存，避免首屏空白/更旧数据。
@@ -143,16 +144,19 @@ final class MacLibraryViewModel: ObservableObject {
         }
 
         do {
-            await refreshEmbyAndPersist(
-                connections: connections,
-                in: context,
-                refreshFolderPreviews: true
-            )
-            hasRefreshedLiveThisLaunch = true
+            if refreshEmbyLive {
+                await refreshEmbyAndPersist(
+                    connections: connections,
+                    in: context,
+                    refreshFolderPreviews: true
+                )
+                hasRefreshedLiveThisLaunch = true
+            }
             try await reloadHighlights(in: context)
             try loadScannedLibraries(connections: connections, in: context)
             try loadFolderBookmarks(connections: connections, in: context)
             updateLibraryEmptyState(connections: connections)
+            hasLoadedInitial = true
         } catch {
             errorMessage = error.localizedDescription
             showError = true
@@ -189,7 +193,8 @@ final class MacLibraryViewModel: ObservableObject {
     }
 
     func reload(filter: MacLibraryFilter = .all, section: MacSidebarSection = .home) {
-        reloadSectionItems(filter: filter, section: section)
+        // sectionItems 目前无 UI 消费者，这里不做主线程全量 fetch + 排序，
+        // 只更新空态判断，避免每次切换 filter/section/sortOption 时卡顿。
         if let connections = currentConnectionsSnapshot() {
             updateLibraryEmptyState(connections: connections)
         }
@@ -852,8 +857,20 @@ final class MacLibraryViewModel: ObservableObject {
         let descriptor = FetchDescriptor<FolderBookmark>(
             sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
         )
-        folderBookmarks = try context.fetch(descriptor).filter { bookmark in
+        let fetched = try context.fetch(descriptor).filter { bookmark in
             bookmark.deletedAt == nil && activeConnectionIds.contains(bookmark.connectionId)
+        }
+        // 内容未变化时跳过赋值，避免无谓的 objectWillChange 引发整页重绘。
+        guard !areBookmarksEquivalent(folderBookmarks, fetched) else { return }
+        folderBookmarks = fetched
+    }
+
+    private func areBookmarksEquivalent(_ lhs: [FolderBookmark], _ rhs: [FolderBookmark]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        return zip(lhs, rhs).allSatisfy { left, right in
+            left.persistentModelID == right.persistentModelID
+                && left.title == right.title
+                && left.path == right.path
         }
     }
 

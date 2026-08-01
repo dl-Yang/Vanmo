@@ -275,6 +275,7 @@ public final class WebDAVService: RemoteFileService {
                 <D:getcontentlength/>
                 <D:getlastmodified/>
                 <D:getcontenttype/>
+                <D:getetag/>
             </D:prop>
         </D:propfind>
         """
@@ -329,6 +330,8 @@ public final class WebDAVService: RemoteFileService {
             let modified = modifiedText.flatMap { rfc1123.date(from: $0) }
                 ?? modifiedText.flatMap { iso8601.date(from: $0) }
 
+            let etag = pickElementText(prop, candidates: ["D:getetag", "d:getetag", "getetag"])
+
             let displayName = pickElementText(prop, candidates: ["D:displayname", "d:displayname", "displayname"])
 
             let fallbackName = serverPath
@@ -347,7 +350,8 @@ public final class WebDAVService: RemoteFileService {
                     size: size,
                     isDirectory: isDirectory,
                     modifiedDate: modified,
-                    type: fileType
+                    type: fileType,
+                    contentVersion: etag
                 )
             )
         }

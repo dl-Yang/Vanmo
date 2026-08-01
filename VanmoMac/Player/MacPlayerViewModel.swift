@@ -1490,33 +1490,25 @@ final class MacPlayerViewModel: ObservableObject {
     }
 
     private func resolveCloudDriveStreamURLIfNeeded(_ url: URL) async -> URL {
-        guard let connectionId = item.sourceConnectionId,
-              let serverPath = item.serverId,
+        guard PlaybackURLResolver.isPlaceholder(url),
+              let connectionId = item.sourceConnectionId,
               let modelContext else { return url }
 
         let descriptor = FetchDescriptor<SavedConnection>(
             predicate: #Predicate { $0.id == connectionId }
         )
-        guard let connection = try? modelContext.fetch(descriptor).first,
-              connection.type.supportsOAuthLogin,
-              !connection.type.requiresBearerStreaming else {
+        guard let connection = try? modelContext.fetch(descriptor).first else {
             return url
         }
 
         let service = RemoteServiceFactory.create(for: connection.type)
         do {
-            try await service.connect(config: ConnectionConfig(from: connection))
-            let placeholder = RemoteFile(
-                name: item.originalFileName ?? url.lastPathComponent,
-                path: serverPath,
-                size: item.fileSize,
-                isDirectory: false,
-                modifiedDate: nil,
-                type: .video
-            )
-            return try await service.streamURL(for: placeholder)
+            let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+            try await service.connect(config: ConnectionConfig(from: connection, password: password))
+            defer { Task { await service.disconnect() } }
+            return try await PlaybackURLResolver.resolvePlaybackURL(item: item, service: service)
         } catch {
-            VanmoLogger.player.error("[MacPlayerVM] 重新解析 \(connection.type.displayName) 直链失败，回退到缓存 URL: \(error.localizedDescription)")
+            VanmoLogger.player.error("[MacPlayerVM] 重新解析 \(connection.type.displayName) 播放地址失败，回退到缓存 URL: \(error.localizedDescription)")
             return url
         }
     }

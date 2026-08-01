@@ -97,7 +97,7 @@ struct VanmoMacRootView: View {
                     await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
                     await connectionsViewModel.loadSavedConnections()
                     searchViewModel.setConnections(connectionsViewModel.savedConnections)
-                    await refreshLibrarySections()
+                    // 不再全量刷新 library：folder preview / Emby live 数据只在冷启动时加载一次。
                 } else if newPhase == .background {
                     await downloadManager.suspend()
                 }
@@ -121,7 +121,8 @@ struct VanmoMacRootView: View {
         .onChange(of: connectionsViewModel.librarySyncCompletionID) { _, newValue in
             guard newValue > 0 else { return }
             Task {
-                await refreshLibrarySections()
+                // 扫描完成：只重载本地扫描/高亮/书签，不再重复拉取 Emby live 与 folder preview。
+                await refreshLibrarySections(refreshEmbyLive: false)
                 showSyncToast("数据同步完成")
             }
         }
@@ -187,9 +188,12 @@ struct VanmoMacRootView: View {
         }
     }
 
-    private func refreshLibrarySections() async {
+    private func refreshLibrarySections(refreshEmbyLive: Bool = true) async {
         await connectionsViewModel.loadSavedConnections()
-        await libraryViewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
+        await libraryViewModel.refreshAfterLibrarySync(
+            connections: connectionsViewModel.savedConnections,
+            refreshEmbyLive: refreshEmbyLive
+        )
         libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
     }
 
@@ -202,39 +206,101 @@ struct VanmoMacRootView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        if let selectedItem = appState.selectedMediaItem {
-            MacMediaDetailView(item: selectedItem)
-        } else {
-            switch appState.contentRoute {
-            case .library:
-                MacLibraryHomeView()
-            case .libraryFavorites:
-                MacFavoritesListView()
-            case .libraryCollectionFolder:
-                if let folder = appState.routeCollectionFolder,
-                   let connection = appState.routeConnection {
-                    MacCollectionFolderListView(folder: folder, connection: connection)
-                }
-            case .libraryScannedLibrary:
-                if let connection = appState.routeConnection,
-                   let collectionType = scannedCollectionType {
-                    MacScannedLibraryListView(connection: connection, collectionType: collectionType)
-                }
-            case .libraryEmbyFolderBrowse:
-                if let container = appState.routeContainerItem {
-                    MacEmbyFolderBrowseView(container: container)
-                }
-            case let .libraryScannedShowDetail(_, showTitle):
-                if let connection = appState.routeConnection {
-                    MacScannedShowDetailView(connection: connection, showTitle: showTitle)
-                }
-            case .connectionBrowser:
-                MacConnectionsBrowseView()
-            case .search:
-                MacSearchResultsView()
-            case .settings:
-                MacSettingsView()
+        ZStack {
+            // 库根视图常驻：切 tab / 详情返回 / 子路由返回时仅切换透明度，不销毁重建，
+            // 保留 ScrollView 位置与 Kingfisher 内存缓存。
+            libraryRootContent
+
+            // 库子路由覆盖层（collectionFolder 等从库根推入）
+            librarySubrouteContent
+                .opacity(isLibrarySubrouteActive ? 1 : 0)
+                .allowsHitTesting(isLibrarySubrouteActive)
+
+            // 独立路由覆盖层（连接浏览器 / 搜索 / 设置）
+            standaloneRouteContent
+                .opacity(isLibraryFamilyActive ? 0 : 1)
+                .allowsHitTesting(!isLibraryFamilyActive)
+        }
+        .overlay {
+            if let selectedItem = appState.selectedMediaItem {
+                MacMediaDetailView(item: selectedItem)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity)
             }
+        }
+    }
+
+    private var libraryRootContent: some View {
+        ZStack {
+            MacLibraryHomeView()
+                .opacity(appState.contentRoute == .library ? 1 : 0)
+                .allowsHitTesting(appState.contentRoute == .library)
+            MacFavoritesListView()
+                .opacity(appState.contentRoute == .libraryFavorites ? 1 : 0)
+                .allowsHitTesting(appState.contentRoute == .libraryFavorites)
+        }
+    }
+
+    /// 从库根推入的子页面（媒体库 / 剧集详情等），激活时覆盖在库根之上。
+    @ViewBuilder
+    private var librarySubrouteContent: some View {
+        switch appState.contentRoute {
+        case .libraryCollectionFolder:
+            if let folder = appState.routeCollectionFolder,
+               let connection = appState.routeConnection {
+                MacCollectionFolderListView(folder: folder, connection: connection)
+            }
+        case .libraryScannedLibrary:
+            if let connection = appState.routeConnection,
+               let collectionType = scannedCollectionType {
+                MacScannedLibraryListView(connection: connection, collectionType: collectionType)
+            }
+        case .libraryEmbyFolderBrowse:
+            if let container = appState.routeContainerItem {
+                MacEmbyFolderBrowseView(container: container)
+            }
+        case let .libraryScannedShowDetail(_, showTitle):
+            if let connection = appState.routeConnection {
+                MacScannedShowDetailView(connection: connection, showTitle: showTitle)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    /// 与库互斥的独立页面（连接浏览器 / 搜索 / 设置）。
+    @ViewBuilder
+    private var standaloneRouteContent: some View {
+        switch appState.contentRoute {
+        case .connectionBrowser:
+            MacConnectionsBrowseView()
+        case .search:
+            MacSearchResultsView()
+        case .settings:
+            MacSettingsView()
+        default:
+            EmptyView()
+        }
+    }
+
+    private var isLibraryFamilyActive: Bool {
+        switch appState.contentRoute {
+        case .library, .libraryFavorites,
+             .libraryCollectionFolder, .libraryScannedLibrary,
+             .libraryEmbyFolderBrowse, .libraryScannedShowDetail:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var isLibrarySubrouteActive: Bool {
+        switch appState.contentRoute {
+        case .libraryCollectionFolder, .libraryScannedLibrary,
+             .libraryEmbyFolderBrowse, .libraryScannedShowDetail:
+            return true
+        default:
+            return false
         }
     }
 

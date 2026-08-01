@@ -19,9 +19,25 @@ struct MacConnectionsBrowseView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.appBackground)
         .overlay {
-            if connectionsViewModel.isLoading {
+            if connectionsViewModel.isLoading && !connectionsViewModel.scanCoordinator.isActive {
                 loadingOverlay
             }
+        }
+        .overlay(alignment: .bottom) {
+            MacScanSyncBanner(
+                coordinator: connectionsViewModel.scanCoordinator,
+                onPause: { connectionsViewModel.pauseScan() },
+                onResume: { connectionsViewModel.resumeScan() },
+                onCancel: { connectionsViewModel.cancelScan() }
+            )
+        }
+        .alert("同步", isPresented: Binding(
+            get: { connectionsViewModel.scanToastMessage != nil },
+            set: { if !$0 { connectionsViewModel.scanToastMessage = nil } }
+        )) {
+            Button("确定") { connectionsViewModel.scanToastMessage = nil }
+        } message: {
+            Text(connectionsViewModel.scanToastMessage ?? "")
         }
         .alert("错误", isPresented: $connectionsViewModel.showError) {
             Button("确定") {}
@@ -75,6 +91,16 @@ struct MacConnectionsBrowseView: View {
                 .buttonStyle(.plain)
                 .help("刷新当前目录")
 
+                Button {
+                    Task { await connectionsViewModel.scanCurrentDirectory() }
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.plain)
+                .help("同步当前目录到媒体库")
+
                 Menu {
                     connectionContextMenu
                 } label: {
@@ -103,14 +129,32 @@ struct MacConnectionsBrowseView: View {
     private var connectionContextMenu: some View {
         if let connection = connectionsViewModel.selectedConnection {
             Button {
+                Task { await connectionsViewModel.refreshCurrentDirectory() }
+            } label: {
+                Label("刷新", systemImage: "arrow.clockwise")
+            }
+            Button {
+                Task { await connectionsViewModel.scanCurrentDirectory() }
+            } label: {
+                Label("同步当前目录", systemImage: "square.and.arrow.down")
+            }
+            Button {
                 appState.presentEditConnection(connection)
             } label: {
                 Label("编辑", systemImage: "pencil")
             }
-            Button {
-                Task { await fullRescanConnection(connection) }
-            } label: {
-                Label("全量重扫", systemImage: "arrow.clockwise")
+            if !connection.type.requiresManualDirectorySync {
+                Button {
+                    Task { await fullRescanConnection(connection) }
+                } label: {
+                    Label("全量重扫", systemImage: "arrow.clockwise")
+                }
+            } else {
+                Button {
+                    Task { await connectionsViewModel.scanCurrentDirectory(forceFullScan: true) }
+                } label: {
+                    Label("全量重扫当前目录", systemImage: "arrow.clockwise")
+                }
             }
             Button(role: .destructive) {
                 deleteConnection(connection)
@@ -247,10 +291,18 @@ struct MacConnectionsBrowseView: View {
             } label: {
                 Label("编辑", systemImage: "pencil")
             }
-            Button {
-                Task { await fullRescanConnection(connection) }
-            } label: {
-                Label("全量重扫", systemImage: "arrow.clockwise")
+            if connection.type.requiresManualDirectorySync {
+                Button {
+                    Task { await connectionsViewModel.scanCurrentDirectory(forceFullScan: true) }
+                } label: {
+                    Label("全量重扫当前目录", systemImage: "arrow.clockwise")
+                }
+            } else {
+                Button {
+                    Task { await fullRescanConnection(connection) }
+                } label: {
+                    Label("全量重扫", systemImage: "arrow.clockwise")
+                }
             }
             Button(role: .destructive) {
                 deleteConnection(connection)
@@ -387,7 +439,11 @@ struct MacConnectionsBrowseView: View {
     }
 
     private func fullRescanConnection(_ connection: SavedConnection) async {
-        _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
+        if connection.type.requiresManualDirectorySync {
+            _ = await connectionsViewModel.scanCurrentDirectory(forceFullScan: true)
+        } else {
+            _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
+        }
         if connectionsViewModel.selectedConnectionID == connection.id {
             await connectionsViewModel.refreshCurrentDirectory()
         }

@@ -273,33 +273,25 @@ final class PlayerViewModel: ObservableObject {
     /// 重新连接对应服务、换一个新鲜直链再播放。Google Drive 的 API URL 本身不过期（靠下面的
     /// headerProvider 动态带 Bearer），不需要这一步；非 OAuth 网盘也直接跳过。
     private func resolveCloudDriveStreamURLIfNeeded(_ url: URL) async -> URL {
-        guard let connectionId = item.sourceConnectionId,
-              let serverPath = item.serverId,
+        guard PlaybackURLResolver.isPlaceholder(url),
+              let connectionId = item.sourceConnectionId,
               let modelContext else { return url }
 
         let descriptor = FetchDescriptor<SavedConnection>(
             predicate: #Predicate { $0.id == connectionId }
         )
-        guard let connection = try? modelContext.fetch(descriptor).first,
-              connection.type.supportsOAuthLogin,
-              !connection.type.requiresBearerStreaming else {
+        guard let connection = try? modelContext.fetch(descriptor).first else {
             return url
         }
 
         let service = RemoteServiceFactory.create(for: connection.type)
         do {
-            try await service.connect(config: ConnectionConfig(from: connection))
-            let placeholder = RemoteFile(
-                name: item.originalFileName ?? url.lastPathComponent,
-                path: serverPath,
-                size: item.fileSize,
-                isDirectory: false,
-                modifiedDate: nil,
-                type: .video
-            )
-            return try await service.streamURL(for: placeholder)
+            let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+            try await service.connect(config: ConnectionConfig(from: connection, password: password))
+            defer { Task { await service.disconnect() } }
+            return try await PlaybackURLResolver.resolvePlaybackURL(item: item, service: service)
         } catch {
-            VanmoLogger.player.error("[PlayerVM] 重新解析 \(connection.type.displayName) 直链失败，回退到缓存 URL: \(error.localizedDescription)")
+            VanmoLogger.player.error("[PlayerVM] 重新解析 \(connection.type.displayName) 播放地址失败，回退到缓存 URL: \(error.localizedDescription)")
             return url
         }
     }

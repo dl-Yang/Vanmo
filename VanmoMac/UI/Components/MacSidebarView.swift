@@ -240,12 +240,24 @@ struct MacSidebarView: View {
                             Button {
                                 syncConnection(connection)
                             } label: {
-                                Label("同步到媒体库", systemImage: "arrow.triangle.2.circlepath")
+                                Label(
+                                    sidebarSyncLabel(for: connection),
+                                    systemImage: sidebarSyncIcon(for: connection)
+                                )
                             }
-                            Button {
-                                fullRescanConnection(connection)
-                            } label: {
-                                Label("全量重扫", systemImage: "arrow.clockwise")
+                            if !connection.type.requiresManualDirectorySync {
+                                Button {
+                                    Task { _ = await connectionsViewModel.syncAllBookmarks(for: connection) }
+                                } label: {
+                                    Label("同步全部书签", systemImage: "bookmark.circle")
+                                }
+                            }
+                            if !connection.type.requiresManualDirectorySync {
+                                Button {
+                                    fullRescanConnection(connection)
+                                } label: {
+                                    Label("全量重扫", systemImage: "arrow.clockwise")
+                                }
                             }
                             Button(role: .destructive) {
                                 deleteConnection(connection)
@@ -344,15 +356,45 @@ struct MacSidebarView: View {
         }
     }
 
+    private func sidebarSyncLabel(for connection: SavedConnection) -> String {
+        if connection.type.requiresManualDirectorySync {
+            return connectionsViewModel.selectedConnection?.id == connection.id
+                ? "同步当前目录"
+                : "连接"
+        }
+        return "同步到媒体库"
+    }
+
+    private func sidebarSyncIcon(for connection: SavedConnection) -> String {
+        if connection.type.requiresManualDirectorySync {
+            return connectionsViewModel.selectedConnection?.id == connection.id
+                ? "square.and.arrow.down"
+                : "link"
+        }
+        return "arrow.triangle.2.circlepath"
+    }
+
     private func syncConnection(_ connection: SavedConnection) {
         Task {
-            _ = await connectionsViewModel.connectAndScan(connection)
+            if connection.type.requiresManualDirectorySync,
+               connectionsViewModel.selectedConnection?.id == connection.id {
+                _ = await connectionsViewModel.scanCurrentDirectory()
+            } else {
+                _ = await connectionsViewModel.connectAndScan(connection)
+            }
         }
     }
 
     private func fullRescanConnection(_ connection: SavedConnection) {
         Task {
-            _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
+            if connection.type.requiresManualDirectorySync,
+               connectionsViewModel.selectedConnection?.id == connection.id {
+                _ = await connectionsViewModel.scanCurrentDirectory(forceFullScan: true)
+            } else if connection.type.requiresManualDirectorySync {
+                _ = await connectionsViewModel.connectAndScan(connection)
+            } else {
+                _ = await connectionsViewModel.connectAndScan(connection, forceFullScan: true)
+            }
         }
     }
 

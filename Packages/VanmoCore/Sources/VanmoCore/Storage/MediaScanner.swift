@@ -1,6 +1,5 @@
 import Foundation
 import SwiftData
-import AVFoundation
 
 public actor MediaScanner {
     private let modelContainer: ModelContainer
@@ -19,40 +18,34 @@ public actor MediaScanner {
         ) else { return [] }
 
         var newItems: [MediaItem] = []
-
         let existingURLs = try existingFileURLs(in: context)
 
         for case let fileURL as URL in enumerator {
             guard fileURL.isVideoFile else { continue }
             guard !existingURLs.contains(fileURL.absoluteString) else { continue }
 
-            let attributes = try fileURL.resourceValues(forKeys: [.fileSizeKey])
+            let attributes = try fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
             let fileSize = Int64(attributes.fileSize ?? 0)
 
-            let duration = await videoDuration(for: fileURL)
-            let parsed = FileNameParser.parse(fileURL.lastPathComponent)
-
-            let item = MediaItem(
-                title: parsed.title,
-                fileURL: fileURL,
-                mediaType: parsed.isTV ? .tvEpisode : .movie,
-                fileSize: fileSize,
-                duration: duration
+            let remoteFile = RemoteFile(
+                name: fileURL.lastPathComponent,
+                path: fileURL.path,
+                size: fileSize,
+                isDirectory: false,
+                modifiedDate: attributes.contentModificationDate,
+                type: .video
             )
 
-            item.year = parsed.year
-            item.seasonNumber = parsed.season
-            item.episodeNumber = parsed.episode
-            if parsed.isTV {
-                item.showTitle = parsed.title
-            }
-            item.originalFileName = fileURL.lastPathComponent
-            item.container = fileURL.pathExtension.isEmpty ? nil : fileURL.pathExtension.lowercased()
+            guard let item = MediaItemFactory.makeMediaItem(
+                from: remoteFile,
+                streamURL: fileURL,
+                connectionId: nil,
+                directoryPath: fileURL.deletingLastPathComponent().path
+            ) else { continue }
 
             context.insert(item)
             newItems.append(item)
-
-            VanmoLogger.library.info("Scanned: \(parsed.title)")
+            VanmoLogger.library.info("Scanned: \(item.title)")
         }
 
         try context.save()
@@ -65,102 +58,94 @@ public actor MediaScanner {
         path: String,
         connectionId: UUID? = nil,
         in context: ModelContext,
-        maxDepth: Int = 8,
-        batchSize: Int = 200
-    ) async throws -> [MediaItem] {
-        var existing = try await MainActor.run {
+        options: RemoteScanOptions = RemoteScanOptions(),
+        shouldPause: (@Sendable () async -> Void)? = nil,
+        onProgress: (@Sendable (ScanProgress) -> Void)? = nil
+    ) async throws -> ScanResult {
+        let existing = try await MainActor.run {
             try existingServerItemMap(connectionId: connectionId, in: context)
         }
-        var newItems: [MediaItem] = []
-        var pendingInBatch = 0
 
-        var queue: [(path: String, depth: Int)] = [(path, 0)]
-        var visited: Set<String> = []
+        let state = RemoteScanAccumulator(
+            options: options,
+            connectionId: connectionId,
+            rootPath: path,
+            existing: existing
+        )
 
-        while !queue.isEmpty {
-            try Task.checkCancellation()
-            let (current, depth) = queue.removeFirst()
-
-            guard !visited.contains(current) else { continue }
-            visited.insert(current)
-
-            let files: [RemoteFile]
-            do {
-                files = try await service.listDirectory(path: current)
-            } catch {
-                VanmoLogger.library.error("Failed to list \(current): \(error.localizedDescription)")
-                continue
+        let maxWorkers = options.maxConcurrentDirectories
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<maxWorkers {
+                group.addTask {
+                    await self.scanWorker(
+                        service: service,
+                        state: state,
+                        context: context,
+                        shouldPause: shouldPause,
+                        onProgress: onProgress
+                    )
+                }
             }
+        }
 
-            for file in files {
-                if file.isDirectory {
-                    if depth < maxDepth {
-                        queue.append((file.path, depth + 1))
-                    }
-                    continue
-                }
-                guard file.isVideo else { continue }
-                let key = serverItemKey(serverId: file.path, connectionId: connectionId)
-                if let existingItem = existing[key] {
-                    if existingItem.sourceConnectionId == nil, let connectionId {
-                        await MainActor.run {
-                            existingItem.sourceConnectionId = connectionId
-                        }
-                        pendingInBatch += 1
-                    }
-                    continue
-                }
+        let snapshot = await state.snapshot(rootPath: path)
+        await flushBatchIfNeeded(context: context, pendingInBatch: snapshot.pendingInBatch, force: true)
 
-                let streamURL: URL
-                do {
-                    if service.type.usesEphemeralStreamURLs {
-                        streamURL = service.type.catalogPlaybackURL(serverPath: file.path)
-                    } else {
-                        streamURL = try await service.streamURL(for: file)
-                    }
-                } catch {
-                    VanmoLogger.library.error("Failed to get stream URL for \(file.name): \(error.localizedDescription)")
-                    continue
-                }
+        let status: ScanCompletionStatus
+        if snapshot.wasCancelled {
+            status = .cancelled
+        } else if !snapshot.issues.isEmpty {
+            status = .partial
+        } else {
+            status = .completed
+        }
 
-                let parsed = FileNameParser.parse(file.name)
+        var prunedCount = 0
+        let canPrune = options.pruneMissing
+            && !options.isPartialScan
+            && status == .completed
+            && snapshot.issues.isEmpty
+            && connectionId != nil
 
-                let item = MediaItem(
-                    title: parsed.title,
-                    fileURL: streamURL,
-                    mediaType: parsed.isTV ? .tvEpisode : .movie,
-                    fileSize: file.size
+        if canPrune, let connectionId {
+            prunedCount = try await MainActor.run {
+                try pruneMissingItems(
+                    connectionId: connectionId,
+                    seenKeys: snapshot.seenKeys,
+                    in: context
                 )
-                item.year = parsed.year
-                item.seasonNumber = parsed.season
-                item.episodeNumber = parsed.episode
-                if parsed.isTV {
-                    item.showTitle = parsed.title
-                }
-                item.serverId = file.path
-                item.sourceConnectionId = connectionId
-                item.originalFileName = file.name
-                let ext = (file.name as NSString).pathExtension
-                item.container = ext.isEmpty ? nil : ext.lowercased()
-
-                await MainActor.run { context.insert(item) }
-                newItems.append(item)
-                existing[key] = item
-                pendingInBatch += 1
-
-                if pendingInBatch >= batchSize {
-                    await MainActor.run { try? context.save() }
-                    pendingInBatch = 0
-                }
+            }
+            if prunedCount > 0 {
+                try await MainActor.run { try context.save() }
             }
         }
 
-        if pendingInBatch > 0 {
-            await MainActor.run { try? context.save() }
-        }
+        VanmoLogger.library.info(
+            "Remote scan finished under \(path): inserted=\(snapshot.insertedItems.count) updated=\(snapshot.updatedCount) unchanged=\(snapshot.unchangedCount) pruned=\(prunedCount) status=\(status.rawValue)"
+        )
 
-        VanmoLogger.library.info("Remote scan complete: \(newItems.count) new items found under \(path)")
-        return newItems
+        onProgress?(ScanProgress(
+            scannedDirectories: snapshot.scannedDirectories,
+            discoveredVideos: snapshot.discoveredVideos,
+            insertedCount: snapshot.insertedItems.count,
+            updatedCount: snapshot.updatedCount,
+            unchangedCount: snapshot.unchangedCount,
+            prunedCount: prunedCount,
+            currentDirectory: path,
+            stats: snapshot.stats
+        ))
+
+        return ScanResult(
+            status: status,
+            insertedItems: snapshot.insertedItems,
+            updatedCount: snapshot.updatedCount,
+            unchangedCount: snapshot.unchangedCount,
+            prunedCount: prunedCount,
+            seenKeys: snapshot.seenKeys,
+            issues: snapshot.issues,
+            stats: snapshot.stats,
+            probeCandidates: snapshot.probeCandidates
+        )
     }
 
     @MainActor
@@ -195,7 +180,202 @@ public actor MediaScanner {
         return newItems
     }
 
-    // MARK: - Private
+    // MARK: - Workers
+
+    private func scanWorker(
+        service: RemoteFileService,
+        state: RemoteScanAccumulator,
+        context: ModelContext,
+        shouldPause: (@Sendable () async -> Void)?,
+        onProgress: (@Sendable (ScanProgress) -> Void)?
+    ) async {
+        while let work = await state.claimNextDirectory() {
+            let (current, depth) = work
+
+            do {
+                try Task.checkCancellation()
+            } catch {
+                await state.markCancelled()
+                await state.recordIssue(ScanIssue(kind: .cancelled, path: current, message: error.localizedDescription))
+                break
+            }
+
+            if let shouldPause {
+                await shouldPause()
+            }
+
+            let files: [RemoteFile]
+            do {
+                await RemoteRequestLimiter.shared.acquire(for: service.type)
+                files = try await service.listDirectory(path: current)
+            } catch {
+                VanmoLogger.library.error("Failed to list \(current): \(error.localizedDescription)")
+                await state.recordIssue(ScanIssue(
+                    kind: .directoryListFailed,
+                    path: current,
+                    message: error.localizedDescription
+                ))
+                continue
+            }
+
+            await state.markDirectoryScanned(current)
+            let progressSnapshot = await state.progressSnapshot(currentDirectory: current)
+            onProgress?(progressSnapshot)
+
+            let nfoByFileName = await loadNFOMap(from: files, service: service, directoryPath: current)
+
+            for file in files {
+                if file.isDirectory {
+                    let maxDepth = await state.maxDepth
+                    if depth < maxDepth {
+                        await state.enqueueDirectory(file.path, depth: depth + 1)
+                    }
+                    continue
+                }
+
+                guard file.isVideo else { continue }
+                await state.markVideoDiscovered()
+
+                let activeConnectionId = await state.connectionId
+                let key = serverItemKey(serverId: file.path, connectionId: activeConnectionId)
+                await state.markSeen(key: key)
+
+                let storageURL = PlaybackURLResolver.storageURL(for: file, service: service)
+
+                if let existingItem = await state.existingItem(for: key) {
+                    if existingItem.sourceConnectionId == nil, let activeConnectionId {
+                        await MainActor.run {
+                            existingItem.sourceConnectionId = activeConnectionId
+                        }
+                        await state.incrementPendingBatch()
+                    }
+
+                    let forceFullScan = await state.forceFullScan
+                    let changed = MediaItemFactory.remoteFileChanged(
+                        existing: existingItem,
+                        file: file,
+                        forceFullScan: forceFullScan
+                    )
+
+                    if !changed {
+                        await state.incrementUnchanged()
+                        continue
+                    }
+
+                    await MainActor.run {
+                        MediaItemFactory.applyRemoteFileMetadata(
+                            file,
+                            streamURL: storageURL,
+                            connectionId: activeConnectionId,
+                            directoryPath: current,
+                            nfoByFileName: nfoByFileName,
+                            to: existingItem
+                        )
+                    }
+                    await state.recordUpdated(existingItem)
+                    await flushBatchIfNeeded(context: context, pendingInBatch: await state.pendingBatchCount(), force: false, batchSize: await state.batchSize, reset: { await state.resetPendingBatch() })
+                    continue
+                }
+
+                guard let item = MediaItemFactory.makeMediaItem(
+                    from: file,
+                    streamURL: storageURL,
+                    connectionId: activeConnectionId,
+                    directoryPath: current,
+                    nfoByFileName: nfoByFileName
+                ) else {
+                    continue
+                }
+
+                await MainActor.run { context.insert(item) }
+                await state.recordInserted(item, key: key)
+                await flushBatchIfNeeded(context: context, pendingInBatch: await state.pendingBatchCount(), force: false, batchSize: await state.batchSize, reset: { await state.resetPendingBatch() })
+            }
+        }
+    }
+
+    private func flushBatchIfNeeded(
+        context: ModelContext,
+        pendingInBatch: Int,
+        force: Bool,
+        batchSize: Int = 200,
+        reset: (() async -> Void)? = nil
+    ) async {
+        guard force || pendingInBatch >= batchSize else { return }
+        guard pendingInBatch > 0 else { return }
+        await MainActor.run { try? context.save() }
+        if let reset {
+            await reset()
+        }
+    }
+
+    private func loadNFOMap(
+        from files: [RemoteFile],
+        service: RemoteFileService,
+        directoryPath: String
+    ) async -> [String: ParsedNFOMetadata] {
+        var map: [String: ParsedNFOMetadata] = [:]
+
+        for file in files where NFOMetadataParser.isNFOFileName(file.name) {
+            guard file.size <= 512 * 1024 else { continue }
+
+            if let data = await readNFOData(for: file, service: service),
+               let parsed = NFOMetadataParser.parse(data: data, fileName: file.name) {
+                map[file.name.lowercased()] = parsed
+            }
+        }
+
+        return map
+    }
+
+    private func readNFOData(for file: RemoteFile, service: RemoteFileService) async -> Data? {
+        if service.type == .localFolder {
+            let url = URL(fileURLWithPath: file.path)
+            return try? Data(contentsOf: url)
+        }
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("nfo")
+
+        defer {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
+
+        do {
+            await RemoteRequestLimiter.shared.acquire(for: service.type)
+            try await service.download(file: file, to: tempURL) { _ in }
+            return try Data(contentsOf: tempURL)
+        } catch {
+            return nil
+        }
+    }
+
+    @MainActor
+    private func pruneMissingItems(
+        connectionId: UUID,
+        seenKeys: Set<String>,
+        in context: ModelContext
+    ) throws -> Int {
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { item in
+                item.sourceConnectionId == connectionId
+            }
+        )
+        let items = try context.fetch(descriptor)
+        var removed = 0
+
+        for item in items {
+            guard let serverId = item.serverId else { continue }
+            let key = serverItemKey(serverId: serverId, connectionId: connectionId)
+            if !seenKeys.contains(key) {
+                context.delete(item)
+                removed += 1
+            }
+        }
+
+        return removed
+    }
 
     @MainActor
     private func apply(
@@ -234,7 +414,6 @@ public actor MediaScanner {
         item.episodeNumber = serverItem.episodeNumber
         item.episodeTitle = serverItem.episodeTitle
 
-        // Live API 元数据：服务器是 resume / favorite 的权威来源。
         if let serverPlayed = serverItem.lastPlayedAt {
             if let existingPlayed = item.lastPlayedAt {
                 item.lastPlayedAt = max(serverPlayed, existingPlayed)
@@ -281,14 +460,180 @@ public actor MediaScanner {
         }
         return serverId
     }
+}
 
-    private func videoDuration(for url: URL) async -> TimeInterval {
-        let asset = AVURLAsset(url: url)
-        do {
-            let duration = try await asset.load(.duration)
-            return duration.seconds.isFinite ? duration.seconds : 0
-        } catch {
-            return 0
+// MARK: - Scan accumulator
+
+private actor RemoteScanAccumulator {
+    struct Snapshot {
+        let insertedItems: [MediaItem]
+        let updatedCount: Int
+        let unchangedCount: Int
+        let seenKeys: Set<String>
+        let issues: [ScanIssue]
+        let scannedDirectories: Int
+        let discoveredVideos: Int
+        let stats: ScanProgressStats
+        let probeCandidates: [MediaItem]
+        let pendingInBatch: Int
+        let wasCancelled: Bool
+    }
+
+    let options: RemoteScanOptions
+    let connectionId: UUID?
+    var existing: [String: MediaItem]
+
+    private var queue: [(path: String, depth: Int)]
+    private var queueIndex = 0
+    private var visited: Set<String> = []
+    private var seenKeys: Set<String> = []
+    private var insertedItems: [MediaItem] = []
+    private var probeCandidates: [MediaItem] = []
+    private var updatedCount = 0
+    private var unchangedCount = 0
+    private var issues: [ScanIssue] = []
+    private var scannedDirectories = 0
+    private var discoveredVideos = 0
+    private var pendingInBatch = 0
+    private var wasCancelled = false
+    private var movieCount = 0
+    private var tvEpisodeCount = 0
+    private var otherCount = 0
+    private var lowConfidenceCount = 0
+
+    init(options: RemoteScanOptions, connectionId: UUID?, rootPath: String, existing: [String: MediaItem]) {
+        self.options = options
+        self.connectionId = connectionId
+        self.existing = existing
+        self.queue = [(rootPath, 0)]
+    }
+
+    var maxDepth: Int { options.maxDepth }
+    var batchSize: Int { options.batchSize }
+    var forceFullScan: Bool { options.forceFullScan }
+
+    func claimNextDirectory() -> (String, Int)? {
+        while queueIndex < queue.count {
+            let item = queue[queueIndex]
+            queueIndex += 1
+            if visited.insert(item.path).inserted {
+                return item
+            }
         }
+        return nil
+    }
+
+    func enqueueDirectory(_ path: String, depth: Int) {
+        queue.append((path, depth))
+    }
+
+    func existingItem(for key: String) -> MediaItem? {
+        existing[key]
+    }
+
+    func markSeen(key: String) {
+        seenKeys.insert(key)
+    }
+
+    func markDirectoryScanned(_ path: String) {
+        scannedDirectories += 1
+    }
+
+    func markVideoDiscovered() {
+        discoveredVideos += 1
+    }
+
+    func incrementUnchanged() {
+        unchangedCount += 1
+    }
+
+    func incrementPendingBatch() {
+        pendingInBatch += 1
+    }
+
+    func pendingBatchCount() -> Int { pendingInBatch }
+
+    func resetPendingBatch() {
+        pendingInBatch = 0
+    }
+
+    func recordIssue(_ issue: ScanIssue) {
+        issues.append(issue)
+    }
+
+    func markCancelled() {
+        wasCancelled = true
+    }
+
+    func recordInserted(_ item: MediaItem, key: String) {
+        insertedItems.append(item)
+        existing[key] = item
+        pendingInBatch += 1
+        trackStats(for: item)
+        if MediaProbeApplicator.shouldProbe(item: item) {
+            probeCandidates.append(item)
+        }
+    }
+
+    func recordUpdated(_ item: MediaItem) {
+        updatedCount += 1
+        pendingInBatch += 1
+        trackStats(for: item)
+        if MediaProbeApplicator.shouldProbe(item: item) {
+            probeCandidates.append(item)
+        }
+    }
+
+    private func trackStats(for item: MediaItem) {
+        switch item.mediaType {
+        case .movie:
+            movieCount += 1
+        case .tvEpisode:
+            tvEpisodeCount += 1
+        default:
+            otherCount += 1
+        }
+        if let confidence = item.identificationConfidence,
+           confidence < ScanLibraryQueries.defaultLowConfidenceThreshold {
+            lowConfidenceCount += 1
+        }
+    }
+
+    func progressSnapshot(currentDirectory: String) -> ScanProgress {
+        ScanProgress(
+            scannedDirectories: scannedDirectories,
+            discoveredVideos: discoveredVideos,
+            insertedCount: insertedItems.count,
+            updatedCount: updatedCount,
+            unchangedCount: unchangedCount,
+            currentDirectory: currentDirectory,
+            stats: ScanProgressStats(
+                movieCount: movieCount,
+                tvEpisodeCount: tvEpisodeCount,
+                otherCount: otherCount,
+                lowConfidenceCount: lowConfidenceCount
+            )
+        )
+    }
+
+    func snapshot(rootPath: String) -> Snapshot {
+        Snapshot(
+            insertedItems: insertedItems,
+            updatedCount: updatedCount,
+            unchangedCount: unchangedCount,
+            seenKeys: seenKeys,
+            issues: issues,
+            scannedDirectories: scannedDirectories,
+            discoveredVideos: discoveredVideos,
+            stats: ScanProgressStats(
+                movieCount: movieCount,
+                tvEpisodeCount: tvEpisodeCount,
+                otherCount: otherCount,
+                lowConfidenceCount: lowConfidenceCount
+            ),
+            probeCandidates: probeCandidates,
+            pendingInBatch: pendingInBatch,
+            wasCancelled: wasCancelled
+        )
     }
 }

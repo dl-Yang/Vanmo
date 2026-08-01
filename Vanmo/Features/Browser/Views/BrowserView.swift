@@ -27,9 +27,25 @@ struct ConnectionsView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .overlay {
-            if viewModel.isLoading {
+            if viewModel.isLoading && !viewModel.scanCoordinator.isActive {
                 LoadingView(viewModel.loadingMessage)
             }
+        }
+        .overlay(alignment: .bottom) {
+            ScanSyncBanner(
+                coordinator: viewModel.scanCoordinator,
+                onPause: { viewModel.pauseScan() },
+                onResume: { viewModel.resumeScan() },
+                onCancel: { viewModel.cancelScan() }
+            )
+        }
+        .alert("同步", isPresented: Binding(
+            get: { viewModel.scanToastMessage != nil },
+            set: { if !$0 { viewModel.scanToastMessage = nil } }
+        )) {
+            Button("确定") { viewModel.scanToastMessage = nil }
+        } message: {
+            Text(viewModel.scanToastMessage ?? "")
         }
         .task {
             viewModel.setModelContext(modelContext)
@@ -113,15 +129,23 @@ struct ConnectionsView: View {
             } label: {
                 Label("编辑", systemImage: "pencil")
             }
-            Button {
-                Task { await viewModel.connectAndScan(connection) }
-            } label: {
-                Label("同步到媒体库", systemImage: "arrow.triangle.2.circlepath")
-            }
-            Button {
-                Task { await viewModel.connectAndScan(connection, forceFullScan: true) }
-            } label: {
-                Label("全量重扫", systemImage: "arrow.clockwise")
+            if connection.type.requiresManualDirectorySync {
+                Button {
+                    Task { await viewModel.connectAndScan(connection) }
+                } label: {
+                    Label("连接", systemImage: "link")
+                }
+            } else {
+                Button {
+                    Task { await viewModel.connectAndScan(connection) }
+                } label: {
+                    Label("同步到媒体库", systemImage: "arrow.triangle.2.circlepath")
+                }
+                Button {
+                    Task { await viewModel.connectAndScan(connection, forceFullScan: true) }
+                } label: {
+                    Label("全量重扫", systemImage: "arrow.clockwise")
+                }
             }
             Button(role: .destructive) {
                 viewModel.deleteConnection(connection)
@@ -349,24 +373,33 @@ struct ConnectionsView: View {
                 // 直播频道：用频道原名作标题，不跑文件名解析（避免把频道名误判成季集）。
                 item = MediaItem(title: file.name, fileURL: url, mediaType: .movie, fileSize: file.size)
                 item.isLiveStream = true
+            } else if let connection = viewModel.selectedConnection,
+                      let factoryItem = MediaItemFactory.makeMediaItem(
+                          from: file,
+                          streamURL: url,
+                          connectionId: connection.id,
+                          directoryPath: viewModel.currentPath
+                      ) {
+                item = factoryItem
             } else {
-                let parsed = FileNameParser.parse(file.name)
-                item = MediaItem(
-                    title: parsed.title,
-                    fileURL: url,
-                    mediaType: parsed.isTV ? .tvEpisode : .movie,
-                    fileSize: file.size
-                )
-                item.year = parsed.year
-                item.seasonNumber = parsed.season
-                item.episodeNumber = parsed.episode
-                item.showTitle = parsed.isTV ? parsed.title : nil
+                item = MediaItem(title: file.name, fileURL: url, mediaType: .movie, fileSize: file.size)
+                item.serverId = file.path
+                item.sourceConnectionId = viewModel.selectedConnection?.id
+                item.originalFileName = file.name
             }
-            item.serverId = file.path
-            item.sourceConnectionId = viewModel.selectedConnection?.id
-            item.originalFileName = file.name
-            let ext = (file.name as NSString).pathExtension
-            item.container = ext.isEmpty ? nil : ext.lowercased()
+            if item.serverId == nil {
+                item.serverId = file.path
+            }
+            if item.sourceConnectionId == nil {
+                item.sourceConnectionId = viewModel.selectedConnection?.id
+            }
+            if item.originalFileName == nil {
+                item.originalFileName = file.name
+            }
+            if item.container == nil {
+                let ext = (file.name as NSString).pathExtension
+                item.container = ext.isEmpty ? nil : ext.lowercased()
+            }
             appState.play(item)
         } catch {
             if isIPTVBrowsing {

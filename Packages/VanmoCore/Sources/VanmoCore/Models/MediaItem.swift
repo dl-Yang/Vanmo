@@ -40,6 +40,23 @@ public final class MediaItem {
     public var seriesId: String?
     public var sourceConnectionId: UUID?
 
+    /// 远端文件最后修改时间，用于增量扫描跳过未变化条目。
+    public var remoteModifiedAt: Date?
+    /// 离线识别置信度（0~1），文件名/目录/NFO 合并结果。
+    public var identificationConfidence: Double?
+
+    /// 远端内容版本或 etag，用于增量变更检测。
+    public var remoteContentVersion: String?
+    /// 最近一次技术探测完成时间。
+    public var probedAt: Date?
+    /// 技术探测状态（`ProbeStatus.rawValue`）。
+    public var probeStatus: String?
+    /// 技术探测缓存指纹，文件变化后失效。
+    public var probeFingerprint: String?
+    public var videoWidth: Int?
+    public var videoHeight: Int?
+    public var videoCodec: String?
+
     /// 是否允许通过 CloudKit 同步播放进度（Emby/Plex/Jellyfin 以服务端为准）。
     public var isProgressCloudSynced: Bool
     /// 是否允许通过 CloudKit 同步收藏状态（媒体服务器条目以服务端为准）。

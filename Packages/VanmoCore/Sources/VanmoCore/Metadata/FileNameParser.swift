@@ -5,37 +5,56 @@ public struct ParsedFileName {
     public let year: Int?
     public let season: Int?
     public let episode: Int?
+    public let episodeTitle: String?
     public let isTV: Bool
+    public let confidence: Double
 
     public var searchQuery: String {
         title.replacingOccurrences(of: ".", with: " ")
              .replacingOccurrences(of: "_", with: " ")
              .trimmingCharacters(in: .whitespaces)
     }
+
+    public init(
+        title: String,
+        year: Int?,
+        season: Int?,
+        episode: Int?,
+        episodeTitle: String? = nil,
+        isTV: Bool,
+        confidence: Double = 0.5
+    ) {
+        self.title = title
+        self.year = year
+        self.season = season
+        self.episode = episode
+        self.episodeTitle = episodeTitle
+        self.isTV = isTV
+        self.confidence = confidence
+    }
 }
 
 public enum FileNameParser {
-    // Common patterns:
-    // Movie.Name.2024.1080p.BluRay.x264
-    // Movie Name (2024)
-    // Show.Name.S01E02.Episode.Title.720p
-    // Show Name - S01E02
-    // Show.Name.1x02
-
-    private static let tvPatterns: [(pattern: String, seasonGroup: Int, episodeGroup: Int)] = [
-        (#"[Ss](\d{1,2})[Ee](\d{1,3})"#, 1, 2),        // S01E02
-        (#"(\d{1,2})[xX](\d{1,3})"#, 1, 2),             // 1x02
-        (#"[Ss]eason\s*(\d{1,2}).*[Ee]pisode\s*(\d{1,3})"#, 1, 2),  // Season 1 Episode 2
-        (#"\[(\d{1,2})x(\d{1,3})\]"#, 1, 2),             // [1x02]
+    private static let tvPatterns: [(pattern: String, seasonGroup: Int, episodeGroup: Int, confidence: Double)] = [
+        (#"[Ss](\d{1,2})[Ee](\d{1,3})(?:[Ee](\d{1,3}))?"#, 1, 2, 0.9),
+        (#"(\d{1,2})[xX](\d{1,3})"#, 1, 2, 0.85),
+        (#"[Ss]eason[\s._-]*(\d{1,2}).*[Ee]pisode[\s._-]*(\d{1,3})"#, 1, 2, 0.85),
+        (#"\[(\d{1,2})[xX](\d{1,3})\]"#, 1, 2, 0.8),
+        (#"\b[Ee][Pp](\d{1,3})\b"#, 0, 1, 0.75),
+        (#"\b[Ee](\d{1,3})\b"#, 0, 1, 0.65),
+        (#"第[\s]*(\d{1,2})[\s]*季[\s._-]*第[\s]*(\d{1,3})[\s]*集"#, 1, 2, 0.85),
+        (#"第[\s]*(\d{1,3})[\s]*集"#, 0, 1, 0.7),
+        (#"\[(\d{1,3})\]"#, 0, 1, 0.6),
     ]
 
     private static let yearPattern = #"\b((?:19|20)\d{2})\b"#
 
     private static let cleanupPatterns = [
-        #"\b(720p|1080p|2160p|4K|UHD)\b"#,
-        #"\b(BluRay|BDRip|BRRip|WEB-DL|WEBRip|HDTV|DVDRip|HDRip)\b"#,
-        #"\b(x264|x265|H\.264|H\.265|HEVC|AVC|AAC|DTS|AC3|FLAC|Atmos)\b"#,
-        #"\b(REMUX|PROPER|REPACK|EXTENDED|UNRATED|DIRECTORS\.CUT)\b"#,
+        #"\b(720p|1080p|1440p|2160p|4320p|4K|8K|UHD|HD|FHD)\b"#,
+        #"\b(BluRay|BDRip|BRRip|WEB-DL|WEBRip|WEBDL|HDTV|DVDRip|HDRip|HDTC|CAM|TS|TC)\b"#,
+        #"\b(x264|x265|H\.264|H\.265|HEVC|AVC|AAC|DTS|AC3|FLAC|Atmos|TrueHD|DDP?\d?(?:\.\d)?)\b"#,
+        #"\b(REMUX|PROPER|REPACK|EXTENDED|UNRATED|DIRECTORS\.CUT|IMAX|HDR10|DV|DoVi)\b"#,
+        #"\b(SP|OVA|OAD|NC|PV|CM|Menu|Bonus|Extra|Special)\b"#,
         #"\[.*?\]"#,
         #"\((?!.*\d{4})[^)]*\)"#,
     ]
@@ -43,32 +62,38 @@ public enum FileNameParser {
     public static func parse(_ fileName: String) -> ParsedFileName {
         let name = (fileName as NSString).deletingPathExtension
 
-        // Check for TV show patterns first
         for tvPattern in tvPatterns {
             if let regex = try? NSRegularExpression(pattern: tvPattern.pattern),
                let match = regex.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) {
 
-                let seasonRange = Range(match.range(at: tvPattern.seasonGroup), in: name)
-                let episodeRange = Range(match.range(at: tvPattern.episodeGroup), in: name)
+                let season: Int?
+                if tvPattern.seasonGroup > 0,
+                   let seasonRange = Range(match.range(at: tvPattern.seasonGroup), in: name) {
+                    season = Int(name[seasonRange])
+                } else {
+                    season = nil
+                }
 
-                let season = seasonRange.flatMap { Int(name[$0]) }
+                let episodeRange = Range(match.range(at: tvPattern.episodeGroup), in: name)
                 let episode = episodeRange.flatMap { Int(name[$0]) }
 
                 let titleEnd = match.range.location
                 let rawTitle = String(name.prefix(titleEnd))
                 let title = cleanTitle(rawTitle)
+                let episodeTitle = extractEpisodeTitle(from: name, afterIndex: match.range.upperBound)
 
                 return ParsedFileName(
                     title: title,
                     year: extractYear(from: name),
                     season: season,
                     episode: episode,
-                    isTV: true
+                    episodeTitle: episodeTitle,
+                    isTV: true,
+                    confidence: tvPattern.confidence
                 )
             }
         }
 
-        // Movie pattern
         let year = extractYear(from: name)
         var title = name
 
@@ -85,14 +110,24 @@ public enum FileNameParser {
             year: year,
             season: nil,
             episode: nil,
-            isTV: false
+            episodeTitle: nil,
+            isTV: false,
+            confidence: year == nil ? 0.45 : 0.6
         )
+    }
+
+    private static func extractEpisodeTitle(from string: String, afterIndex: Int) -> String? {
+        guard afterIndex < string.count else { return nil }
+        let start = string.index(string.startIndex, offsetBy: afterIndex)
+        var remainder = String(string[start...])
+        remainder = cleanTitle(remainder)
+        return remainder.isEmpty ? nil : remainder
     }
 
     private static func extractYear(from string: String) -> Int? {
         guard let regex = try? NSRegularExpression(pattern: yearPattern),
               let match = regex.firstMatch(in: string, range: NSRange(string.startIndex..., in: string)),
-              let range = Range(match.range(at: 1), in: string) else {
+              let range = Range(match.range, in: string) else {
             return nil
         }
         return Int(string[range])
@@ -117,7 +152,6 @@ public enum FileNameParser {
             .replacingOccurrences(of: " - ", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Remove trailing separators
         while title.hasSuffix("-") || title.hasSuffix(" ") {
             title = String(title.dropLast()).trimmingCharacters(in: .whitespaces)
         }

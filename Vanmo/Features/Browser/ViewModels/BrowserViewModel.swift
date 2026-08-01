@@ -38,6 +38,8 @@ final class ConnectionsViewModel: ObservableObject {
     @Published var showAddConnection = false
     @Published var showError = false
     @Published var errorMessage = ""
+    @Published private(set) var scanCoordinator = ScanCoordinator()
+    @Published var scanToastMessage: String?
 
     private var connectionStatuses: [UUID: ConnectionStatus] = [:]
     private var modelContext: ModelContext?
@@ -60,6 +62,39 @@ final class ConnectionsViewModel: ObservableObject {
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
+        configureMediaProbeQueue(context: context)
+    }
+
+    private func configureMediaProbeQueue(context: ModelContext) {
+        MediaProbeBootstrap.configure()
+        Task {
+            await MediaProbeQueue.shared.setURLResolver { item in
+                try await Self.resolveProbeURL(for: item, context: context)
+            }
+        }
+    }
+
+    private static func resolveProbeURL(for item: MediaItem, context: ModelContext) async throws -> URL {
+        if !PlaybackURLResolver.isPlaceholder(item.fileURL) {
+            return item.fileURL
+        }
+        guard let connectionId = item.sourceConnectionId else {
+            throw NetworkError.invalidURL
+        }
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        let connection: SavedConnection? = await MainActor.run {
+            try? context.fetch(descriptor).first
+        }
+        guard let connection else {
+            throw NetworkError.notConnected
+        }
+        let service = RemoteServiceFactory.create(for: connection.type)
+        let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+        try await service.connect(config: ConnectionConfig(from: connection, password: password))
+        defer { Task { await service.disconnect() } }
+        return try await PlaybackURLResolver.resolvePlaybackURL(item: item, service: service)
     }
 
     private func isMediaServer(_ type: ConnectionType) -> Bool {
@@ -159,6 +194,11 @@ final class ConnectionsViewModel: ObservableObject {
             return
         }
 
+        guard UserDefaults.standard.object(forKey: "library.autoScan") as? Bool ?? true else {
+            VanmoLogger.network.info("[Connections] Auto-reconnect skipped: library.autoScan disabled")
+            return
+        }
+
         VanmoLogger.network.info("[Connections] Auto-reconnect to \(target.name)")
         await connectAndScan(target, showErrorAlert: false)
     }
@@ -186,7 +226,8 @@ final class ConnectionsViewModel: ObservableObject {
         _ connection: SavedConnection,
         showErrorAlert: Bool = true,
         forceFullScan: Bool = false,
-        scanPath: String? = nil
+        scanPath: String? = nil,
+        isPartialScan: Bool = false
     ) async -> Bool {
         connectionStatuses[connection.id] = .connecting
         isLoading = true
@@ -227,8 +268,9 @@ final class ConnectionsViewModel: ObservableObject {
                 setActiveMediaServer(connection)
             }
 
-            loadingMessage = "扫描媒体文件..."
-            librarySyncMessage = "正在同步数据..."
+            let requiresDirectorySelection = connection.type.requiresManualDirectorySync
+            let shouldScanRemoteFiles = !requiresDirectorySelection || scanPath != nil
+
             guard let context = modelContext else {
                 isLoading = false
                 librarySyncMessage = nil
@@ -237,6 +279,17 @@ final class ConnectionsViewModel: ObservableObject {
             }
 
             let scanner = MediaScanner(modelContainer: context.container)
+            var shouldRefreshLibrary = true
+            var partialSyncNotice: String?
+
+            if shouldScanRemoteFiles {
+                loadingMessage = forceFullScan ? "全量重扫 \(connection.name)..." : "扫描媒体文件..."
+                librarySyncMessage = "正在同步数据..."
+            } else {
+                loadingMessage = "已连接 \(connection.name)"
+                librarySyncMessage = nil
+                shouldRefreshLibrary = false
+            }
 
             if let mediaServer = service as? MediaServerService,
                connection.type != .emby,
@@ -257,18 +310,24 @@ final class ConnectionsViewModel: ObservableObject {
                 }
                 connection.lastSyncedAt = syncStart
                 try? modelContext?.save()
-            } else if connection.type != .emby && connection.type != .jellyfin {
-                // 百度网盘登录后仅建立连接并展示文件浏览器；不在 connect 阶段做全量递归扫库。
-                // 实测大目录（如 /来自：iPhone）单目录分页即可超过 1 万条，全库 maxDepth=8 扫描会导致 loading 长时间不结束。
-                if connection.type != .baiduNetdisk {
-                    let scanPath = scanPath ?? connection.path ?? "/"
-                    _ = try await scanner.scanRemoteDirectory(
-                        service: service,
-                        path: scanPath,
-                        connectionId: connection.id,
-                        in: context
-                    )
+            } else if connection.type != .emby && connection.type != .jellyfin, shouldScanRemoteFiles {
+                let resolvedScanPath = scanPath ?? connection.path ?? "/"
+                let scope: ScanScope = isPartialScan ? .directory(path: resolvedScanPath) : .connectionRoot
+                isLoading = false
+
+                let scanResult = await performCoordinatorScan(
+                    connection: connection,
+                    service: service,
+                    scope: scope,
+                    forceFullScan: forceFullScan,
+                    context: context
+                )
+                if scanResult.status == .completed || scanResult.status == .partial {
+                    connection.lastSyncedAt = Date()
+                    try? modelContext?.save()
                 }
+                publishScanFeedback(scanResult, showErrorAlert: showErrorAlert, partialSyncNotice: &partialSyncNotice)
+                shouldRefreshLibrary = scanResult.hasLibraryChanges
             }
 
             // 本地文件夹保持 access，让媒体库里的视频后续可直接播放；
@@ -279,8 +338,14 @@ final class ConnectionsViewModel: ObservableObject {
 
             VanmoLogger.network.info("[Connections] Scan complete for \(connection.name)")
             isLoading = false
+            if let partialSyncNotice {
+                errorMessage = partialSyncNotice
+                showError = true
+            }
             librarySyncMessage = nil
-            librarySyncCompletionID += 1
+            if shouldRefreshLibrary {
+                librarySyncCompletionID += 1
+            }
             return true
         } catch {
             VanmoLogger.network.error("[Connections] Connection failed: \(error.localizedDescription)")
@@ -332,8 +397,7 @@ final class ConnectionsViewModel: ObservableObject {
         await loadSavedConnections()
         if let saved = savedConnections.first(where: { $0.id == connection.id }) {
             await selectConnection(saved)
-            // 添加连接后立即连接并扫描，触发 librarySyncCompletionID 递增，使首页主动刷新
-            // 显示该服务内容（修复首次添加后首页不刷新的问题）。
+            // 添加连接后立即建立连接；目录型源须用户在浏览页手动「同步当前目录」入库。
             return await connectAndScan(saved, showErrorAlert: true)
         }
         return false
@@ -388,8 +452,7 @@ final class ConnectionsViewModel: ObservableObject {
         return true
     }
 
-    /// 发起 OAuth 网盘登录：授权成功后用固定的 connectionId 落地一条新连接，
-    /// 并立即触发 `connectAndScan`（实际浏览/取流交给对应网盘的 `RemoteFileService` 实现）。
+    /// 发起 OAuth 网盘登录：授权成功后落地连接并进入浏览；入库须用户在目录内手动「同步当前目录」。
     @discardableResult
     func beginOAuthConnection(type: ConnectionType, name: String?) async -> Bool {
         guard type.supportsOAuthLogin else { return false }
@@ -744,6 +807,14 @@ final class ConnectionsViewModel: ObservableObject {
 
     func scanSelectedConnection(forceFullScan: Bool = false) async -> Bool {
         guard let selectedConnection else { return false }
+        if selectedConnection.type.requiresManualDirectorySync {
+            return await connectAndScan(
+                selectedConnection,
+                forceFullScan: forceFullScan,
+                scanPath: currentPath,
+                isPartialScan: true
+            )
+        }
         return await connectAndScan(selectedConnection, forceFullScan: forceFullScan)
     }
 
@@ -752,7 +823,8 @@ final class ConnectionsViewModel: ObservableObject {
         return await connectAndScan(
             selectedConnection,
             forceFullScan: forceFullScan,
-            scanPath: currentPath
+            scanPath: currentPath,
+            isPartialScan: true
         )
     }
 
@@ -883,6 +955,125 @@ final class ConnectionsViewModel: ObservableObject {
             return lhs.isDirectory && !rhs.isDirectory
         }
         return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+    }
+
+    func pauseScan() {
+        scanCoordinator.pause()
+    }
+
+    func resumeScan() {
+        scanCoordinator.resume()
+    }
+
+    func cancelScan() {
+        scanCoordinator.cancel()
+    }
+
+    func syncAllBookmarks(for connection: SavedConnection) async -> Bool {
+        guard let context = modelContext else { return false }
+        let targetConnectionId = connection.id
+        let descriptor = FetchDescriptor<FolderBookmark>(
+            predicate: #Predicate<FolderBookmark> { bookmark in
+                bookmark.connectionId == targetConnectionId && bookmark.deletedAt == nil
+            }
+        )
+        guard let bookmarks = try? context.fetch(descriptor), !bookmarks.isEmpty else { return false }
+        return await syncBookmarks(connection: connection, bookmarks: bookmarks)
+    }
+
+    func syncBookmark(_ bookmark: FolderBookmark) async -> Bool {
+        await syncBookmarks(connection: nil, bookmarks: [bookmark], explicitConnectionId: bookmark.connectionId)
+    }
+
+    private func syncBookmarks(
+        connection: SavedConnection?,
+        bookmarks: [FolderBookmark],
+        explicitConnectionId: UUID? = nil
+    ) async -> Bool {
+        guard let context = modelContext else { return false }
+        let connectionId = connection?.id ?? explicitConnectionId
+        guard let connectionId,
+              let resolvedConnection = connection ?? savedConnections.first(where: { $0.id == connectionId }) else {
+            return false
+        }
+
+        do {
+            let service = try await browserFileService(for: resolvedConnection)
+            let result = await performCoordinatorScan(
+                connection: resolvedConnection,
+                service: service,
+                scope: .bookmarks(paths: bookmarks.map(\.path)),
+                forceFullScan: false,
+                context: context
+            )
+            var notice: String?
+            publishScanFeedback(result, showErrorAlert: true, partialSyncNotice: &notice)
+            return result.status == .completed || result.status == .partial
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
+        }
+    }
+
+    private func performCoordinatorScan(
+        connection: SavedConnection,
+        service: RemoteFileService,
+        scope: ScanScope,
+        forceFullScan: Bool,
+        context: ModelContext
+    ) async -> ScanResult {
+        await withCheckedContinuation { continuation in
+            scanCoordinator.start(
+                connection: connection,
+                service: service,
+                scope: scope,
+                forceFullScan: forceFullScan,
+                modelContainer: context.container,
+                context: context
+            ) { result in
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    private func publishScanFeedback(
+        _ result: ScanResult,
+        showErrorAlert: Bool,
+        partialSyncNotice: inout String?
+    ) {
+        switch result.status {
+        case .completed:
+            scanToastMessage = result.stats.lowConfidenceCount > 0
+                ? "同步完成，\(result.stats.lowConfidenceCount) 项待确认"
+                : ScanProgress(
+                    scannedDirectories: 0,
+                    discoveredVideos: 0,
+                    insertedCount: result.insertedItems.count,
+                    updatedCount: result.updatedCount,
+                    unchangedCount: result.unchangedCount,
+                    prunedCount: result.prunedCount,
+                    currentDirectory: "",
+                    stats: result.stats
+                ).completionSummary
+        case .partial:
+            partialSyncNotice = "同步部分完成，\(result.issues.count) 个问题"
+            if showErrorAlert {
+                scanToastMessage = partialSyncNotice
+            }
+        case .cancelled:
+            scanToastMessage = "同步已取消，已保留 \(result.insertedItems.count + result.updatedCount) 项变更"
+        case .failed:
+            partialSyncNotice = result.issues.last?.message ?? "同步失败"
+            if showErrorAlert {
+                scanToastMessage = partialSyncNotice
+            }
+        }
+        #if os(iOS)
+        if result.status != .failed {
+            ScanBackgroundTask.scheduleIfNeeded()
+        }
+        #endif
     }
 
     private func userFacingFileBrowserMessage(for error: Error, connection: SavedConnection) -> String {
