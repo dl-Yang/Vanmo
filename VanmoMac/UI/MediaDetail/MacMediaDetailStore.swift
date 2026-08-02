@@ -47,6 +47,12 @@ final class MacMediaDetailStore: ObservableObject {
         seasonEpisodes
     }
 
+    var nextEpisodeToPlay: EpisodeInfo? {
+        seasonEpisodes
+            .sorted { ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber) }
+            .first
+    }
+
     // MARK: - Loading
 
     func load(item: MediaItem, modelContext: ModelContext, autoDownloadMetadata: Bool) async {

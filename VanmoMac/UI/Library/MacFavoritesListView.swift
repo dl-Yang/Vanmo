@@ -47,6 +47,7 @@ struct MacFavoritesListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Spacer(minLength: MacDesignTokens.Layout.trafficLightsTopInset + 5)
             header
 
             if isSearching {

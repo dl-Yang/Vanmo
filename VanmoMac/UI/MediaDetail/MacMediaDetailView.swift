@@ -225,10 +225,16 @@ struct MacMediaDetailView: View {
     @ViewBuilder
     private var playButton: some View {
         let action = {
-            let startPosition = UserDefaults.standard.bool(forKey: "playback.resumePlayback")
-                ? item.lastPlaybackPosition
-                : 0
-            appState.play(item, from: startPosition)
+            if item.mediaType == .tvShow {
+                guard let episode = store.nextEpisodeToPlay else { return }
+                let episodeItem = store.makeEpisodeItem(from: episode, show: item)
+                appState.play(episodeItem)
+            } else {
+                let startPosition = UserDefaults.standard.bool(forKey: "playback.resumePlayback")
+                    ? item.lastPlaybackPosition
+                    : 0
+                appState.play(item, from: startPosition)
+            }
         }
 
         if #available(macOS 26.0, *) {
@@ -525,7 +531,7 @@ struct MacMediaDetailView: View {
                 Text(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : "\(episode.episodeNumber) \(episode.title)")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .frame(width: 200, alignment: .leading)
             }
         }

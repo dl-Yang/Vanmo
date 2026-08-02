@@ -1,0 +1,372 @@
+{
+  "nodes": [
+    {
+      "id": "file:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
+      "type": "file",
+      "name": "LibraryViewModel.swift",
+      "filePath": "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
+      "summary": "媒体库首页 ViewModel，聚合最近播放、收藏、服务器合集、扫描库文件夹预览与书签数据，并提供网格/列表与排序状态。",
+      "tags": ["view-model", "library", "media", "aggregation"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/CollectionFolderListView.swift",
+      "type": "file",
+      "name": "CollectionFolderListView.swift",
+      "filePath": "Vanmo/Features/Library/Views/CollectionFolderListView.swift",
+      "summary": "CollectionFolder 二级列表页，分页加载 Movie/Series/Video 条目并以网格展示。",
+      "tags": ["ui", "library", "pagination", "grid"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
+      "type": "file",
+      "name": "EmbyFolderBrowseView.swift",
+      "filePath": "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
+      "summary": "Emby/Jellyfin 容器条目的子级浏览页，加载 Folder/CollectionFolder/Season 的子项列表。",
+      "tags": ["ui", "emby", "browse", "server"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
+      "type": "file",
+      "name": "FavoritesListView.swift",
+      "filePath": "Vanmo/Features/Library/Views/FavoritesListView.swift",
+      "summary": "收藏列表页，支持搜索、编辑、批量操作与分类展示，含私有的收藏 ViewModel 与空态/加载态组件。",
+      "tags": ["ui", "favorites", "list", "search"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
+      "type": "file",
+      "name": "FavoritesStackedCard.swift",
+      "filePath": "Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
+      "summary": "收藏堆叠卡片组件，用多张海报叠加效果展示收藏数量与徽章信息，并配套按钮样式。",
+      "tags": ["ui", "component", "favorites", "card"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/FilterChipsRow.swift",
+      "type": "file",
+      "name": "FilterChipsRow.swift",
+      "filePath": "Vanmo/Features/Library/Views/FilterChipsRow.swift",
+      "summary": "筛选芯片行组件，支持折叠/展开与多选状态绑定。",
+      "tags": ["ui", "component", "filter", "chips"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/FlowLayout.swift",
+      "type": "file",
+      "name": "FlowLayout.swift",
+      "filePath": "Vanmo/Features/Library/Views/FlowLayout.swift",
+      "summary": "自适应流式布局 Layout 实现，按可用宽度自动换行排列子视图。",
+      "tags": ["ui", "layout", "component"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/LibraryView.swift",
+      "type": "file",
+      "name": "LibraryView.swift",
+      "filePath": "Vanmo/Features/Library/Views/LibraryView.swift",
+      "summary": "媒体库首页视图，展示继续观看、收藏、服务器合集与扫描库等分区，含空态、同步提示与背景层。",
+      "tags": ["ui", "library", "home", "scroll"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
+      "type": "file",
+      "name": "MediaDetailView.swift",
+      "filePath": "Vanmo/Features/Library/Views/MediaDetailView.swift",
+      "summary": "媒体详情页，含可拖拽展开面板、海报/背景/Loading 视觉、演职人员、合集、分集与下载选择等丰富子组件。",
+      "tags": ["ui", "detail", "metadata", "download"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/MediaListRow.swift",
+      "type": "file",
+      "name": "MediaListRow.swift",
+      "filePath": "Vanmo/Features/Library/Views/MediaListRow.swift",
+      "summary": "媒体列表行组件，展示海报、标题、评分与年份等元数据信息。",
+      "tags": ["ui", "component", "list", "row"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "type": "file",
+      "name": "ScannedLibraryListView.swift",
+      "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+      "summary": "本地扫描媒体库列表页，按电影/剧集分类加载扫描结果并分页展示。",
+      "tags": ["ui", "library", "scan", "list"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "type": "file",
+      "name": "ScannedShowDetailView.swift",
+      "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+      "summary": "扫描剧集详情页，加载并展示某部剧的全部分集列表。",
+      "tags": ["ui", "library", "episodes", "detail"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "type": "file",
+      "name": "SecondFloorItemView.swift",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+      "summary": "全屏播放过渡页中的单个媒体条目视图，展示海报、标题、进度与播放按钮。",
+      "tags": ["ui", "component", "playback", "transition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "type": "file",
+      "name": "SecondFloorView.swift",
+      "filePath": "Vanmo/Features/Library/Views/SecondFloorView.swift",
+      "summary": "“二楼”全屏卡片过渡视图，展示最近播放条目并支持滑动手势返回。",
+      "tags": ["ui", "library", "transition", "gesture"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "type": "file",
+      "name": "PlayerViewModel.swift",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "summary": "播放器核心 ViewModel，管理播放状态、音轨/字幕轨道、章节、倍速、画中画、字幕样式与在线字幕搜索下载。",
+      "tags": ["view-model", "player", "subtitle", "playback"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "type": "file",
+      "name": "PlayerProgressBar.swift",
+      "filePath": "Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+      "summary": "播放进度条组件，展示缓冲与播放进度，支持拖动 seek 与触觉反馈。",
+      "tags": ["ui", "component", "player", "progress"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Player/Views/PlayerView.swift",
+      "type": "file",
+      "name": "PlayerView.swift",
+      "filePath": "Vanmo/Features/Player/Views/PlayerView.swift",
+      "summary": "播放器主视图，组合视频层、字幕覆盖、手势层、控制面板、画中画控制器与章节/选集/倍速面板。",
+      "tags": ["ui", "player", "gesture", "pip"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Player/Views/TrackSelectorView.swift",
+      "type": "file",
+      "name": "TrackSelectorView.swift",
+      "filePath": "Vanmo/Features/Player/Views/TrackSelectorView.swift",
+      "summary": "音轨与字幕选择面板，列出可用轨道并切换当前选中项。",
+      "tags": ["ui", "player", "tracks", "selector"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
+      "type": "file",
+      "name": "SearchViewModel.swift",
+      "filePath": "Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
+      "summary": "搜索 ViewModel，并发聚合本地库与远程来源（Emby/Plex/WebDAV 等）的搜索结果并去重分组。",
+      "tags": ["view-model", "search", "aggregation", "remote"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:Vanmo/Features/Search/Views/SearchView.swift",
+      "type": "file",
+      "name": "SearchView.swift",
+      "filePath": "Vanmo/Features/Search/Views/SearchView.swift",
+      "summary": "搜索页面，提供搜索框、空态、加载态与分组结果展示。",
+      "tags": ["ui", "search", "page"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "type": "file",
+      "name": "SettingsViewModel.swift",
+      "filePath": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "summary": "设置页 ViewModel，管理播放、字幕、硬件解码、在线字幕、缓存与 CloudKit 同步等偏好绑定。",
+      "tags": ["view-model", "settings", "preferences"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "type": "file",
+      "name": "SettingsView.swift",
+      "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
+      "summary": "设置页表单视图，按云同步、播放、音频、字幕、媒体库、元数据、外观、存储等分区组织设置项。",
+      "tags": ["ui", "settings", "form", "preferences"],
+      "complexity": "complex"
+    },
+    {
+      "id": "config:Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+      "type": "config",
+      "name": "AccentColor Contents.json",
+      "filePath": "Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+      "summary": "全局强调色（AccentColor）资源定义，亮/暗外观均使用同一橙色系颜色。",
+      "tags": ["asset", "color", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "type": "config",
+      "name": "AppIcon Contents.json",
+      "filePath": "Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "summary": "iOS 应用图标资源清单定义。",
+      "tags": ["asset", "app-icon", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:Vanmo/Resources/Assets.xcassets/Contents.json",
+      "type": "config",
+      "name": "Assets.xcassets Contents.json",
+      "filePath": "Vanmo/Resources/Assets.xcassets/Contents.json",
+      "summary": "iOS 资源目录根清单文件。",
+      "tags": ["asset", "catalog", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift:LibraryViewModel",
+      "type": "class",
+      "name": "LibraryViewModel",
+      "filePath": "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
+      "lineRange": [6, 884],
+      "summary": "媒体库首页数据聚合与状态管理类，负责加载各分区数据与排序筛选。",
+      "tags": ["view-model", "library", "observable-object"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerViewModel",
+      "type": "class",
+      "name": "PlayerViewModel",
+      "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "lineRange": [8, 1419],
+      "summary": "播放器状态与业务逻辑中枢，桥接播放引擎、字幕服务、轨道选择与持久化设置。",
+      "tags": ["view-model", "player", "observable-object"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:Vanmo/Features/Search/ViewModels/SearchViewModel.swift:SearchViewModel",
+      "type": "class",
+      "name": "SearchViewModel",
+      "filePath": "Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
+      "lineRange": [20, 443],
+      "summary": "聚合本地与远程搜索结果的异步搜索管理器，带并发控制与去重。",
+      "tags": ["view-model", "search", "async"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:SettingsViewModel",
+      "type": "class",
+      "name": "SettingsViewModel",
+      "filePath": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "lineRange": [6, 188],
+      "summary": "设置偏好绑定与缓存计算逻辑类。",
+      "tags": ["view-model", "settings", "preferences"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:Vanmo/Features/Library/Views/MediaDetailView.swift:MediaDetailStore",
+      "type": "class",
+      "name": "MediaDetailStore",
+      "filePath": "Vanmo/Features/Library/Views/MediaDetailView.swift",
+      "lineRange": [806, 1312],
+      "summary": "媒体详情数据加载 Store，处理收藏切换、元数据刷新与合集数据获取。",
+      "tags": ["store", "detail", "metadata", "observable-object"],
+      "complexity": "complex"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
+      "target": "class:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift:LibraryViewModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+      "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerViewModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
+      "target": "class:Vanmo/Features/Search/ViewModels/SearchViewModel.swift:SearchViewModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+      "target": "class:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:SettingsViewModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
+      "target": "class:Vanmo/Features/Library/Views/MediaDetailView.swift:MediaDetailStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/LibraryView.swift",
+      "target": "class:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift:LibraryViewModel",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/FavoritesListView.swift",
+      "target": "class:Vanmo/Features/Library/ViewModels/LibraryViewModel.swift:LibraryViewModel",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:Vanmo/Features/Player/Views/PlayerView.swift",
+      "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerViewModel",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Features/Player/Views/TrackSelectorView.swift",
+      "target": "class:Vanmo/Features/Player/ViewModels/PlayerViewModel.swift:PlayerViewModel",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Features/Search/Views/SearchView.swift",
+      "target": "class:Vanmo/Features/Search/ViewModels/SearchViewModel.swift:SearchViewModel",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Features/Settings/Views/SettingsView.swift",
+      "target": "class:Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift:SettingsViewModel",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:Vanmo/Features/Library/Views/MediaDetailView.swift",
+      "target": "file:Vanmo/Features/Player/Views/PlayerView.swift",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+      "target": "file:Vanmo/App/ContentView.swift",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

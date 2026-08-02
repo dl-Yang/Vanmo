@@ -1,0 +1,1399 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "louvain",
+  "totalFiles": 169,
+  "totalBatches": 9,
+  "exportsByPath": {
+    ".cursorignore": [],
+    "scripts/migrate-vanmocore-public.py": [
+      "already_public",
+      "strip_erroneous_public",
+      "transform",
+      "main"
+    ],
+    "scripts/vanmocore-public-api.py": [
+      "is_type_line",
+      "publicize_type_line",
+      "publicize_model_class",
+      "publicize_members",
+      "strip_erroneous_public",
+      "transform_file",
+      "main"
+    ],
+    "Vanmo.xcodeproj/project.pbxproj": [],
+    "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo-macOS.xcscheme": [],
+    "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme": [],
+    "Vanmo/App/AppState.swift": [],
+    "Vanmo/App/ContentView.swift": [],
+    "Vanmo/App/VanmoApp.swift": [],
+    "Vanmo/Core/Metadata/KSPlayerMediaProbeProvider.swift": [],
+    "Vanmo/Core/Player/KSPlayerEngine.swift": [],
+    "Vanmo/Core/Player/PlayerEngine.swift": [],
+    "Vanmo/Core/Player/PlayerEngineFactory.swift": [],
+    "Vanmo/Core/Player/PlayerState.swift": [],
+    "Vanmo/Core/Storage/ScanBackgroundTask.swift": [],
+    "Vanmo/Core/Subtitle/SubtitleOverlayView.swift": [],
+    "Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift": [],
+    "Vanmo/Features/Browser/Views/AddConnectionView.swift": [],
+    "Vanmo/Features/Browser/Views/BrowserView.swift": [],
+    "Vanmo/Features/Browser/Views/ScanSyncBanner.swift": [],
+    "Vanmo/Features/Library/Models/HomeCollectionCache.swift": [],
+    "Vanmo/Features/Library/Models/LibraryFilters.swift": [],
+    "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift": [],
+    "Vanmo/Features/Library/Views/CollectionFolderListView.swift": [],
+    "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift": [],
+    "Vanmo/Features/Library/Views/FavoritesListView.swift": [],
+    "Vanmo/Features/Library/Views/FavoritesStackedCard.swift": [],
+    "Vanmo/Features/Library/Views/FilterChipsRow.swift": [],
+    "Vanmo/Features/Library/Views/FlowLayout.swift": [],
+    "Vanmo/Features/Library/Views/LibraryView.swift": [],
+    "Vanmo/Features/Library/Views/MediaDetailView.swift": [],
+    "Vanmo/Features/Library/Views/MediaListRow.swift": [],
+    "Vanmo/Features/Library/Views/ScannedLibraryListView.swift": [],
+    "Vanmo/Features/Library/Views/ScannedShowDetailView.swift": [],
+    "Vanmo/Features/Library/Views/SecondFloorItemView.swift": [],
+    "Vanmo/Features/Library/Views/SecondFloorView.swift": [],
+    "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift": [],
+    "Vanmo/Features/Player/Views/PlayerProgressBar.swift": [],
+    "Vanmo/Features/Player/Views/PlayerView.swift": [],
+    "Vanmo/Features/Player/Views/TrackSelectorView.swift": [],
+    "Vanmo/Features/Search/ViewModels/SearchViewModel.swift": [],
+    "Vanmo/Features/Search/Views/SearchView.swift": [],
+    "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift": [],
+    "Vanmo/Features/Settings/Views/SettingsView.swift": [],
+    "Vanmo/Shared/Components/BackdropHeader.swift": [],
+    "Vanmo/Shared/Components/EmptyStateView.swift": [],
+    "Vanmo/Shared/Components/LoadingIndicatorView.swift": [],
+    "Vanmo/Shared/Components/LoadingView.swift": [],
+    "Vanmo/Shared/Components/MediaTitleLogoView.swift": [],
+    "Vanmo/Shared/Components/PosterCard.swift": [],
+    "Vanmo/Shared/Components/RatingBadge.swift": [],
+    "Vanmo/Shared/Extensions/Color+Vanmo.swift": [],
+    "Vanmo/Shared/Extensions/Int64+FileSize.swift": [],
+    "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift": [],
+    "Vanmo/Shared/Extensions/URL+Extensions.swift": [],
+    "Vanmo/Shared/Extensions/View+Extensions.swift": [],
+    "Vanmo/Shared/Network/OAuthPresentationContextProvider+UIKit.swift": [],
+    "Vanmo/Shared/Utilities/CountryMapper.swift": [],
+    "Vanmo/Shared/Utilities/DominantColorExtractor.swift": [],
+    "Vanmo/Shared/Utilities/PlatformCompatibility.swift": [],
+    "Vanmo/Vanmo-Bridging-Header.h": [],
+    "Vanmo/Vanmo-Cloud.entitlements": [],
+    "Vanmo/Vanmo-Mac-Cloud.entitlements": [],
+    "Vanmo/Vanmo-Mac.entitlements": [],
+    "Vanmo/Vanmo.entitlements": [],
+    "VanmoMac/App/MacAppState.swift": [],
+    "VanmoMac/App/VanmoMacApp.swift": [],
+    "VanmoMac/App/VanmoMacRootView.swift": [],
+    "VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift": [],
+    "VanmoMac/Player/MacAVPlayerView.swift": [],
+    "VanmoMac/Player/MacEpisodeSelectorView.swift": [],
+    "VanmoMac/Player/MacKSPlayerEngine.swift": [],
+    "VanmoMac/Player/MacKSPlayerView.swift": [],
+    "VanmoMac/Player/MacLocalFilePlayback.swift": [],
+    "VanmoMac/Player/MacPlayerCommands.swift": [],
+    "VanmoMac/Player/MacPlayerControlsOverlay.swift": [],
+    "VanmoMac/Player/MacPlayerEngineFactory.swift": [],
+    "VanmoMac/Player/MacPlayerView.swift": [],
+    "VanmoMac/Player/MacPlayerViewModel.swift": [],
+    "VanmoMac/Player/MacPlayerWindowController.swift": [],
+    "VanmoMac/Player/MacSubtitleOverlayView.swift": [],
+    "VanmoMac/Player/MacTrackSelectorView.swift": [],
+    "VanmoMac/Shared/Extensions/Color+Mac.swift": [],
+    "VanmoMac/Shared/Extensions/Int64+FileSize.swift": [],
+    "VanmoMac/Shared/Network/OAuthPresentationContextProvider+AppKit.swift": [],
+    "VanmoMac/UI/Browser/Models/MacConnectionTypeGroups.swift": [],
+    "VanmoMac/UI/Browser/ViewModels/MacConnectionsViewModel.swift": [],
+    "VanmoMac/UI/Browser/Views/MacAddConnectionView.swift": [],
+    "VanmoMac/UI/Browser/Views/MacConnectionsBrowseView.swift": [],
+    "VanmoMac/UI/Browser/Views/MacScanSyncBanner.swift": [],
+    "VanmoMac/UI/Components/MacHeaderToolbar.swift": [],
+    "VanmoMac/UI/Components/MacLibrarySyncToast.swift": [],
+    "VanmoMac/UI/Components/MacMediaCards.swift": [],
+    "VanmoMac/UI/Components/MacMediaItemContextMenu.swift": [],
+    "VanmoMac/UI/Components/MacQuickLookPresenter.swift": [],
+    "VanmoMac/UI/Components/MacRemoteImage.swift": [],
+    "VanmoMac/UI/Components/MacSidebarView.swift": [],
+    "VanmoMac/UI/Components/MacVibrancyBackground.swift": [],
+    "VanmoMac/UI/DesignSystem/MacDesignTokens.swift": [],
+    "VanmoMac/UI/DesignSystem/MacFormatters.swift": [],
+    "VanmoMac/UI/Library/MacCollectionFolderListView.swift": [],
+    "VanmoMac/UI/Library/MacEmbyFolderBrowseView.swift": [],
+    "VanmoMac/UI/Library/MacFavoritesListView.swift": [],
+    "VanmoMac/UI/Library/MacLibraryEmptyStateView.swift": [],
+    "VanmoMac/UI/Library/MacLibraryHomeView.swift": [],
+    "VanmoMac/UI/Library/MacLibraryItemDestination.swift": [],
+    "VanmoMac/UI/Library/MacLibrarySort.swift": [],
+    "VanmoMac/UI/Library/MacLibrarySublistHeader.swift": [],
+    "VanmoMac/UI/Library/MacLibraryViewModel.swift": [],
+    "VanmoMac/UI/Library/MacMediaListRow.swift": [],
+    "VanmoMac/UI/Library/MacScannedLibraryListView.swift": [],
+    "VanmoMac/UI/Library/MacScannedShowDetailView.swift": [],
+    "VanmoMac/UI/Library/Models/MacHomeCollectionCache.swift": [],
+    "VanmoMac/UI/MediaDetail/MacMediaDetailStore.swift": [],
+    "VanmoMac/UI/MediaDetail/MacMediaDetailView.swift": [],
+    "VanmoMac/UI/Search/MacSearchResultsView.swift": [],
+    "VanmoMac/UI/Search/MacSearchViewModel.swift": [],
+    "VanmoMac/UI/Settings/MacSettingsView.swift": [],
+    "VanmoMac/UI/Settings/MacSettingsViewModel.swift": [],
+    "VanmoMac/Vanmo-Mac-Cloud.entitlements": [],
+    "VanmoMac/Vanmo-Mac.entitlements": []
+  },
+  "batches": [
+    {
+      "batchIndex": 1,
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "language": "markdown",
+          "sizeLines": 30,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "ExportOptions.plist",
+          "language": "xml",
+          "sizeLines": 20,
+          "fileCategory": "config"
+        },
+        {
+          "path": "README.md",
+          "language": "markdown",
+          "sizeLines": 125,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "build_ipa.sh",
+          "language": "shell",
+          "sizeLines": 72,
+          "fileCategory": "script"
+        },
+        {
+          "path": "project.yml",
+          "language": "yaml",
+          "sizeLines": 206,
+          "fileCategory": "config"
+        },
+        {
+          "path": "run_device.sh",
+          "language": "shell",
+          "sizeLines": 627,
+          "fileCategory": "script"
+        },
+        {
+          "path": "todos.md",
+          "language": "markdown",
+          "sizeLines": 58,
+          "fileCategory": "docs"
+        }
+      ],
+      "batchImportData": {
+        "AGENTS.md": [],
+        "ExportOptions.plist": [],
+        "README.md": [],
+        "build_ipa.sh": [],
+        "project.yml": [],
+        "run_device.sh": [],
+        "todos.md": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 2,
+      "files": [
+        {
+          "path": "Vanmo/Resources/Info-Mac.plist",
+          "language": "xml",
+          "sizeLines": 44,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Info.plist",
+          "language": "xml",
+          "sizeLines": 95,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/loadingSpinner.json",
+          "language": "json",
+          "sizeLines": 1,
+          "fileCategory": "config"
+        }
+      ],
+      "batchImportData": {
+        "Vanmo/Resources/Info-Mac.plist": [],
+        "Vanmo/Resources/Info.plist": [],
+        "Vanmo/Resources/loadingSpinner.json": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 3,
+      "files": [
+        {
+          "path": ".cursorignore",
+          "language": "unknown",
+          "sizeLines": 57,
+          "fileCategory": "code"
+        },
+        {
+          "path": "file/animation loading.json",
+          "language": "json",
+          "sizeLines": 0,
+          "fileCategory": "config"
+        },
+        {
+          "path": "scripts/build-ffmpeg-ios.sh",
+          "language": "shell",
+          "sizeLines": 146,
+          "fileCategory": "script"
+        },
+        {
+          "path": "scripts/check-cloud-sync-multiplatform-scope.sh",
+          "language": "shell",
+          "sizeLines": 207,
+          "fileCategory": "script"
+        },
+        {
+          "path": "scripts/migrate-vanmocore-public.py",
+          "language": "python",
+          "sizeLines": 96,
+          "fileCategory": "code"
+        },
+        {
+          "path": "scripts/vanmocore-public-api.py",
+          "language": "python",
+          "sizeLines": 128,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo.xcodeproj/project.pbxproj",
+          "language": "pbxproj",
+          "sizeLines": 1628,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo-macOS.xcscheme",
+          "language": "xcscheme",
+          "sizeLines": 91,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme",
+          "language": "xcscheme",
+          "sizeLines": 91,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/App/AppState.swift",
+          "language": "swift",
+          "sizeLines": 56,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/App/ContentView.swift",
+          "language": "swift",
+          "sizeLines": 96,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/App/VanmoApp.swift",
+          "language": "swift",
+          "sizeLines": 85,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Core/Metadata/KSPlayerMediaProbeProvider.swift",
+          "language": "swift",
+          "sizeLines": 201,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Core/Player/KSPlayerEngine.swift",
+          "language": "swift",
+          "sizeLines": 593,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Core/Player/PlayerEngine.swift",
+          "language": "swift",
+          "sizeLines": 415,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Core/Player/PlayerEngineFactory.swift",
+          "language": "swift",
+          "sizeLines": 32,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Core/Player/PlayerState.swift",
+          "language": "swift",
+          "sizeLines": 12,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Core/Storage/ScanBackgroundTask.swift",
+          "language": "swift",
+          "sizeLines": 105,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Core/Subtitle/SubtitleOverlayView.swift",
+          "language": "swift",
+          "sizeLines": 268,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift",
+          "language": "swift",
+          "sizeLines": 1096,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Browser/Views/AddConnectionView.swift",
+          "language": "swift",
+          "sizeLines": 691,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Browser/Views/BrowserView.swift",
+          "language": "swift",
+          "sizeLines": 884,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Browser/Views/ScanSyncBanner.swift",
+          "language": "swift",
+          "sizeLines": 98,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Models/HomeCollectionCache.swift",
+          "language": "swift",
+          "sizeLines": 139,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Models/LibraryFilters.swift",
+          "language": "swift",
+          "sizeLines": 105,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        ".cursorignore": [],
+        "file/animation loading.json": [],
+        "scripts/build-ffmpeg-ios.sh": [],
+        "scripts/check-cloud-sync-multiplatform-scope.sh": [],
+        "scripts/migrate-vanmocore-public.py": [],
+        "scripts/vanmocore-public-api.py": [],
+        "Vanmo.xcodeproj/project.pbxproj": [],
+        "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo-macOS.xcscheme": [],
+        "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme": [],
+        "Vanmo/App/AppState.swift": [],
+        "Vanmo/App/ContentView.swift": [],
+        "Vanmo/App/VanmoApp.swift": [],
+        "Vanmo/Core/Metadata/KSPlayerMediaProbeProvider.swift": [],
+        "Vanmo/Core/Player/KSPlayerEngine.swift": [],
+        "Vanmo/Core/Player/PlayerEngine.swift": [],
+        "Vanmo/Core/Player/PlayerEngineFactory.swift": [],
+        "Vanmo/Core/Player/PlayerState.swift": [],
+        "Vanmo/Core/Storage/ScanBackgroundTask.swift": [],
+        "Vanmo/Core/Subtitle/SubtitleOverlayView.swift": [],
+        "Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift": [],
+        "Vanmo/Features/Browser/Views/AddConnectionView.swift": [],
+        "Vanmo/Features/Browser/Views/BrowserView.swift": [],
+        "Vanmo/Features/Browser/Views/ScanSyncBanner.swift": [],
+        "Vanmo/Features/Library/Models/HomeCollectionCache.swift": [],
+        "Vanmo/Features/Library/Models/LibraryFilters.swift": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 4,
+      "files": [
+        {
+          "path": "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
+          "language": "swift",
+          "sizeLines": 905,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/CollectionFolderListView.swift",
+          "language": "swift",
+          "sizeLines": 515,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
+          "language": "swift",
+          "sizeLines": 169,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/FavoritesListView.swift",
+          "language": "swift",
+          "sizeLines": 752,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
+          "language": "swift",
+          "sizeLines": 464,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/FilterChipsRow.swift",
+          "language": "swift",
+          "sizeLines": 155,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/FlowLayout.swift",
+          "language": "swift",
+          "sizeLines": 104,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/LibraryView.swift",
+          "language": "swift",
+          "sizeLines": 1394,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/MediaDetailView.swift",
+          "language": "swift",
+          "sizeLines": 1955,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/MediaListRow.swift",
+          "language": "swift",
+          "sizeLines": 102,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
+          "language": "swift",
+          "sizeLines": 311,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
+          "language": "swift",
+          "sizeLines": 190,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/SecondFloorItemView.swift",
+          "language": "swift",
+          "sizeLines": 109,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Library/Views/SecondFloorView.swift",
+          "language": "swift",
+          "sizeLines": 195,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
+          "language": "swift",
+          "sizeLines": 1481,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Player/Views/PlayerProgressBar.swift",
+          "language": "swift",
+          "sizeLines": 111,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Player/Views/PlayerView.swift",
+          "language": "swift",
+          "sizeLines": 918,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Player/Views/TrackSelectorView.swift",
+          "language": "swift",
+          "sizeLines": 159,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
+          "language": "swift",
+          "sizeLines": 443,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Search/Views/SearchView.swift",
+          "language": "swift",
+          "sizeLines": 137,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
+          "language": "swift",
+          "sizeLines": 188,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Features/Settings/Views/SettingsView.swift",
+          "language": "swift",
+          "sizeLines": 732,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json",
+          "language": "json",
+          "sizeLines": 38,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json",
+          "language": "json",
+          "sizeLines": 13,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/Contents.json",
+          "language": "json",
+          "sizeLines": 6,
+          "fileCategory": "config"
+        }
+      ],
+      "batchImportData": {
+        "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift": [],
+        "Vanmo/Features/Library/Views/CollectionFolderListView.swift": [],
+        "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift": [],
+        "Vanmo/Features/Library/Views/FavoritesListView.swift": [],
+        "Vanmo/Features/Library/Views/FavoritesStackedCard.swift": [],
+        "Vanmo/Features/Library/Views/FilterChipsRow.swift": [],
+        "Vanmo/Features/Library/Views/FlowLayout.swift": [],
+        "Vanmo/Features/Library/Views/LibraryView.swift": [],
+        "Vanmo/Features/Library/Views/MediaDetailView.swift": [],
+        "Vanmo/Features/Library/Views/MediaListRow.swift": [],
+        "Vanmo/Features/Library/Views/ScannedLibraryListView.swift": [],
+        "Vanmo/Features/Library/Views/ScannedShowDetailView.swift": [],
+        "Vanmo/Features/Library/Views/SecondFloorItemView.swift": [],
+        "Vanmo/Features/Library/Views/SecondFloorView.swift": [],
+        "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift": [],
+        "Vanmo/Features/Player/Views/PlayerProgressBar.swift": [],
+        "Vanmo/Features/Player/Views/PlayerView.swift": [],
+        "Vanmo/Features/Player/Views/TrackSelectorView.swift": [],
+        "Vanmo/Features/Search/ViewModels/SearchViewModel.swift": [],
+        "Vanmo/Features/Search/Views/SearchView.swift": [],
+        "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift": [],
+        "Vanmo/Features/Settings/Views/SettingsView.swift": [],
+        "Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json": [],
+        "Vanmo/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json": [],
+        "Vanmo/Resources/Assets.xcassets/Contents.json": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 5,
+      "files": [
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/EmptyStateDatabase.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 16,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/FilesFileVideo.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 16,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/FilesFolder.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 16,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/FilesHardDrive.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 16,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/FilesServer.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 16,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 16,
+          "fileCategory": "config"
+        },
+        {
+          "path": "Vanmo/Shared/Components/BackdropHeader.swift",
+          "language": "swift",
+          "sizeLines": 36,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Components/EmptyStateView.swift",
+          "language": "swift",
+          "sizeLines": 66,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Components/LoadingIndicatorView.swift",
+          "language": "swift",
+          "sizeLines": 32,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Components/LoadingView.swift",
+          "language": "swift",
+          "sizeLines": 25,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Components/MediaTitleLogoView.swift",
+          "language": "swift",
+          "sizeLines": 109,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Components/PosterCard.swift",
+          "language": "swift",
+          "sizeLines": 158,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Components/RatingBadge.swift",
+          "language": "swift",
+          "sizeLines": 43,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Extensions/Color+Vanmo.swift",
+          "language": "swift",
+          "sizeLines": 205,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Extensions/Int64+FileSize.swift",
+          "language": "swift",
+          "sizeLines": 15,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
+          "language": "swift",
+          "sizeLines": 27,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Extensions/URL+Extensions.swift",
+          "language": "swift",
+          "sizeLines": 15,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Extensions/View+Extensions.swift",
+          "language": "swift",
+          "sizeLines": 42,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Network/OAuthPresentationContextProvider+UIKit.swift",
+          "language": "swift",
+          "sizeLines": 15,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Utilities/CountryMapper.swift",
+          "language": "swift",
+          "sizeLines": 24,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
+          "language": "swift",
+          "sizeLines": 283,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Shared/Utilities/PlatformCompatibility.swift",
+          "language": "swift",
+          "sizeLines": 19,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Vanmo-Bridging-Header.h",
+          "language": "c",
+          "sizeLines": 4,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Vanmo-Cloud.entitlements",
+          "language": "entitlements",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Vanmo-Mac-Cloud.entitlements",
+          "language": "entitlements",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "Vanmo/Resources/Assets.xcassets/EmptyStateDatabase.imageset/Contents.json": [],
+        "Vanmo/Resources/Assets.xcassets/FilesFileVideo.imageset/Contents.json": [],
+        "Vanmo/Resources/Assets.xcassets/FilesFolder.imageset/Contents.json": [],
+        "Vanmo/Resources/Assets.xcassets/FilesHardDrive.imageset/Contents.json": [],
+        "Vanmo/Resources/Assets.xcassets/FilesServer.imageset/Contents.json": [],
+        "Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json": [],
+        "Vanmo/Shared/Components/BackdropHeader.swift": [],
+        "Vanmo/Shared/Components/EmptyStateView.swift": [],
+        "Vanmo/Shared/Components/LoadingIndicatorView.swift": [],
+        "Vanmo/Shared/Components/LoadingView.swift": [],
+        "Vanmo/Shared/Components/MediaTitleLogoView.swift": [],
+        "Vanmo/Shared/Components/PosterCard.swift": [],
+        "Vanmo/Shared/Components/RatingBadge.swift": [],
+        "Vanmo/Shared/Extensions/Color+Vanmo.swift": [],
+        "Vanmo/Shared/Extensions/Int64+FileSize.swift": [],
+        "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift": [],
+        "Vanmo/Shared/Extensions/URL+Extensions.swift": [],
+        "Vanmo/Shared/Extensions/View+Extensions.swift": [],
+        "Vanmo/Shared/Network/OAuthPresentationContextProvider+UIKit.swift": [],
+        "Vanmo/Shared/Utilities/CountryMapper.swift": [],
+        "Vanmo/Shared/Utilities/DominantColorExtractor.swift": [],
+        "Vanmo/Shared/Utilities/PlatformCompatibility.swift": [],
+        "Vanmo/Vanmo-Bridging-Header.h": [],
+        "Vanmo/Vanmo-Cloud.entitlements": [],
+        "Vanmo/Vanmo-Mac-Cloud.entitlements": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 6,
+      "files": [
+        {
+          "path": "Vanmo/Vanmo-Mac.entitlements",
+          "language": "entitlements",
+          "sizeLines": 14,
+          "fileCategory": "code"
+        },
+        {
+          "path": "Vanmo/Vanmo.entitlements",
+          "language": "entitlements",
+          "sizeLines": 14,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/App/MacAppState.swift",
+          "language": "swift",
+          "sizeLines": 412,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/App/VanmoMacApp.swift",
+          "language": "swift",
+          "sizeLines": 126,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/App/VanmoMacRootView.swift",
+          "language": "swift",
+          "sizeLines": 318,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift",
+          "language": "swift",
+          "sizeLines": 201,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacAVPlayerView.swift",
+          "language": "swift",
+          "sizeLines": 21,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacEpisodeSelectorView.swift",
+          "language": "swift",
+          "sizeLines": 119,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacKSPlayerEngine.swift",
+          "language": "swift",
+          "sizeLines": 368,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacKSPlayerView.swift",
+          "language": "swift",
+          "sizeLines": 34,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacLocalFilePlayback.swift",
+          "language": "swift",
+          "sizeLines": 68,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacPlayerCommands.swift",
+          "language": "swift",
+          "sizeLines": 17,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacPlayerControlsOverlay.swift",
+          "language": "swift",
+          "sizeLines": 253,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacPlayerEngineFactory.swift",
+          "language": "swift",
+          "sizeLines": 70,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacPlayerView.swift",
+          "language": "swift",
+          "sizeLines": 186,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacPlayerViewModel.swift",
+          "language": "swift",
+          "sizeLines": 1633,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacPlayerWindowController.swift",
+          "language": "swift",
+          "sizeLines": 110,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacSubtitleOverlayView.swift",
+          "language": "swift",
+          "sizeLines": 88,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Player/MacTrackSelectorView.swift",
+          "language": "swift",
+          "sizeLines": 155,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/Contents.json",
+          "language": "json",
+          "sizeLines": 0,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnAList.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnAliyunDrive.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnBaiduNetdisk.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnBox.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnDLNA.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        }
+      ],
+      "batchImportData": {
+        "Vanmo/Vanmo-Mac.entitlements": [],
+        "Vanmo/Vanmo.entitlements": [],
+        "VanmoMac/App/MacAppState.swift": [],
+        "VanmoMac/App/VanmoMacApp.swift": [],
+        "VanmoMac/App/VanmoMacRootView.swift": [],
+        "VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift": [],
+        "VanmoMac/Player/MacAVPlayerView.swift": [],
+        "VanmoMac/Player/MacEpisodeSelectorView.swift": [],
+        "VanmoMac/Player/MacKSPlayerEngine.swift": [],
+        "VanmoMac/Player/MacKSPlayerView.swift": [],
+        "VanmoMac/Player/MacLocalFilePlayback.swift": [],
+        "VanmoMac/Player/MacPlayerCommands.swift": [],
+        "VanmoMac/Player/MacPlayerControlsOverlay.swift": [],
+        "VanmoMac/Player/MacPlayerEngineFactory.swift": [],
+        "VanmoMac/Player/MacPlayerView.swift": [],
+        "VanmoMac/Player/MacPlayerViewModel.swift": [],
+        "VanmoMac/Player/MacPlayerWindowController.swift": [],
+        "VanmoMac/Player/MacSubtitleOverlayView.swift": [],
+        "VanmoMac/Player/MacTrackSelectorView.swift": [],
+        "VanmoMac/Resources/Assets.xcassets/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnAList.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnAliyunDrive.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnBaiduNetdisk.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnBox.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnDLNA.imageset/Contents.json": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 7,
+      "files": [
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnDrive115.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnEmby.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnFnOS.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnFTP.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnGoogleDrive.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnIPTV.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnJellyfin.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnLocalFolder.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnMEGA.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnNFS.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnOneDrive.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnPCloud.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnPlex.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnQuarkDrive.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnSFTP.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnSMB.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnWebDAV.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Assets.xcassets/MacConnYandexDisk.imageset/Contents.json",
+          "language": "json",
+          "sizeLines": 21,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/Info-Mac.plist",
+          "language": "xml",
+          "sizeLines": 44,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Resources/loadingSpinner.json",
+          "language": "json",
+          "sizeLines": 1,
+          "fileCategory": "config"
+        },
+        {
+          "path": "VanmoMac/Shared/Extensions/Color+Mac.swift",
+          "language": "swift",
+          "sizeLines": 46,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Shared/Extensions/Int64+FileSize.swift",
+          "language": "swift",
+          "sizeLines": 14,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Shared/Network/OAuthPresentationContextProvider+AppKit.swift",
+          "language": "swift",
+          "sizeLines": 12,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Browser/Models/MacConnectionTypeGroups.swift",
+          "language": "swift",
+          "sizeLines": 138,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Browser/ViewModels/MacConnectionsViewModel.swift",
+          "language": "swift",
+          "sizeLines": 1233,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "VanmoMac/Resources/Assets.xcassets/MacConnDrive115.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnEmby.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnFnOS.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnFTP.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnGoogleDrive.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnIPTV.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnJellyfin.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnLocalFolder.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnMEGA.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnNFS.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnOneDrive.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnPCloud.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnPlex.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnQuarkDrive.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnSFTP.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnSMB.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnWebDAV.imageset/Contents.json": [],
+        "VanmoMac/Resources/Assets.xcassets/MacConnYandexDisk.imageset/Contents.json": [],
+        "VanmoMac/Resources/Info-Mac.plist": [],
+        "VanmoMac/Resources/loadingSpinner.json": [],
+        "VanmoMac/Shared/Extensions/Color+Mac.swift": [],
+        "VanmoMac/Shared/Extensions/Int64+FileSize.swift": [],
+        "VanmoMac/Shared/Network/OAuthPresentationContextProvider+AppKit.swift": [],
+        "VanmoMac/UI/Browser/Models/MacConnectionTypeGroups.swift": [],
+        "VanmoMac/UI/Browser/ViewModels/MacConnectionsViewModel.swift": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 8,
+      "files": [
+        {
+          "path": "VanmoMac/UI/Browser/Views/MacAddConnectionView.swift",
+          "language": "swift",
+          "sizeLines": 913,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Browser/Views/MacConnectionsBrowseView.swift",
+          "language": "swift",
+          "sizeLines": 577,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Browser/Views/MacScanSyncBanner.swift",
+          "language": "swift",
+          "sizeLines": 92,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacHeaderToolbar.swift",
+          "language": "swift",
+          "sizeLines": 154,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacLibrarySyncToast.swift",
+          "language": "swift",
+          "sizeLines": 29,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacMediaCards.swift",
+          "language": "swift",
+          "sizeLines": 191,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacMediaItemContextMenu.swift",
+          "language": "swift",
+          "sizeLines": 38,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacQuickLookPresenter.swift",
+          "language": "swift",
+          "sizeLines": 30,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacRemoteImage.swift",
+          "language": "swift",
+          "sizeLines": 45,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacSidebarView.swift",
+          "language": "swift",
+          "sizeLines": 462,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Components/MacVibrancyBackground.swift",
+          "language": "swift",
+          "sizeLines": 51,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/DesignSystem/MacDesignTokens.swift",
+          "language": "swift",
+          "sizeLines": 228,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/DesignSystem/MacFormatters.swift",
+          "language": "swift",
+          "sizeLines": 36,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacCollectionFolderListView.swift",
+          "language": "swift",
+          "sizeLines": 189,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacEmbyFolderBrowseView.swift",
+          "language": "swift",
+          "sizeLines": 176,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacFavoritesListView.swift",
+          "language": "swift",
+          "sizeLines": 313,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacLibraryEmptyStateView.swift",
+          "language": "swift",
+          "sizeLines": 110,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacLibraryHomeView.swift",
+          "language": "swift",
+          "sizeLines": 348,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacLibraryItemDestination.swift",
+          "language": "swift",
+          "sizeLines": 21,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacLibrarySort.swift",
+          "language": "swift",
+          "sizeLines": 72,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacLibrarySublistHeader.swift",
+          "language": "swift",
+          "sizeLines": 41,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacLibraryViewModel.swift",
+          "language": "swift",
+          "sizeLines": 1088,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacMediaListRow.swift",
+          "language": "swift",
+          "sizeLines": 143,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacScannedLibraryListView.swift",
+          "language": "swift",
+          "sizeLines": 252,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Library/MacScannedShowDetailView.swift",
+          "language": "swift",
+          "sizeLines": 120,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "VanmoMac/UI/Browser/Views/MacAddConnectionView.swift": [],
+        "VanmoMac/UI/Browser/Views/MacConnectionsBrowseView.swift": [],
+        "VanmoMac/UI/Browser/Views/MacScanSyncBanner.swift": [],
+        "VanmoMac/UI/Components/MacHeaderToolbar.swift": [],
+        "VanmoMac/UI/Components/MacLibrarySyncToast.swift": [],
+        "VanmoMac/UI/Components/MacMediaCards.swift": [],
+        "VanmoMac/UI/Components/MacMediaItemContextMenu.swift": [],
+        "VanmoMac/UI/Components/MacQuickLookPresenter.swift": [],
+        "VanmoMac/UI/Components/MacRemoteImage.swift": [],
+        "VanmoMac/UI/Components/MacSidebarView.swift": [],
+        "VanmoMac/UI/Components/MacVibrancyBackground.swift": [],
+        "VanmoMac/UI/DesignSystem/MacDesignTokens.swift": [],
+        "VanmoMac/UI/DesignSystem/MacFormatters.swift": [],
+        "VanmoMac/UI/Library/MacCollectionFolderListView.swift": [],
+        "VanmoMac/UI/Library/MacEmbyFolderBrowseView.swift": [],
+        "VanmoMac/UI/Library/MacFavoritesListView.swift": [],
+        "VanmoMac/UI/Library/MacLibraryEmptyStateView.swift": [],
+        "VanmoMac/UI/Library/MacLibraryHomeView.swift": [],
+        "VanmoMac/UI/Library/MacLibraryItemDestination.swift": [],
+        "VanmoMac/UI/Library/MacLibrarySort.swift": [],
+        "VanmoMac/UI/Library/MacLibrarySublistHeader.swift": [],
+        "VanmoMac/UI/Library/MacLibraryViewModel.swift": [],
+        "VanmoMac/UI/Library/MacMediaListRow.swift": [],
+        "VanmoMac/UI/Library/MacScannedLibraryListView.swift": [],
+        "VanmoMac/UI/Library/MacScannedShowDetailView.swift": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 9,
+      "files": [
+        {
+          "path": "VanmoMac/UI/Library/Models/MacHomeCollectionCache.swift",
+          "language": "swift",
+          "sizeLines": 143,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/MediaDetail/MacMediaDetailStore.swift",
+          "language": "swift",
+          "sizeLines": 679,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/MediaDetail/MacMediaDetailView.swift",
+          "language": "swift",
+          "sizeLines": 907,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Search/MacSearchResultsView.swift",
+          "language": "swift",
+          "sizeLines": 160,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Search/MacSearchViewModel.swift",
+          "language": "swift",
+          "sizeLines": 469,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Settings/MacSettingsView.swift",
+          "language": "swift",
+          "sizeLines": 791,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/UI/Settings/MacSettingsViewModel.swift",
+          "language": "swift",
+          "sizeLines": 169,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Vanmo-Mac-Cloud.entitlements",
+          "language": "entitlements",
+          "sizeLines": 28,
+          "fileCategory": "code"
+        },
+        {
+          "path": "VanmoMac/Vanmo-Mac.entitlements",
+          "language": "entitlements",
+          "sizeLines": 20,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "VanmoMac/UI/Library/Models/MacHomeCollectionCache.swift": [],
+        "VanmoMac/UI/MediaDetail/MacMediaDetailStore.swift": [],
+        "VanmoMac/UI/MediaDetail/MacMediaDetailView.swift": [],
+        "VanmoMac/UI/Search/MacSearchResultsView.swift": [],
+        "VanmoMac/UI/Search/MacSearchViewModel.swift": [],
+        "VanmoMac/UI/Settings/MacSettingsView.swift": [],
+        "VanmoMac/UI/Settings/MacSettingsViewModel.swift": [],
+        "VanmoMac/Vanmo-Mac-Cloud.entitlements": [],
+        "VanmoMac/Vanmo-Mac.entitlements": []
+      },
+      "neighborMap": {}
+    }
+  ]
+}

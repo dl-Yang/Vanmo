@@ -1,3 +1,5 @@
+import AppKit
+import SwiftData
 import SwiftUI
 import VanmoCore
 
@@ -141,6 +143,11 @@ final class MacAppState: ObservableObject {
 
     weak var activePlayerViewModel: MacPlayerViewModel?
 
+    private var playerWindowController: MacPlayerWindowController?
+    private weak var playerLibraryViewModel: MacLibraryViewModel?
+    private weak var playerConnectionsViewModel: MacConnectionsViewModel?
+    private var playerModelContainer: ModelContainer?
+
     var nowPlayingTitle: String? {
         playerItem?.displayTitle ?? playerItem?.title
     }
@@ -151,6 +158,17 @@ final class MacAppState: ObservableObject {
 
     func syncAppearance(with systemColorScheme: ColorScheme) {
         isDarkMode = appearanceMode.resolvedIsDark(systemColorScheme: systemColorScheme)
+    }
+
+    /// 主窗口挂载后注入播放窗口所需的依赖（library / connections / SwiftData 容器）。
+    func configurePlayerDependencies(
+        libraryViewModel: MacLibraryViewModel,
+        connectionsViewModel: MacConnectionsViewModel,
+        modelContainer: ModelContainer
+    ) {
+        playerLibraryViewModel = libraryViewModel
+        playerConnectionsViewModel = connectionsViewModel
+        playerModelContainer = modelContainer
     }
 
     func openDetail(_ item: MediaItem) {
@@ -230,6 +248,36 @@ final class MacAppState: ObservableObject {
             selectedSection = .home
         }
         contentRoute = .library
+    }
+
+    /// 当前是否还有上一级页面可返回（处于 home 根页面时为 false）。
+    var canGoBack: Bool {
+        if selectedMediaItem != nil { return true }
+        switch contentRoute {
+        case .library: return false
+        default: return true
+        }
+    }
+
+    /// 返回上一步：详情 → 列表/收藏 → home。
+    func goBack() {
+        if selectedMediaItem != nil {
+            closeDetail()
+            return
+        }
+        switch contentRoute {
+        case .libraryFavorites:
+            selectLibrarySection(.home)
+        case .libraryCollectionFolder, .libraryScannedLibrary,
+             .libraryEmbyFolderBrowse, .libraryScannedShowDetail:
+            backFromLibrarySubRoute()
+        case .connectionBrowser:
+            exitConnectionBrowser()
+        case .search, .settings:
+            contentRoute = .library
+        case .library:
+            break
+        }
     }
 
     func selectSearch() {
@@ -318,12 +366,43 @@ final class MacAppState: ObservableObject {
     }
 
     func play(_ item: MediaItem, from position: TimeInterval = 0) {
+        if isPlayerPresented {
+            closePlayer()
+        }
+
         playerItem = item
         playerStartPosition = position
         isPlayerPresented = true
+
+        guard let playerLibraryViewModel,
+              let playerConnectionsViewModel,
+              let playerModelContainer else {
+            return
+        }
+
+        let controller = MacPlayerWindowController(
+            item: item,
+            startPosition: position,
+            appState: self,
+            libraryViewModel: playerLibraryViewModel,
+            connectionsViewModel: playerConnectionsViewModel,
+            modelContainer: playerModelContainer,
+            onWindowClosed: { [weak self] in
+                self?.handlePlayerWindowClosed()
+            }
+        )
+        playerWindowController = controller
+        controller.showPlayer()
     }
 
     func closePlayer() {
+        playerWindowController?.closeWindow()
+        playerWindowController = nil
+        handlePlayerWindowClosed()
+    }
+
+    /// 播放窗口关闭（用户点红点 / 菜单关闭 / 切换新播放内容）后的统一收尾。
+    private func handlePlayerWindowClosed() {
         activePlayerViewModel?.cleanup()
         isPlayerPresented = false
         playerItem = nil

@@ -1,27 +1,27 @@
 {
   "version": "1.0.0",
-  "gitCommitHash": "1c18734d98602fb1201ca0f6ce1a82d36331794f",
-  "generatedAt": "2026-06-15T06:14:51.736Z",
+  "gitCommitHash": "e3a3e1d54c907e52f701fad2246ce48415daf9f4",
+  "generatedAt": "2026-08-01T05:10:17.454Z",
   "files": {
     ".cursorignore": {
       "filePath": ".cursorignore",
-      "contentHash": "c5b38ddb3c40a0e70b4bcfb32ddb5cd69d9cbcbf4e224662630e6d45a8f21c87",
+      "contentHash": "c788c0b3d3e028f3db1983af25d31f35c77590fc63ddb44ef81ff47f396cd89d",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 44,
+      "totalLines": 58,
       "hasStructuralAnalysis": false
     },
-    ".understand-anything/.understandignore": {
-      "filePath": ".understand-anything/.understandignore",
-      "contentHash": "a8ee876e9fa1383c5d821d30e0781583a13cbeff9f7fa8bc05885adde438076f",
+    "AGENTS.md": {
+      "filePath": "AGENTS.md",
+      "contentHash": "be2ecd7f14254aea9e1c5315209e8235ef486d2bd5c70e1c69e45cb69074ff0e",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 50,
-      "hasStructuralAnalysis": false
+      "totalLines": 31,
+      "hasStructuralAnalysis": true
     },
     "build_ipa.sh": {
       "filePath": "build_ipa.sh",
@@ -43,24 +43,171 @@
       "totalLines": 21,
       "hasStructuralAnalysis": false
     },
-    "project.yml": {
-      "filePath": "project.yml",
-      "contentHash": "7101e8657f2ca20d23e46dc0b69c52aaca376568fc89d2e65f32ce87e6dbc1ea",
+    "file/animation loading.json": {
+      "filePath": "file/animation loading.json",
+      "contentHash": "1bc59e46c837c83dac852ba231d1d7cbc58133a5a17a6abe8bc97b7fa526c2e3",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 83,
+      "totalLines": 1,
+      "hasStructuralAnalysis": true
+    },
+    "project.yml": {
+      "filePath": "project.yml",
+      "contentHash": "82d0adfe56517a8a297282904b43690696d7a92fecdb2b8f88b8e4d5fdb13312",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 207,
       "hasStructuralAnalysis": true
     },
     "README.md": {
       "filePath": "README.md",
-      "contentHash": "1fec1b1492b03ae70bf251a1aec790859da7bf64f4345e813ddac6d32b11fbff",
+      "contentHash": "f73934424f387b95fc303bbe53bb08f4a9e59366d88c39c634101035dee14507",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 113,
+      "totalLines": 126,
+      "hasStructuralAnalysis": true
+    },
+    "run_device.sh": {
+      "filePath": "run_device.sh",
+      "contentHash": "ecf6d225d928cdaca54d6f66c3102beb18dcf842b3eaab930c0c37f714d39aed",
+      "functions": [
+        {
+          "name": "usage",
+          "params": [],
+          "exported": false,
+          "lineCount": 30
+        },
+        {
+          "name": "configure_target",
+          "params": [],
+          "exported": false,
+          "lineCount": 26
+        },
+        {
+          "name": "update_app_path",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "is_udid",
+          "params": [],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "parse_simctl_line",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "parse_xcodebuild_destination",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "list_xcodebuild_destinations",
+          "params": [],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "resolve_simulator",
+          "params": [],
+          "exported": false,
+          "lineCount": 32
+        },
+        {
+          "name": "detect_simulator",
+          "params": [],
+          "exported": false,
+          "lineCount": 25
+        },
+        {
+          "name": "resolve_ios_device_from_xcodebuild",
+          "params": [],
+          "exported": false,
+          "lineCount": 23
+        },
+        {
+          "name": "detect_ios_device_from_xcodebuild",
+          "params": [],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "resolve_device_from_xctrace",
+          "params": [],
+          "exported": false,
+          "lineCount": 35
+        },
+        {
+          "name": "detect_device_from_xctrace",
+          "params": [],
+          "exported": false,
+          "lineCount": 18
+        },
+        {
+          "name": "query_devicectl_devices",
+          "params": [],
+          "exported": false,
+          "lineCount": 57
+        },
+        {
+          "name": "resolve_device_from_devicectl",
+          "params": [],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "resolve_device",
+          "params": [],
+          "exported": false,
+          "lineCount": 24
+        },
+        {
+          "name": "detect_device",
+          "params": [],
+          "exported": false,
+          "lineCount": 23
+        },
+        {
+          "name": "devicectl_ref",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "ensure_simulator_booted",
+          "params": [],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "check_ios_signing",
+          "params": [],
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "select_destination",
+          "params": [],
+          "exported": false,
+          "lineCount": 13
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 628,
       "hasStructuralAnalysis": true
     },
     "scripts/build-ffmpeg-ios.sh": {
@@ -92,14 +239,225 @@
       "totalLines": 147,
       "hasStructuralAnalysis": true
     },
-    "Vanmo.xcodeproj/project.pbxproj": {
-      "filePath": "Vanmo.xcodeproj/project.pbxproj",
-      "contentHash": "7ca543341adaf799f592a33dde4ee559703e4e43b5f2e538345aa215e80f5e3c",
+    "scripts/check-cloud-sync-multiplatform-scope.sh": {
+      "filePath": "scripts/check-cloud-sync-multiplatform-scope.sh",
+      "contentHash": "ec21a232664ae66d0a7fc5bcd79894bc77bd93b7487af7dcbbe5bddd18253574",
+      "functions": [
+        {
+          "name": "fail",
+          "params": [],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "pass",
+          "params": [],
+          "exported": false,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 208,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/migrate-vanmocore-public.py": {
+      "filePath": "scripts/migrate-vanmocore-public.py",
+      "contentHash": "b49d45046a1fad8f0c0d1bbccea315cc47dcb1ea90d8f6c9598c7a4bd9f97887",
+      "functions": [
+        {
+          "name": "already_public",
+          "params": [
+            "line"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "strip_erroneous_public",
+          "params": [
+            "content"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "transform",
+          "params": [
+            "content"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 32
+        },
+        {
+          "name": "main",
+          "params": [],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 11
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "re",
+          "specifiers": [
+            "re"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "pathlib",
+          "specifiers": [
+            "Path"
+          ]
+        }
+      ],
+      "exports": [
+        "already_public",
+        "strip_erroneous_public",
+        "transform",
+        "main"
+      ],
+      "totalLines": 97,
+      "hasStructuralAnalysis": true
+    },
+    "scripts/vanmocore-public-api.py": {
+      "filePath": "scripts/vanmocore-public-api.py",
+      "contentHash": "e6341320822ea3dfbed1ce068276262ba59e6af6ae63159fc9a8962e79de576f",
+      "functions": [
+        {
+          "name": "is_type_line",
+          "params": [
+            "stripped"
+          ],
+          "returnType": "bool",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "publicize_type_line",
+          "params": [
+            "line"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "publicize_model_class",
+          "params": [
+            "content"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 2
+        },
+        {
+          "name": "publicize_members",
+          "params": [
+            "content"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 49
+        },
+        {
+          "name": "strip_erroneous_public",
+          "params": [
+            "content"
+          ],
+          "returnType": "str",
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "transform_file",
+          "params": [
+            "path"
+          ],
+          "returnType": "None",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "main",
+          "params": [],
+          "returnType": "int",
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "re",
+          "specifiers": [
+            "re"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "pathlib",
+          "specifiers": [
+            "Path"
+          ]
+        }
+      ],
+      "exports": [
+        "is_type_line",
+        "publicize_type_line",
+        "publicize_model_class",
+        "publicize_members",
+        "strip_erroneous_public",
+        "transform_file",
+        "main"
+      ],
+      "totalLines": 129,
+      "hasStructuralAnalysis": true
+    },
+    "todos.md": {
+      "filePath": "todos.md",
+      "contentHash": "abba0f287c4666a6cadce7240f069695311ac5b3ef821fe59b1f4e432d458089",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 1058,
+      "totalLines": 59,
+      "hasStructuralAnalysis": true
+    },
+    "Vanmo.xcodeproj/project.pbxproj": {
+      "filePath": "Vanmo.xcodeproj/project.pbxproj",
+      "contentHash": "b81b3ad0428f0226e68a500503f414c98652360351faadd695ed0ad2e7e8093f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1629,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo-macOS.xcscheme": {
+      "filePath": "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo-macOS.xcscheme",
+      "contentHash": "4b98076e0134565dc154827e1c6ec025136123a6ec8bfe77a3e45f3602fe4faf",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 92,
       "hasStructuralAnalysis": false
     },
     "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme": {
@@ -114,147 +472,57 @@
     },
     "Vanmo/App/AppState.swift": {
       "filePath": "Vanmo/App/AppState.swift",
-      "contentHash": "c5e6275adaf834f3909006c28230e0ef9b2ce590303afa3986e99d25a89ef835",
+      "contentHash": "9d05c88b18702011bbd38684cbda674982a23fa89455de36c46e849efc8799a8",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 55,
+      "totalLines": 57,
       "hasStructuralAnalysis": false
     },
     "Vanmo/App/ContentView.swift": {
       "filePath": "Vanmo/App/ContentView.swift",
-      "contentHash": "3bdcddca5f22fca6097f26ffed1a44f2302b40907c554630207b04aba7b4d3d0",
+      "contentHash": "2fc6bfeab283fcb5a53c791a06e4a1a281b8854302e85c50f15bf561ad96cd4c",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 69,
+      "totalLines": 97,
       "hasStructuralAnalysis": false
     },
     "Vanmo/App/VanmoApp.swift": {
       "filePath": "Vanmo/App/VanmoApp.swift",
-      "contentHash": "99eaa2ee28bacdef313a63de99fb6613309bad9fc424e7efe1ed2f81ef46c4ec",
+      "contentHash": "1072bb8940c90d7889bfcb2370c4fa7a46636accba861a24dd05f392a5bccf26",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 85,
+      "totalLines": 86,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Core/Metadata/FileNameParser.swift": {
-      "filePath": "Vanmo/Core/Metadata/FileNameParser.swift",
-      "contentHash": "6274cfb6e896ced9b6d4c068ae81a1ee358a6a88142f1494e02e85023322afcb",
+    "Vanmo/Core/Metadata/KSPlayerMediaProbeProvider.swift": {
+      "filePath": "Vanmo/Core/Metadata/KSPlayerMediaProbeProvider.swift",
+      "contentHash": "b0a75fea25476e070dde969577c293bd6818e1d0d3487746c9b4cabb823fe948",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 128,
+      "totalLines": 202,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Core/Metadata/MetadataService.swift": {
-      "filePath": "Vanmo/Core/Metadata/MetadataService.swift",
-      "contentHash": "d348f5faa95a3c7fe0f1df0217d86d6e8dd284c4454eb8a8454a12006e9bc468",
+    "Vanmo/Core/Player/KSPlayerEngine.swift": {
+      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "contentHash": "2aca9b4d6299c799b0f75b956937b2a0d501ae4dd67478fc561f381b482a8530",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 113,
+      "totalLines": 594,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Core/Metadata/TMDbModels.swift": {
-      "filePath": "Vanmo/Core/Metadata/TMDbModels.swift",
-      "contentHash": "32d25bdce6161dee54f32767474c244944325d7d19313224fb088c577e21c7ed",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 150,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Metadata/TMDbService.swift": {
-      "filePath": "Vanmo/Core/Metadata/TMDbService.swift",
-      "contentHash": "92f663ca113b7a9059a1117df6415851ac5fc85cbdd2706ec7ac0477be1ca165",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 152,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/EmbyService.swift": {
-      "filePath": "Vanmo/Core/Network/EmbyService.swift",
-      "contentHash": "b4631036c1963916a598b63031f3c67462f9e7767df60e21c5bc887387f49813",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 1480,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/JellyfinService.swift": {
-      "filePath": "Vanmo/Core/Network/JellyfinService.swift",
-      "contentHash": "d5a0aaa226098cef9ca7c22b5d7d6d8c46ca7318fe5bbd28ace5a07ea84f7b69",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 55,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/LocalFolderService.swift": {
-      "filePath": "Vanmo/Core/Network/LocalFolderService.swift",
-      "contentHash": "f395ddb467229b25631b1b61c718b5c6eb7d91f2aba89b82ccb03700b7c9b992",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 148,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/NetworkError.swift": {
-      "filePath": "Vanmo/Core/Network/NetworkError.swift",
-      "contentHash": "04fe34214a4e3d80db7fef54be0fb58faa21117e074d1fa42cd81200b6e89b01",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 24,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/PlexService.swift": {
-      "filePath": "Vanmo/Core/Network/PlexService.swift",
-      "contentHash": "172410c438964a85b933c0c4963c14325f17de110adf0ed4cd5cf445cf31d121",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 712,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/ServiceFactory.swift": {
-      "filePath": "Vanmo/Core/Network/ServiceFactory.swift",
-      "contentHash": "fc029231ed2f620b9d3142e4b13156e0e13fa3c3ee30452a99c9eea5d87be2ea",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 85,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/SMBService.swift": {
-      "filePath": "Vanmo/Core/Network/SMBService.swift",
-      "contentHash": "265a1ad22cb2d61db4814ef42855d28967364c63070512c4a20086b092f5b0b5",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 252,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Network/WebDAVService.swift": {
-      "filePath": "Vanmo/Core/Network/WebDAVService.swift",
-      "contentHash": "854cb3f1d5e09a84b34bac23f45c98567525ab932d8ed7b2856bff1c4644ad56",
+    "Vanmo/Core/Player/PlayerEngine.swift": {
+      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
+      "contentHash": "337e8eaccbe0311a52b19841548a32eaba992af89066901e3177d1d9a16e7119",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -262,259 +530,169 @@
       "totalLines": 416,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Core/Player/KSPlayerEngine.swift": {
-      "filePath": "Vanmo/Core/Player/KSPlayerEngine.swift",
-      "contentHash": "c5cfcf4b467a287d448f1264034475f18b93f6ab6786fa88961cd6ad960c5839",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 432,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/PlayerEngine.swift": {
-      "filePath": "Vanmo/Core/Player/PlayerEngine.swift",
-      "contentHash": "1b829e2239b10ea1ef7543cc4acb98b9c43255ef90e5c19707529732f002de88",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 372,
-      "hasStructuralAnalysis": false
-    },
     "Vanmo/Core/Player/PlayerEngineFactory.swift": {
       "filePath": "Vanmo/Core/Player/PlayerEngineFactory.swift",
-      "contentHash": "0edaec054f9abe99e8f10edbca934ef9d16d752d5aac0809138adb209065e56f",
+      "contentHash": "d1b97343022883237a71067ae336b246e901b426c9587de0b48c9a698830182c",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 40,
+      "totalLines": 33,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Core/Player/PlayerState.swift": {
       "filePath": "Vanmo/Core/Player/PlayerState.swift",
-      "contentHash": "2231d96d6a18ef71d7571616b79f79da6016284ade186aa1a13c436f8509fbdf",
+      "contentHash": "155051570c618f5b7aa7d5c078ecdbc15e7f48e2a5828d961725109bf4768843",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 116,
+      "totalLines": 13,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Core/Player/Prefetch/FetchLimiter.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/FetchLimiter.swift",
-      "contentHash": "18c29c966371880ac96639c212dbd25aa259d2b42c4b204a0187f0d35a5e4ddc",
+    "Vanmo/Core/Storage/ScanBackgroundTask.swift": {
+      "filePath": "Vanmo/Core/Storage/ScanBackgroundTask.swift",
+      "contentHash": "0a76b87995d4ab257cee71ede52ff335dd3f1d8547cf0ca7b60a915b8f626bf9",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 27,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/HTTPProtocolHandler.swift",
-      "contentHash": "e0a94499b8a6e0de2e604f83e2a4d13c82b0d88795005df4fb7cfe710994306e",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 113,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/PrefetchConfig.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchConfig.swift",
-      "contentHash": "d6f4cfa790ddb1fe6a47b458b77a7a7da4f031bd78cdb5aab4480da732d6adea",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 28,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/PrefetchError.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchError.swift",
-      "contentHash": "4d2422bf95d3a592871fab424e628e150a9e09295732a298e8eca7f5685db593",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 24,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchProxy.swift",
-      "contentHash": "cc6f09d1d26e61fcb19480483bd517793c404d47289b91f9be33b2c331666833",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 245,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/PrefetchSession.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchSession.swift",
-      "contentHash": "c8c8d2d761c237a1e4fd6ff5157cade885d56dbbd9dd285b580fe94655ead766",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 258,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/PrefetchTemporaryStore.swift",
-      "contentHash": "bdc51c42581e6ddf669b5b2b7b82814e278c3acb82c602bc58ead03b4f708728",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 34,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/RangeCache.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/RangeCache.swift",
-      "contentHash": "49a49ac038403e0e77ed6a0192ed95437923e0817a7bf5c22efc97f0ee8b80e6",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 227,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift": {
-      "filePath": "Vanmo/Core/Player/Prefetch/RemoteFetcher.swift",
-      "contentHash": "ad6ee08c14c7ad37e6a753022cbf814665509462323f4b9f535b2e13723acfc2",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 148,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Storage/MediaScanner.swift": {
-      "filePath": "Vanmo/Core/Storage/MediaScanner.swift",
-      "contentHash": "6581233739312cd4ae7b250736ab5cc2816f2d992373daa197c1e50da56d44c9",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 274,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Subtitle/SRTParser.swift": {
-      "filePath": "Vanmo/Core/Subtitle/SRTParser.swift",
-      "contentHash": "da6953665dbc3d39d31167376faebf4e9894f2bdb9e88274aa1b8def10a147c7",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 119,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Subtitle/SubtitleManager.swift": {
-      "filePath": "Vanmo/Core/Subtitle/SubtitleManager.swift",
-      "contentHash": "7b2d6184b7780dbf25b82193903ab9b7c4d2d1aa46c472d8583cb59e5fcd7aa3",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 97,
+      "totalLines": 106,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Core/Subtitle/SubtitleOverlayView.swift": {
       "filePath": "Vanmo/Core/Subtitle/SubtitleOverlayView.swift",
-      "contentHash": "19cef5d097f5d97abf0117c6e52a2be81fbb1200a0ff562e2adc6f03ca77638c",
+      "contentHash": "0db16438e289a0014a46d28976ab0c7f6e12a0b4c89c7a1fbfa0d464b3057d73",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 122,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Subtitle/SubtitleParser.swift": {
-      "filePath": "Vanmo/Core/Subtitle/SubtitleParser.swift",
-      "contentHash": "ff77b59333d5e959ba8e2d0eff032aefc33f38460833cc49b5f98f3bd7ac71e0",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 68,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Core/Subtitle/VTTParser.swift": {
-      "filePath": "Vanmo/Core/Subtitle/VTTParser.swift",
-      "contentHash": "fb8af5436f15083cf9c5ddedcee159541b10cc3a50c382c04954c1372b64f948",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 94,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Browser/Models/ConnectionModels.swift": {
-      "filePath": "Vanmo/Features/Browser/Models/ConnectionModels.swift",
-      "contentHash": "d91b9aef53f4180dace704d83a4a206c96e601f112e397d655e31beb2c44cedf",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 147,
+      "totalLines": 269,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift": {
       "filePath": "Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift",
-      "contentHash": "e2af5ff1565f673a100696734317f74c5d792f28429d0633b1113cd7eac1f1a6",
+      "contentHash": "4e7d948b3c74d3763c930263f716b738164355c9d131be92940b9b1155b1b187",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 455,
+      "totalLines": 1097,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Browser/Views/AddConnectionView.swift": {
       "filePath": "Vanmo/Features/Browser/Views/AddConnectionView.swift",
-      "contentHash": "37fe301ff74ec1f3f3f16849ec5152a4e1eba6119263f3718635103967dfbe54",
+      "contentHash": "f41184851b8df40bf12572338bc3964104e1f21c0afed95b83102a594ee48140",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 247,
+      "totalLines": 692,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Browser/Views/BrowserView.swift": {
       "filePath": "Vanmo/Features/Browser/Views/BrowserView.swift",
-      "contentHash": "9453b005b646d0268b98e263e261c9ecf26f9b1d2cb5e92f6cc4973b7746f336",
+      "contentHash": "a9cc335fa90af726db02e87c4540550247c7d23d4a3aa491222b29998d682e0d",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 411,
+      "totalLines": 885,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Features/Library/Models/CollectionFolder.swift": {
-      "filePath": "Vanmo/Features/Library/Models/CollectionFolder.swift",
-      "contentHash": "6786fb0494da6de8b2d407da08238adc18a3adde5a2390c40013629223045fd1",
+    "Vanmo/Features/Browser/Views/ScanSyncBanner.swift": {
+      "filePath": "Vanmo/Features/Browser/Views/ScanSyncBanner.swift",
+      "contentHash": "3f9cd88b75c987ce06d6afdec58e7ea48ad0d6d54796c38c5a82bc10047f6c59",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 51,
+      "totalLines": 99,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Models/HomeCollectionCache.swift": {
       "filePath": "Vanmo/Features/Library/Models/HomeCollectionCache.swift",
-      "contentHash": "6181862e9b2db90d44706a91471abb08e4e0f983f3d3dca31aa77585b30a7e27",
+      "contentHash": "fa098eed08146059cd4eb7cce2120310efaee4bcdc8f266c62989b78fdc76caa",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 127,
+      "totalLines": 140,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Models/LibraryFilters.swift": {
       "filePath": "Vanmo/Features/Library/Models/LibraryFilters.swift",
-      "contentHash": "8e57ee34e49f2530e0fcad95e5438f9ee642b34f234ecbdace92baaeb64641f0",
+      "contentHash": "3f715f85be7074cba840663922de5d911e87a7acf007299d3075dcd4418b93be",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 106,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift": {
+      "filePath": "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
+      "contentHash": "e55825a0518eb5f9b01b6f1c25a63466de23f34e7e1be1e9edba439bd819aee0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 906,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Features/Library/Views/CollectionFolderListView.swift": {
+      "filePath": "Vanmo/Features/Library/Views/CollectionFolderListView.swift",
+      "contentHash": "dc39d5290017f81a0036998a324c1ec9ae7ab8d64c8fbd496eea75bc0ed1971e",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 516,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift": {
+      "filePath": "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
+      "contentHash": "1cc8cd8613f7532450aa5b240535bf4a9571f89489a3ae713ff848f066627305",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 170,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Features/Library/Views/FavoritesListView.swift": {
+      "filePath": "Vanmo/Features/Library/Views/FavoritesListView.swift",
+      "contentHash": "f2f6958cbb491c0fbe40319df224108a7ba456a630b47050c7862f7a9124a6e5",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 753,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Features/Library/Views/FavoritesStackedCard.swift": {
+      "filePath": "Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
+      "contentHash": "4e728fb64303715379ba9be1e829092fe052853cefc1148c9c0fb49a116b38d1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 465,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Features/Library/Views/FilterChipsRow.swift": {
+      "filePath": "Vanmo/Features/Library/Views/FilterChipsRow.swift",
+      "contentHash": "236288e8cffde7fbd7743c4bb90caa2750582dc462abf3c26376819282dd05e8",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 156,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Features/Library/Views/FlowLayout.swift": {
+      "filePath": "Vanmo/Features/Library/Views/FlowLayout.swift",
+      "contentHash": "528aa993e6f05943985d87907c01b39e7c4b23c54d684b0c87c8560e1c782ac9",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -522,244 +700,154 @@
       "totalLines": 105,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Features/Library/Models/MediaItem.swift": {
-      "filePath": "Vanmo/Features/Library/Models/MediaItem.swift",
-      "contentHash": "dc9532d08e98aacf29d336fcbec9c030e395028b06437a114de5d2ab1d61f481",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 249,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/Models/PlaybackRecord.swift": {
-      "filePath": "Vanmo/Features/Library/Models/PlaybackRecord.swift",
-      "contentHash": "71a5ac78952e3fde37213ec37643556773470700ab0c55888d55b04089d06fee",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 26,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift": {
-      "filePath": "Vanmo/Features/Library/ViewModels/LibraryViewModel.swift",
-      "contentHash": "20cbb3ee5a2b69dfdcff88a7ca11b6a06f540b6b686061c296892d714f421d76",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 703,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/Views/CollectionFolderListView.swift": {
-      "filePath": "Vanmo/Features/Library/Views/CollectionFolderListView.swift",
-      "contentHash": "bef6d53cdca28bd9991a3a9e1b5610a41f9c77d4834fa34770dc281a3f38bce2",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 503,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift": {
-      "filePath": "Vanmo/Features/Library/Views/EmbyFolderBrowseView.swift",
-      "contentHash": "c52c72a133048e8cc88fd695890f519b1cce805d376bdfe02940058ed2ed068d",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 157,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/Views/FavoritesListView.swift": {
-      "filePath": "Vanmo/Features/Library/Views/FavoritesListView.swift",
-      "contentHash": "33f6e159ef4a68ddc72e3a5d5834d518273fd81d5b2814be80eb2d7594ed2cb2",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 439,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/Views/FavoritesStackedCard.swift": {
-      "filePath": "Vanmo/Features/Library/Views/FavoritesStackedCard.swift",
-      "contentHash": "79e823bd033073d042d75b05441441d59956cbeec912391e1959f7adf1714df8",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 464,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/Views/FilterChipsRow.swift": {
-      "filePath": "Vanmo/Features/Library/Views/FilterChipsRow.swift",
-      "contentHash": "250db62dcc7124087ad7340e86dc71849656d0ab78c9f2d453e3382197c2d45c",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 155,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Features/Library/Views/FlowLayout.swift": {
-      "filePath": "Vanmo/Features/Library/Views/FlowLayout.swift",
-      "contentHash": "41229831c55bdc04c23a6a6f8a2d7e9422ea290f3fc756d01307a945f9734e9f",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 104,
-      "hasStructuralAnalysis": false
-    },
     "Vanmo/Features/Library/Views/LibraryView.swift": {
       "filePath": "Vanmo/Features/Library/Views/LibraryView.swift",
-      "contentHash": "91177492e6118d384cc45c0c1be4c5cdc4993e8be2c459f13d3165583f422449",
+      "contentHash": "b020f9268dccc758bdae3abb564d3fea4464626c0df0de0dea68f63e0f4ecb00",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 789,
+      "totalLines": 1395,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Views/MediaDetailView.swift": {
       "filePath": "Vanmo/Features/Library/Views/MediaDetailView.swift",
-      "contentHash": "fac6bcd56af428492155685b4c5b36d86abad18bbe2c9f19f5046fc2abcac6e7",
+      "contentHash": "d201dae00ccd4c33b59eba546785b76d23ccb5b17a98a2cb274841b53e7a811f",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 920,
+      "totalLines": 1956,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Views/MediaListRow.swift": {
       "filePath": "Vanmo/Features/Library/Views/MediaListRow.swift",
-      "contentHash": "22f76db31d265fb870bfe62a6ad8dd3b54f0f1a578e82b86fe081d1d47966047",
+      "contentHash": "d4229c7283cee9934dd4fea11677d6f1834f3d7d75491b39425e328c03678a2f",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 101,
+      "totalLines": 103,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Views/ScannedLibraryListView.swift": {
       "filePath": "Vanmo/Features/Library/Views/ScannedLibraryListView.swift",
-      "contentHash": "3b857d1d2ba36b259de8d3319c3fa6305fb16f4d7f55a91622ccc7ace50854ac",
+      "contentHash": "38c9281cded063083b0e46a73223a2582c7872bb2e4758317530b100aecb5aaf",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 307,
+      "totalLines": 312,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Views/ScannedShowDetailView.swift": {
       "filePath": "Vanmo/Features/Library/Views/ScannedShowDetailView.swift",
-      "contentHash": "8fb5655f618f4523ddf303ab94fbc20f9ff94eaa4e125480f344a1d8dbbb321d",
+      "contentHash": "395de716d45438078f52299bf2d3a94d0139f0c1521da084344d137d33277394",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 186,
+      "totalLines": 191,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Views/SecondFloorItemView.swift": {
       "filePath": "Vanmo/Features/Library/Views/SecondFloorItemView.swift",
-      "contentHash": "b2720695ec3d92dc713fb59e5f62321f7c565bcc2f672836ce29806501dfe75b",
+      "contentHash": "2fd8403ddc11d464e08e5fffeb3d499621dc6d3665d330c4225b34be9c7086c2",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 109,
+      "totalLines": 110,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Library/Views/SecondFloorView.swift": {
       "filePath": "Vanmo/Features/Library/Views/SecondFloorView.swift",
-      "contentHash": "f112495a0b24c71511588c623c9a91c15f1fb3572eb7ffa574738cfc9d69833f",
+      "contentHash": "253bb7afa8bb30e91784f7f38bbd1d940836a07cf122e1353b043526fa2c83c0",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 195,
+      "totalLines": 196,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift": {
       "filePath": "Vanmo/Features/Player/ViewModels/PlayerViewModel.swift",
-      "contentHash": "a81330263b9c232718801cf5262dd4972682c6a2dd7e142fd6d78aae9698ccd9",
+      "contentHash": "0c716f993ae03f08f1cef50e0db918627d96ee1b909737adf060a36f4d586525",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 658,
+      "totalLines": 1482,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Player/Views/PlayerProgressBar.swift": {
       "filePath": "Vanmo/Features/Player/Views/PlayerProgressBar.swift",
-      "contentHash": "be6ceb203d7e4a1bf9c4073f131ce71f55599f98d7f885d716dd1fa56bc6e6db",
+      "contentHash": "66a23035dff38176011b24426ac6b3c893d71a7cc83bdf32f86137eb6a73accc",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 97,
+      "totalLines": 112,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Player/Views/PlayerView.swift": {
       "filePath": "Vanmo/Features/Player/Views/PlayerView.swift",
-      "contentHash": "28a4094eba3778ee3aa8b77744adde5c7a2553d6af202299d13f03cce972b42e",
+      "contentHash": "f707db0c8bd2475d681d9995fb63c0911158cf8cda564ab0ac99232a34af868e",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 707,
+      "totalLines": 919,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Player/Views/TrackSelectorView.swift": {
       "filePath": "Vanmo/Features/Player/Views/TrackSelectorView.swift",
-      "contentHash": "080fb2a1c7109ac5b6b0e547de0efccd4fb9a12ed6e5effd857c0150e71a1d11",
+      "contentHash": "ca7a9b8e5c59d8befcb1a6f46f82a7cc295a3efd98f0ab76564b6386554dafce",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 97,
+      "totalLines": 160,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Search/ViewModels/SearchViewModel.swift": {
       "filePath": "Vanmo/Features/Search/ViewModels/SearchViewModel.swift",
-      "contentHash": "dea31f851819238406a82a5941150742786219da586265ae9e2474a1dd85a8af",
+      "contentHash": "bba1adf9209d3e4186c731f4454675cd402a3975ccb5c3281b7ffbb106d066e2",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 90,
+      "totalLines": 444,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Search/Views/SearchView.swift": {
       "filePath": "Vanmo/Features/Search/Views/SearchView.swift",
-      "contentHash": "4c6d17331f075d33badb37e8ad8a8d52c670a9aa0e833bda3e4035e479121a04",
+      "contentHash": "fd6528c9721ee88f3c037ac38ced0a5ce0e3417fa6c4479a31c4576da49f9ad1",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 199,
+      "totalLines": 138,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift": {
       "filePath": "Vanmo/Features/Settings/ViewModels/SettingsViewModel.swift",
-      "contentHash": "b101da5542614fac09d7c39a5f1afa07e825d207142e7b6bf983d45e562017c4",
+      "contentHash": "a23dbc7e5e2c3803a64fbb943c069062628d32db9d3127a61bf4850d6ab5013d",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 82,
+      "totalLines": 189,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Features/Settings/Views/SettingsView.swift": {
       "filePath": "Vanmo/Features/Settings/Views/SettingsView.swift",
-      "contentHash": "05a62db101d31ebe5a8a9ea1fb9992f65d053caeb7bd3e73006711a189f470fb",
+      "contentHash": "57c7de9eadc81ba909fa3b7a6a07187e7a9b6e2bb6f982079e0b0a02d1f5f34a",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 440,
+      "totalLines": 733,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Resources/Assets.xcassets/AccentColor.colorset/Contents.json": {
@@ -792,6 +880,56 @@
       "totalLines": 7,
       "hasStructuralAnalysis": true
     },
+    "Vanmo/Resources/Assets.xcassets/EmptyStateDatabase.imageset/Contents.json": {
+      "filePath": "Vanmo/Resources/Assets.xcassets/EmptyStateDatabase.imageset/Contents.json",
+      "contentHash": "1013309a4623a0b6c7171a71724fceef4a796737a7518825dca0442e63e05497",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "Vanmo/Resources/Assets.xcassets/FilesFileVideo.imageset/Contents.json": {
+      "filePath": "Vanmo/Resources/Assets.xcassets/FilesFileVideo.imageset/Contents.json",
+      "contentHash": "c74a3789ab964d0deb88adc95d51991bdacb38ac736f1a4902dc0f4fce82bcd5",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "Vanmo/Resources/Assets.xcassets/FilesFolder.imageset/Contents.json": {
+      "filePath": "Vanmo/Resources/Assets.xcassets/FilesFolder.imageset/Contents.json",
+      "contentHash": "72619d4a3f06350c33a26a1a886a33ee53579e722abe808d061a83b9c5cea076",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "Vanmo/Resources/Assets.xcassets/FilesHardDrive.imageset/Contents.json": {
+      "filePath": "Vanmo/Resources/Assets.xcassets/FilesHardDrive.imageset/Contents.json",
+      "contentHash": "01dcca5ef5dea10fc55d3adeb05e2566a052f13249f5981f5d559c511961e446",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "Vanmo/Resources/Assets.xcassets/FilesServer.imageset/Contents.json": {
+      "filePath": "Vanmo/Resources/Assets.xcassets/FilesServer.imageset/Contents.json",
+      "contentHash": "6381337c79eca29809935d15a3ad1759502354ac25e7b3cd8ac325c1da17ff80",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
     "Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json": {
       "filePath": "Vanmo/Resources/Assets.xcassets/icon_download.imageset/Contents.json",
       "contentHash": "c0008987f43ac2e4633f98d8a9212bbb7ae81adca47bf3a91fed95e1a3fb89eb",
@@ -802,49 +940,59 @@
       "totalLines": 17,
       "hasStructuralAnalysis": true
     },
-    "Vanmo/Resources/Info.plist": {
-      "filePath": "Vanmo/Resources/Info.plist",
-      "contentHash": "32c00f8f164a7d60864c2eba0256e22991b0746d862791137b28de14c9607194",
+    "Vanmo/Resources/Info-Mac.plist": {
+      "filePath": "Vanmo/Resources/Info-Mac.plist",
+      "contentHash": "3af35873040079774c86b07ff0ef1800b2f50a5a7886ecb3e44c2095bd311174",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 72,
+      "totalLines": 45,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Resources/Info.plist": {
+      "filePath": "Vanmo/Resources/Info.plist",
+      "contentHash": "ec6ec2874089a2443506f495656e608d717998815439bcf7e0a3417783c99fb2",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 96,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Resources/loadingSpinner.json": {
       "filePath": "Vanmo/Resources/loadingSpinner.json",
-      "contentHash": "bc618f9571a0398e36743b7c349b39b955e3ac76b0b93d261f4f454036ae2c07",
+      "contentHash": "45cb498ed5c085ac4a370814c31cd08c852563a30d3dd597379de7463931476b",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 70,
+      "totalLines": 2,
       "hasStructuralAnalysis": true
     },
     "Vanmo/Shared/Components/BackdropHeader.swift": {
       "filePath": "Vanmo/Shared/Components/BackdropHeader.swift",
-      "contentHash": "907e1c1201adff9030ed74474f2b1e0eeec5b3cd255c468dec9959959c1b20d0",
+      "contentHash": "8b9d1a8bb87914b0b9fff63882444654c60988183b405c4d5d9b197b6c370470",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 36,
+      "totalLines": 37,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Components/EmptyStateView.swift": {
       "filePath": "Vanmo/Shared/Components/EmptyStateView.swift",
-      "contentHash": "1ee30b2c2973545dd27778198b05e7fda330fb613943e8da267e0c55d7b0ee28",
+      "contentHash": "c744c5a98d1d5240f66052b0d14207d90313f08a8bea7d452a09a68810a5dd2e",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 66,
+      "totalLines": 67,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Components/LoadingIndicatorView.swift": {
       "filePath": "Vanmo/Shared/Components/LoadingIndicatorView.swift",
-      "contentHash": "a422ddf0eff589b0c5a3d599490988c9400d9dd16802d50e0cfd3a9feb986618",
+      "contentHash": "76af8ffd1721da6ab96672e9da97859327d4e4a3caa54aace80d98fefa0ed301",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -854,67 +1002,67 @@
     },
     "Vanmo/Shared/Components/LoadingView.swift": {
       "filePath": "Vanmo/Shared/Components/LoadingView.swift",
-      "contentHash": "78eb1c9509b4fd13391f8f169f1576ebb75a9887828482aff795cc0a2c41c433",
+      "contentHash": "a841c95e0eaba1bec7ea766db78703d268c8aae0eb6a7c47f66b0c75588bc81e",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 25,
+      "totalLines": 26,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Shared/Components/MediaTitleLogoView.swift": {
+      "filePath": "Vanmo/Shared/Components/MediaTitleLogoView.swift",
+      "contentHash": "df61e5c3f0e90c0e3bc4d86f49c9c38d3c804656cfa355b409b1730d3b963248",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 110,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Components/PosterCard.swift": {
       "filePath": "Vanmo/Shared/Components/PosterCard.swift",
-      "contentHash": "e603ff253da09ee548edf6e2e8c9fa7e11a4dbeae95444a90a02384a1dbd5e3a",
+      "contentHash": "d9d6d958013e980990069307f4ec3ec6247af221c9f222e3d2c324c129ecbb5a",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 156,
+      "totalLines": 159,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Components/RatingBadge.swift": {
       "filePath": "Vanmo/Shared/Components/RatingBadge.swift",
-      "contentHash": "c1b099ea264a776e9c6b91c945a2a11d824ef0e8a9fb608c29524e768b2e3673",
+      "contentHash": "ae933abec934877b222b4cd73a1dac214c3774e5a83934849f9c7fc16d5cd480",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 43,
+      "totalLines": 44,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Extensions/Color+Vanmo.swift": {
       "filePath": "Vanmo/Shared/Extensions/Color+Vanmo.swift",
-      "contentHash": "49bfd609bf07f03b396e6037cf592253ec4a1ea5cdcb632d6de930dd20132f16",
+      "contentHash": "61ea31cc781815568c61631e5077be93264b905e15a31059c9a7c911008303bb",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 182,
+      "totalLines": 206,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Extensions/Int64+FileSize.swift": {
       "filePath": "Vanmo/Shared/Extensions/Int64+FileSize.swift",
-      "contentHash": "5843431031d4c0fddf7050bb3fd93dd1ed76c5591ed38f695d040be3e3501bfc",
+      "contentHash": "50aead9aafec58f928e6e3ce963a3638aa2dc422f3ad15c7265a2c2aaaff6d82",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 15,
+      "totalLines": 16,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift": {
       "filePath": "Vanmo/Shared/Extensions/TimeInterval+Formatting.swift",
-      "contentHash": "a278613d112630b26ddaeb06693d8ae5fee076cd2df6ddec0ade0866ec55e561",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 27,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Shared/Extensions/URL+Extensions.swift": {
-      "filePath": "Vanmo/Shared/Extensions/URL+Extensions.swift",
-      "contentHash": "4912cc60fe90aab38d3a82f58659aee2c1d083200d686842c253dec7dd31bb8b",
+      "contentHash": "5390a77626cc9a4e114fcffe4e67361cdfe37a03b6606060f7f052ac5dd79650",
       "functions": [],
       "classes": [],
       "imports": [],
@@ -922,64 +1070,64 @@
       "totalLines": 28,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Shared/Extensions/View+Extensions.swift": {
-      "filePath": "Vanmo/Shared/Extensions/View+Extensions.swift",
-      "contentHash": "86a3c5deeaec4ec00af722d24bfee30c83852dbf5436af4d4a72b710d5499e5d",
+    "Vanmo/Shared/Extensions/URL+Extensions.swift": {
+      "filePath": "Vanmo/Shared/Extensions/URL+Extensions.swift",
+      "contentHash": "7b0a40d2b54419b6a6ba641323fbde58f50b6e8ba4a4e72f8ca73e170115e927",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 42,
+      "totalLines": 16,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Shared/Protocols/RemoteFileService.swift": {
-      "filePath": "Vanmo/Shared/Protocols/RemoteFileService.swift",
-      "contentHash": "4b34d705dcd1c291c3fe2bedb50eac60b75432dc132c4ccad6406810716c6db4",
+    "Vanmo/Shared/Extensions/View+Extensions.swift": {
+      "filePath": "Vanmo/Shared/Extensions/View+Extensions.swift",
+      "contentHash": "0f2eb7de2d1dbc06431fc6d2ac00389fe94d789bace223bea8d2a328b5b6995c",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 157,
+      "totalLines": 43,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Shared/Network/OAuthPresentationContextProvider+UIKit.swift": {
+      "filePath": "Vanmo/Shared/Network/OAuthPresentationContextProvider+UIKit.swift",
+      "contentHash": "59b96bdb0865613bd10c619e8278e564b1dd9af0ccb46255d07b6cef673cfc13",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 16,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Utilities/CountryMapper.swift": {
       "filePath": "Vanmo/Shared/Utilities/CountryMapper.swift",
-      "contentHash": "b55365f8dd8bb18f3db200fd54dd8d688977f298f1c0419e7c4f64a1538d6481",
+      "contentHash": "b446b5abeedae6da384181987ce22e5cf6f5ba691c2cc8eecf196b1f18bebdb1",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 24,
+      "totalLines": 25,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Shared/Utilities/DominantColorExtractor.swift": {
       "filePath": "Vanmo/Shared/Utilities/DominantColorExtractor.swift",
-      "contentHash": "e74f06e340ba47941fcd6aa6cb999b601964eeed36e4d9b853a59e587f908855",
+      "contentHash": "9dcd93a02278e528f2c65f523ae99c12a12583a22797da2bee83a19eade7eac3",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 283,
+      "totalLines": 284,
       "hasStructuralAnalysis": false
     },
-    "Vanmo/Shared/Utilities/KeychainManager.swift": {
-      "filePath": "Vanmo/Shared/Utilities/KeychainManager.swift",
-      "contentHash": "30752956863127b4585bc70cf99e08ce84831d441a7ae25f7d252709b2c94bd0",
+    "Vanmo/Shared/Utilities/PlatformCompatibility.swift": {
+      "filePath": "Vanmo/Shared/Utilities/PlatformCompatibility.swift",
+      "contentHash": "12160b9a78133ea251bd8eee96f180eb2ce4a772bbf9f7708bfaf3cdd2b2fc59",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 88,
-      "hasStructuralAnalysis": false
-    },
-    "Vanmo/Shared/Utilities/Logger.swift": {
-      "filePath": "Vanmo/Shared/Utilities/Logger.swift",
-      "contentHash": "e0eb046d57dcb2bfbbc5ea67b882999560f99fb97e5095237b30ad1435947643",
-      "functions": [],
-      "classes": [],
-      "imports": [],
-      "exports": [],
-      "totalLines": 12,
+      "totalLines": 20,
       "hasStructuralAnalysis": false
     },
     "Vanmo/Vanmo-Bridging-Header.h": {
@@ -992,14 +1140,864 @@
       "totalLines": 5,
       "hasStructuralAnalysis": true
     },
-    "Vanmo/Vanmo.entitlements": {
-      "filePath": "Vanmo/Vanmo.entitlements",
-      "contentHash": "b043dea477bbd5da1552ef2f436a0cb644b884bb2568a9f831bd4ee362f9e99b",
+    "Vanmo/Vanmo-Cloud.entitlements": {
+      "filePath": "Vanmo/Vanmo-Cloud.entitlements",
+      "contentHash": "0dc609f9b2793f3bdd44057feacfd87680ab6e2be371934811ee87f07e9437c1",
       "functions": [],
       "classes": [],
       "imports": [],
       "exports": [],
-      "totalLines": 11,
+      "totalLines": 23,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Vanmo-Mac-Cloud.entitlements": {
+      "filePath": "Vanmo/Vanmo-Mac-Cloud.entitlements",
+      "contentHash": "bdc6b919c424f182ebd4a9a4fb2ea5667d59b364c507d59abb40cf15fbcf1b7e",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 23,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Vanmo-Mac.entitlements": {
+      "filePath": "Vanmo/Vanmo-Mac.entitlements",
+      "contentHash": "c5cff21f87771287f5ebdbdf4584006efdd0cf23b515c9cb5f5bbf937dbae724",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 15,
+      "hasStructuralAnalysis": false
+    },
+    "Vanmo/Vanmo.entitlements": {
+      "filePath": "Vanmo/Vanmo.entitlements",
+      "contentHash": "053f6d3611e9120abe1465d4bfe47bd7dd0da06eadba631ce7ae04e299b750b4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 15,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/App/MacAppState.swift": {
+      "filePath": "VanmoMac/App/MacAppState.swift",
+      "contentHash": "26225b966b9b8e765be9d5002e6cb8ebba50003a5b0f41726598295cba55d5fc",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 413,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/App/VanmoMacApp.swift": {
+      "filePath": "VanmoMac/App/VanmoMacApp.swift",
+      "contentHash": "02c946323552cfaf20d105b626b537a0a46ffcb9d2e1d5fa33928cea5a7c933d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 127,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/App/VanmoMacRootView.swift": {
+      "filePath": "VanmoMac/App/VanmoMacRootView.swift",
+      "contentHash": "aef24af827d9aff9be409a932caa8b2439669f1f3c1bda1e6ea51aa8cec9de3e",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 319,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift": {
+      "filePath": "VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift",
+      "contentHash": "b0a75fea25476e070dde969577c293bd6818e1d0d3487746c9b4cabb823fe948",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 202,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacAVPlayerView.swift": {
+      "filePath": "VanmoMac/Player/MacAVPlayerView.swift",
+      "contentHash": "9d77b04f19705234bc7fa062317c5500529de6d9b7b1609c237ab831664bd1ea",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacEpisodeSelectorView.swift": {
+      "filePath": "VanmoMac/Player/MacEpisodeSelectorView.swift",
+      "contentHash": "f88b39fe1f63fabc6ef161e197ed991ec0d1f3fecf6f2cb11a864b86e8849a50",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 120,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacKSPlayerEngine.swift": {
+      "filePath": "VanmoMac/Player/MacKSPlayerEngine.swift",
+      "contentHash": "bf89a81d2e5956cd2fa714fc25c9bfe50ac7cab1e7bb658635d9df65419426e6",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 369,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacKSPlayerView.swift": {
+      "filePath": "VanmoMac/Player/MacKSPlayerView.swift",
+      "contentHash": "35a9d2f31e32acd6ce576c3aedaf6d9a96a54ccebba6fa3688f2bdbab753dca1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 35,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacLocalFilePlayback.swift": {
+      "filePath": "VanmoMac/Player/MacLocalFilePlayback.swift",
+      "contentHash": "4056e5ee656716387f58547b8190bed797c108444734744b6c1a6b2a0eed6852",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 69,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacPlayerCommands.swift": {
+      "filePath": "VanmoMac/Player/MacPlayerCommands.swift",
+      "contentHash": "27c4a4d9ddead71f7e46870b976f629a5edb6c193b9a109233e50b1c0869a70a",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 18,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacPlayerControlsOverlay.swift": {
+      "filePath": "VanmoMac/Player/MacPlayerControlsOverlay.swift",
+      "contentHash": "8611ba33a04fde4c06b212b86143cc566c1f52c334ba5bd1133c95893c1085c0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 254,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacPlayerEngineFactory.swift": {
+      "filePath": "VanmoMac/Player/MacPlayerEngineFactory.swift",
+      "contentHash": "6b35e2c77af503e3d1e62f7991575e9a5307545fa5e10047fdc97778efb6bd0f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 71,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacPlayerView.swift": {
+      "filePath": "VanmoMac/Player/MacPlayerView.swift",
+      "contentHash": "2dede3e4d63c240dd7dabd242e47806ccb081f7a1ec13fcd4be9f9211d397a02",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 187,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacPlayerViewModel.swift": {
+      "filePath": "VanmoMac/Player/MacPlayerViewModel.swift",
+      "contentHash": "fcabc2e4cf7075af20a1b363568b6395b2f62f9f7ab1348d07857a8b1b7935e8",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1634,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacPlayerWindowController.swift": {
+      "filePath": "VanmoMac/Player/MacPlayerWindowController.swift",
+      "contentHash": "5708d7596ffe86eee0354205484a4040c4eaa218bf82000626c3a85d74cfbc6c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 111,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacSubtitleOverlayView.swift": {
+      "filePath": "VanmoMac/Player/MacSubtitleOverlayView.swift",
+      "contentHash": "1d819febd851aa1dfd074381ae80dbb40425e2b946372db1048e9fb9504c1ae1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 89,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Player/MacTrackSelectorView.swift": {
+      "filePath": "VanmoMac/Player/MacTrackSelectorView.swift",
+      "contentHash": "ffbd9bfeda8240a4f1d90ad3c767efb7f468e6a72eb6f97a43a91cdf481c8efb",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 156,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Resources/Assets.xcassets/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/Contents.json",
+      "contentHash": "e8e8ef4b27126d62305af321d12a6e64b866ca0b160f0f83efae90111f0ee576",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnAList.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnAList.imageset/Contents.json",
+      "contentHash": "26c4f4b1950c735fa29df6e9284acee211c4f8f986a0a81aefc3343369558413",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnAliyunDrive.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnAliyunDrive.imageset/Contents.json",
+      "contentHash": "3af07e19ebcbe4e3ac41ef97bc939055cc64c5cdbf6ab9adb53b30e2c7f8ad42",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnBaiduNetdisk.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnBaiduNetdisk.imageset/Contents.json",
+      "contentHash": "4b65655ba70fbf48b07f3fcacf8459c912f0cb061f1479c2a6ffa806d3534985",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnBox.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnBox.imageset/Contents.json",
+      "contentHash": "3972084b56d06a7c64dd3edeb2ed74a952563d4a36388644b29d5032d856fdac",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnDLNA.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnDLNA.imageset/Contents.json",
+      "contentHash": "6f7169fd419c158a23754e765161debe213467f9e87172cb3853d32af54b035e",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnDrive115.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnDrive115.imageset/Contents.json",
+      "contentHash": "ccd6dddf1b235f744d7f267eddcd1ce6ee54e8627ce8e6604b5252b522e74082",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnEmby.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnEmby.imageset/Contents.json",
+      "contentHash": "a3d69f818f601e87185e15e0e2f122431ff52b31216b955788188cd31ce50101",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnFnOS.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnFnOS.imageset/Contents.json",
+      "contentHash": "c0d080c3891e4827c08227eb4864f258156bf46b40cb11d0addbb1793a21c612",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnFTP.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnFTP.imageset/Contents.json",
+      "contentHash": "c850008242760d797c26cf97e9c9ebc869539b48116dd288be1b51ca3549eceb",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnGoogleDrive.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnGoogleDrive.imageset/Contents.json",
+      "contentHash": "6ecf15413e5f13cc237ca9abb038276daf32ae620685cd63e96923681de8e44a",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnIPTV.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnIPTV.imageset/Contents.json",
+      "contentHash": "ca9e306506fa7cf6c5d5185d8d583f83a39a538426170eaefee012e531e58830",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnJellyfin.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnJellyfin.imageset/Contents.json",
+      "contentHash": "156c3dff530dc14f2c8edfae744d3c278185c088c60865442327baaba707c3b3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnLocalFolder.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnLocalFolder.imageset/Contents.json",
+      "contentHash": "c9b8f8eabd30cb4c56f2ad7434f60ca5f42c2921f8ad27d2929daa33436ea62c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnMEGA.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnMEGA.imageset/Contents.json",
+      "contentHash": "4b35236f022f92fa0d6c1791b2f77bbe6a418e7e8158065605180ef1aaa3649e",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnNFS.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnNFS.imageset/Contents.json",
+      "contentHash": "b33f9660737eef852bc21295a98fce3a6d033646350bfa0889570b6fb1cc2447",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnOneDrive.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnOneDrive.imageset/Contents.json",
+      "contentHash": "b46b94cc1c27bfd64e09f81f2fe9f2462bd6767afcfeee404fe996ee645ebc5b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnPCloud.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnPCloud.imageset/Contents.json",
+      "contentHash": "c9811ea4e4ff4a2fdb8da40817ff3647050f6db5458b4ad6da87735653fa078c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnPlex.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnPlex.imageset/Contents.json",
+      "contentHash": "55cdbd8c149aa7180cec42ab1191ff0c92f2cb161c09a8ad9e2796b857e81f4a",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnQuarkDrive.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnQuarkDrive.imageset/Contents.json",
+      "contentHash": "a6fa9c81d687fb10ebccfcdd0ca342f14c6acb9265de657e7998459e07bffea3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnSFTP.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnSFTP.imageset/Contents.json",
+      "contentHash": "66a3e5182232345419dc1446e79f6280c23d4363f72e33998e76eb1fbf07dcdb",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnSMB.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnSMB.imageset/Contents.json",
+      "contentHash": "57e60667be87705d2e1930062da22ad8a3e7ca20b52aa466c61ae4bb09a8f9ec",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnWebDAV.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnWebDAV.imageset/Contents.json",
+      "contentHash": "b6f3c508fbb9cdab50dca91f1ce033d45746f3616384e4926bf9499028179984",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Assets.xcassets/MacConnYandexDisk.imageset/Contents.json": {
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnYandexDisk.imageset/Contents.json",
+      "contentHash": "71b89d25f3c54f641e55a59a9a79be3b196bf2074461fb645618494ab293e391",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Resources/Info-Mac.plist": {
+      "filePath": "VanmoMac/Resources/Info-Mac.plist",
+      "contentHash": "3af35873040079774c86b07ff0ef1800b2f50a5a7886ecb3e44c2095bd311174",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 45,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Resources/loadingSpinner.json": {
+      "filePath": "VanmoMac/Resources/loadingSpinner.json",
+      "contentHash": "45cb498ed5c085ac4a370814c31cd08c852563a30d3dd597379de7463931476b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 2,
+      "hasStructuralAnalysis": true
+    },
+    "VanmoMac/Shared/Extensions/Color+Mac.swift": {
+      "filePath": "VanmoMac/Shared/Extensions/Color+Mac.swift",
+      "contentHash": "61ac51f3f4b9a01faf0333c6246696daec1a2a0bd85bf5b35d5475657852c60d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 47,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Shared/Extensions/Int64+FileSize.swift": {
+      "filePath": "VanmoMac/Shared/Extensions/Int64+FileSize.swift",
+      "contentHash": "5843431031d4c0fddf7050bb3fd93dd1ed76c5591ed38f695d040be3e3501bfc",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 15,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Shared/Network/OAuthPresentationContextProvider+AppKit.swift": {
+      "filePath": "VanmoMac/Shared/Network/OAuthPresentationContextProvider+AppKit.swift",
+      "contentHash": "2484971cf94556c4b75ee759b9a5ac130dde2e07f7d2961aee9a9cc9acc6a120",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 13,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Browser/Models/MacConnectionTypeGroups.swift": {
+      "filePath": "VanmoMac/UI/Browser/Models/MacConnectionTypeGroups.swift",
+      "contentHash": "4f23656dad0ededf10c9d902f15302371b408504b142547b54d9b905b10c36da",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 139,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Browser/ViewModels/MacConnectionsViewModel.swift": {
+      "filePath": "VanmoMac/UI/Browser/ViewModels/MacConnectionsViewModel.swift",
+      "contentHash": "e989f2232b0e1125449141a5b843c1c431949945db41440a7890c8ceca93ef09",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1234,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Browser/Views/MacAddConnectionView.swift": {
+      "filePath": "VanmoMac/UI/Browser/Views/MacAddConnectionView.swift",
+      "contentHash": "1a361d2b63616c3e5560a3e32b6db29a5a0939e44788f54cab522a569bb50f9d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 914,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Browser/Views/MacConnectionsBrowseView.swift": {
+      "filePath": "VanmoMac/UI/Browser/Views/MacConnectionsBrowseView.swift",
+      "contentHash": "422b10eed488e671c2ae638501b33d3ecea4346a32301de76cf5d7f83a3f3879",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 578,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Browser/Views/MacScanSyncBanner.swift": {
+      "filePath": "VanmoMac/UI/Browser/Views/MacScanSyncBanner.swift",
+      "contentHash": "e850f3563fb0443bffd2de5621869ffaf68d4638d55dea9b4c8f87e76fe3dd61",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 93,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacHeaderToolbar.swift": {
+      "filePath": "VanmoMac/UI/Components/MacHeaderToolbar.swift",
+      "contentHash": "924c45989d5f6446363c49bdf8fa4dde6a7a0ee981713062b43b3af7d6277845",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 155,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacLibrarySyncToast.swift": {
+      "filePath": "VanmoMac/UI/Components/MacLibrarySyncToast.swift",
+      "contentHash": "d9f003990a5008452d490a0ea6a8ccac1c4dcf2e5fd34568ee630a8415320b03",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacMediaCards.swift": {
+      "filePath": "VanmoMac/UI/Components/MacMediaCards.swift",
+      "contentHash": "3b2973cf2ee1e8e0d25ed1686eae9106dc8e2036b97587e4ff0b6c9ca24d8385",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 192,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacMediaItemContextMenu.swift": {
+      "filePath": "VanmoMac/UI/Components/MacMediaItemContextMenu.swift",
+      "contentHash": "e3f12c70e6291b0d8a7ce2757acc4d2d5d374f2faeb9bb2788d59f8f80e33a45",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 39,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacQuickLookPresenter.swift": {
+      "filePath": "VanmoMac/UI/Components/MacQuickLookPresenter.swift",
+      "contentHash": "79dd43d67c26bbe3547d70b8948969e6f62d5675dd1d9905f2fb6324b345b134",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 31,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacRemoteImage.swift": {
+      "filePath": "VanmoMac/UI/Components/MacRemoteImage.swift",
+      "contentHash": "454f7d99389568584506223cd4a55a41cd6f24487f719a68be58f07c2546ed34",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 46,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacSidebarView.swift": {
+      "filePath": "VanmoMac/UI/Components/MacSidebarView.swift",
+      "contentHash": "c3abf72e0dbf23fb923588f7a02091925f34c307151733ec34daaa2b99e56fb0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 463,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Components/MacVibrancyBackground.swift": {
+      "filePath": "VanmoMac/UI/Components/MacVibrancyBackground.swift",
+      "contentHash": "e69ccd0d7fa9f7ad649f2cbaf21b0d208d68e4af76e4898f4353d645b6418682",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 52,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/DesignSystem/MacDesignTokens.swift": {
+      "filePath": "VanmoMac/UI/DesignSystem/MacDesignTokens.swift",
+      "contentHash": "0de449aadd9ae7ba86312d65b43796106100864bb34d4030e00e9afc80a2384d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 229,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/DesignSystem/MacFormatters.swift": {
+      "filePath": "VanmoMac/UI/DesignSystem/MacFormatters.swift",
+      "contentHash": "80433c1021cce7ede7fa2a31c0a550d8d5dc4c86a0abdc5bd5292c57b22f200d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 37,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacCollectionFolderListView.swift": {
+      "filePath": "VanmoMac/UI/Library/MacCollectionFolderListView.swift",
+      "contentHash": "b68d0578ef796d68afbea88beaaafc53a1ca2ad3c085ef1d7dc78ee4c4a1da7f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 190,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacEmbyFolderBrowseView.swift": {
+      "filePath": "VanmoMac/UI/Library/MacEmbyFolderBrowseView.swift",
+      "contentHash": "a10dbea54bd2718c6ae2bd6bef544b7758d51b92b50d46cedbf48879bc673843",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 177,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacFavoritesListView.swift": {
+      "filePath": "VanmoMac/UI/Library/MacFavoritesListView.swift",
+      "contentHash": "740c747e1cdababc90f3503dce2c833aeb02ba06028374cdf44d78abbfe8ad6d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 314,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacLibraryEmptyStateView.swift": {
+      "filePath": "VanmoMac/UI/Library/MacLibraryEmptyStateView.swift",
+      "contentHash": "16ccf95b31042a2908ffb88808fa2ed619daedfaace6b13b78ba75633f2b068d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 111,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacLibraryHomeView.swift": {
+      "filePath": "VanmoMac/UI/Library/MacLibraryHomeView.swift",
+      "contentHash": "986235695fd03d29d7e4918a4a425d3cb8ec236a80ebb31e37ac2e1af798dc0d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 349,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacLibraryItemDestination.swift": {
+      "filePath": "VanmoMac/UI/Library/MacLibraryItemDestination.swift",
+      "contentHash": "5f6b8104b3f0e33e58ac6a1267ce585f806b065956e88bab5ee716b80baffc62",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacLibrarySort.swift": {
+      "filePath": "VanmoMac/UI/Library/MacLibrarySort.swift",
+      "contentHash": "56e466f41db14fc2eba021a4e61e1487038320f271e6c84046cfe8a653150721",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 73,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacLibrarySublistHeader.swift": {
+      "filePath": "VanmoMac/UI/Library/MacLibrarySublistHeader.swift",
+      "contentHash": "c8f2116441f662868c8b8446d9f8bd42ea20874df593abd8321f5ae674f9922d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 42,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacLibraryViewModel.swift": {
+      "filePath": "VanmoMac/UI/Library/MacLibraryViewModel.swift",
+      "contentHash": "2ca02d7bfcb53485784e6574225c00df79af22542468f37aacfbcac8e74c9799",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1089,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacMediaListRow.swift": {
+      "filePath": "VanmoMac/UI/Library/MacMediaListRow.swift",
+      "contentHash": "d69dd77c16e42fef4950854e50f05e423e2eab94863377cfe10bbf58794ed756",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 144,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacScannedLibraryListView.swift": {
+      "filePath": "VanmoMac/UI/Library/MacScannedLibraryListView.swift",
+      "contentHash": "9ccc432268c89258bcbb690d08f17d8bb7f9c1c75814360d79407c77104983c0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 253,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/MacScannedShowDetailView.swift": {
+      "filePath": "VanmoMac/UI/Library/MacScannedShowDetailView.swift",
+      "contentHash": "822e1d598e0f2c267267de07f1b3ddc58cfc9ca1e106d1ac1aab461aa06221fa",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 121,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Library/Models/MacHomeCollectionCache.swift": {
+      "filePath": "VanmoMac/UI/Library/Models/MacHomeCollectionCache.swift",
+      "contentHash": "c333e81e5e8813a7c27cad32df58159f228ba78ee7bdeba8d0b97642116f1fa9",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 144,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/MediaDetail/MacMediaDetailStore.swift": {
+      "filePath": "VanmoMac/UI/MediaDetail/MacMediaDetailStore.swift",
+      "contentHash": "fbd8e87623f65850dcf24ea892cbf77fa54e95a88dc6184dbe68720411551ded",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 680,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/MediaDetail/MacMediaDetailView.swift": {
+      "filePath": "VanmoMac/UI/MediaDetail/MacMediaDetailView.swift",
+      "contentHash": "5267c64274bd9ec253b8a2e97ae8ce5403c87ab6ab63f19b4a0f9024499a742b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 908,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Search/MacSearchResultsView.swift": {
+      "filePath": "VanmoMac/UI/Search/MacSearchResultsView.swift",
+      "contentHash": "3f6ff38831a4eba4d0f0a3ba19e93464b545ca5ef800102adffd5a9cba40df8b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 161,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Search/MacSearchViewModel.swift": {
+      "filePath": "VanmoMac/UI/Search/MacSearchViewModel.swift",
+      "contentHash": "ca93f0163ec7aee2fd628dcb52634753f41e0c463bfe9c5dab27a276842328f2",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 470,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Settings/MacSettingsView.swift": {
+      "filePath": "VanmoMac/UI/Settings/MacSettingsView.swift",
+      "contentHash": "eba9f0f1b179d5aae9ede7894bbfc7cd2a1fa8d47c31d513c0033679bc11793b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 792,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/UI/Settings/MacSettingsViewModel.swift": {
+      "filePath": "VanmoMac/UI/Settings/MacSettingsViewModel.swift",
+      "contentHash": "cad6570f1735ae1502d8b63235d854e7bc4daa13fc3ca825f3b8fd9d726086b1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 170,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Vanmo-Mac-Cloud.entitlements": {
+      "filePath": "VanmoMac/Vanmo-Mac-Cloud.entitlements",
+      "contentHash": "0293e728ea9dc2bb03cd26cd4daf9f10969362183cac45403ab913d3bc84ea46",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 29,
+      "hasStructuralAnalysis": false
+    },
+    "VanmoMac/Vanmo-Mac.entitlements": {
+      "filePath": "VanmoMac/Vanmo-Mac.entitlements",
+      "contentHash": "a60842c726e6fc42f99a2972914a39d198b1f54a8379cd7c9ef488107573243c",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 21,
       "hasStructuralAnalysis": false
     }
   }

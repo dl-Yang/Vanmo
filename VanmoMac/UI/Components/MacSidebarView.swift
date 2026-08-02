@@ -172,12 +172,10 @@ struct MacSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-//            Spacer(minLength: MacDesignTokens.Layout.headerHeight)
-            MacSidebarToggleButton()
-                .padding(.bottom, 12)
-                .padding(.leading, MacDesignTokens.Layout.trafficLightsLeadingInset + 5)
-                .padding(.top,2)
-            
+            // 展开/折叠控制行已移出为顶部悬浮层，这里保留等高占位避免内容位置变化。
+            Color.clear
+                .frame(height: MacDesignTokens.Layout.sidebarControlRowHeight)
+
             MacSearchField(text: $searchViewModel.searchText) {
                 appState.selectSearch()
                 searchViewModel.search()

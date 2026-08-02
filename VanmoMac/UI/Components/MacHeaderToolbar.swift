@@ -71,11 +71,11 @@ struct MacSidebarToggleButton: View {
             .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
            
             Button {
-                openWindow(id: "downloads")
+                appState.goBack()
             } label: {
                 Image(systemName: "arrow.left")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(appState.contentRoute != .library ? .black : .gray.opacity(0.2))
+                    .foregroundStyle(appState.canGoBack ? theme.primaryText : .gray.opacity(0.2))
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -86,8 +86,7 @@ struct MacSidebarToggleButton: View {
             Spacer()
             
             Button {
-                //todo check
-//                appState.contentRoute =
+               openWindow(id: "downloads")
             } label: {
                 Image(systemName: "arrow.down.circle")
                     .font(.system(size: 14, weight: .medium))

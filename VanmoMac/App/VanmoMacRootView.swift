@@ -45,11 +45,13 @@ struct VanmoMacRootView: View {
                 }
             }
 
-            if appState.isPlayerPresented, let playerItem = appState.playerItem {
-                MacPlayerView(item: playerItem, startPosition: appState.playerStartPosition)
-                    .transition(.opacity)
-                    .zIndex(1)
-            }
+            // 顶部悬浮控制条：展开/折叠 + 下载，侧边栏收起时保持原位可用。
+            MacSidebarToggleButton()
+                .frame(width: appState.sidebarWidth - MacDesignTokens.Layout.trafficLightsLeadingInset)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.leading, MacDesignTokens.Layout.trafficLightsLeadingInset + 5)
+                .padding(.top, 2)
+                .ignoresSafeArea(edges: .top)
 
             if let message = connectionsViewModel.librarySyncMessage {
                 syncStatusOverlay(message: message)
@@ -66,7 +68,6 @@ struct VanmoMacRootView: View {
             }
         }
         .macTheme(activeTheme)
-        .animation(.easeInOut(duration: 0.2), value: appState.isPlayerPresented)
         .animation(.easeInOut(duration: 0.2), value: appState.isSidebarExpanded)
         .sheet(isPresented: $appState.isAddConnectionPresented, onDismiss: refreshLibraryAfterConnection) {
             MacAddConnectionView(viewModel: connectionsViewModel)
@@ -79,6 +80,11 @@ struct VanmoMacRootView: View {
                 .presentationBackground(.clear)
         }
         .task {
+            appState.configurePlayerDependencies(
+                libraryViewModel: libraryViewModel,
+                connectionsViewModel: connectionsViewModel,
+                modelContainer: modelContext.container
+            )
             connectionsViewModel.setModelContext(modelContext)
             libraryViewModel.setModelContext(modelContext)
             searchViewModel.setModelContext(modelContext)

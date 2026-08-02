@@ -1,6 +1,6 @@
 ---
 name: figma-design-fidelity
-description: Enforce that every UI change in the Vanmo iOS app strictly replicates the Figma design source of truth, and that any missing screen is first designed in Figma before being coded. Use whenever the user asks to build, modify, or restyle any UI / 界面 / 页面 / 组件 / 视图 / SwiftUI View, mentions 设计稿 / Figma / 还原 / 复刻 / 高保真 / 图标 / icon / SF Symbol / 动效 / 动画 / loading 动画, or starts UI work where a design may or may not exist yet.
+description: Enforce that every UI change in the Vanmo iOS/macOS app strictly replicates the correct platform-specific Figma design source of truth, and that any missing screen is first designed in Figma before being coded. Use whenever the user asks to build, modify, or restyle any UI / 界面 / 页面 / 组件 / 视图 / SwiftUI View, mentions 设计稿 / Figma / 还原 / 复刻 / 高保真 / 图标 / icon / SF Symbol / 动效 / 动画 / loading 动画, or starts UI work where a design may or may not exist yet.
 ---
 
 # Vanmo Figma 设计还原 Skill
@@ -10,13 +10,28 @@ description: Enforce that every UI change in the Vanmo iOS app strictly replicat
 
 ## Figma 设计源
 
-- 项目：**Vanmo**
-- 页面 PageName：
-  - - `MediaDetail`(媒体详情): [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2)
-  - - `LibraryHome`（媒体库首页） : [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=295-6](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=295-6)
-  - - `File`（文件浏览）: [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=317-80](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=317-80)
-  - - `Favorites`(收藏列表):[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=322-192](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=322-192)
+- 先判断本次 UI 修改目标平台：iOS 只使用 iOS 设计稿，macOS 只使用 macOS 设计稿；不要把一个平台的页面默认当作另一个平台的设计真相来源。
+- 如果目标平台对应页面缺失，走下方「设计稿不存在」流程，先在对应平台的 Figma 文件中补设计。
+
+### iOS 设计稿
+
+- 项目：**Vanmo iOS**
 - `fileKey`：`miM6YTQAnerz6SgkkYZMjo`
+- 页面 PageName：
+  - `MediaDetail`（媒体详情）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=203-2)
+  - `LibraryHome`（媒体库首页）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=295-6](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=295-6)
+  - `File`（文件浏览）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=317-80](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=317-80)
+  - `Favorites`（收藏列表）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=322-192](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=322-192)
+  - `Icons`（图标合集）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=424-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=424-2)
+
+### macOS 设计稿
+
+- 项目：**Vanmo macOS**
+- `fileKey`：`O75W1XT1Q0btSrepDwEx39`
+- 页面 PageName：
+  - `LibraryHome`（媒体库首页）：`https://www.figma.com/design/O75W1XT1Q0btSrepDwEx39/Vanmo-MacOS?node-id=0-1`
+  - `MediaDetail`（媒体库首页）：`https://www.figma.com/design/O75W1XT1Q0btSrepDwEx39/Vanmo-MacOS?node-id=7-1126`
+  - `Player`（媒体库首页）：`https://www.figma.com/design/O75W1XT1Q0btSrepDwEx39/Vanmo-MacOS?node-id=7-1536`
 
 任何 UI 改动开始前，先把对应页面/组件的 Figma 节点定位出来（节点 URL 形如 `...?node-id=1-23`，调用工具时把 `node-id` 的 `-` 转成 `:`）。
 

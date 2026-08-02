@@ -1,0 +1,950 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": ".cursorignore",
+      "language": "unknown",
+      "fileCategory": "code",
+      "totalLines": 57,
+      "nonEmptyLines": 48,
+      "metrics": {}
+    },
+    {
+      "path": "file/animation loading.json",
+      "language": "json",
+      "fileCategory": "config",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "sections": [
+        {
+          "heading": "v",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "fr",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "ip",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "op",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "w",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "h",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "nm",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "ddd",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "assets",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "layers",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "markers",
+          "level": 1,
+          "line": 1
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 11
+      }
+    },
+    {
+      "path": "scripts/build-ffmpeg-ios.sh",
+      "language": "shell",
+      "fileCategory": "script",
+      "totalLines": 146,
+      "nonEmptyLines": 124,
+      "functions": [
+        {
+          "name": "download_source",
+          "startLine": 23,
+          "endLine": 36,
+          "params": []
+        },
+        {
+          "name": "build_arch",
+          "startLine": 38,
+          "endLine": 112,
+          "params": []
+        },
+        {
+          "name": "install_output",
+          "startLine": 114,
+          "endLine": 141,
+          "params": []
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 3,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/check-cloud-sync-multiplatform-scope.sh",
+      "language": "shell",
+      "fileCategory": "script",
+      "totalLines": 207,
+      "nonEmptyLines": 183,
+      "functions": [
+        {
+          "name": "fail",
+          "startLine": 10,
+          "endLine": 13,
+          "params": []
+        },
+        {
+          "name": "pass",
+          "startLine": 15,
+          "endLine": 17,
+          "params": []
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 2,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/migrate-vanmocore-public.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 96,
+      "nonEmptyLines": 76,
+      "functions": [
+        {
+          "name": "already_public",
+          "startLine": 38,
+          "endLine": 40,
+          "params": [
+            "line"
+          ]
+        },
+        {
+          "name": "strip_erroneous_public",
+          "startLine": 43,
+          "endLine": 45,
+          "params": [
+            "content"
+          ]
+        },
+        {
+          "name": "transform",
+          "startLine": 48,
+          "endLine": 79,
+          "params": [
+            "content"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 82,
+          "endLine": 92,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "already_public",
+          "line": 38,
+          "isDefault": false
+        },
+        {
+          "name": "strip_erroneous_public",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "transform",
+          "line": 48,
+          "isDefault": false
+        },
+        {
+          "name": "main",
+          "line": 82,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "already_public",
+          "callee": "line.lstrip",
+          "lineNumber": 39
+        },
+        {
+          "caller": "already_public",
+          "callee": "any",
+          "lineNumber": 40
+        },
+        {
+          "caller": "already_public",
+          "callee": "stripped.startswith",
+          "lineNumber": 40
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "re.sub",
+          "lineNumber": 45
+        },
+        {
+          "caller": "transform",
+          "callee": "strip_erroneous_public",
+          "lineNumber": 49
+        },
+        {
+          "caller": "transform",
+          "callee": "content.splitlines",
+          "lineNumber": 50
+        },
+        {
+          "caller": "transform",
+          "callee": "line.rstrip",
+          "lineNumber": 56
+        },
+        {
+          "caller": "transform",
+          "callee": "raw.strip",
+          "lineNumber": 57
+        },
+        {
+          "caller": "transform",
+          "callee": "pattern.match",
+          "lineNumber": 61
+        },
+        {
+          "caller": "transform",
+          "callee": "already_public",
+          "lineNumber": 61
+        },
+        {
+          "caller": "transform",
+          "callee": "pattern.sub",
+          "lineNumber": 62
+        },
+        {
+          "caller": "transform",
+          "callee": "re.match",
+          "lineNumber": 64
+        },
+        {
+          "caller": "transform",
+          "callee": "stripped.startswith",
+          "lineNumber": 64
+        },
+        {
+          "caller": "transform",
+          "callee": "raw.count",
+          "lineNumber": 66
+        },
+        {
+          "caller": "transform",
+          "callee": "raw.count",
+          "lineNumber": 66
+        },
+        {
+          "caller": "transform",
+          "callee": "pattern.match",
+          "lineNumber": 69
+        },
+        {
+          "caller": "transform",
+          "callee": "already_public",
+          "lineNumber": 69
+        },
+        {
+          "caller": "transform",
+          "callee": "raw.lstrip",
+          "lineNumber": 69
+        },
+        {
+          "caller": "transform",
+          "callee": "pattern.sub",
+          "lineNumber": 70
+        },
+        {
+          "caller": "transform",
+          "callee": "raw.count",
+          "lineNumber": 72
+        },
+        {
+          "caller": "transform",
+          "callee": "raw.count",
+          "lineNumber": 72
+        },
+        {
+          "caller": "transform",
+          "callee": "out.append",
+          "lineNumber": 77
+        },
+        {
+          "caller": "transform",
+          "callee": "line.endswith",
+          "lineNumber": 77
+        },
+        {
+          "caller": "transform",
+          "callee": "\"\".join",
+          "lineNumber": 79
+        },
+        {
+          "caller": "main",
+          "callee": "Path",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "len",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "Path",
+          "lineNumber": 83
+        },
+        {
+          "caller": "main",
+          "callee": "sorted",
+          "lineNumber": 84
+        },
+        {
+          "caller": "main",
+          "callee": "root.rglob",
+          "lineNumber": 84
+        },
+        {
+          "caller": "main",
+          "callee": "path.read_text",
+          "lineNumber": 87
+        },
+        {
+          "caller": "main",
+          "callee": "transform",
+          "lineNumber": 88
+        },
+        {
+          "caller": "main",
+          "callee": "path.write_text",
+          "lineNumber": 90
+        },
+        {
+          "caller": "main",
+          "callee": "print",
+          "lineNumber": 91
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 4,
+        "functionCount": 4,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "scripts/vanmocore-public-api.py",
+      "language": "python",
+      "fileCategory": "code",
+      "totalLines": 128,
+      "nonEmptyLines": 104,
+      "functions": [
+        {
+          "name": "is_type_line",
+          "startLine": 13,
+          "endLine": 17,
+          "params": [
+            "stripped"
+          ]
+        },
+        {
+          "name": "publicize_type_line",
+          "startLine": 20,
+          "endLine": 30,
+          "params": [
+            "line"
+          ]
+        },
+        {
+          "name": "publicize_model_class",
+          "startLine": 33,
+          "endLine": 34,
+          "params": [
+            "content"
+          ]
+        },
+        {
+          "name": "publicize_members",
+          "startLine": 37,
+          "endLine": 85,
+          "params": [
+            "content"
+          ]
+        },
+        {
+          "name": "strip_erroneous_public",
+          "startLine": 88,
+          "endLine": 101,
+          "params": [
+            "content"
+          ]
+        },
+        {
+          "name": "transform_file",
+          "startLine": 104,
+          "endLine": 116,
+          "params": [
+            "path"
+          ]
+        },
+        {
+          "name": "main",
+          "startLine": 119,
+          "endLine": 124,
+          "params": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "is_type_line",
+          "line": 13,
+          "isDefault": false
+        },
+        {
+          "name": "publicize_type_line",
+          "line": 20,
+          "isDefault": false
+        },
+        {
+          "name": "publicize_model_class",
+          "line": 33,
+          "isDefault": false
+        },
+        {
+          "name": "publicize_members",
+          "line": 37,
+          "isDefault": false
+        },
+        {
+          "name": "strip_erroneous_public",
+          "line": 88,
+          "isDefault": false
+        },
+        {
+          "name": "transform_file",
+          "line": 104,
+          "isDefault": false
+        },
+        {
+          "name": "main",
+          "line": 119,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "is_type_line",
+          "callee": "bool",
+          "lineNumber": 14
+        },
+        {
+          "caller": "is_type_line",
+          "callee": "re.match",
+          "lineNumber": 15
+        },
+        {
+          "caller": "is_type_line",
+          "callee": "stripped.startswith",
+          "lineNumber": 16
+        },
+        {
+          "caller": "publicize_type_line",
+          "callee": "line.strip",
+          "lineNumber": 21
+        },
+        {
+          "caller": "publicize_type_line",
+          "callee": "any",
+          "lineNumber": 22
+        },
+        {
+          "caller": "publicize_type_line",
+          "callee": "stripped.startswith",
+          "lineNumber": 22
+        },
+        {
+          "caller": "publicize_type_line",
+          "callee": "stripped.startswith",
+          "lineNumber": 24
+        },
+        {
+          "caller": "publicize_type_line",
+          "callee": "re.sub",
+          "lineNumber": 26
+        },
+        {
+          "caller": "publicize_model_class",
+          "callee": "content.replace",
+          "lineNumber": 34
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "content.splitlines",
+          "lineNumber": 38
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.strip",
+          "lineNumber": 46
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "re.match",
+          "lineNumber": 47
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "is_type_line",
+          "lineNumber": 53
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "re.match",
+          "lineNumber": 54
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "out.append",
+          "lineNumber": 59
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.count",
+          "lineNumber": 60
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.count",
+          "lineNumber": 60
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.startswith",
+          "lineNumber": 65
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.startswith",
+          "lineNumber": 65
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.lstrip",
+          "lineNumber": 66
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "inner.startswith",
+          "lineNumber": 67
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "inner.startswith",
+          "lineNumber": 67
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "out.append",
+          "lineNumber": 68
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.count",
+          "lineNumber": 69
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.count",
+          "lineNumber": 69
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "any",
+          "lineNumber": 73
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "inner.startswith",
+          "lineNumber": 73
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "re.match",
+          "lineNumber": 74
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "inner.startswith",
+          "lineNumber": 76
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "out.append",
+          "lineNumber": 79
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.count",
+          "lineNumber": 81
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "line.count",
+          "lineNumber": 81
+        },
+        {
+          "caller": "publicize_members",
+          "callee": "\"\".join",
+          "lineNumber": 85
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "content.splitlines",
+          "lineNumber": 90
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "line.strip",
+          "lineNumber": 94
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "stripped.startswith",
+          "lineNumber": 95
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "stripped.startswith",
+          "lineNumber": 95
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "line.replace(\"public let \", \"let \", 1).replace",
+          "lineNumber": 96
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "line.replace",
+          "lineNumber": 96
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "out.append",
+          "lineNumber": 97
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "line.count",
+          "lineNumber": 98
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "line.count",
+          "lineNumber": 98
+        },
+        {
+          "caller": "strip_erroneous_public",
+          "callee": "\"\".join",
+          "lineNumber": 101
+        },
+        {
+          "caller": "transform_file",
+          "callee": "path.read_text",
+          "lineNumber": 105
+        },
+        {
+          "caller": "transform_file",
+          "callee": "strip_erroneous_public",
+          "lineNumber": 106
+        },
+        {
+          "caller": "transform_file",
+          "callee": "publicize_model_class",
+          "lineNumber": 107
+        },
+        {
+          "caller": "transform_file",
+          "callee": "content.splitlines",
+          "lineNumber": 109
+        },
+        {
+          "caller": "transform_file",
+          "callee": "line.strip",
+          "lineNumber": 110
+        },
+        {
+          "caller": "transform_file",
+          "callee": "line.startswith",
+          "lineNumber": 111
+        },
+        {
+          "caller": "transform_file",
+          "callee": "is_type_line",
+          "lineNumber": 111
+        },
+        {
+          "caller": "transform_file",
+          "callee": "publicize_type_line",
+          "lineNumber": 112
+        },
+        {
+          "caller": "transform_file",
+          "callee": "lines.append",
+          "lineNumber": 113
+        },
+        {
+          "caller": "transform_file",
+          "callee": "\"\".join",
+          "lineNumber": 114
+        },
+        {
+          "caller": "transform_file",
+          "callee": "publicize_members",
+          "lineNumber": 115
+        },
+        {
+          "caller": "transform_file",
+          "callee": "path.write_text",
+          "lineNumber": 116
+        },
+        {
+          "caller": "main",
+          "callee": "Path",
+          "lineNumber": 120
+        },
+        {
+          "caller": "main",
+          "callee": "len",
+          "lineNumber": 120
+        },
+        {
+          "caller": "main",
+          "callee": "Path",
+          "lineNumber": 120
+        },
+        {
+          "caller": "main",
+          "callee": "sorted",
+          "lineNumber": 121
+        },
+        {
+          "caller": "main",
+          "callee": "root.rglob",
+          "lineNumber": 121
+        },
+        {
+          "caller": "main",
+          "callee": "transform_file",
+          "lineNumber": 122
+        },
+        {
+          "caller": "main",
+          "callee": "print",
+          "lineNumber": 123
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 7,
+        "functionCount": 7,
+        "classCount": 0
+      }
+    },
+    {
+      "path": "Vanmo.xcodeproj/project.pbxproj",
+      "language": "pbxproj",
+      "fileCategory": "code",
+      "totalLines": 1628,
+      "nonEmptyLines": 1614,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo-macOS.xcscheme",
+      "language": "xcscheme",
+      "fileCategory": "code",
+      "totalLines": 91,
+      "nonEmptyLines": 91,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo.xcodeproj/xcshareddata/xcschemes/Vanmo.xcscheme",
+      "language": "xcscheme",
+      "fileCategory": "code",
+      "totalLines": 91,
+      "nonEmptyLines": 91,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/App/AppState.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 56,
+      "nonEmptyLines": 48,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/App/ContentView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 96,
+      "nonEmptyLines": 88,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/App/VanmoApp.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 85,
+      "nonEmptyLines": 74,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Core/Metadata/KSPlayerMediaProbeProvider.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 201,
+      "nonEmptyLines": 174,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Core/Player/KSPlayerEngine.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 593,
+      "nonEmptyLines": 513,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Core/Player/PlayerEngine.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 415,
+      "nonEmptyLines": 357,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Core/Player/PlayerEngineFactory.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 29,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Core/Player/PlayerState.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 12,
+      "nonEmptyLines": 11,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Core/Storage/ScanBackgroundTask.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 105,
+      "nonEmptyLines": 93,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Core/Subtitle/SubtitleOverlayView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 268,
+      "nonEmptyLines": 235,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Browser/ViewModels/BrowserViewModel.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 1096,
+      "nonEmptyLines": 976,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Browser/Views/AddConnectionView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 691,
+      "nonEmptyLines": 619,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Browser/Views/BrowserView.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 884,
+      "nonEmptyLines": 796,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Browser/Views/ScanSyncBanner.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 98,
+      "nonEmptyLines": 89,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Models/HomeCollectionCache.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 139,
+      "nonEmptyLines": 121,
+      "metrics": {}
+    },
+    {
+      "path": "Vanmo/Features/Library/Models/LibraryFilters.swift",
+      "language": "swift",
+      "fileCategory": "code",
+      "totalLines": 105,
+      "nonEmptyLines": 96,
+      "metrics": {}
+    }
+  ]
+}

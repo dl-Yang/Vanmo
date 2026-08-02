@@ -28,3 +28,9 @@ Vanmo is a video player app: iOS app (`Vanmo` target) + macOS app (`Vanmo-macOS`
 - Device debugging: `.cursor/rules/ios-device-debug-logs.mdc` (alwaysApply) — debug via local console logs only (`print`/`os.Logger`/`NSLog`), **never** remote logging/telemetry instrumentation; wrap temp logs in `#if DEBUG`, remove after fixing.
 - UI work: load `.agents/skills/figma-design-fidelity` — Figma is the design source of truth; icons via better-icons MCP (Iconify), Lottie animations via lottiefiles-creator MCP.
 - Git: origin is `git@github.com:dl-Yang/Vanmo.git`, main branch. Commit messages historically Chinese/free-form; `.codex/skills/git-workflow` prescribes conventional commits.
+
+## Code Review
+- Once the current task is resolved, output a summary of the changes; the summary must be well-organized and comprehensive. Then, use the `post-task-code-reviewer` subagent to review this summary and return the results to the main model for further optimization.
+Red-line rules:
+- Plain-text plans are not subject to review.
+- `git commit` and `git push` operations are not subject to review.

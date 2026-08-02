@@ -13,6 +13,7 @@ struct MacLibraryHomeView: View {
         ZStack(alignment: .top) {
 
             VStack(spacing: 0) {
+                Spacer(minLength: MacDesignTokens.Layout.trafficLightsTopInset + 5)
                 MacHeaderToolbar(
                     title: MacSidebarSection.home.title,
                     isEmptyLibrary: libraryViewModel.isLibraryEmpty

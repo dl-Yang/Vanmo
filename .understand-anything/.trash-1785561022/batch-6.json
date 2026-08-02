@@ -1,0 +1,389 @@
+{
+  "nodes": [
+    {
+      "id": "file:Vanmo/Vanmo-Mac.entitlements",
+      "type": "file",
+      "name": "Vanmo-Mac.entitlements",
+      "filePath": "Vanmo/Vanmo-Mac.entitlements",
+      "summary": "macOS Debug 权限文件，启用沙盒、网络客户端与独立 keychain 组。",
+      "tags": ["entitlements", "macos", "debug", "sandbox"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:Vanmo/Vanmo.entitlements",
+      "type": "file",
+      "name": "Vanmo.entitlements",
+      "filePath": "Vanmo/Vanmo.entitlements",
+      "summary": "iOS Debug 权限文件，启用沙盒、网络客户端与 keychain 组（不含 iCloud）。",
+      "tags": ["entitlements", "ios", "debug", "sandbox"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:VanmoMac/App/MacAppState.swift",
+      "type": "file",
+      "name": "MacAppState.swift",
+      "filePath": "VanmoMac/App/MacAppState.swift",
+      "summary": "macOS 全局应用状态，定义侧边栏分区、媒体库筛选、外观模式、内容路由与播放窗口管理状态。",
+      "tags": ["state", "macos", "app-core", "navigation"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:VanmoMac/App/VanmoMacApp.swift",
+      "type": "file",
+      "name": "VanmoMacApp.swift",
+      "filePath": "VanmoMac/App/VanmoMacApp.swift",
+      "summary": "macOS 应用入口，装配环境对象与 ModelContainer，注册 OAuth、在线字幕与媒体探测服务。",
+      "tags": ["entry-point", "app", "macos", "lifecycle"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/App/VanmoMacRootView.swift",
+      "type": "file",
+      "name": "VanmoMacRootView.swift",
+      "filePath": "VanmoMac/App/VanmoMacRootView.swift",
+      "summary": "macOS 根视图，组合侧边栏与主内容区，支持拖拽导入文件与场景阶段同步处理。",
+      "tags": ["ui", "macos", "root", "sidebar"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift",
+      "type": "file",
+      "name": "KSPlayerMediaProbeProvider.swift",
+      "filePath": "VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift",
+      "summary": "macOS 版基于 KSPlayer 的媒体探测实现，探测媒体时长、轨道与动态范围。",
+      "tags": ["metadata", "media-probe", "ksplayer", "macos"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacAVPlayerView.swift",
+      "type": "file",
+      "name": "MacAVPlayerView.swift",
+      "filePath": "VanmoMac/Player/MacAVPlayerView.swift",
+      "summary": "macOS AVPlayer 视频视图包装，将 AVPlayer 与视频填充模式桥接到 SwiftUI。",
+      "tags": ["player", "macos", "avfoundation", "view"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacEpisodeSelectorView.swift",
+      "type": "file",
+      "name": "MacEpisodeSelectorView.swift",
+      "filePath": "VanmoMac/Player/MacEpisodeSelectorView.swift",
+      "summary": "macOS 选集面板，按季分组展示并切换剧集。",
+      "tags": ["ui", "player", "episodes", "macos"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacKSPlayerEngine.swift",
+      "type": "file",
+      "name": "MacKSPlayerEngine.swift",
+      "filePath": "VanmoMac/Player/MacKSPlayerEngine.swift",
+      "summary": "macOS KSPlayer/FFmpeg 播放引擎封装，发布播放状态、时间与字幕事件。",
+      "tags": ["player", "engine", "ffmpeg", "macos"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacKSPlayerView.swift",
+      "type": "file",
+      "name": "MacKSPlayerView.swift",
+      "filePath": "VanmoMac/Player/MacKSPlayerView.swift",
+      "summary": "macOS KSPlayer 视频视图包装，将播放器 NSView 嵌入 SwiftUI 容器。",
+      "tags": ["player", "view", "ksplayer", "macos"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacLocalFilePlayback.swift",
+      "type": "file",
+      "name": "MacLocalFilePlayback.swift",
+      "filePath": "VanmoMac/Player/MacLocalFilePlayback.swift",
+      "summary": "macOS 本地文件播放工具，处理 security-scoped 资源访问与文件可读性校验。",
+      "tags": ["player", "file-access", "macos", "utility"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacPlayerCommands.swift",
+      "type": "file",
+      "name": "MacPlayerCommands.swift",
+      "filePath": "VanmoMac/Player/MacPlayerCommands.swift",
+      "summary": "macOS 播放器命令路由，通过 Notification 分发播放/暂停、跳转、音量与全屏等快捷键命令。",
+      "tags": ["player", "commands", "notification", "macos"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacPlayerControlsOverlay.swift",
+      "type": "file",
+      "name": "MacPlayerControlsOverlay.swift",
+      "filePath": "VanmoMac/Player/MacPlayerControlsOverlay.swift",
+      "summary": "macOS 播放控制浮层，提供返回、播放控制、进度、音量与全屏等控件。",
+      "tags": ["ui", "player", "controls", "macos"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacPlayerEngineFactory.swift",
+      "type": "file",
+      "name": "MacPlayerEngineFactory.swift",
+      "filePath": "VanmoMac/Player/MacPlayerEngineFactory.swift",
+      "summary": "macOS 播放引擎工厂，按格式选择 AVFoundation 或 KSPlayer，并定义播放错误类型。",
+      "tags": ["player", "factory", "macos", "engine-selection"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacPlayerView.swift",
+      "type": "file",
+      "name": "MacPlayerView.swift",
+      "filePath": "VanmoMac/Player/MacPlayerView.swift",
+      "summary": "macOS 播放器主视图，按引擎选择 AVPlayer 或 KSPlayer 视频层，并叠加字幕与控制层。",
+      "tags": ["ui", "player", "macos", "view"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacPlayerViewModel.swift",
+      "type": "file",
+      "name": "MacPlayerViewModel.swift",
+      "filePath": "VanmoMac/Player/MacPlayerViewModel.swift",
+      "summary": "macOS 播放器 ViewModel，管理引擎切换、播放状态、轨道、字幕样式、在线字幕与选集。",
+      "tags": ["view-model", "player", "macos", "subtitle"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacPlayerWindowController.swift",
+      "type": "file",
+      "name": "MacPlayerWindowController.swift",
+      "filePath": "VanmoMac/Player/MacPlayerWindowController.swift",
+      "summary": "macOS 独立播放窗口控制器，从主窗口分离播放内容，关闭时通知状态清理。",
+      "tags": ["player", "window", "macos", "controller"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacSubtitleOverlayView.swift",
+      "type": "file",
+      "name": "MacSubtitleOverlayView.swift",
+      "filePath": "VanmoMac/Player/MacSubtitleOverlayView.swift",
+      "summary": "macOS 字幕叠加视图，按位置与样式渲染文本字幕，并定义字幕样式偏好。",
+      "tags": ["subtitle", "ui", "macos", "overlay"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:VanmoMac/Player/MacTrackSelectorView.swift",
+      "type": "file",
+      "name": "MacTrackSelectorView.swift",
+      "filePath": "VanmoMac/Player/MacTrackSelectorView.swift",
+      "summary": "macOS 音轨与字幕选择面板。",
+      "tags": ["ui", "player", "tracks", "macos"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:VanmoMac/Resources/Assets.xcassets/Contents.json",
+      "type": "config",
+      "name": "Mac Assets Contents.json",
+      "filePath": "VanmoMac/Resources/Assets.xcassets/Contents.json",
+      "summary": "macOS 资源目录根清单文件。",
+      "tags": ["asset", "catalog", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:VanmoMac/Resources/Assets.xcassets/MacConnAList.imageset/Contents.json",
+      "type": "config",
+      "name": "MacConnAList Contents.json",
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnAList.imageset/Contents.json",
+      "summary": "AList 连接类型图标资源清单。",
+      "tags": ["asset", "icon", "connection", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:VanmoMac/Resources/Assets.xcassets/MacConnAliyunDrive.imageset/Contents.json",
+      "type": "config",
+      "name": "MacConnAliyunDrive Contents.json",
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnAliyunDrive.imageset/Contents.json",
+      "summary": "阿里云盘连接类型图标资源清单。",
+      "tags": ["asset", "icon", "connection", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:VanmoMac/Resources/Assets.xcassets/MacConnBaiduNetdisk.imageset/Contents.json",
+      "type": "config",
+      "name": "MacConnBaiduNetdisk Contents.json",
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnBaiduNetdisk.imageset/Contents.json",
+      "summary": "百度网盘连接类型图标资源清单。",
+      "tags": ["asset", "icon", "connection", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:VanmoMac/Resources/Assets.xcassets/MacConnBox.imageset/Contents.json",
+      "type": "config",
+      "name": "MacConnBox Contents.json",
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnBox.imageset/Contents.json",
+      "summary": "Box 连接类型图标资源清单。",
+      "tags": ["asset", "icon", "connection", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:VanmoMac/Resources/Assets.xcassets/MacConnDLNA.imageset/Contents.json",
+      "type": "config",
+      "name": "MacConnDLNA Contents.json",
+      "filePath": "VanmoMac/Resources/Assets.xcassets/MacConnDLNA.imageset/Contents.json",
+      "summary": "DLNA 连接类型图标资源清单。",
+      "tags": ["asset", "icon", "connection", "configuration"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:VanmoMac/App/MacAppState.swift:MacAppState",
+      "type": "class",
+      "name": "MacAppState",
+      "filePath": "VanmoMac/App/MacAppState.swift",
+      "lineRange": [101, 412],
+      "summary": "macOS 全局可观察状态，管理侧边栏、内容路由、播放窗口与外观模式。",
+      "tags": ["state", "macos", "observable-object"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:VanmoMac/App/VanmoMacApp.swift:VanmoMacApp",
+      "type": "class",
+      "name": "VanmoMacApp",
+      "filePath": "VanmoMac/App/VanmoMacApp.swift",
+      "lineRange": [6, 125],
+      "summary": "macOS 应用主体，初始化服务并装配根视图与环境对象。",
+      "tags": ["entry-point", "app", "macos"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:VanmoMac/Player/MacPlayerViewModel.swift:MacPlayerViewModel",
+      "type": "class",
+      "name": "MacPlayerViewModel",
+      "filePath": "VanmoMac/Player/MacPlayerViewModel.swift",
+      "lineRange": [9, 1546],
+      "summary": "macOS 播放器状态中枢，统筹引擎切换、播放控制、字幕与选集逻辑。",
+      "tags": ["view-model", "player", "macos", "observable-object"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:VanmoMac/Player/MacKSPlayerEngine.swift:MacKSPlayerEngine",
+      "type": "class",
+      "name": "MacKSPlayerEngine",
+      "filePath": "VanmoMac/Player/MacKSPlayerEngine.swift",
+      "lineRange": [9, 298],
+      "summary": "macOS 端 KSPlayer 引擎封装，发布播放状态与字幕事件。",
+      "tags": ["player", "engine", "macos", "ksplayer"],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:VanmoMac/Player/MacPlayerWindowController.swift:MacPlayerWindowController",
+      "type": "class",
+      "name": "MacPlayerWindowController",
+      "filePath": "VanmoMac/Player/MacPlayerWindowController.swift",
+      "lineRange": [10, 110],
+      "summary": "独立播放窗口控制器，承载播放器视图并处理窗口关闭清理。",
+      "tags": ["player", "window", "macos", "controller"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift:KSPlayerMediaProbeProvider",
+      "type": "class",
+      "name": "KSPlayerMediaProbeProvider",
+      "filePath": "VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift",
+      "lineRange": [5, 123],
+      "summary": "macOS 媒体探测实现，供元数据服务探测媒体信息。",
+      "tags": ["metadata", "probe", "macos", "ksplayer"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:VanmoMac/App/MacAppState.swift",
+      "target": "class:VanmoMac/App/MacAppState.swift:MacAppState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:VanmoMac/App/VanmoMacApp.swift",
+      "target": "class:VanmoMac/App/VanmoMacApp.swift:VanmoMacApp",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerViewModel.swift",
+      "target": "class:VanmoMac/Player/MacPlayerViewModel.swift:MacPlayerViewModel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:VanmoMac/Player/MacKSPlayerEngine.swift",
+      "target": "class:VanmoMac/Player/MacKSPlayerEngine.swift:MacKSPlayerEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerWindowController.swift",
+      "target": "class:VanmoMac/Player/MacPlayerWindowController.swift:MacPlayerWindowController",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift",
+      "target": "class:VanmoMac/Metadata/KSPlayerMediaProbeProvider.swift:KSPlayerMediaProbeProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:VanmoMac/App/VanmoMacApp.swift",
+      "target": "file:VanmoMac/App/VanmoMacRootView.swift",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:VanmoMac/App/VanmoMacRootView.swift",
+      "target": "class:VanmoMac/App/MacAppState.swift:MacAppState",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerView.swift",
+      "target": "class:VanmoMac/Player/MacPlayerViewModel.swift:MacPlayerViewModel",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerView.swift",
+      "target": "file:VanmoMac/Player/MacKSPlayerView.swift",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerView.swift",
+      "target": "file:VanmoMac/Player/MacAVPlayerView.swift",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerEngineFactory.swift",
+      "target": "class:VanmoMac/Player/MacKSPlayerEngine.swift:MacKSPlayerEngine",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerWindowController.swift",
+      "target": "file:VanmoMac/Player/MacPlayerView.swift",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:VanmoMac/Player/MacPlayerViewModel.swift",
+      "target": "file:VanmoMac/Player/MacLocalFilePlayback.swift",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

@@ -9,6 +9,8 @@ enum MacDesignTokens {
         /// 交通灯区域宽度，侧边栏顶部控件需从此处起排
         static let trafficLightsLeadingInset: CGFloat = 78
         static let trafficLightsTopInset: CGFloat = 8
+        /// 顶部悬浮的展开/折叠控制行高度（顶部 2 + 按钮 28 + 底部 12），供侧边栏内容避让
+        static let sidebarControlRowHeight: CGFloat = 42
         static let headerHeight: CGFloat = 56
         static let contentPadding: CGFloat = 24
         static let detailContentPadding: CGFloat = 40
