@@ -53,6 +53,10 @@ struct ContentView: View {
         }
         .tint(.vanmoPrimary)
         .modifier(PlayerPresentationModifier())
+        .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in
+            // 持久化到 AppState，避免 LibraryView 未挂载时通知丢失。
+            appState.notifyFavoriteDidChange()
+        }
         .task {
             connectionsViewModel.setModelContext(modelContext)
             downloadManager.configure(modelContext: modelContext)

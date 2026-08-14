@@ -32,6 +32,10 @@ enum MacDesignTokens {
         static let addConnectionWidth: CGFloat = 720
         static let addConnectionHeight: CGFloat = 540
         static let addConnectionSidebarWidth: CGFloat = 220
+        static let settingsSidebarWidth: CGFloat = 184
+        static let settingsContentMaxWidth: CGFloat = 760
+        static let settingsWindowWidth: CGFloat = 920
+        static let settingsWindowHeight: CGFloat = 620
         static let addConnectionContentWidth: CGFloat = 500
         static let addConnectionRadius: CGFloat = 10
         static let downloadWidth: CGFloat = 96

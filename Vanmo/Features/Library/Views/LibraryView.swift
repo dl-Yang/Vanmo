@@ -47,10 +47,9 @@ struct LibraryView: View {
             await viewModel.loadInitialSections(connections: connectionsViewModel.savedConnections)
             viewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in
+        .onChange(of: appState.favoriteChangeCount) { _, _ in
             Task {
-                await connectionsViewModel.loadSavedConnections()
-                await viewModel.refreshEmbyHome(connections: connectionsViewModel.savedConnections)
+                await viewModel.refreshFavoritesAfterChange(connections: connectionsViewModel.savedConnections)
             }
         }
         .onChange(of: connectionsViewModel.librarySyncCompletionID) { _, newValue in
@@ -63,6 +62,10 @@ struct LibraryView: View {
         .onChange(of: appState.selectedTab) { _, newValue in
             guard newValue == .library else { return }
             viewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)
+            Task {
+                // 兜底：若 LibraryView 此前未挂载而错过收藏通知，切回本 tab 时补一次轻量刷新。
+                await viewModel.refreshFavoritesAfterChange(connections: connectionsViewModel.savedConnections)
+            }
         }
     }
 

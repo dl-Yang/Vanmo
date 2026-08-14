@@ -47,6 +47,7 @@
 		40B23352EAEA2801537E0094 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EA488509E18DC2C884AAA5 /* LoadingView.swift */; };
 		41E4DED1170C0C52F9FE107D /* fnos.png in Resources */ = {isa = PBXBuildFile; fileRef = EEC7D8C959C3FA07E45E3754 /* fnos.png */; };
 		45003B26F5BA4EFA4AF8A063 /* MacTrackSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F884249848ED7286C2E2C8 /* MacTrackSelectorView.swift */; };
+		466EDFD4700B246CBA657BDD /* MacSettingsWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C304ACAE13AD2BF266BE9E /* MacSettingsWindowView.swift */; };
 		46A07DA016A61F9706E11605 /* nfs.png in Resources */ = {isa = PBXBuildFile; fileRef = 1EA73A8F025D2DF849E23FDF /* nfs.png */; };
 		47330A3092F593DB5BCA6784 /* MacRemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8636415210B4191F85B68B7E /* MacRemoteImage.swift */; };
 		4806BCE02AE553C029719058 /* MacEmbyFolderBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABF5F0C14AD796EE9479119E /* MacEmbyFolderBrowseView.swift */; };
@@ -68,7 +69,6 @@
 		64CF5C8E5EE52BF5A409698C /* TimeInterval+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD11C496362FE830670827E2 /* TimeInterval+Formatting.swift */; };
 		6552953C998DADD0EAF96B00 /* MacLibraryItemDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA3C4A9A6E5C41D88C88A0D /* MacLibraryItemDestination.swift */; };
 		69EEF69A6647D91612F19B44 /* MacPlayerWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FBE7AC773A8FA662C936AF /* MacPlayerWindowController.swift */; };
-		6A1F599656B3D4148E76AC08 /* MacSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD94F4887522207389D8457 /* MacSettingsView.swift */; };
 		6C559DE8C613197CDED94D0C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FAE01D009AD30867E0E07D15 /* Assets.xcassets */; };
 		6E784F486580B35270057863 /* MacLibrarySort.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AD8C87B76D5E9531E0DC0C /* MacLibrarySort.swift */; };
 		6F994896E9F4472385DB92DD /* MacMediaItemContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 120E300378E53BD1C48BE3F7 /* MacMediaItemContextMenu.swift */; };
@@ -99,6 +99,7 @@
 		92FE67DF76138D930B46E066 /* VanmoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 42B7EA96FE9499172F66E647 /* VanmoCore */; };
 		93D79E4B24BB123992D01808 /* MacHomeCollectionCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F8B25C7F98E598559CBE6A /* MacHomeCollectionCache.swift */; };
 		94CC08A9C73E34D912F49CC8 /* emby.png in Resources */ = {isa = PBXBuildFile; fileRef = F0A25BAD49788F06D474B95F /* emby.png */; };
+		9594C847839FD1AA5E98EBEC /* MacDownloadManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B07335DD76360DAFE15A376 /* MacDownloadManagementView.swift */; };
 		9674A00E86D78D53EDA38E2C /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DEC87067987F9F73EF86AC /* SettingsViewModel.swift */; };
 		96980FF8C625A4CA15A5C525 /* MediaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC3480B949E6965C136DCA2 /* MediaDetailView.swift */; };
 		99E93834735C788CA24EBF79 /* box.png in Resources */ = {isa = PBXBuildFile; fileRef = 2808E3F2654CF170151A05FD /* box.png */; };
@@ -210,6 +211,7 @@
 		58FD915D4042EB1C1A80D05C /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		5A64BCC4A5AF212206C6EB3A /* MacPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerView.swift; sourceTree = "<group>"; };
 		5A9C865D6F495BA681A5A92C /* MacSubtitleOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSubtitleOverlayView.swift; sourceTree = "<group>"; };
+		5B07335DD76360DAFE15A376 /* MacDownloadManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDownloadManagementView.swift; sourceTree = "<group>"; };
 		60323ABED836DC766B05A32F /* webdav.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = webdav.png; sourceTree = "<group>"; };
 		60CF418D9980D92E7E15716C /* SecondFloorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorView.swift; sourceTree = "<group>"; };
 		61585942DFE77AC7C9FD50CC /* FlowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
@@ -280,13 +282,13 @@
 		D09B8FEDE094A9A00BE8EC90 /* Vanmo-Mac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac.entitlements"; sourceTree = "<group>"; };
 		D28884D0283563E4720407AA /* MacMediaListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaListRow.swift; sourceTree = "<group>"; };
 		D66F1E32A5FB3FEDDD125127 /* Color+Mac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Mac.swift"; sourceTree = "<group>"; };
+		D7C304ACAE13AD2BF266BE9E /* MacSettingsWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsWindowView.swift; sourceTree = "<group>"; };
 		DA597E508F1FD4192290F715 /* MacAVPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAVPlayerView.swift; sourceTree = "<group>"; };
 		DD83E98C75F323D9F3C45579 /* Int64+FileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Int64+FileSize.swift"; sourceTree = "<group>"; };
 		DF13EE778805D51585A39F36 /* MacPlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerViewModel.swift; sourceTree = "<group>"; };
 		E30E7D0BFDB02BE5CD1DF7A0 /* MacConnectionsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacConnectionsViewModel.swift; sourceTree = "<group>"; };
 		E5142357466F69E4FBA98C44 /* CountryMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountryMapper.swift; sourceTree = "<group>"; };
 		E54BF05A8A41A3B3729D3238 /* VanmoMacRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VanmoMacRootView.swift; sourceTree = "<group>"; };
-		EAD94F4887522207389D8457 /* MacSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsView.swift; sourceTree = "<group>"; };
 		EC27A159B320F156FA413559 /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		EC6ABD1126A2D309D76CC059 /* RatingBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingBadge.swift; sourceTree = "<group>"; };
 		EDA3C4A9A6E5C41D88C88A0D /* MacLibraryItemDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibraryItemDestination.swift; sourceTree = "<group>"; };
@@ -366,8 +368,9 @@
 		1764F5190C45207D6F575AFE /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				EAD94F4887522207389D8457 /* MacSettingsView.swift */,
+				5B07335DD76360DAFE15A376 /* MacDownloadManagementView.swift */,
 				8A20D39765496E942D610EFB /* MacSettingsViewModel.swift */,
+				D7C304ACAE13AD2BF266BE9E /* MacSettingsWindowView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -1141,6 +1144,7 @@
 				60FA29961D5E179227A2CCF0 /* MacConnectionsBrowseView.swift in Sources */,
 				2A2B6EB9673A6E70E8E26511 /* MacConnectionsViewModel.swift in Sources */,
 				7E03C279AF25FF1638DB5A5F /* MacDesignTokens.swift in Sources */,
+				9594C847839FD1AA5E98EBEC /* MacDownloadManagementView.swift in Sources */,
 				4806BCE02AE553C029719058 /* MacEmbyFolderBrowseView.swift in Sources */,
 				348399A49CBCA143089052E9 /* MacEpisodeSelectorView.swift in Sources */,
 				4AB498DB48B747B50389B085 /* MacFavoritesListView.swift in Sources */,
@@ -1175,8 +1179,8 @@
 				7138EDE575639610A7BDB133 /* MacScannedShowDetailView.swift in Sources */,
 				C0CFDC64B361728C856717B6 /* MacSearchResultsView.swift in Sources */,
 				B9F256A4F6740B73A51EB899 /* MacSearchViewModel.swift in Sources */,
-				6A1F599656B3D4148E76AC08 /* MacSettingsView.swift in Sources */,
 				019B243C08912889B93A7829 /* MacSettingsViewModel.swift in Sources */,
+				466EDFD4700B246CBA657BDD /* MacSettingsWindowView.swift in Sources */,
 				3327E030E931885C3DF57DEA /* MacSidebarView.swift in Sources */,
 				068CC4178E48140CFD936298 /* MacSubtitleOverlayView.swift in Sources */,
 				45003B26F5BA4EFA4AF8A063 /* MacTrackSelectorView.swift in Sources */,

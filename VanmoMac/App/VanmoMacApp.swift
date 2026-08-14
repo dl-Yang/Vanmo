@@ -82,12 +82,6 @@ struct VanmoMacApp: App {
                 .keyboardShortcut(.escape, modifiers: [])
             }
 
-            CommandGroup(after: .appSettings) {
-                Button("Settings...") {
-                    appState.selectSettings()
-                }
-                .keyboardShortcut(",", modifiers: .command)
-            }
         }
 
         WindowGroup("下载", id: "downloads") {
@@ -99,6 +93,22 @@ struct VanmoMacApp: App {
         .windowStyle(.hiddenTitleBar)
         .modelContainer(sharedModelContainer)
         .defaultSize(width: 720, height: 640)
+
+        Settings {
+            MacSettingsWindowView()
+                .environmentObject(cloudSyncCoordinator)
+                .environmentObject(appState)
+                .environmentObject(downloadManager)
+                .frame(minWidth: 760, minHeight: 520)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unifiedCompact)
+        .modelContainer(sharedModelContainer)
+        .windowResizability(.contentMinSize)
+        .defaultSize(
+            width: MacDesignTokens.Layout.settingsWindowWidth,
+            height: MacDesignTokens.Layout.settingsWindowHeight
+        )
 
         MenuBarExtra {
             if appState.isPlayerPresented {

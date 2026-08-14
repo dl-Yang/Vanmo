@@ -198,6 +198,20 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    /// 收藏变化后轻量刷新：仅重读 SwiftData 高亮数据（继续观看 / 收藏分区），
+    /// 不触发 Emby 网络请求。收藏/取消收藏已同步服务端并落盘，本地重读即可，
+    /// 避免全量刷新带来的延迟，也不受「Emby 刷新中直接丢弃」的影响。
+    func refreshFavoritesAfterChange(connections: [SavedConnection]) async {
+        guard let context = modelContext else { return }
+        do {
+            try await reloadHighlights(in: context, connections: connections)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+        updateLibraryEmptyState(connections: connections)
+    }
+
     // MARK: - Emby Live Refresh + Persist
 
     private func refreshEmbyAndPersist(

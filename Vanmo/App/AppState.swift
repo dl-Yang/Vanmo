@@ -13,6 +13,14 @@ final class AppState: ObservableObject {
     /// 二级页面（如外观设置）的导航栈仍能保留，用户体验上不会被弹回根。
     @Published var settingsPath = NavigationPath()
 
+    /// 收藏变化信号（每次 +1）。由常驻的 `ContentView` 转发 `.mediaFavoriteDidChange`
+    /// 通知而来，避免 LibraryView 未挂载期间通知丢失；各页面订阅它做轻量刷新。
+    @Published private(set) var favoriteChangeCount = 0
+
+    func notifyFavoriteDidChange() {
+        favoriteChangeCount += 1
+    }
+
     func play(_ item: MediaItem) {
         currentPlayingItem = item
         isPlayerPresented = true

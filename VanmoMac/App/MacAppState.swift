@@ -84,7 +84,6 @@ enum MacContentRoute: Equatable {
     case libraryScannedShowDetail(connectionId: UUID, showTitle: String)
     case connectionBrowser(activeConnectionId: UUID)
     case search
-    case settings
 }
 
 struct MacMediaPurgeEvent: Equatable {
@@ -141,7 +140,9 @@ final class MacAppState: ObservableObject {
     /// 同步 purge 回调（删除前立刻执行），避免仅依赖 onChange 时序。
     private var mediaPurgeHandlers: [UUID: (UUID) -> Void] = [:]
 
-    weak var activePlayerViewModel: MacPlayerViewModel?
+    /// 播放器 ViewModel 由 AppState 强持有，确保播放窗口以任何方式关闭（红点/快捷键/切歌）时
+    /// `handlePlayerWindowClosed()` 都能拿到它执行 `cleanup()`，避免引擎残留继续播放。
+    private var activePlayerViewModel: MacPlayerViewModel?
 
     private var playerWindowController: MacPlayerWindowController?
     private weak var playerLibraryViewModel: MacLibraryViewModel?
@@ -193,11 +194,6 @@ final class MacAppState: ObservableObject {
 
     var isSearchActive: Bool {
         if case .search = contentRoute { return true }
-        return false
-    }
-
-    var isSettingsActive: Bool {
-        if case .settings = contentRoute { return true }
         return false
     }
 
@@ -273,7 +269,7 @@ final class MacAppState: ObservableObject {
             backFromLibrarySubRoute()
         case .connectionBrowser:
             exitConnectionBrowser()
-        case .search, .settings:
+        case .search:
             contentRoute = .library
         case .library:
             break
@@ -282,11 +278,6 @@ final class MacAppState: ObservableObject {
 
     func selectSearch() {
         contentRoute = .search
-        closeDetail()
-    }
-
-    func selectSettings() {
-        contentRoute = .settings
         closeDetail()
     }
 

@@ -274,7 +274,7 @@ struct VanmoMacRootView: View {
         }
     }
 
-    /// 与库互斥的独立页面（连接浏览器 / 搜索 / 设置）。
+    /// 与库互斥的独立页面（连接浏览器 / 搜索）。
     @ViewBuilder
     private var standaloneRouteContent: some View {
         switch appState.contentRoute {
@@ -282,8 +282,6 @@ struct VanmoMacRootView: View {
             MacConnectionsBrowseView()
         case .search:
             MacSearchResultsView()
-        case .settings:
-            MacSettingsView()
         default:
             EmptyView()
         }

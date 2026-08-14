@@ -157,6 +157,7 @@ struct MacSidebarView: View {
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @Environment(\.macTheme) private var theme
+    @Environment(\.openSettings) private var openSettings
     @Query(
         filter: #Predicate<SavedConnection> { $0.deletedAt == nil },
         sort: \SavedConnection.name
@@ -341,9 +342,9 @@ struct MacSidebarView: View {
         MacSidebarRow(
             title: "Settings",
             systemImage: "gearshape",
-            isSelected: appState.isSettingsActive && appState.selectedMediaItem == nil
+            isSelected: false
         ) {
-            appState.selectSettings()
+            openSettings()
         }
         .padding(.horizontal, MacDesignTokens.Layout.sidebarHorizontalPadding)
         .padding(.vertical, 12)

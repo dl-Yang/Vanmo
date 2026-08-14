@@ -132,6 +132,15 @@ final class MacPlayerViewModel: ObservableObject {
         }
     }
 
+    /// 兜底：若播放窗口以任何方式被销毁而 `cleanup()` 未被调用，
+    /// 释放时立即停止 AVPlayer；KSPlayer 引擎由其自身 `deinit` 调用 `shutdown()`。
+    deinit {
+        if !didCleanup {
+            player.pause()
+            player.replaceCurrentItem(with: nil)
+        }
+    }
+
     var progress: Double {
         guard duration > 0 else { return 0 }
         return currentTime / duration
@@ -336,6 +345,7 @@ final class MacPlayerViewModel: ObservableObject {
     }
 
     func playEpisode(_ episode: MacPlayerEpisode) async {
+        guard !didCleanup else { return }
         guard episode.id != currentEpisodeID else {
             showEpisodeSelector = false
             return
@@ -559,6 +569,7 @@ final class MacPlayerViewModel: ObservableObject {
         legibleOutput = nil
         itemCancellables.removeAll()
         ksCancellables.removeAll()
+        cancellables.removeAll()
         ksEngine?.stop()
         ksEngine = nil
     }
