@@ -413,6 +413,8 @@ struct MacSidebarView: View {
             return appState.selectedSection == section
         case .libraryFavorites:
             return section == .favorites
+        case .libraryHistory:
+            return section == .history
         default:
             return false
         }

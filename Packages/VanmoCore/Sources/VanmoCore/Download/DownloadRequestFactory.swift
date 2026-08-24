@@ -21,7 +21,10 @@ public enum DownloadRequestFactory {
         )
         return DownloadRequest(
             sourceConnectionId: item.sourceConnectionId,
-            postUrl: item.backdropURL ?? item.backdropURL,
+            postUrl: item.posterURL ?? item.backdropURL,
+            sourceMediaItemID: item.id,
+            sourceServerID: item.serverId,
+            seriesServerID: item.seriesId,
             connectionType: connectionType,
             remotePath: remotePath,
             sourceFileURL: item.sourceConnectionId == nil ? item.fileURL : nil,
@@ -78,7 +81,10 @@ public enum DownloadRequestFactory {
         )
         return DownloadRequest(
             sourceConnectionId: connectionId,
-            postUrl: episode.backdropURL ?? show.backdropURL,
+            postUrl: episode.backdropURL ?? show.posterURL ?? show.backdropURL,
+            sourceMediaItemID: show.id,
+            sourceServerID: episode.id,
+            seriesServerID: show.serverId ?? show.seriesId,
             connectionType: connectionType,
             remotePath: episode.remotePath ?? episode.id,
             fileName: fileName,

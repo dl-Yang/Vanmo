@@ -192,6 +192,17 @@ final class MacLibraryViewModel: ObservableObject {
         }
     }
 
+    /// 轻量刷新首页「历史记录」区（播放进度保存后由 Root 触发）。
+    func reloadWatchHistory() async {
+        guard let context = modelContext else { return }
+        do {
+            try await reloadHighlights(in: context)
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
     func reload(filter: MacLibraryFilter = .all, section: MacSidebarSection = .home) {
         // sectionItems 目前无 UI 消费者，这里不做主线程全量 fetch + 排序，
         // 只更新空态判断，避免每次切换 filter/section/sortOption 时卡顿。
@@ -954,6 +965,9 @@ final class MacLibraryViewModel: ObservableObject {
             break
         case .favorites:
             items = items.filter(\.isFavorite)
+        case .history:
+            // 仅为 switch 穷尽而保留：History 页使用独立的 MacHistoryListViewModel，此处无 UI 消费者。
+            items = items.filter { $0.lastPlayedAt != nil }
         }
 
         switch filter {

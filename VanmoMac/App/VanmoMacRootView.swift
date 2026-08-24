@@ -1,3 +1,5 @@
+import AppKit
+import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 import VanmoCore
@@ -68,6 +70,11 @@ struct VanmoMacRootView: View {
             }
         }
         .macTheme(activeTheme)
+        .background {
+            MacMainWindowAccessor { window in
+                appState.registerMainWindow(window)
+            }
+        }
         .animation(.easeInOut(duration: 0.2), value: appState.isSidebarExpanded)
         .sheet(isPresented: $appState.isAddConnectionPresented, onDismiss: refreshLibraryAfterConnection) {
             MacAddConnectionView(viewModel: connectionsViewModel)
@@ -92,6 +99,7 @@ struct VanmoMacRootView: View {
             await downloadManager.restoreAndResume()
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
+            appState.notifyWatchHistoryDidChange()
             await connectionsViewModel.loadSavedConnections()
             searchViewModel.setConnections(connectionsViewModel.savedConnections)
             await refreshLibrarySections()
@@ -101,6 +109,7 @@ struct VanmoMacRootView: View {
                 if newPhase == .active {
                     downloadManager.resume()
                     await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
+                    appState.notifyWatchHistoryDidChange()
                     await connectionsViewModel.loadSavedConnections()
                     searchViewModel.setConnections(connectionsViewModel.savedConnections)
                     // 不再全量刷新 library：folder preview / Emby live 数据只在冷启动时加载一次。
@@ -114,6 +123,10 @@ struct VanmoMacRootView: View {
             if !searchViewModel.searchText.isEmpty {
                 searchViewModel.search()
             }
+        }
+        .onChange(of: appState.pendingDownloadDetailTarget, initial: true) { _, target in
+            guard let target else { return }
+            openDownloadDetail(target)
         }
         .onAppear {
             appState.syncAppearance(with: colorScheme)
@@ -136,10 +149,64 @@ struct VanmoMacRootView: View {
             // 持久化到 AppState，避免 Favorites 未挂载时通知丢失。
             appState.notifyFavoriteDidChange()
         }
+        .onChange(of: appState.watchHistoryChangeNonce) { _, _ in
+            // 播放器窗口关闭（进度已落库）后刷新首页「历史记录」区。
+            Task {
+                await libraryViewModel.reloadWatchHistory()
+            }
+        }
         .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
             handleDroppedFiles(providers)
         }
 
+    }
+
+    private func openDownloadDetail(_ target: MacDownloadDetailTarget) {
+        let item = storedMediaItem(for: target.request)
+            ?? makeDownloadDetailFallback(for: target.request)
+        appState.openDetail(item, focusedEpisode: target.focusedEpisode)
+        appState.consumeDownloadDetailTarget()
+    }
+
+    private func storedMediaItem(for request: DownloadRequest) -> MediaItem? {
+        if let mediaID = request.sourceMediaItemID {
+            let descriptor = FetchDescriptor<MediaItem>(
+                predicate: #Predicate { $0.id == mediaID }
+            )
+            if let item = try? modelContext.fetch(descriptor).first {
+                return item
+            }
+        }
+
+        let serverID = request.mediaType == .tvEpisode
+            ? request.seriesServerID
+            : request.sourceServerID
+        guard let serverID, let connectionID = request.sourceConnectionId else {
+            return nil
+        }
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate {
+                $0.serverId == serverID && $0.sourceConnectionId == connectionID
+            }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func makeDownloadDetailFallback(for request: DownloadRequest) -> MediaItem {
+        let opensSeries = request.mediaType == .tvEpisode
+        let item = MediaItem(
+            title: opensSeries ? (request.showTitle ?? request.displayTitle) : request.displayTitle,
+            fileURL: request.sourceFileURL ?? URL(fileURLWithPath: request.remotePath),
+            mediaType: opensSeries ? .tvShow : request.mediaType,
+            fileSize: request.totalBytes
+        )
+        item.posterURL = request.postUrl
+        item.backdropURL = request.postUrl
+        item.sourceConnectionId = request.sourceConnectionId
+        item.serverId = opensSeries ? request.seriesServerID : request.sourceServerID
+        item.seriesId = request.seriesServerID
+        item.showTitle = request.showTitle
+        return item
     }
 
     private func syncStatusOverlay(message: String) -> some View {
@@ -229,7 +296,10 @@ struct VanmoMacRootView: View {
         }
         .overlay {
             if let selectedItem = appState.selectedMediaItem {
-                MacMediaDetailView(item: selectedItem)
+                MacMediaDetailView(
+                    item: selectedItem,
+                    focusedEpisode: appState.detailEpisodeLocator
+                )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.opacity)
             }
@@ -244,6 +314,9 @@ struct VanmoMacRootView: View {
             MacFavoritesListView()
                 .opacity(appState.contentRoute == .libraryFavorites ? 1 : 0)
                 .allowsHitTesting(appState.contentRoute == .libraryFavorites)
+            MacHistoryListView()
+                .opacity(appState.contentRoute == .libraryHistory ? 1 : 0)
+                .allowsHitTesting(appState.contentRoute == .libraryHistory)
         }
     }
 
@@ -289,7 +362,7 @@ struct VanmoMacRootView: View {
 
     private var isLibraryFamilyActive: Bool {
         switch appState.contentRoute {
-        case .library, .libraryFavorites,
+        case .library, .libraryFavorites, .libraryHistory,
              .libraryCollectionFolder, .libraryScannedLibrary,
              .libraryEmbyFolderBrowse, .libraryScannedShowDetail:
             return true
@@ -311,6 +384,24 @@ struct VanmoMacRootView: View {
     private var scannedCollectionType: EmbyCollectionType? {
         guard case let .libraryScannedLibrary(_, rawValue) = appState.contentRoute else { return nil }
         return EmbyCollectionType(raw: rawValue)
+    }
+}
+
+private struct MacMainWindowAccessor: NSViewRepresentable {
+    let onResolve: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            onResolve(view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            onResolve(view.window)
+        }
     }
 }
 

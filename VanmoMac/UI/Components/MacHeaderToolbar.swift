@@ -5,6 +5,9 @@ struct MacLibraryViewControls: View {
     @EnvironmentObject private var libraryViewModel: MacLibraryViewModel
     @Environment(\.macTheme) private var theme
 
+    /// 是否显示排序菜单。History 等固定顺序的页面置 false，仅保留视图切换。
+    var showsSortMenu: Bool = true
+
     var body: some View {
         HStack(spacing: 16) {
             HStack(spacing: 0) {
@@ -15,20 +18,22 @@ struct MacLibraryViewControls: View {
             .background(theme.segmentedBackground)
             .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.segmentedControl))
 
-            Menu {
-                Picker("排序", selection: $libraryViewModel.sortOption) {
-                    ForEach(MacLibrarySortOption.allCases) { option in
-                        Text(option.displayName).tag(option)
+            if showsSortMenu {
+                Menu {
+                    Picker("排序", selection: $libraryViewModel.sortOption) {
+                        ForEach(MacLibrarySortOption.allCases) { option in
+                            Text(option.displayName).tag(option)
+                        }
                     }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(theme.secondaryText)
+                        .frame(width: 20, height: 20)
                 }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(theme.secondaryText)
-                    .frame(width: 20, height: 20)
+                .menuStyle(.borderlessButton)
+                .help("排序")
             }
-            .menuStyle(.borderlessButton)
-            .help("排序")
         }
     }
 

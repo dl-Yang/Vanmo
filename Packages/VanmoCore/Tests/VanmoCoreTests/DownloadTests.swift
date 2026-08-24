@@ -59,6 +59,100 @@ final class DownloadTests: XCTestCase {
         XCTAssertEqual(request.sourceKey, "\(connectionID.uuidString):/share/a.mkv")
     }
 
+    func testLegacyRequestDecodesWithoutSourceIdentityFields() throws {
+        let request = DownloadRequest(
+            sourceConnectionId: UUID(),
+            connectionType: .webdav,
+            remotePath: "/Movies/Movie.mkv",
+            fileName: "Movie.mkv",
+            displayTitle: "Movie",
+            mediaType: .movie
+        )
+        let encoder = JSONEncoder()
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any]
+        )
+        object.removeValue(forKey: "sourceMediaItemID")
+        object.removeValue(forKey: "sourceServerID")
+        object.removeValue(forKey: "seriesServerID")
+
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(DownloadRequest.self, from: legacyData)
+
+        XCTAssertNil(decoded.sourceMediaItemID)
+        XCTAssertNil(decoded.sourceServerID)
+        XCTAssertNil(decoded.seriesServerID)
+    }
+
+    @MainActor
+    func testEpisodeRequestPreservesSeriesIdentity() throws {
+        let connectionID = UUID()
+        let show = MediaItem(
+            title: "Example Show",
+            fileURL: URL(fileURLWithPath: "/shows/example"),
+            mediaType: .tvShow
+        )
+        show.sourceConnectionId = connectionID
+        show.serverId = "series-42"
+        show.posterURL = URL(string: "https://example.com/poster.jpg")
+        let episode = EpisodeInfo(
+            id: "episode-7",
+            title: "Pilot",
+            seasonNumber: 1,
+            episodeNumber: 7,
+            duration: 2_400,
+            overview: nil,
+            streamURL: URL(string: "https://example.com/episode-7.mkv")!,
+            backdropURL: nil
+        )
+
+        let request = try DownloadRequestFactory.make(
+            from: episode,
+            show: show,
+            connectionType: .emby
+        )
+
+        XCTAssertEqual(request.sourceMediaItemID, show.id)
+        XCTAssertEqual(request.sourceServerID, episode.id)
+        XCTAssertEqual(request.seriesServerID, show.serverId)
+        XCTAssertEqual(request.postUrl, show.posterURL)
+    }
+
+    @MainActor
+    func testBatchEnqueueDeduplicatesAndSupportsPauseResume() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("VanmoDownloadManagerTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manager = DownloadManager(storeRootDirectory: root)
+        await manager.suspend()
+
+        let first = downloadRequest(path: "/share/episode-1.mkv")
+        let second = downloadRequest(path: "/share/episode-2.mkv")
+        let duplicate = downloadRequest(path: first.remotePath)
+        let ids = try await manager.enqueue([first, second, duplicate])
+
+        XCTAssertEqual(manager.tasks.count, 2)
+        XCTAssertEqual(ids[0], ids[2])
+        XCTAssertEqual(
+            manager.tasks.min(by: { $0.createdAt < $1.createdAt })?.request.remotePath,
+            first.remotePath
+        )
+        XCTAssertTrue(manager.hasPausableTasks)
+
+        await manager.pauseAll()
+        XCTAssertTrue(manager.tasks.allSatisfy { $0.status == .paused })
+        XCTAssertTrue(manager.hasResumableTasks)
+        let storedPausedTasks = try await DownloadTaskStore(rootDirectory: root).load()
+        XCTAssertTrue(storedPausedTasks.allSatisfy { $0.status == .paused })
+
+        await manager.resumeAll()
+        XCTAssertTrue(manager.tasks.allSatisfy { $0.status == .queued })
+        await manager.pause(ids[0])
+        XCTAssertEqual(manager.tasks.first(where: { $0.id == ids[0] })?.status, .paused)
+        await manager.resume(ids[0])
+        XCTAssertEqual(manager.tasks.first(where: { $0.id == ids[0] })?.status, .queued)
+    }
+
     @MainActor
     func testPlexMediaRequestKeepsStablePartPathWithoutToken() throws {
         let item = MediaItem(
@@ -74,6 +168,17 @@ final class DownloadTests: XCTestCase {
 
         XCTAssertEqual(request.remotePath, "/library/parts/42/file.mkv")
         XCTAssertNil(request.sourceFileURL)
+    }
+
+    private func downloadRequest(path: String) -> DownloadRequest {
+        DownloadRequest(
+            sourceConnectionId: UUID(uuidString: "00000000-0000-0000-0000-000000000001"),
+            connectionType: .smb,
+            remotePath: path,
+            fileName: URL(fileURLWithPath: path).lastPathComponent,
+            displayTitle: URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent,
+            mediaType: .tvEpisode
+        )
     }
 
     private func remoteFile(name: String, path: String) -> RemoteFile {

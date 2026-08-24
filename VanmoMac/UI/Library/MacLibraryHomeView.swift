@@ -83,7 +83,7 @@ struct MacLibraryHomeView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
-                    ForEach(libraryViewModel.recentlyPlayed) { item in
+                    ForEach(libraryViewModel.recentlyPlayed.prefix(homeHistoryLimit)) { item in
                         MacContinueWatchingCard(
                             title: item.displayTitle,
                             subtitle: continueWatchingSubtitle(item),
@@ -93,10 +93,19 @@ struct MacLibraryHomeView: View {
                             appState.play(item, from: item.lastPlaybackPosition)
                         }
                     }
+
+                    // 首页最多展示 8 条，超出时在列表末尾给出「查看更多」入口。
+                    if libraryViewModel.recentlyPlayed.count > homeHistoryLimit {
+                        MacContinueWatchingMoreCard {
+                            appState.selectLibrarySection(.history)
+                        }
+                    }
                 }
             }
         }
     }
+
+    private var homeHistoryLimit: Int { 8 }
 
     private var folderBookmarksSection: some View {
         VStack(alignment: .leading, spacing: 12) {

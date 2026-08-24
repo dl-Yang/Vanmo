@@ -84,7 +84,7 @@ struct VanmoMacApp: App {
 
         }
 
-        WindowGroup("下载", id: "downloads") {
+        Window("下载", id: "downloads") {
             MacDownloadManagementView()
                 .environmentObject(downloadManager)
                 .environmentObject(appState)

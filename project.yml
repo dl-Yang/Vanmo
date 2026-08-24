@@ -130,8 +130,10 @@ targets:
       configs:
         Debug:
           CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac.entitlements
+          DEVELOPMENT_TEAM: L775YJ7YS4
         Release:
           CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac-Cloud.entitlements
+          DEVELOPMENT_TEAM: L775YJ7YS4
           OTHER_SWIFT_FLAGS:
             - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"

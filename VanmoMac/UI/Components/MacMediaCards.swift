@@ -50,6 +50,45 @@ struct MacContinueWatchingCard: View {
     }
 }
 
+/// 「查看更多」入口卡片：与继续观看卡片等宽等高，放在首页历史记录列表末尾。
+struct MacContinueWatchingMoreCard: View {
+    @Environment(\.macTheme) private var theme
+
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: MacDesignTokens.Radius.continueWatching)
+                        .fill(theme.secondaryButtonBackground)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 16, weight: .medium))
+                        Text("查看更多")
+                            .font(MacDesignTokens.Typography.cardAction)
+                    }
+                    .foregroundStyle(theme.secondaryText)
+                }
+                .frame(
+                    width: MacDesignTokens.Layout.continueWatchingWidth,
+                    height: MacDesignTokens.Layout.continueWatchingThumbHeight
+                )
+
+                Text("全部历史记录")
+                    .font(MacDesignTokens.Typography.cardTitle)
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+                    .padding(.top, 12)
+            }
+            .frame(width: MacDesignTokens.Layout.continueWatchingWidth, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .help("查看全部历史记录")
+    }
+}
+
 struct MacPosterCard: View {
     @Environment(\.macTheme) private var theme
 

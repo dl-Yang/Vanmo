@@ -89,6 +89,23 @@ struct MacDownloadManagementView: View {
                 .controlSize(.regular)
             } else {
                 if !downloadManager.tasks.isEmpty {
+                    if downloadManager.hasPausableTasks {
+                        Button("全部暂停") {
+                            Task { await downloadManager.pauseAll() }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                    }
+
+                    if downloadManager.hasResumableTasks {
+                        Button("全部继续") {
+                            Task { await downloadManager.resumeAll() }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                        .tint(MacDesignTokens.accentBlue)
+                    }
+
                     Button("选择") {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             isSelectionMode = true
@@ -130,14 +147,22 @@ struct MacDownloadManagementView: View {
         let active = downloadManager.tasks.filter {
             $0.status == .downloading || $0.status == .queued
         }.count
+        let paused = downloadManager.tasks.filter { $0.status == .paused }.count
         let failed = downloadManager.tasks.filter { $0.status == .failed }.count
+        var parts = ["\(total) 项"]
         if active > 0 {
-            return "\(total) 项 · \(active) 进行中"
+            parts.append("\(active) 进行中")
+        }
+        if paused > 0 {
+            parts.append("\(paused) 已暂停")
         }
         if failed > 0 {
-            return "\(total) 项 · \(failed) 失败"
+            parts.append("\(failed) 失败")
         }
-        return "\(total) 项 · 全部完成"
+        if parts.count == 1 {
+            parts.append("全部完成")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var emptyState: some View {
@@ -196,6 +221,9 @@ struct MacDownloadManagementView: View {
                     play: { play(task) },
                     reveal: { reveal(task) },
                     retry: { Task { await downloadManager.retry(task.id) } },
+                    pause: { Task { await downloadManager.pause(task.id) } },
+                    resume: { Task { await downloadManager.resume(task.id) } },
+                    openDetail: { openDetail(for: task) },
                     toggleSelection: {
                         if selection.contains(task.id) {
                             selection.remove(task.id)
@@ -218,6 +246,27 @@ struct MacDownloadManagementView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.automatic)
+    }
+
+    private func openDetail(for task: DownloadTaskSnapshot) {
+        appState.requestDownloadDetail(
+            for: task.request,
+            focusedEpisode: episodeLocator(for: task.request)
+        )
+        appState.activateMainWindow()
+    }
+
+    private func episodeLocator(for request: DownloadRequest) -> MacEpisodeDetailLocator? {
+        guard request.mediaType == .tvEpisode,
+              let seasonNumber = request.seasonNumber,
+              let episodeNumber = request.episodeNumber else {
+            return nil
+        }
+        return MacEpisodeDetailLocator(
+            serverID: request.sourceServerID,
+            seasonNumber: seasonNumber,
+            episodeNumber: episodeNumber
+        )
     }
 
     private func play(_ task: DownloadTaskSnapshot) {
@@ -253,6 +302,9 @@ private struct MacDownloadTaskRow: View {
     let play: () -> Void
     let reveal: () -> Void
     let retry: () -> Void
+    let pause: () -> Void
+    let resume: () -> Void
+    let openDetail: () -> Void
     let toggleSelection: () -> Void
 
     private var cardShape: RoundedRectangle {
@@ -287,7 +339,7 @@ private struct MacDownloadTaskRow: View {
                     }
                 }
 
-                if task.status == .queued || task.status == .downloading {
+                if task.status == .queued || task.status == .downloading || task.status == .paused {
                     ProgressView(value: task.totalBytes > 0 ? task.progress : nil)
                         .tint(MacDesignTokens.accentBlue)
                         .controlSize(.small)
@@ -318,10 +370,18 @@ private struct MacDownloadTaskRow: View {
         .onTapGesture {
             if isSelectionMode {
                 toggleSelection()
+            } else {
+                openDetail()
             }
         }
         .contextMenu {
-            if task.status == .completed {
+            Button("查看详情", action: openDetail)
+            Divider()
+            if task.status == .queued || task.status == .downloading {
+                Button("暂停", action: pause)
+            } else if task.status == .paused {
+                Button("继续", action: resume)
+            } else if task.status == .completed {
                 Button("播放", action: play)
                 Button("在 Finder 中显示", action: reveal)
             } else if task.status == .failed {
@@ -354,7 +414,11 @@ private struct MacDownloadTaskRow: View {
 
     @ViewBuilder
     private var actionButtons: some View {
-        if task.status == .completed {
+        if task.status == .queued || task.status == .downloading {
+            queueControlButton(title: "暂停", action: pause)
+        } else if task.status == .paused {
+            queueControlButton(title: "继续", action: resume)
+        } else if task.status == .completed {
             if #available(macOS 26.0, *) {
                 GlassEffectContainer(spacing: 8) {
                     HStack(spacing: 8) {
@@ -399,6 +463,20 @@ private struct MacDownloadTaskRow: View {
     }
 
     @ViewBuilder
+    private func queueControlButton(title: String, action: @escaping () -> Void) -> some View {
+        if #available(macOS 26.0, *) {
+            Button(title, action: action)
+                .buttonStyle(.glass)
+                .controlSize(.small)
+                .tint(MacDesignTokens.accentBlue)
+        } else {
+            Button(title, action: action)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
     private var cardBackground: some View {
         let tint = isSelected
             ? MacDesignTokens.accentBlue.opacity(isDark ? 0.22 : 0.12)
@@ -430,7 +508,7 @@ private struct MacDownloadTaskRow: View {
             return parts.joined(separator: " · ")
         }
         if task.totalBytes > 0 {
-            if task.status == .downloading || task.status == .queued {
+            if task.status == .downloading || task.status == .queued || task.status == .paused {
                 let received = ByteCountFormatter.string(fromByteCount: task.receivedBytes, countStyle: .file)
                 let total = ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file)
                 return "\(received) / \(total)"
@@ -444,6 +522,7 @@ private struct MacDownloadTaskRow: View {
         switch task.status {
         case .queued: return "等待中"
         case .downloading: return task.totalBytes > 0 ? "\(Int(task.progress * 100))%" : "下载中"
+        case .paused: return "已暂停"
         case .completed: return "已完成"
         case .failed: return "失败"
         }
@@ -453,6 +532,7 @@ private struct MacDownloadTaskRow: View {
         switch task.status {
         case .queued: return theme.secondaryText.opacity(0.2)
         case .downloading: return MacDesignTokens.accentBlue.opacity(0.28)
+        case .paused: return theme.secondaryText.opacity(0.2)
         case .completed: return Color.green.opacity(0.28)
         case .failed: return MacDesignTokens.ratingRed.opacity(0.28)
         }
@@ -462,6 +542,7 @@ private struct MacDownloadTaskRow: View {
         switch task.status {
         case .queued: return theme.secondaryText
         case .downloading: return MacDesignTokens.accentBlue
+        case .paused: return theme.secondaryText
         case .completed: return Color.green
         case .failed: return MacDesignTokens.ratingRed
         }

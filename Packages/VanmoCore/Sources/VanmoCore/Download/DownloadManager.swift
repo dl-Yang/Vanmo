@@ -9,6 +9,14 @@ public final class DownloadManager: ObservableObject {
     @Published public private(set) var tasks: [DownloadTaskSnapshot] = []
     @Published public private(set) var destination = DownloadPreferences.destination
 
+    public var hasPausableTasks: Bool {
+        tasks.contains { $0.status == .queued || $0.status == .downloading }
+    }
+
+    public var hasResumableTasks: Bool {
+        tasks.contains { $0.status == .paused }
+    }
+
     private let store: DownloadTaskStore
     private var modelContext: ModelContext?
     private var worker: Task<Void, Never>?
@@ -48,18 +56,35 @@ public final class DownloadManager: ObservableObject {
 
     @discardableResult
     public func enqueue(_ request: DownloadRequest) async throws -> UUID {
-        if let duplicate = tasks.first(where: {
-            $0.request.sourceKey == request.sourceKey
-                && ($0.status != .completed || completedFileExists(for: $0))
-        }) {
-            return duplicate.id
+        let ids = try await enqueue([request])
+        guard let id = ids.first else {
+            throw DownloadError.sourceUnavailable
+        }
+        return id
+    }
+
+    @discardableResult
+    public func enqueue(_ requests: [DownloadRequest]) async throws -> [UUID] {
+        guard !requests.isEmpty else { return [] }
+        var ids: [UUID] = []
+        var didInsertTask = false
+
+        for request in requests {
+            if let duplicate = duplicateTask(for: request) {
+                ids.append(duplicate.id)
+                continue
+            }
+
+            let snapshot = DownloadTaskSnapshot(request: request, destination: destination)
+            tasks.insert(snapshot, at: 0)
+            ids.append(snapshot.id)
+            didInsertTask = true
         }
 
-        let snapshot = DownloadTaskSnapshot(request: request, destination: destination)
-        tasks.insert(snapshot, at: 0)
+        guard didInsertTask else { return ids }
         try await persist()
         startWorkerIfNeeded()
-        return snapshot.id
+        return ids
     }
 
     public func retry(_ id: UUID) async {
@@ -101,6 +126,58 @@ public final class DownloadManager: ObservableObject {
         if !cancelledActiveTask {
             startWorkerIfNeeded()
         }
+    }
+
+    public func pause(_ id: UUID) async {
+        guard let index = tasks.firstIndex(where: { $0.id == id }),
+              tasks[index].status == .queued || tasks[index].status == .downloading else {
+            return
+        }
+        let wasDownloading = tasks[index].status == .downloading
+        tasks[index].status = .paused
+        tasks[index].updatedAt = Date()
+        if wasDownloading {
+            worker?.cancel()
+        }
+        try? await persist()
+    }
+
+    public func resume(_ id: UUID) async {
+        guard let index = tasks.firstIndex(where: { $0.id == id }),
+              tasks[index].status == .paused else {
+            return
+        }
+        tasks[index].status = .queued
+        tasks[index].updatedAt = Date()
+        try? await persist()
+        startWorkerIfNeeded()
+    }
+
+    public func pauseAll() async {
+        let hasDownloadingTask = tasks.contains { $0.status == .downloading }
+        var didChange = false
+        for index in tasks.indices where tasks[index].status == .queued || tasks[index].status == .downloading {
+            tasks[index].status = .paused
+            tasks[index].updatedAt = Date()
+            didChange = true
+        }
+        guard didChange else { return }
+        if hasDownloadingTask {
+            worker?.cancel()
+        }
+        try? await persist()
+    }
+
+    public func resumeAll() async {
+        var didChange = false
+        for index in tasks.indices where tasks[index].status == .paused {
+            tasks[index].status = .queued
+            tasks[index].updatedAt = Date()
+            didChange = true
+        }
+        guard didChange else { return }
+        try? await persist()
+        startWorkerIfNeeded()
     }
 
     public func suspend() async {
@@ -154,7 +231,10 @@ public final class DownloadManager: ObservableObject {
             }
         }
         while !Task.isCancelled, !isSuspended,
-              let id = tasks.first(where: { $0.status == .queued })?.id {
+              let id = tasks
+                .filter({ $0.status == .queued })
+                .min(by: { $0.createdAt < $1.createdAt })?
+                .id {
             await runTask(id)
         }
     }
@@ -170,11 +250,11 @@ public final class DownloadManager: ObservableObject {
             guard let task = tasks.first(where: { $0.id == id }) else { return }
             try await perform(task)
         } catch is CancellationError {
-            update(id) { $0.status = .queued }
+            restoreQueuedStatusAfterCancellation(id)
             try? await persist()
         } catch {
             if Task.isCancelled || (error as? URLError)?.code == .cancelled {
-                update(id) { $0.status = .queued }
+                restoreQueuedStatusAfterCancellation(id)
             } else {
                 markFailed(id, error: error)
             }
@@ -477,6 +557,13 @@ public final class DownloadManager: ObservableObject {
         return FileManager.default.fileExists(atPath: url.path)
     }
 
+    private func duplicateTask(for request: DownloadRequest) -> DownloadTaskSnapshot? {
+        tasks.first {
+            $0.request.sourceKey == request.sourceKey
+                && ($0.status != .completed || completedFileExists(for: $0))
+        }
+    }
+
     private func uniqueDestinationURL(in directory: URL, preferredName: String, excluding id: UUID) -> URL {
         var candidate = directory.appendingPathComponent(preferredName)
         let base = candidate.deletingPathExtension().lastPathComponent
@@ -513,6 +600,15 @@ public final class DownloadManager: ObservableObject {
             $0.status = .failed
             $0.errorMessage = error.localizedDescription
         }
+    }
+
+    private func restoreQueuedStatusAfterCancellation(_ id: UUID) {
+        guard let index = tasks.firstIndex(where: { $0.id == id }),
+              tasks[index].status == .downloading else {
+            return
+        }
+        tasks[index].status = .queued
+        tasks[index].updatedAt = Date()
     }
 
     private func fileSize(at url: URL) -> Int64 {

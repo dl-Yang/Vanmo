@@ -6,6 +6,7 @@ import VanmoCore
 enum MacSidebarSection: String, CaseIterable, Identifiable {
     case home
     case favorites
+    case history
 
     var id: String { rawValue }
 
@@ -13,6 +14,7 @@ enum MacSidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: "Home"
         case .favorites: "Favorites"
+        case .history: "History"
         }
     }
 
@@ -20,6 +22,7 @@ enum MacSidebarSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: "house"
         case .favorites: "heart"
+        case .history: "clock"
         }
     }
 }
@@ -78,6 +81,7 @@ enum MacAppearanceMode: String, CaseIterable, Identifiable {
 enum MacContentRoute: Equatable {
     case library
     case libraryFavorites
+    case libraryHistory
     case libraryCollectionFolder(connectionId: UUID, folderId: String)
     case libraryScannedLibrary(connectionId: UUID, collectionTypeRaw: String)
     case libraryEmbyFolderBrowse
@@ -96,6 +100,30 @@ struct MacMediaPurgeEvent: Equatable {
     }
 }
 
+struct MacEpisodeDetailLocator: Hashable {
+    let serverID: String?
+    let seasonNumber: Int
+    let episodeNumber: Int
+    let requestID: UUID
+
+    init(
+        serverID: String?,
+        seasonNumber: Int,
+        episodeNumber: Int,
+        requestID: UUID = UUID()
+    ) {
+        self.serverID = serverID
+        self.seasonNumber = seasonNumber
+        self.episodeNumber = episodeNumber
+        self.requestID = requestID
+    }
+}
+
+struct MacDownloadDetailTarget: Equatable {
+    let request: DownloadRequest
+    let focusedEpisode: MacEpisodeDetailLocator?
+}
+
 @MainActor
 final class MacAppState: ObservableObject {
     @AppStorage(MacAppearanceMode.storageKey) var appearanceMode: MacAppearanceMode = .system
@@ -107,6 +135,8 @@ final class MacAppState: ObservableObject {
     @Published var viewMode: MacLibraryViewMode = .grid
     @Published var isDarkMode = false
     @Published var selectedMediaItem: MediaItem?
+    @Published private(set) var detailEpisodeLocator: MacEpisodeDetailLocator?
+    @Published private(set) var pendingDownloadDetailTarget: MacDownloadDetailTarget?
     @Published var isPlayerPresented = false
     @Published var playerItem: MediaItem?
     @Published var playerStartPosition: TimeInterval = 0
@@ -136,6 +166,8 @@ final class MacAppState: ObservableObject {
     @Published private(set) var mediaPurgeEvent: MacMediaPurgeEvent?
     /// 任意入口收藏变更后递增；Favorites 未挂载时也能在下次进入时强制 reload。
     @Published private(set) var favoriteChangeNonce = UUID()
+    /// 播放进度保存（播放器窗口关闭）后递增，供首页「历史记录」与 History 页面刷新。
+    @Published private(set) var watchHistoryChangeNonce = UUID()
 
     /// 同步 purge 回调（删除前立刻执行），避免仅依赖 onChange 时序。
     private var mediaPurgeHandlers: [UUID: (UUID) -> Void] = [:]
@@ -145,6 +177,7 @@ final class MacAppState: ObservableObject {
     private var activePlayerViewModel: MacPlayerViewModel?
 
     private var playerWindowController: MacPlayerWindowController?
+    private weak var mainWindow: NSWindow?
     private weak var playerLibraryViewModel: MacLibraryViewModel?
     private weak var playerConnectionsViewModel: MacConnectionsViewModel?
     private var playerModelContainer: ModelContainer?
@@ -172,17 +205,50 @@ final class MacAppState: ObservableObject {
         playerModelContainer = modelContainer
     }
 
-    func openDetail(_ item: MediaItem) {
-    
+    func registerMainWindow(_ window: NSWindow?) {
+        guard let window else { return }
+        mainWindow = window
+    }
+
+    func activateMainWindow() {
+        guard let mainWindow else { return }
+        if mainWindow.isMiniaturized {
+            mainWindow.deminiaturize(nil)
+        }
+        mainWindow.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    func openDetail(_ item: MediaItem, focusedEpisode: MacEpisodeDetailLocator? = nil) {
+        detailEpisodeLocator = focusedEpisode
         selectedMediaItem = item
     }
 
     func closeDetail() {
         selectedMediaItem = nil
+        detailEpisodeLocator = nil
+    }
+
+    func requestDownloadDetail(
+        for request: DownloadRequest,
+        focusedEpisode: MacEpisodeDetailLocator?
+    ) {
+        pendingDownloadDetailTarget = MacDownloadDetailTarget(
+            request: request,
+            focusedEpisode: focusedEpisode
+        )
+    }
+
+    func consumeDownloadDetailTarget() {
+        pendingDownloadDetailTarget = nil
     }
 
     func notifyFavoriteDidChange() {
         favoriteChangeNonce = UUID()
+    }
+
+    func notifyWatchHistoryDidChange() {
+        watchHistoryChangeNonce = UUID()
     }
 
     var activeConnectionId: UUID? {
@@ -200,7 +266,14 @@ final class MacAppState: ObservableObject {
     func selectLibrarySection(_ section: MacSidebarSection) {
         selectedSection = section
         clearLibrarySubRouteContext()
-        contentRoute = section == .favorites ? .libraryFavorites : .library
+        switch section {
+        case .home:
+            contentRoute = .library
+        case .favorites:
+            contentRoute = .libraryFavorites
+        case .history:
+            contentRoute = .libraryHistory
+        }
         closeDetail()
     }
 
@@ -240,7 +313,7 @@ final class MacAppState: ObservableObject {
 
     func backFromLibrarySubRoute() {
         clearLibrarySubRouteContext()
-        if contentRoute == .libraryFavorites {
+        if contentRoute == .libraryFavorites || contentRoute == .libraryHistory {
             selectedSection = .home
         }
         contentRoute = .library
@@ -262,7 +335,7 @@ final class MacAppState: ObservableObject {
             return
         }
         switch contentRoute {
-        case .libraryFavorites:
+        case .libraryFavorites, .libraryHistory:
             selectLibrarySection(.home)
         case .libraryCollectionFolder, .libraryScannedLibrary,
              .libraryEmbyFolderBrowse, .libraryScannedShowDetail:
@@ -289,6 +362,8 @@ final class MacAppState: ObservableObject {
 
     func exitConnectionBrowser() {
         contentRoute = .library
+        // 回到 home 根页面时同步重置选中 section，避免侧边栏高亮与主区内容不一致。
+        selectedSection = .home
     }
 
     func clearActiveConnectionIfDeleted(_ connectionId: UUID) {
@@ -394,11 +469,16 @@ final class MacAppState: ObservableObject {
 
     /// 播放窗口关闭（用户点红点 / 菜单关闭 / 切换新播放内容）后的统一收尾。
     private func handlePlayerWindowClosed() {
+        // closeWindow() 会同步回调 windowWillClose → 本方法；closePlayer() 随后还会显式调用一次。
+        // 以播放状态做幂等保护，避免收尾逻辑（含历史刷新通知）重复执行。
+        guard isPlayerPresented || playerItem != nil else { return }
         activePlayerViewModel?.cleanup()
         isPlayerPresented = false
         playerItem = nil
         playerStartPosition = 0
         unregisterActivePlayer()
+        // 播放进度在关闭前已落库，通知首页与 History 页面刷新观看记录。
+        notifyWatchHistoryDidChange()
     }
 
     func registerActivePlayer(_ viewModel: MacPlayerViewModel) {

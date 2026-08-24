@@ -3,6 +3,7 @@ import Foundation
 public enum DownloadTaskStatus: String, Codable, Sendable {
     case queued
     case downloading
+    case paused
     case completed
     case failed
 }
@@ -37,6 +38,9 @@ public struct DownloadRequest: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public let postUrl: URL?
     public let sourceConnectionId: UUID?
+    public let sourceMediaItemID: UUID?
+    public let sourceServerID: String?
+    public let seriesServerID: String?
     public let connectionType: ConnectionType?
     public let remotePath: String
     public let sourceFileURL: URL?
@@ -53,6 +57,9 @@ public struct DownloadRequest: Codable, Hashable, Identifiable, Sendable {
         id: UUID = UUID(),
         sourceConnectionId: UUID?,
         postUrl: URL? = nil,
+        sourceMediaItemID: UUID? = nil,
+        sourceServerID: String? = nil,
+        seriesServerID: String? = nil,
         connectionType: ConnectionType?,
         remotePath: String,
         sourceFileURL: URL? = nil,
@@ -67,6 +74,9 @@ public struct DownloadRequest: Codable, Hashable, Identifiable, Sendable {
     ) {
         self.id = id
         self.sourceConnectionId = sourceConnectionId
+        self.sourceMediaItemID = sourceMediaItemID
+        self.sourceServerID = sourceServerID
+        self.seriesServerID = seriesServerID
         self.connectionType = connectionType
         self.remotePath = remotePath
         self.sourceFileURL = sourceFileURL

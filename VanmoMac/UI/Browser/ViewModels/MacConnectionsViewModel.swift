@@ -1228,6 +1228,8 @@ enum MacConnectionDeletion {
                 refreshEmbyLive: false
             )
             libraryViewModel.reload(filter: appState.selectedFilter, section: appState.selectedSection)
+            // 库已物理删除：广播历史变更，让 History 页从 offset 0 整体重载，避免分页空洞。
+            appState.notifyWatchHistoryDidChange()
         }
     }
 }

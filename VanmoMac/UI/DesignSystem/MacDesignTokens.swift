@@ -65,6 +65,7 @@ enum MacDesignTokens {
         static let filterPill = Font.system(size: 14, weight: .medium)
         static let cardTitle = Font.system(size: 18, weight: .semibold)
         static let cardSubtitle = Font.system(size: 14, weight: .regular)
+        static let cardAction = Font.system(size: 15, weight: .semibold)
         static let detailHeroTitle = Font.system(size: 60, weight: .heavy)
         static let detailSectionTitle = Font.system(size: 22, weight: .semibold)
         static let playerTitle = Font.system(size: 20, weight: .semibold)

@@ -1,0 +1,29 @@
+---
+description: Startup, acceptance, and handoff constraints for long-running agent tasks
+alwaysApply: true
+---
+# Long-Running Task Continuity
+
+`AGENTS.md` is the complete and authoritative repository operating guide. This rule only emphasizes continuity for long-running tasks and does not duplicate architecture or coding constraints.
+
+## Startup
+
+1. Confirm the repository root and working-tree status, preserving unrelated changes.
+2. Read `doc/agent-progress.md`, `doc/session-handoff.md`, and the initialized `doc/feature_list.json`.
+3. Review recent commits and run `./init.sh`.
+4. If the baseline fails, record the failure before adding unrelated implementation work.
+
+## Execution
+
+- Advance one user-visible feature or infrastructure concern at a time.
+- Every status claim must trace to an actual command, test result, or manual verification.
+- Incomplete verification cannot be marked `passing`, and checks must not be weakened to obtain a pass.
+- Create and update repository documentation in English.
+
+## Handoff
+
+- Update progress, feature state, and `doc/session-handoff.md` when needed.
+- Use `doc/clean-state-checklist.md` to verify recoverability.
+- Evaluate substantial implementations with `doc/evaluator-rubric.md` and complete the review required by `AGENTS.md`.
+- Do not commit or push without explicit user authorization.
+
