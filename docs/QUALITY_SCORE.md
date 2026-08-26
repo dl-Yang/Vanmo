@@ -3,7 +3,7 @@
 A conservative snapshot of Vanmo product domains and architectural layers. Grades reflect recorded evidence only; code existence is not treated as verified behavior.
 
 **Last updated:** 2026-08-26  
-**Current baseline evidence:** The current recorded `./init.sh` baseline completed all four stages with 0 failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation and live narrative-consistency check, and the iOS UI interaction CLI static check. The documentation stage now also checks init stage count, plan-index Status, spec/plan Status, and QUALITY current-baseline command paths. The UI CLI check remains structural. Focused `./scripts/check-app-build.sh ios-simulator` then passed, and `./init.sh --full` recorded a green iOS Simulator plus macOS Debug compile matrix on clean `34bf345`. Simulator XCUITest on iPhone 17 Pro recorded tree, default-screen assert, and `journey --name tab-navigation` with retained `xcresult` artifacts. No physical-device XCUITest ran for this snapshot.
+**Current baseline evidence:** The current recorded `./init.sh` baseline completed all four stages with 0 failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation and live narrative-consistency check, and the iOS UI interaction CLI static check. The documentation stage now also checks init stage count, plan-index Status, spec/plan Status, and QUALITY current-baseline command paths. The UI CLI check remains structural. Focused `./scripts/check-app-build.sh ios-simulator` then passed, and `./init.sh --full` recorded a green iOS Simulator plus macOS Debug compile matrix on clean `34bf345`. Simulator XCUITest on iPhone 17 Pro recorded tree, default-screen assert, and `journey --name tab-navigation` with retained `xcresult` artifacts. No physical-device XCUITest ran for this snapshot. A separate 2026-08-26 macOS HTTP-via-Emby download acceptance run passed; that run is not part of `./init.sh` and does not prove SMB.
 
 ## Grading Scale
 
@@ -17,13 +17,13 @@ A conservative snapshot of Vanmo product domains and architectural layers. Grade
 | Product domain | Grade | Existing evidence | Key gaps |
 | --- | --- | --- | --- |
 | Media identification and scanning | B | Filename, directory semantics, NFO, incremental scan, and pruning coverage is included in the passing 36-test baseline | No real large-directory, failure-recovery, or app progress-UI integration evidence |
-| Downloads | B | Download model, persistence, directory resolution, and queue logic are covered by the passing baseline | Real SMB/HTTP checkpoint recovery and cross-window navigation remain manually unverified |
+| Downloads | B | Download model, persistence, directory resolution, and queue logic are covered by the passing baseline; one 2026-08-26 macOS HTTP-via-Emby run passed queue, pause, restart-from-part, and main-window detail navigation | SMB recovery remains unverified; iOS download acceptance has not run |
 | Remote connections and search | C | Capability declarations and catalog playback URL behavior are covered by shared tests | Several UI-visible protocols are placeholders or incomplete; no real-service integration suite |
 | Playback and prefetching | C | Catalog URL resolution is covered and cleanup paths are documented | No automated app playback, gesture, player-window, or prefetch journey; iOS/macOS paths may drift |
 | Metadata and subtitles | C | NFO parsing and subtitle-related shared logic have test coverage | Network refresh, cache invalidation, online subtitle, and rendering paths lack end-to-end evidence |
 | Persistence and iCloud sync | C | Local/cloud store boundaries pass the static check | No versioned SwiftData migration; Debug cannot prove CloudKit; no real Release CloudKit evidence |
 | iOS app experience | B | The unified XCUITest CLI, iOS Simulator Debug compile, and simulator tab-navigation journey passed on 2026-08-26 with retained `xcresult` attachments | No signed physical-device XCUITest; connect, play, and download journeys remain unverified |
-| macOS app experience | C | Platform boundaries are documented; a Debug compile of `Vanmo-macOS` passed on 2026-08-26 | Launch, windows, navigation, and download interactions still rely on manual evidence |
+| macOS app experience | C | Platform boundaries are documented; a Debug compile of `Vanmo-macOS` passed on 2026-08-26; one HTTP-via-Emby download recovery and detail-navigation run was recorded the same day | Broader window, player, and non-Emby source journeys remain manual-only |
 
 ## Architectural Layers
 

@@ -13,6 +13,9 @@ LAUNCH_ONLY=false
 CLEAN=false
 DEVICE=""
 DEVICE_NAME=""
+TEAM="${VANMO_DEVELOPMENT_TEAM:-}"
+TEAM_OPTION_SET=false
+TEAM_XCCONFIG=""
 
 SCHEME=""
 PRODUCT_NAME=""
@@ -34,6 +37,7 @@ usage() {
   --clean                             清理 DerivedData 后再构建（SPM 卡住时用）
   --install-only                      只安装，不启动
   --launch-only                       只启动已安装的 App（跳过构建）
+  --team TEAM                         Development Team；仅真机，默认读取 VANMO_DEVELOPMENT_TEAM
   -h, --help                          显示帮助
 
 示例:
@@ -117,6 +121,11 @@ while [[ $# -gt 0 ]]; do
             LAUNCH_ONLY=true
             shift
             ;;
+        --team)
+            TEAM="${2:?缺少 team 值}"
+            TEAM_OPTION_SET=true
+            shift 2
+            ;;
         -h|--help)
             usage
             exit 0
@@ -139,6 +148,16 @@ done
 
 configure_target
 update_app_path
+
+if [[ "$RUN_TARGET" != "ios-device" && "$TEAM_OPTION_SET" == true ]]; then
+    echo "❌ 仅 iOS 真机构建支持 --team。" >&2
+    exit 1
+fi
+
+if [[ -n "$TEAM" && ! "$TEAM" =~ ^[A-Za-z0-9]{10}$ ]]; then
+    echo "❌ --team 必须是 10 位字母数字 Apple Team ID。" >&2
+    exit 1
+fi
 
 if [[ "$RUN_TARGET" == "macos" && -n "$DEVICE" ]]; then
     echo "❌ macOS 模式不支持指定设备参数: ${DEVICE}" >&2
@@ -474,10 +493,17 @@ ensure_simulator_booted() {
     fi
 }
 
-check_ios_signing() {
-    local team
+prepare_ios_signing() {
+    local project_team
 
-    team=$(xcodebuild \
+    if [[ -n "$TEAM" ]]; then
+        TEAM_XCCONFIG="$(mktemp "${TMPDIR:-/tmp}/vanmo-signing.XXXXXX")"
+        printf 'DEVELOPMENT_TEAM = %s\n' "$TEAM" >"$TEAM_XCCONFIG"
+        chmod 600 "$TEAM_XCCONFIG"
+        return
+    fi
+
+    project_team=$(xcodebuild \
         -project "${PROJECT_NAME}.xcodeproj" \
         -scheme "${SCHEME}" \
         -configuration "${CONFIGURATION}" \
@@ -485,11 +511,17 @@ check_ios_signing() {
         -showBuildSettings 2>/dev/null \
         | awk -F ' = ' '/^[[:space:]]*DEVELOPMENT_TEAM = / {print $2; exit}')
 
-    if [[ -z "$team" ]]; then
+    if [[ -z "$project_team" ]]; then
         echo "❌ iOS 真机构建需要 Development Team。" >&2
-        echo "   请在 Xcode → Signing & Capabilities 中设置 Team，或执行 xcodegen generate 后重新配置。" >&2
+        echo "   设置环境变量 VANMO_DEVELOPMENT_TEAM，或使用 --team TEAM。" >&2
+        echo "   也可在 Xcode → Signing & Capabilities 中设置 Team。" >&2
         exit 1
     fi
+}
+
+cleanup_ios_signing() {
+    [[ -z "$TEAM_XCCONFIG" ]] || rm -f "$TEAM_XCCONFIG"
+    TEAM_XCCONFIG=""
 }
 
 select_destination() {
@@ -537,7 +569,8 @@ if [[ "$LAUNCH_ONLY" == false ]]; then
     fi
 
     if [[ "$RUN_TARGET" == "ios-device" ]]; then
-        check_ios_signing
+        prepare_ios_signing
+        trap cleanup_ios_signing EXIT
     fi
 
     echo ""
@@ -551,8 +584,14 @@ if [[ "$LAUNCH_ONLY" == false ]]; then
         -derivedDataPath "${DERIVED_DATA}"
     )
 
+    if [[ -n "$TEAM_XCCONFIG" ]]; then
+        XCODEBUILD_ARGS=(-xcconfig "$TEAM_XCCONFIG" "${XCODEBUILD_ARGS[@]}")
+    fi
+
     if [[ "$RUN_TARGET" == "ios-device" ]]; then
         xcodebuild "${XCODEBUILD_ARGS[@]}" -allowProvisioningUpdates build
+        cleanup_ios_signing
+        trap - EXIT
     else
         xcodebuild "${XCODEBUILD_ARGS[@]}" build
     fi

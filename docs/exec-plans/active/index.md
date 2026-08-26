@@ -4,7 +4,7 @@ Active plans include not-started, in-progress, or blocked work that still requir
 
 ## Current Plans
 
-- [`2026-08-25-mac-download-real-source-validation.md`](2026-08-25-mac-download-real-source-validation.md) — **Not started.** Manually validate existing macOS download recovery and detail navigation with a real SMB or HTTP source.
+There are no active plans.
 
 ## Rules
 

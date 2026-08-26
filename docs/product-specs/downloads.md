@@ -22,7 +22,7 @@ This evidence does not establish the real-source acceptance flow below.
 
 A user can download movies and episodes from a readable real SMB or HTTP source, pause and resume without duplicate queue entries, restart the app, continue from existing partial files, and return from the downloads window to the correct movie detail or episode.
 
-**Current acceptance status:** Not started. No real-source evidence is recorded.
+**Current acceptance status:** Completed. One HTTP-via-Emby manual run on 2026-08-26 passed queue, pause, restart-from-part, and main-window movie/episode navigation. SMB was not exercised.
 
 ## Real-Source Acceptance Criteria
 
@@ -48,4 +48,4 @@ All steps must pass in one recorded manual acceptance run:
 
 ## Related Plan
 
-- [`../exec-plans/active/2026-08-25-mac-download-real-source-validation.md`](../exec-plans/active/2026-08-25-mac-download-real-source-validation.md)
+- [`../exec-plans/completed/2026-08-25-mac-download-real-source-validation.md`](../exec-plans/completed/2026-08-25-mac-download-real-source-validation.md)

@@ -4,7 +4,7 @@ This folder contains current user-visible behavior and acceptance targets. It do
 
 ## Active Specifications
 
-- [`downloads.md`](downloads.md): macOS download progress, pause controls, detail navigation, and pending real-source recovery acceptance
+- [`downloads.md`](downloads.md): macOS download progress, pause controls, detail navigation, and HTTP-via-Emby real-source recovery acceptance
 
 ## Rules
 

@@ -95,11 +95,28 @@ targets:
           - $(AppIdentifierPrefix)com.vanmo.app
     postBuildScripts:
       - name: Fix KSPlayer Framework Plist
+        basedOnDependencyAnalysis: false
         script: |
           FRAMEWORK="${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/libshaderc_combined.framework"
-          if [ -d "$FRAMEWORK" ]; then
+          if [ ! -d "$FRAMEWORK" ]; then
+            exit 0
+          fi
+          if [ -f "$FRAMEWORK/Info.plist" ]; then
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.kintan.ksplayer.libshaderc-combined" "$FRAMEWORK/Info.plist" 2>/dev/null || true
-            /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none "$FRAMEWORK"
+          fi
+          # codesign --force can seal libshaderc_combined.cstemp into CodeResources.
+          # Strip leftovers first so this re-sign, and the next build's Xcode CodeSign, stay valid.
+          find "$FRAMEWORK" -name "*.cstemp" -delete
+          xattr -cr "$FRAMEWORK" 2>/dev/null || true
+          rm -rf "$FRAMEWORK/_CodeSignature"
+          if [ -z "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]; then
+            exit 0
+          fi
+          /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none "$FRAMEWORK"
+          find "$FRAMEWORK" -name "*.cstemp" -delete
+          APP="${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}"
+          if [ -d "$APP" ] && /usr/bin/codesign -d "$APP" >/dev/null 2>&1; then
+            /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none --preserve-metadata=identifier,entitlements,flags --generate-entitlement-der "$APP"
           fi
 
   VanmoUITests:
