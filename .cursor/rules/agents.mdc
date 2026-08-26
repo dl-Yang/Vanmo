@@ -9,9 +9,10 @@ alwaysApply: true
 ## Startup
 
 1. Confirm the repository root and working-tree status, preserving unrelated changes.
-2. Read `doc/agent-progress.md`, `doc/session-handoff.md`, and the initialized `doc/feature_list.json`.
-3. Review recent commits and run `./init.sh`.
-4. If the baseline fails, record the failure before adding unrelated implementation work.
+2. Read `ARCHITECTURE.md`, `docs/QUALITY_SCORE.md`, and `docs/PLANS.md`.
+3. Read `docs/exec-plans/active/index.md`, any active plan governing the task, and the related product spec under `docs/product-specs/`.
+4. Review recent commits and run the baseline and affected-platform checks required by `docs/RELIABILITY.md`; pure documentation tasks do not require an unrelated app build.
+5. If the baseline fails, record the failure before adding unrelated implementation work.
 
 ## Execution
 
@@ -19,11 +20,12 @@ alwaysApply: true
 - Every status claim must trace to an actual command, test result, or manual verification.
 - Incomplete verification cannot be marked `passing`, and checks must not be weakened to obtain a pass.
 - Create and update repository documentation in English.
+- Keep product, design, plan, quality, reliability, security, frontend, and execution state under `docs/`.
 
 ## Handoff
 
-- Update progress, feature state, and `doc/session-handoff.md` when needed.
-- Use `doc/clean-state-checklist.md` to verify recoverability.
-- Evaluate substantial implementations with `doc/evaluator-rubric.md` and complete the review required by `AGENTS.md`.
+- Update the governing active plan with progress, evidence, risks, and the next step.
+- Update `docs/QUALITY_SCORE.md` and `docs/exec-plans/tech-debt-tracker.md` only when evidence supports the change.
+- Complete the post-task review required by `AGENTS.md`.
 - Do not commit or push without explicit user authorization.
 

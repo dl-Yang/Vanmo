@@ -1,125 +1,93 @@
 # Vanmo
 
-一款 iOS 视频播放器应用，支持多格式播放、网络串流、媒体库管理、字幕和元数据抓取。
+Vanmo is a native video player repository with:
 
-## 功能特性
+- an iOS 17+ application (`Vanmo`)
+- a native macOS 14+ application (`Vanmo-macOS`)
+- a shared local Swift package (`VanmoCore`)
 
-### 视频播放
-- AVFoundation 硬件解码播放引擎
-- 支持 MP4、MKV、AVI、MOV 等常见格式
-- 手势控制：左右滑动快进快退、左侧亮度、右侧音量
-- 双击暂停/播放、长按倍速、捏合缩放
-- 多音轨/字幕轨切换
-- 播放速度调节 (0.5x ~ 4.0x)
-- 断点续播
+The applications use SwiftUI, SwiftData, Swift Concurrency, Combine, AVFoundation, and KSPlayer. Platform navigation, presentation, and player adapters remain separate; shared models and infrastructure live in `VanmoCore`. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the implemented system map, supported and incomplete integration paths, persistence boundaries, and current risks.
 
-### 媒体库
-- 网格/列表双模式浏览
-- 按电影/剧集/收藏/未观看分类
-- 支持标题、年份、评分、添加日期排序
-- 继续观看、最近添加智能列表
-- 详情页展示海报、背景图、Logo 标题、演职人员头像、单集封面
+## Repository Layout
 
-### 网络串流
-- SMB / FTP / SFTP / WebDAV 协议支持
-- 远程文件浏览与流式播放
-- 连接管理与凭据安全存储 (Keychain)
-
-### 字幕
-- SRT / WebVTT 格式解析
-- 自动匹配同名字幕文件
-- 字幕样式自定义（字号、颜色、位置）
-- 时间偏移调整
-- CJK 编码自动检测
-
-### 元数据
-- 媒体服务器元数据（Emby / Jellyfin / Plex）
-- 智能文件名解析 (S01E02、年份、清晰度标签)，用于本地/远程文件入库
-- **本地元数据缓存**：Logo、背景图、演职人员头像、电视剧单集封面落盘至 `Application Support/Vanmo/MetadataCache/`
-- **多来源单条刷新**：Emby / Jellyfin / Plex，详情页「更多 → 刷新」仅更新当前条目
-- **详情页增强展示**：标题先显示、Logo 加载后淡入替换；演职人员横向头像列表
-- **设置页管理**：自动从媒体服务器下载元数据（默认开启）、查看缓存大小、删除全部元数据缓存
-
-详见 [`doc/ai/metadata-cache.md`](doc/ai/metadata-cache.md)。
-
-### 搜索
-- 本地媒体库全文搜索
-
-## 技术栈
-
-| 项目 | 选型 |
-|------|------|
-| 语言 | Swift 5.9+ |
-| 最低系统 | iOS 16.0 |
-| UI 框架 | SwiftUI + UIKit (播放器层) |
-| 架构模式 | MVVM + Clean Architecture |
-| 异步 | Swift Concurrency (async/await, Actor) |
-| 本地存储 | SwiftData |
-| 网络 | URLSession |
-| 播放核心 | AVFoundation |
-
-## 项目结构
-
-```
-Vanmo/
-├── App/                  # 应用入口、全局状态、导航
-├── Core/                 # 核心基础设施
-│   ├── Player/           # 播放引擎
-│   ├── Network/          # 网络协议服务 (SMB, WebDAV, FTP)
-│   ├── Storage/          # 媒体扫描、图片缓存
-│   ├── Subtitle/         # 字幕解析与渲染
-│   └── Metadata/         # 元数据缓存、服务器刷新协调器
-├── Features/             # 功能模块
-│   ├── Library/          # 媒体库
-│   ├── Player/           # 播放器界面
-│   ├── Browser/          # 文件浏览器
-│   ├── Search/           # 搜索
-│   └── Settings/         # 设置
-├── Shared/               # 共享组件
-│   ├── Components/       # 可复用 UI (PosterCard, RatingBadge...)
-│   ├── Extensions/       # Swift 扩展
-│   ├── Protocols/        # 公共协议
-│   └── Utilities/        # 工具类 (Logger, Keychain)
-└── Resources/            # 资源文件
+```text
+Vanmo/                       # iOS application UI and platform behavior
+VanmoMac/                    # macOS application UI, AppKit integration, and windows
+Packages/VanmoCore/          # Shared models and infrastructure
+VanmoUITests/                # iOS device interaction XCUITest target
+scripts/                     # Build and static verification helpers
+scripts/ios-ui.sh            # iOS device XCUITest and Simulator simctl CLI
+docs/                        # Durable product, design, plan, quality, and operating knowledge
+project.yml                  # XcodeGen source of truth
+Vanmo.xcodeproj/             # Generated and committed Xcode project
+init.sh                      # Shared dependency and baseline verification entry point
+run_device.sh                # iOS device, simulator, and macOS build/run entry point
+build_ipa.sh                 # iOS Release archive and export entry point
 ```
 
-## 开始开发
+Do not create a replacement Xcode project or import source files manually. Target definitions, dependencies, resources, build settings, and entitlements are maintained in `project.yml`; regenerate the committed project with XcodeGen after changing that file.
 
-### 前置要求
-- Xcode 15.0+
-- iOS 16.0+ 设备或模拟器
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (推荐)
+## Getting Started
 
-### 生成 Xcode 项目
+Requirements:
+
+- a compatible Xcode installation
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+- Python 3 for the Harness documentation check included in `./init.sh`
+- an Apple development team when signing or device execution requires one
+
+Resolve shared dependencies and run the repository baseline:
 
 ```bash
-# 安装 XcodeGen
-brew install xcodegen
-
-# 生成项目
-xcodegen generate
-
-# 打开项目
-open Vanmo.xcodeproj
+./init.sh
 ```
 
-或直接在 Xcode 中新建 iOS App 项目并导入 `Vanmo/` 目录下的所有源文件。
+Build or run the relevant application:
 
-### 配置
+```bash
+./run_device.sh              # iOS device
+./run_device.sh --simulator  # iOS Simulator
+./run_device.sh --macos      # native macOS app
+```
 
-1. 在 Xcode 中设置 Development Team
-2. 连接 Emby / Jellyfin / Plex 媒体服务器，或添加本地/网络文件夹浏览播放
-3. 连接真机或模拟器运行
+`./init.sh` does not compile either application by default. Use `./init.sh --full` or `./scripts/check-app-build.sh` for Debug compile evidence, and keep launch, manual journeys, real-source checks, and Release CloudKit validation separate. See [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
 
-## 文档
+## Device UI Interaction
 
-| 文档 | 说明 |
-|------|------|
-| [`doc/ai/player-architecture.md`](doc/ai/player-architecture.md) | 双引擎播放器架构、Prefetch 预缓存 |
-| [`doc/ai/player-buffering.md`](doc/ai/player-buffering.md) | 网络播放缓冲调优与时序 |
-| [`doc/ai/metadata-cache.md`](doc/ai/metadata-cache.md) | 元数据缓存、单条刷新、Logo/演职人员/单集封面 |
-| [`doc/ai/swift-coding.md`](doc/ai/swift-coding.md) | Swift 编码约定 |
+Use the repository CLI for bounded iOS interaction and evidence capture:
 
-## 许可证
+```bash
+# Physical device: runs the one-command XCUITest backend
+./scripts/ios-ui.sh device screenshot --device "My iPhone" --output /tmp/vanmo.png
+./scripts/ios-ui.sh device tree --device "My iPhone" --output /tmp/vanmo-tree.json
+./scripts/ios-ui.sh device tap --identifier "identifier-from-tree" --timeout 5
+./scripts/ios-ui.sh device wait --label "exact-label-from-tree" --state exists
 
-见 [LICENSE](LICENSE) 文件。
+# Simulator: simctl screenshot and app lifecycle only
+./scripts/ios-ui.sh simulator screenshot --device "iPhone 17 Pro" --output /tmp/vanmo-simulator.png
+./scripts/ios-ui.sh simulator launch --device "iPhone 17 Pro"
+```
+
+Physical-device commands require a connected, trusted device and valid signing. Replace the example selector values with identifiers or exact labels from the current tree output. Supply the Apple development team with `VANMO_DEVELOPMENT_TEAM` or `--team TEAM`. Each device run retains its result bundle, logs, and exported attachments under `build/ui-cli/runs/`. Simulator interaction commands such as tap, type, swipe, wait, assert, and tree are rejected because this backend uses `simctl`, not XCUITest.
+
+## Architecture and Capability Status
+
+Vanmo uses MVVM/Store-style observable state and platform-specific application layers rather than a strict Clean Architecture implementation. AVFoundation handles native playback paths, while KSPlayer provides the current FFmpeg-backed paths. The exact engine selection, protocol capability, download, metadata, subtitle, persistence, and cloud-sync behavior is documented in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+Visible connection types are not all production-ready. Do not infer support from an enum case or menu entry; use the current implementation and architecture document as the authority.
+
+## Documentation
+
+- [`AGENTS.md`](AGENTS.md): concise repository operating guide and routing map
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): implemented boundaries, runtime data flows, and known risks
+- [`docs/DESIGN.md`](docs/DESIGN.md): durable design decisions
+- [`docs/PLANS.md`](docs/PLANS.md): execution-plan policy and active/completed plan routing
+- [`docs/product-specs/index.md`](docs/product-specs/index.md): user-visible specifications and acceptance status
+- [`docs/QUALITY_SCORE.md`](docs/QUALITY_SCORE.md): evidence-based quality snapshot
+- [`docs/RELIABILITY.md`](docs/RELIABILITY.md): verification, recovery, and debugging
+- [`docs/SECURITY.md`](docs/SECURITY.md): credential, data, dependency, and external-action rules
+- [`docs/FRONTEND.md`](docs/FRONTEND.md): Figma, platform UI, accessibility, and visual-validation rules
+
+## License
+
+See [`LICENSE`](LICENSE).

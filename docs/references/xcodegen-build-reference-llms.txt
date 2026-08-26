@@ -1,0 +1,99 @@
+VANMO XCODEGEN AND BUILD REFERENCE FOR LLMS
+Last reviewed: 2026-08-26
+
+CONFIGURATION AUTHORITY
+- project.yml is the source of truth for application targets, package
+  dependencies, source inclusion, resources, build settings, schemes, and
+  entitlements.
+- Packages/VanmoCore/Package.swift is the source of truth for the shared Swift
+  package.
+- Vanmo.xcodeproj is generated and committed. Never hand-edit
+  Vanmo.xcodeproj/project.pbxproj.
+- After changing project.yml, run:
+  xcodegen generate
+- Include the regenerated Vanmo.xcodeproj/project.pbxproj with the project.yml
+  change and inspect the generated diff.
+
+IOS UI TEST TARGET
+- VanmoUITests is a bundle.ui-testing target with a dependency on Vanmo and
+  TEST_TARGET_NAME set to Vanmo.
+- The Vanmo scheme includes VanmoUITests in its test action.
+- scripts/ios-ui.sh sets TEST_RUNNER_VANMO_UI_* environment variables. Xcode's
+  test runner is expected to remove the TEST_RUNNER_ prefix when exposing them
+  to VanmoDeviceInteractionTests.swift, which reads VANMO_UI_* variables. This
+  delivery path is not yet verified on a physical device.
+
+STANDARD COMMANDS
+- Resolve VanmoCore dependencies and run the four-stage baseline:
+  ./init.sh
+- Run the fast baseline, then Debug compile evidence for both apps:
+  ./init.sh --full
+- Compile one Debug application target without launching it:
+  ./scripts/check-app-build.sh ios-simulator
+  ./scripts/check-app-build.sh macos
+- Check the iOS UI target, generated project, Bash CLI, and Swift test source:
+  ./scripts/check-ios-ui-cli.sh
+- Run a bounded physical-device XCUITest interaction:
+  ./scripts/ios-ui.sh device screenshot --output /tmp/vanmo.png
+- Capture a Simulator screenshot through simctl:
+  ./scripts/ios-ui.sh simulator screenshot --output /tmp/vanmo-simulator.png
+- Build, install, and launch the default iOS device target:
+  ./run_device.sh
+- Build, install, and launch an iOS Simulator target:
+  ./run_device.sh --simulator
+- Build and launch the native macOS app:
+  ./run_device.sh --macos
+- Select a configuration:
+  ./run_device.sh --configuration Debug|Release
+- Clean the script-managed DerivedData before building:
+  ./run_device.sh --clean
+- Launch an already built app without rebuilding:
+  ./run_device.sh --launch-only
+- Archive and export the iOS Release IPA:
+  ./build_ipa.sh
+
+COMMAND BOUNDARIES
+- ./init.sh does not build or launch either app by default. After dependency
+  resolution, its four baseline stages are VanmoCore tests,
+  ./scripts/check-cloud-sync-multiplatform-scope.sh,
+  ./scripts/check-harness-docs.sh, and ./scripts/check-ios-ui-cli.sh.
+- ./init.sh --full runs that fast baseline first, then
+  ./scripts/check-app-build.sh all. The focused commands are
+  ./scripts/check-app-build.sh ios-simulator and
+  ./scripts/check-app-build.sh macos.
+- Debug compile evidence is retained under build/app-build-evidence/. A
+  successful compile proves only that the selected Debug target built in the
+  recorded environment. It does not prove launch, UI, device, or CloudKit
+  behavior.
+- The Harness documentation check requires Python 3 and fails when required
+  governance files, routing links, or repository-local Markdown targets are
+  missing.
+- scripts/ios-ui.sh uses XCUITest only for physical-device commands. Its
+  Simulator backend uses simctl only for screenshot, launch, and terminate and
+  rejects unsupported interaction commands.
+- Physical-device UI CLI runs retain result bundles, logs, and exported
+  attachments under build/ui-cli/runs/. A development team may be supplied
+  through VANMO_DEVELOPMENT_TEAM or --team.
+- The iOS UI CLI static check does not prove app compilation, signing, device
+  execution, TEST_RUNNER argument delivery, or attachment export.
+- run_device.sh defaults to Debug and selects the Vanmo or Vanmo-macOS scheme
+  according to the requested platform.
+- build_ipa.sh archives the Vanmo scheme with Release configuration and exports
+  using ExportOptions.plist.
+- Record the platform, configuration, destination, and whether a command only
+  built, installed, launched, archived, or completed a user journey.
+
+CLOUDKIT CONFIGURATION BOUNDARY
+- CLOUDKIT_SYNC_ENABLED is defined only in Release for both app targets.
+- Debug uses Vanmo/Vanmo.entitlements or
+  VanmoMac/Vanmo-Mac.entitlements without the Release cloud entitlement path.
+- Release uses Vanmo/Vanmo-Cloud.entitlements or
+  VanmoMac/Vanmo-Mac-Cloud.entitlements.
+- A Debug build, ./init.sh, or the static scope check cannot prove real
+  CloudKit transport, account, conflict, or multi-device behavior.
+
+RELATED REPOSITORY GUIDANCE
+- project.yml
+- ARCHITECTURE.md
+- docs/RELIABILITY.md
+- docs/sops/layered-domain-architecture.md

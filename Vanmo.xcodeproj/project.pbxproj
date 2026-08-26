@@ -16,6 +16,7 @@
 		068CC4178E48140CFD936298 /* MacSubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9C865D6F495BA681A5A92C /* MacSubtitleOverlayView.swift */; };
 		08D449B2FCD839563D28E73A /* URL+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6219B4DB4376B9D457F04B /* URL+Extensions.swift */; };
 		0A95157B703B08C4B2DDF526 /* AddConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AEA12D55448D2043E54EEB /* AddConnectionView.swift */; };
+		0C64359E55E7B1D7B5C62121 /* VanmoDeviceInteractionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561CE29FA634228675D28621 /* VanmoDeviceInteractionTests.swift */; };
 		0FF17D988CF0CB2C99AB934A /* MacConnectionTypeGroups.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52AB4C935BD3532632AE099A /* MacConnectionTypeGroups.swift */; };
 		131A26795F0009A0306965FB /* webdav.png in Resources */ = {isa = PBXBuildFile; fileRef = 60323ABED836DC766B05A32F /* webdav.png */; };
 		14EA1A3581D94AF5E0C7B3B6 /* PlayerEngineFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */; };
@@ -160,6 +161,16 @@
 		FF84C30ADC33D47677635F7B /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDAAA9821B6C7B549EC0C654 /* LibraryViewModel.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		461F46EA7E98BEF6C56CAF26 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C09E5913DC4B59FEBFD564D4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0F6607F78A5C0B637140BEB4;
+			remoteInfo = Vanmo;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		016853DC64C190C2D1534598 /* MacPlayerEngineFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerEngineFactory.swift; sourceTree = "<group>"; };
 		02FB3A1F58187535A7434A20 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -209,6 +220,7 @@
 		525103842B302272BB888AAD /* MacMediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaDetailView.swift; sourceTree = "<group>"; };
 		529EDB8110AF477715A8A72C /* Vanmo-Mac-Cloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac-Cloud.entitlements"; sourceTree = "<group>"; };
 		52AB4C935BD3532632AE099A /* MacConnectionTypeGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacConnectionTypeGroups.swift; sourceTree = "<group>"; };
+		561CE29FA634228675D28621 /* VanmoDeviceInteractionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VanmoDeviceInteractionTests.swift; sourceTree = "<group>"; };
 		58B4B29A68276E4D731CAB87 /* plex.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = plex.png; sourceTree = "<group>"; };
 		58FD915D4042EB1C1A80D05C /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		5A64BCC4A5AF212206C6EB3A /* MacPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerView.swift; sourceTree = "<group>"; };
@@ -299,6 +311,7 @@
 		EEC7D8C959C3FA07E45E3754 /* fnos.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = fnos.png; sourceTree = "<group>"; };
 		EEC98BD4B313AA01607BDF35 /* ScannedLibraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannedLibraryListView.swift; sourceTree = "<group>"; };
 		EF9F0A2A3F35B894BD467947 /* MacLibrarySublistHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibrarySublistHeader.swift; sourceTree = "<group>"; };
+		EFFC2511A9B53EA207F4A5DC /* VanmoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = VanmoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0A25BAD49788F06D474B95F /* emby.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = emby.png; sourceTree = "<group>"; };
 		F0FEED6C64943C9903BD8BF9 /* googleDrive.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = googleDrive.png; sourceTree = "<group>"; };
 		F1FADA4CEAA0809689C8B825 /* FavoritesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesListView.swift; sourceTree = "<group>"; };
@@ -347,6 +360,7 @@
 			children = (
 				3FD42C988DBE01B7E1C528BA /* Vanmo-macOS.app */,
 				2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */,
+				EFFC2511A9B53EA207F4A5DC /* VanmoUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -495,6 +509,7 @@
 				E57DA65DAC674E2303207E31 /* Packages */,
 				EEE7CE448AD3D26D2778B930 /* Vanmo */,
 				21F3A525E287891F72C79D8C /* VanmoMac */,
+				DB5111DC3E027169DE836103 /* VanmoUITests */,
 				033147F46632DF78009B84E9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -827,6 +842,14 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		DB5111DC3E027169DE836103 /* VanmoUITests */ = {
+			isa = PBXGroup;
+			children = (
+				561CE29FA634228675D28621 /* VanmoDeviceInteractionTests.swift */,
+			);
+			path = VanmoUITests;
+			sourceTree = "<group>";
+		};
 		DF171931D4FCCFCE69AF7F76 /* Core */ = {
 			isa = PBXGroup;
 			children = (
@@ -1000,6 +1023,24 @@
 			productReference = 2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */;
 			productType = "com.apple.product-type.application";
 		};
+		EAFC3AD4DF25F3202D9BB5BC /* VanmoUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4278706DA422F4EB5279C186 /* Build configuration list for PBXNativeTarget "VanmoUITests" */;
+			buildPhases = (
+				3D32554B122B4B2A8C4F2C21 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8353027F6287DCBE7BB87C8E /* PBXTargetDependency */,
+			);
+			name = VanmoUITests;
+			packageProductDependencies = (
+			);
+			productName = VanmoUITests;
+			productReference = EFFC2511A9B53EA207F4A5DC /* VanmoUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1016,6 +1057,11 @@
 					0F6607F78A5C0B637140BEB4 = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
+					};
+					EAFC3AD4DF25F3202D9BB5BC = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = 0F6607F78A5C0B637140BEB4;
 					};
 				};
 			};
@@ -1043,6 +1089,7 @@
 			targets = (
 				0F6607F78A5C0B637140BEB4 /* Vanmo */,
 				0DF5C008C42D8CFE972C79FA /* Vanmo-macOS */,
+				EAFC3AD4DF25F3202D9BB5BC /* VanmoUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -1198,6 +1245,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3D32554B122B4B2A8C4F2C21 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0C64359E55E7B1D7B5C62121 /* VanmoDeviceInteractionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4BAF5F8814705D75C384EEA1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1261,7 +1316,53 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8353027F6287DCBE7BB87C8E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0F6607F78A5C0B637140BEB4 /* Vanmo */;
+			targetProxy = 461F46EA7E98BEF6C56CAF26 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		3B774A05354CBB091E2B4EE7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Vanmo;
+			};
+			name = Release;
+		};
+		3D22B595A00734AC48E1090C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Vanmo;
+			};
+			name = Debug;
+		};
 		6FEB2A4AFCDB27D72AA94160 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1514,6 +1615,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		4278706DA422F4EB5279C186 /* Build configuration list for PBXNativeTarget "VanmoUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3D22B595A00734AC48E1090C /* Debug */,
+				3B774A05354CBB091E2B4EE7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		58AA8BAB124E14F5C3547035 /* Build configuration list for PBXProject "Vanmo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

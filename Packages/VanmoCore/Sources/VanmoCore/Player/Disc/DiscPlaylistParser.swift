@@ -64,7 +64,7 @@ public enum DiscParsingError: LocalizedError {
 
 /// 原盘结构解析层抽象。后续可由 libbluray 封装或自研 `.mpls` 解析实现。
 ///
-/// 设计目标（详见 `doc/disc-playlist-parsing-design.md`）：
+/// 设计目标：
 /// - 识别 ISO 镜像与 BDMV 目录结构；
 /// - 解析 `.mpls` 并选出主片（playlist 选择）；
 /// - 映射章节 / 音轨 / 字幕；

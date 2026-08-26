@@ -1,6 +1,6 @@
 # Vanmo Architecture
 
-> This document describes the repository as of August 24, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.  
+> This document describes the repository as of August 26, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
 > If this document conflicts with the code, treat `project.yml`, `Packages/VanmoCore/Package.swift`, and the current implementation as the sources of truth.
 
 ## 1. System Overview
@@ -62,8 +62,9 @@ Vanmo/
 ├── Packages/VanmoCore/          # Cross-platform domain and infrastructure package
 │   ├── Sources/VanmoCore/
 │   └── Tests/VanmoCoreTests/
+├── VanmoUITests/                # One-command iOS device XCUITest interaction target
 ├── scripts/                     # Build and static architecture checks
-├── doc/                         # Development process and quality documents
+├── docs/                        # Durable product, design, plan, quality, and operating knowledge
 ├── project.yml                  # XcodeGen source of truth
 ├── Vanmo.xcodeproj/             # Generated and committed Xcode project
 ├── init.sh                      # Dependency resolution and repository baseline checks
@@ -79,6 +80,13 @@ Boundary rules:
 - Target definitions, dependencies, resources, compilation conditions, and entitlements must be changed in `project.yml`, followed by `xcodegen generate`. Do not edit `project.pbxproj` by hand.
 - The macOS target directly reuses only `Vanmo/Shared/Components/MediaTitleLogoView.swift` and `LoadingIndicatorView.swift`; the rest of the application UI is platform-specific.
 
+### 2.1 Documentation Boundaries
+
+- `docs/` is the sole Harness system of record for product intent, design decisions, execution plans and progress, quality, reliability, security, frontend standards, SOPs, and maintained references.
+- Active plans record unfinished execution state and evidence. Completed plans preserve outcomes, `QUALITY_SCORE.md` owns quality history, and the tech-debt tracker owns confirmed deferred work.
+- Start at `AGENTS.md`, then read `ARCHITECTURE.md`, `docs/QUALITY_SCORE.md`, and `docs/PLANS.md`. Follow the active-plan index and relevant product spec before opening detailed reliability, security, frontend, design, SOP, or reference material.
+- [`docs/PLANS.md`](docs/PLANS.md) defines durable planning and archival policy. [`docs/exec-plans/active/index.md`](docs/exec-plans/active/index.md) and [`docs/product-specs/index.md`](docs/product-specs/index.md) provide current discovery routes.
+
 ## 3. Build Targets and Dependencies
 
 ### 3.1 Platforms and Targets
@@ -86,15 +94,17 @@ Boundary rules:
 | Target / Product | Platform | Minimum Version | Entry Point |
 |---|---|---:|---|
 | `Vanmo` | iOS | 17.0 | `Vanmo/App/VanmoApp.swift` |
+| `VanmoUITests` | iOS UI testing | 17.0 | `VanmoUITests/VanmoDeviceInteractionTests.swift` |
 | `Vanmo-macOS` | macOS | 14.0 | `VanmoMac/App/VanmoMacApp.swift` |
 | `VanmoCore` | iOS / macOS | 17.0 / 14.0 | `Packages/VanmoCore/Package.swift` |
 
-The “iOS 16.0” requirement in the README is stale. `project.yml` and `Package.swift` define the current deployment targets.
+`project.yml` and `Package.swift` define the current deployment targets.
 
 ### 3.2 Dependencies
 
 - Both apps depend on `VanmoCore`, Kingfisher, KSPlayer, and Lottie.
 - The iOS target also declares direct dependencies on SWXMLHash and SMBClient.
+- `VanmoUITests` is an iOS UI-testing bundle that depends on the `Vanmo` application target, uses `TEST_TARGET_NAME = Vanmo`, and participates in the `Vanmo` scheme test action.
 - `VanmoCore` itself depends on SWXMLHash and SMBClient.
 - System frameworks include SwiftUI, SwiftData, AVFoundation, Network, and Security. iOS also uses UIKit; macOS uses AppKit.
 - `FFMPEG_ENABLED` is still defined for both app targets, but no current Swift source consumes the condition and the Xcode project does not link static libraries from `Vanmo/Frameworks/FFmpeg/`.
@@ -476,6 +486,17 @@ sequenceDiagram
 4. The Store or ViewModel merges metadata, seasons, episodes, and collections.
 5. Generation and cancellation checks prevent stale requests from overwriting the current detail.
 
+### 8.4 iOS Device Interaction CLI
+
+`scripts/ios-ui.sh` has intentionally different device and simulator backends:
+
+1. A `device` command resolves a connected iOS destination and invokes the single `VanmoDeviceInteractionTests/testExecuteCommand` XCUITest through the `Vanmo` scheme.
+2. The script sets `TEST_RUNNER_VANMO_UI_*` environment variables. Xcode's test runner is expected to expose them to the XCUITest process with the `TEST_RUNNER_` prefix removed, where the test reads `VANMO_UI_*`. That delivery path remains unverified on a physical device. The test implementation launches Vanmo and can perform a screenshot, flat JSON accessibility-tree export, identifier or exact-label tap/type, swipe, or exists/absent wait/assert operation.
+3. XCUITest screenshots, trees, failure diagnostics, logs, and result bundles are retained under `build/ui-cli/runs/`; requested screenshot or tree output is copied from the exported `xcresult` attachments.
+4. A `simulator` command uses `simctl` only for screenshot and app launch/termination. It does not run XCUITest and explicitly rejects tree, tap, type, swipe, wait, and assert operations that `simctl` does not provide.
+
+This CLI is a bounded interaction and evidence interface, not a replacement for Figma comparison, accessibility review, or a complete golden journey. Device commands require a connected and trusted device plus valid signing; the development team may be supplied through `VANMO_DEVELOPMENT_TEAM` or `--team`.
+
 ## 9. State, Concurrency, and Events
 
 ### 9.1 State Ownership
@@ -506,7 +527,7 @@ New cross-module events should first have an explicit state owner. Global notifi
 
 ## 10. Tests and Verification
 
-Automated tests currently cover only `VanmoCore`. The Xcode project has no application test target.
+The repository has `VanmoCore` package tests and an iOS `VanmoUITests` UI-testing target. The UI target exposes one dynamic command test; it is not a broad automated app regression suite.
 
 ```bash
 swift test --package-path Packages/VanmoCore
@@ -521,16 +542,29 @@ The tests cover:
 - Remote-service capability declarations.
 - Schema and foundational enum mappings.
 
-As of August 24, 2026, the suite completes 36 tests with no failures. The CloudKit and multiplatform static checks also complete with no failures.
+As of August 26, 2026, all four `./init.sh` baseline stages complete with no failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation check, and `./scripts/check-ios-ui-cli.sh`. The iOS UI CLI stage statically checks the target declarations in `project.yml` and the generated project, validates the Bash CLI, and type-checks the XCUITest source. XcodeGen generation succeeded, the generated target is discoverable, and a simulator `simctl` screenshot command completed successfully.
+
+These checks do not prove that the app or UI-test bundle builds or runs on a device. The first Debug compile matrix on 2026-08-26 recorded a macOS pass and an iOS Simulator failure at the pre-existing non-exhaustive `DownloadStatus` switch in `Vanmo/Features/Settings/Views/SettingsView.swift`, which lacks the `.paused` case. No physical-device XCUITest has run, so signing, `TEST_RUNNER_VANMO_UI_*` delivery, and `xcresult` attachment export remain unverified.
 
 Other verification entry points:
 
 ```bash
-# Resolve shared dependencies and run the core/static baseline
+# Resolve dependencies and run the shared, boundary, and documentation baseline
+# The documentation stage requires Python 3.
 ./init.sh
+
+# After the fast baseline, add Debug compile evidence for both apps
+./init.sh --full
 
 # Check CloudKit and multiplatform boundaries without building
 ./scripts/check-cloud-sync-multiplatform-scope.sh
+
+# Check the iOS UI target and CLI statically without running XCUITest
+./scripts/check-ios-ui-cli.sh
+
+# Compile one application target without launching it
+./scripts/check-app-build.sh ios-simulator
+./scripts/check-app-build.sh macos
 
 # Build and run on an iOS device, simulator, or macOS
 ./run_device.sh
@@ -541,6 +575,8 @@ Other verification entry points:
 ./build_ipa.sh
 ```
 
+See `docs/RELIABILITY.md` for the complete command stages and evidence boundaries.
+
 ## 11. Known Constraints and Risks
 
 1. **Substantial platform-layer duplication.** iOS and macOS maintain separate connection, library, search, and player ViewModels. `VanmoCore` shares infrastructure, but use-case orchestration remains platform-specific.
@@ -548,10 +584,10 @@ Other verification entry points:
 3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. FTP/SFTP, NFS, DLNA, and several official cloud-drive integrations require further implementation.
 4. **No explicit SwiftData migration strategy.** There is no `VersionedSchema` or `SchemaMigrationPlan`. Container creation calls `fatalError` on failure and has no recovery or fallback path.
 5. **CloudKit is Release-only.** Debug builds can verify local fallback and static boundaries, but cannot prove real CloudKit behavior.
-6. **No automated app UI tests.** Navigation, windows, gestures, player UI, and platform lifecycle behavior depend primarily on manual and device verification.
+6. **iOS UI automation lacks successful app-build and device evidence.** The `VanmoUITests` target and command runner exist, but the current app build blocker prevents successful `build-for-testing`, no physical-device XCUITest has run, and stable accessibility identifiers cover only a limited set of controls. macOS UI behavior and broader iOS navigation, player, accessibility, and lifecycle journeys still depend primarily on manual verification.
 7. **Playback implementations can drift.** iOS and macOS do not share one AVFoundation/KSPlayer adapter protocol.
 8. **Legacy FFmpeg configuration remains.** Playback currently uses FFmpeg through KSPlayer, while the repository retains an unused `FFMPEG_ENABLED` definition, an effectively empty bridging header, and a standalone FFmpeg build script.
-9. **README content is stale.** The minimum iOS version, AVFoundation-only playback description, old directory structure, and links to deleted documents are not reliable architecture sources.
+9. **Documentation routing can drift.** All Harness state belongs under `docs/` and must remain consistent with current code, `project.yml`, package manifests, and this architecture document.
 
 ## 12. Extension Guidelines
 
@@ -568,14 +604,17 @@ Place new work according to these rules:
 
 ## 13. Recommended Reading Order
 
-1. `project.yml` and `Packages/VanmoCore/Package.swift`
-2. `Vanmo/App/VanmoApp.swift` and `Vanmo/App/ContentView.swift`
-3. `VanmoMac/App/VanmoMacApp.swift` and `VanmoMac/App/VanmoMacRootView.swift`
-4. `Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift`
-5. `Packages/VanmoCore/Sources/VanmoCore/Models/MediaItem.swift`
-6. `Packages/VanmoCore/Sources/VanmoCore/Protocols/RemoteFileService.swift`
-7. `Packages/VanmoCore/Sources/VanmoCore/Network/ServiceFactory.swift`
-8. `Packages/VanmoCore/Sources/VanmoCore/Storage/MediaScanner.swift`
-9. The iOS and macOS Connections and Library ViewModels
-10. The iOS and macOS Player ViewModels and engine implementations
-11. The Metadata, Download, Subtitle, Prefetch, and CloudSync subsystems
+1. `AGENTS.md` for operating constraints and task routing
+2. `ARCHITECTURE.md`, `docs/QUALITY_SCORE.md`, and `docs/PLANS.md`
+3. The governing entry in `docs/exec-plans/active/` and related file in `docs/product-specs/`
+4. `project.yml` and `Packages/VanmoCore/Package.swift`
+5. `Vanmo/App/VanmoApp.swift` and `Vanmo/App/ContentView.swift`
+6. `VanmoMac/App/VanmoMacApp.swift` and `VanmoMac/App/VanmoMacRootView.swift`
+7. `Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift`
+8. `Packages/VanmoCore/Sources/VanmoCore/Models/MediaItem.swift`
+9. `Packages/VanmoCore/Sources/VanmoCore/Protocols/RemoteFileService.swift`
+10. `Packages/VanmoCore/Sources/VanmoCore/Network/ServiceFactory.swift`
+11. `Packages/VanmoCore/Sources/VanmoCore/Storage/MediaScanner.swift`
+12. The iOS and macOS Connections and Library ViewModels
+13. The iOS and macOS Player ViewModels and engine implementations
+14. The Metadata, Download, Subtitle, Prefetch, and CloudSync subsystems

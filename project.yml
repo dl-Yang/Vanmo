@@ -102,6 +102,21 @@ targets:
             /usr/bin/codesign --force --sign "${EXPANDED_CODE_SIGN_IDENTITY}" --timestamp=none "$FRAMEWORK"
           fi
 
+  VanmoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    dependencies:
+      - target: Vanmo
+    sources:
+      - path: VanmoUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app.uitests
+        TEST_TARGET_NAME: Vanmo
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: ""
+        CODE_SIGN_STYLE: Automatic
+
   Vanmo-macOS:
     type: application
     platform: macOS
@@ -194,8 +209,16 @@ schemes:
     build:
       targets:
         Vanmo: all
+        VanmoUITests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - name: VanmoUITests
+          parallelizable: false
+          randomExecutionOrder: false
     archive:
       config: Release
   Vanmo-macOS:

@@ -1,0 +1,59 @@
+VANMO DESIGN SYSTEM REFERENCE FOR LLMS
+Last reviewed: 2026-08-25
+
+PURPOSE
+This is a compact lookup guide. Figma is the visual source of truth for Vanmo
+UI work. Current SwiftUI code and assets show what is implemented. If they
+disagree, identify the correct platform-specific Figma design and reconcile the
+difference explicitly; do not silently treat this summary as the authority.
+
+PLATFORM BOUNDARY
+- iOS UI, navigation, full-screen player presentation, UIKit bridges, and
+  device lifecycle behavior live under Vanmo/.
+- macOS UI, sidebar routing, AppKit windows, keyboard behavior, and player
+  window lifecycle live under VanmoMac/.
+- VanmoCore must not import SwiftUI, UIKit, or AppKit.
+- Do not assume an iOS component is available to macOS. project.yml currently
+  compiles only these iOS shared views directly into the macOS target:
+  Vanmo/Shared/Components/MediaTitleLogoView.swift
+  Vanmo/Shared/Components/LoadingIndicatorView.swift
+
+IMPLEMENTED DESIGN LOOKUP PATHS
+iOS:
+- Theme and color definitions:
+  Vanmo/Shared/Extensions/Color+Vanmo.swift
+- Reusable SwiftUI components:
+  Vanmo/Shared/Components/
+- Feature-specific views and local patterns:
+  Vanmo/Features/*/Views/
+- Assets and the configured accent color:
+  Vanmo/Resources/Assets.xcassets/
+
+macOS:
+- Layout, radius, typography, color, and environment theme definitions:
+  VanmoMac/UI/DesignSystem/MacDesignTokens.swift
+- Reusable desktop components:
+  VanmoMac/UI/Components/
+- Feature-specific desktop UI:
+  VanmoMac/UI/
+- Assets:
+  VanmoMac/Resources/Assets.xcassets/
+
+USAGE RULES
+- Start from the correct iOS or macOS Figma frame.
+- Search the paths above before adding a token, component, icon, or asset.
+- Prefer existing SwiftUI components, SF Symbols, and approved project assets.
+- Preserve platform-native navigation, presentation, window, pointer, and
+  keyboard behavior instead of forcing visual sharing.
+- Validate empty, loading, success, error, and retry/recovery states where the
+  screen performs remote, persisted, or long-running work.
+- Check Dynamic Type or text scaling, accessibility labels/values/hints,
+  reading and focus order, contrast, target sizes, and Reduce Motion behavior.
+- Do not invent a Figma file key, node id, variable name, token value, or
+  component mapping. Read it from the active Figma source or current code.
+
+RELATED REPOSITORY GUIDANCE
+- docs/FRONTEND.md
+- docs/DESIGN.md
+- docs/sops/apple-ui-validation-loop.md
+- project.yml
