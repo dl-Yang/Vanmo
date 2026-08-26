@@ -95,7 +95,7 @@ Choose verification proportional to the change:
 - iOS UI target and interaction-CLI structure: run `./scripts/check-ios-ui-cli.sh`.
 - App Debug compile evidence: run `./scripts/check-app-build.sh ios-simulator`, `./scripts/check-app-build.sh macos`, or `./init.sh --full` after the fast baseline.
 - iOS app behavior: build/run with `./run_device.sh` or `--simulator`.
-- Physical-device UI interaction and evidence capture: use `./scripts/ios-ui.sh device ...`; the simulator backend supports only `simctl` screenshot, launch, and terminate.
+- iOS UI interaction and evidence capture: use `./scripts/ios-ui.sh device ...` or `./scripts/ios-ui.sh simulator ...` for XCUITest screenshot, tree, tap, type, swipe, wait, assert, and `journey --name tab-navigation`. `simulator launch|terminate` still use `simctl` only for simulator management.
 - macOS app behavior: build/run with `./run_device.sh --macos`.
 - Project configuration: regenerate with XcodeGen before building.
 - UI and device-only behavior: perform the relevant manual flow and record what was actually verified.

@@ -3,7 +3,7 @@
 A conservative snapshot of Vanmo product domains and architectural layers. Grades reflect recorded evidence only; code existence is not treated as verified behavior.
 
 **Last updated:** 2026-08-26  
-**Current baseline evidence:** The current recorded `./init.sh` baseline completed all four stages with 0 failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation check, and the iOS UI interaction CLI static check. The UI CLI check is structural evidence only. `./init.sh --full` then compiled both apps: macOS Debug passed, and iOS Simulator Debug failed at the pre-existing missing `.paused` case in `SettingsView.swift`. No physical-device XCUITest ran for this snapshot.
+**Current baseline evidence:** The current recorded `./init.sh` baseline completed all four stages with 0 failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation check, and the iOS UI interaction CLI static check. The UI CLI check remains structural. Focused `./scripts/check-app-build.sh ios-simulator` then passed after the Settings `.paused` label was added. Simulator XCUITest on iPhone 17 Pro recorded tree, default-screen assert, and `journey --name tab-navigation` with retained `xcresult` artifacts. No physical-device XCUITest ran for this snapshot.
 
 ## Grading Scale
 
@@ -22,7 +22,7 @@ A conservative snapshot of Vanmo product domains and architectural layers. Grade
 | Playback and prefetching | C | Catalog URL resolution is covered and cleanup paths are documented | No automated app playback, gesture, player-window, or prefetch journey; iOS/macOS paths may drift |
 | Metadata and subtitles | C | NFO parsing and subtitle-related shared logic have test coverage | Network refresh, cache invalidation, online subtitle, and rendering paths lack end-to-end evidence |
 | Persistence and iCloud sync | C | Local/cloud store boundaries pass the static check | No versioned SwiftData migration; Debug cannot prove CloudKit; no real Release CloudKit evidence |
-| iOS app experience | C | The `VanmoUITests` target, one-command XCUITest runner, static checker, and device/simulator CLI are present; a simulator `simctl` screenshot succeeded | Debug compile and `build-for-testing` are blocked by the pre-existing missing `.paused` switch case; no signed physical-device XCUITest, attachment export, or golden journey evidence |
+| iOS app experience | B | The unified XCUITest CLI, iOS Simulator Debug compile, and simulator tab-navigation journey passed on 2026-08-26 with retained `xcresult` attachments | No signed physical-device XCUITest; connect, play, and download journeys remain unverified |
 | macOS app experience | C | Platform boundaries are documented; a Debug compile of `Vanmo-macOS` passed on 2026-08-26 | Launch, windows, navigation, and download interactions still rely on manual evidence |
 
 ## Architectural Layers
@@ -30,10 +30,10 @@ A conservative snapshot of Vanmo product domains and architectural layers. Grade
 | Architectural layer | Grade | Boundary and legibility evidence | Key gaps |
 | --- | --- | --- | --- |
 | `VanmoCore` | B | Package boundaries are explicit; 36 tests pass | Uneven service integration coverage; Swift 6 `Sendable` warnings remain |
-| iOS platform layer | C | UI, navigation, and player adapters are isolated to the iOS target; UI-test target and CLI structure pass static validation | Large orchestration surfaces; app build is blocked, physical-device execution is unverified, and stable identifier coverage is limited |
+| iOS platform layer | C | UI, navigation, and player adapters are isolated to the iOS target; Simulator XCUITest now proves tab navigation for four stable identifiers | Large orchestration surfaces remain; physical-device execution is unverified; identifier coverage is still limited to the golden journey |
 | macOS platform layer | C | AppKit windows and desktop player behavior remain platform-isolated | Duplicated orchestration and manual-only window acceptance |
 | SwiftData / CloudKit | C | Local/cloud model assignments and credential exclusions are documented and statically checked | No versioned schema or migration plan; Release CloudKit lacks real-environment proof |
-| Build and agent workflow | B | `project.yml` is the configuration source; `./init.sh` provides four passing shared, boundary, documentation, and iOS UI CLI static stages; `./init.sh --full` adds Debug compile evidence; `docs/` is the single Harness documentation root | Default baseline still does not compile apps; the first full matrix is red on iOS; UI CLI static validation is not device evidence |
+| Build and agent workflow | B | `project.yml` is the configuration source; `./init.sh` provides four passing shared, boundary, documentation, and iOS UI CLI static stages; focused iOS Simulator Debug compile now passes; simulator XCUITest is a separate evidence command | Default baseline still does not compile apps or run XCUITest; physical-device UI evidence is still missing |
 
 ## Benchmark Snapshots
 
@@ -45,6 +45,7 @@ These snapshots measure only the stated harness path. They are not product-perfo
 | 2026-08-26 | Single-root Harness | 3/3 automated stages passed: 36 tests, static check with 0 failures, Harness documentation check with 0 failures | 0 project-level retries | Not measured | Removed the parallel session-artifact layer; no app build, launch, real-source flow, or CloudKit environment validation |
 | 2026-08-26 | iOS UI CLI integration | 4/4 `./init.sh` stages passed; XcodeGen generation and target discovery succeeded; simulator `simctl` screenshot succeeded | Not recorded | Existing app compile blocker recorded | `build-for-testing` stopped at the pre-existing missing `.paused` case in `SettingsView.swift:489`; no physical-device XCUITest, signing, runner-argument, attachment-export, or golden-journey evidence |
 | 2026-08-26 | Debug compile evidence layer | Fast `./init.sh` 4/4 passed with no app-build evidence directory; focused macOS Debug compile passed; `./init.sh --full` recorded iOS fail + macOS pass and aggregate exit 1 | 0 | Existing iOS `.paused` compile blocker recorded | Xcode 26.0.1 / Swift 6.2; evidence under `build/app-build-evidence/runs/20260826-141002-10994`; no launch, XCUITest, or CloudKit claim |
+| 2026-08-26 | iOS UI golden journey | Fast `./init.sh` 4/4 passed; focused iOS Simulator Debug compile passed; simulator `tree`, `assert`, and `journey --name tab-navigation` passed | 1 attachment-name suffix mismatch, then fixed | No new product defect | Xcode 26.0.1 / Swift 6.2; iPhone 17 Pro simulator; journey artifacts at `build/ui-cli/runs/20260826-145830-63647`; no physical-device or real-source claim |
 
 Future entries should keep the command, environment, stage count, retries, and escaped defects comparable. Do not convert manual observations into a completion percentage.
 

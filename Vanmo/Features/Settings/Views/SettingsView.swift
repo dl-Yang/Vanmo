@@ -491,6 +491,8 @@ private struct DownloadTaskRow: View {
             Text("等待中").foregroundStyle(.secondary)
         case .downloading:
             Text("\(Int(task.progress * 100))%").foregroundStyle(.blue)
+        case .paused:
+            Text("已暂停").foregroundStyle(.secondary)
         case .completed:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         case .failed:

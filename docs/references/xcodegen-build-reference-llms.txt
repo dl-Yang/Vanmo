@@ -20,8 +20,10 @@ IOS UI TEST TARGET
 - The Vanmo scheme includes VanmoUITests in its test action.
 - scripts/ios-ui.sh sets TEST_RUNNER_VANMO_UI_* environment variables. Xcode's
   test runner is expected to remove the TEST_RUNNER_ prefix when exposing them
-  to VanmoDeviceInteractionTests.swift, which reads VANMO_UI_* variables. This
-  delivery path is not yet verified on a physical device.
+  to VanmoDeviceInteractionTests.swift, which reads VANMO_UI_* variables.
+  Simulator delivery was verified by the 2026-08-26 tab-navigation journey;
+  physical-device delivery remains unverified until a signed device run is
+  recorded.
 
 STANDARD COMMANDS
 - Resolve VanmoCore dependencies and run the four-stage baseline:
@@ -33,10 +35,11 @@ STANDARD COMMANDS
   ./scripts/check-app-build.sh macos
 - Check the iOS UI target, generated project, Bash CLI, and Swift test source:
   ./scripts/check-ios-ui-cli.sh
-- Run a bounded physical-device XCUITest interaction:
+- Run a bounded Simulator XCUITest interaction or journey:
+  ./scripts/ios-ui.sh simulator tree --output /tmp/vanmo-tree.json
+  ./scripts/ios-ui.sh simulator journey --name tab-navigation
+- Run the same XCUITest commands on a signed physical device:
   ./scripts/ios-ui.sh device screenshot --output /tmp/vanmo.png
-- Capture a Simulator screenshot through simctl:
-  ./scripts/ios-ui.sh simulator screenshot --output /tmp/vanmo-simulator.png
 - Build, install, and launch the default iOS device target:
   ./run_device.sh
 - Build, install, and launch an iOS Simulator target:
@@ -68,12 +71,13 @@ COMMAND BOUNDARIES
 - The Harness documentation check requires Python 3 and fails when required
   governance files, routing links, or repository-local Markdown targets are
   missing.
-- scripts/ios-ui.sh uses XCUITest only for physical-device commands. Its
-  Simulator backend uses simctl only for screenshot, launch, and terminate and
-  rejects unsupported interaction commands.
-- Physical-device UI CLI runs retain result bundles, logs, and exported
-  attachments under build/ui-cli/runs/. A development team may be supplied
-  through VANMO_DEVELOPMENT_TEAM or --team.
+- scripts/ios-ui.sh uses XCUITest for device and Simulator screenshot, tree,
+  tap, type, swipe, wait, assert, and journey commands. simctl is limited to
+  simulator boot plus launch/terminate and does not validate UI.
+- XCUITest runs retain result bundles, logs, and exported attachments under
+  build/ui-cli/runs/. Simulator XCUITest uses build/DerivedData-UITests-sim.
+  A physical-device development team may be supplied through
+  VANMO_DEVELOPMENT_TEAM or --team.
 - The iOS UI CLI static check does not prove app compilation, signing, device
   execution, TEST_RUNNER argument delivery, or attachment export.
 - run_device.sh defaults to Debug and selects the Vanmo or Vanmo-macOS scheme

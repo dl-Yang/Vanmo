@@ -22,14 +22,17 @@ implementation. Do not use the iOS frame as the macOS authority or vice versa.
 
 ## iOS CLI Backends
 
-- Physical-device commands use XCUITest through `./scripts/ios-ui.sh device ...`.
-  They can capture a screenshot or flat JSON accessibility tree and perform one
-  identifier/exact-label tap, type, swipe, wait, or assert action per run.
-- Simulator commands use `simctl` through `./scripts/ios-ui.sh simulator ...`.
-  They support screenshot, launch, and terminate only; they do not provide
-  selector inspection or interaction.
-- Every physical-device command retains its result bundle, logs, attachment
-  export diagnostics, and exported attachments under `build/ui-cli/runs/`.
+- Device and Simulator screenshot, tree, tap, type, swipe, wait, assert, and
+  `journey` commands use XCUITest through `./scripts/ios-ui.sh device ...` or
+  `./scripts/ios-ui.sh simulator ...`. Each command except `journey` performs
+  one action after a fresh launch.
+- `journey --name tab-navigation` keeps library assert, Settings tap, and
+  settings-screen assert in one XCUITest process because independent commands
+  relaunch the app.
+- `simulator launch|terminate` still use `simctl` only to manage the
+  Simulator. They do not capture screenshots or validate selectors.
+- Every XCUITest command retains its result bundle, logs, attachment export
+  diagnostics, and exported attachments under `build/ui-cli/runs/`.
   Copy only sanitized requested outputs into review evidence.
 
 ## Validation Loop
@@ -38,13 +41,12 @@ implementation. Do not use the iOS frame as the macOS authority or vice versa.
    initial state, and success criteria.
 2. Capture **BEFORE** evidence:
    - the relevant Figma frame
-   - a runtime screenshot; on iOS use `./scripts/ios-ui.sh device screenshot`
-     or `./scripts/ios-ui.sh simulator screenshot` when that backend matches
-     the validation scope
+   - a runtime screenshot; on iOS use `./scripts/ios-ui.sh simulator screenshot`
+     or `./scripts/ios-ui.sh device screenshot`
    - the visible state and navigation/window context
    - accessibility labels, values, traits, focus/reading order, and text-scale
-     observations relevant to the change; a physical-device tree may be
-     captured with `./scripts/ios-ui.sh device tree`
+     observations relevant to the change; capture a tree with
+     `./scripts/ios-ui.sh simulator tree` or `./scripts/ios-ui.sh device tree`
    - matching local console output when behavior is stateful or failing
 3. Exercise exactly one journey. Cover the relevant empty, loading, success,
    error, and retry/recovery state rather than inferring them from code.

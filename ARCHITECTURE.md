@@ -488,14 +488,15 @@ sequenceDiagram
 
 ### 8.4 iOS Device Interaction CLI
 
-`scripts/ios-ui.sh` has intentionally different device and simulator backends:
+`scripts/ios-ui.sh` uses one XCUITest entry for both destinations:
 
-1. A `device` command resolves a connected iOS destination and invokes the single `VanmoDeviceInteractionTests/testExecuteCommand` XCUITest through the `Vanmo` scheme.
-2. The script sets `TEST_RUNNER_VANMO_UI_*` environment variables. Xcode's test runner is expected to expose them to the XCUITest process with the `TEST_RUNNER_` prefix removed, where the test reads `VANMO_UI_*`. That delivery path remains unverified on a physical device. The test implementation launches Vanmo and can perform a screenshot, flat JSON accessibility-tree export, identifier or exact-label tap/type, swipe, or exists/absent wait/assert operation.
-3. XCUITest screenshots, trees, failure diagnostics, logs, and result bundles are retained under `build/ui-cli/runs/`; requested screenshot or tree output is copied from the exported `xcresult` attachments.
-4. A `simulator` command uses `simctl` only for screenshot and app launch/termination. It does not run XCUITest and explicitly rejects tree, tap, type, swipe, wait, and assert operations that `simctl` does not provide.
+1. `device` and `simulator` screenshot, tree, tap, type, swipe, wait, assert, and `journey` commands invoke `VanmoDeviceInteractionTests/testExecuteCommand` through the `Vanmo` scheme.
+2. The script sets `TEST_RUNNER_VANMO_UI_*` environment variables. Xcode's test runner is expected to expose them to the XCUITest process with the `TEST_RUNNER_` prefix removed, where the test reads `VANMO_UI_*`. Simulator delivery is part of the tab-navigation golden-journey evidence; physical-device delivery remains unverified until a signed device run is recorded.
+3. Each XCUITest run launches Vanmo. Independent tap and assert commands therefore cannot preserve navigation across processes. `journey --name tab-navigation` performs library assert, Settings tap, and settings-screen assert in one process, then attaches a screenshot and tree.
+4. XCUITest screenshots, trees, failure diagnostics, logs, and result bundles are retained under `build/ui-cli/runs/`; requested screenshot or tree output is copied from the exported `xcresult` attachments. Simulator XCUITest uses `build/DerivedData-UITests-sim`; device runs keep `build/DerivedData-UITests`.
+5. `simulator launch|terminate` still use `simctl` only to boot or manage the Simulator app process. `simctl` does not capture screenshots or validate UI.
 
-This CLI is a bounded interaction and evidence interface, not a replacement for Figma comparison, accessibility review, or a complete golden journey. Device commands require a connected and trusted device plus valid signing; the development team may be supplied through `VANMO_DEVELOPMENT_TEAM` or `--team`.
+This CLI is a bounded interaction and evidence interface, not a replacement for Figma comparison, accessibility review, or product journeys that need a real media source. Device commands require a connected and trusted device plus valid signing; the development team may be supplied through `VANMO_DEVELOPMENT_TEAM` or `--team`. Simulator XCUITest does not require a development team.
 
 ## 9. State, Concurrency, and Events
 
@@ -542,9 +543,9 @@ The tests cover:
 - Remote-service capability declarations.
 - Schema and foundational enum mappings.
 
-As of August 26, 2026, all four `./init.sh` baseline stages complete with no failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation check, and `./scripts/check-ios-ui-cli.sh`. The iOS UI CLI stage statically checks the target declarations in `project.yml` and the generated project, validates the Bash CLI, and type-checks the XCUITest source. XcodeGen generation succeeded, the generated target is discoverable, and a simulator `simctl` screenshot command completed successfully.
+As of August 26, 2026, all four `./init.sh` baseline stages complete with no failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation check, and `./scripts/check-ios-ui-cli.sh`. The iOS UI CLI stage statically checks the target declarations in `project.yml` and the generated project, validates the Bash CLI, and type-checks the XCUITest source.
 
-These checks do not prove that the app or UI-test bundle builds or runs on a device. The first Debug compile matrix on 2026-08-26 recorded a macOS pass and an iOS Simulator failure at the pre-existing non-exhaustive `DownloadStatus` switch in `Vanmo/Features/Settings/Views/SettingsView.swift`, which lacks the `.paused` case. No physical-device XCUITest has run, so signing, `TEST_RUNNER_VANMO_UI_*` delivery, and `xcresult` attachment export remain unverified.
+Focused iOS Simulator Debug compile passed after the Settings `.paused` label was added. Simulator XCUITest on iPhone 17 Pro then recorded tree, default-screen assert, and `journey --name tab-navigation`, including `TEST_RUNNER_VANMO_UI_*` delivery and `xcresult` attachment export. No physical-device XCUITest has run, so signing remains unverified.
 
 Other verification entry points:
 
@@ -584,7 +585,7 @@ See `docs/RELIABILITY.md` for the complete command stages and evidence boundarie
 3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. FTP/SFTP, NFS, DLNA, and several official cloud-drive integrations require further implementation.
 4. **No explicit SwiftData migration strategy.** There is no `VersionedSchema` or `SchemaMigrationPlan`. Container creation calls `fatalError` on failure and has no recovery or fallback path.
 5. **CloudKit is Release-only.** Debug builds can verify local fallback and static boundaries, but cannot prove real CloudKit behavior.
-6. **iOS UI automation lacks successful app-build and device evidence.** The `VanmoUITests` target and command runner exist, but the current app build blocker prevents successful `build-for-testing`, no physical-device XCUITest has run, and stable accessibility identifiers cover only a limited set of controls. macOS UI behavior and broader iOS navigation, player, accessibility, and lifecycle journeys still depend primarily on manual verification.
+6. **iOS UI automation still lacks physical-device evidence.** The `VanmoUITests` target and unified XCUITest CLI exist, and the compile-safe Settings `.paused` label unblocks Simulator `build-for-testing`. Physical-device signing and device-side runner-argument delivery remain unverified; broader iOS/macOS player or real-source journeys still depend on later recorded evidence.
 7. **Playback implementations can drift.** iOS and macOS do not share one AVFoundation/KSPlayer adapter protocol.
 8. **Legacy FFmpeg configuration remains.** Playback currently uses FFmpeg through KSPlayer, while the repository retains an unused `FFMPEG_ENABLED` definition, an effectively empty bridging header, and a standalone FFmpeg build script.
 9. **Documentation routing can drift.** All Harness state belongs under `docs/` and must remain consistent with current code, `project.yml`, package manifests, and this architecture document.

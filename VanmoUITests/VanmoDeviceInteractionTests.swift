@@ -10,6 +10,11 @@ final class VanmoDeviceInteractionTests: XCTestCase {
         case swipe
         case wait
         case assertState = "assert"
+        case journey
+    }
+
+    private enum Journey: String {
+        case tabNavigation = "tab-navigation"
     }
 
     private enum SelectorKind: String {
@@ -63,7 +68,7 @@ final class VanmoDeviceInteractionTests: XCTestCase {
             let action: Action = try requiredEnum(
                 named: "VANMO_UI_ACTION",
                 in: environment,
-                expected: "screenshot, tree, tap, type, swipe, wait, or assert"
+                expected: "screenshot, tree, tap, type, swipe, wait, assert, or journey"
             )
             try execute(action, environment: environment, app: app)
             print("[VanmoUI] action=\(action.rawValue) succeeded")
@@ -134,7 +139,76 @@ final class VanmoDeviceInteractionTests: XCTestCase {
                 selector: selector,
                 timeout: timeout
             )
+        case .journey:
+            let journey: Journey = try requiredEnum(
+                named: "VANMO_UI_JOURNEY",
+                in: environment,
+                expected: "tab-navigation"
+            )
+            let timeout = try timeout(from: environment)
+            switch journey {
+            case .tabNavigation:
+                try runTabNavigationJourney(in: app, timeout: timeout)
+            }
         }
+    }
+
+    private func runTabNavigationJourney(
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) throws {
+        try wait(
+            for: .exists,
+            element: element(identifier: "screen.library", in: app),
+            kind: .identifier,
+            selector: "screen.library",
+            timeout: timeout
+        )
+
+        let tab = try settingsTabElement(in: app, timeout: timeout)
+        tab.tap()
+
+        try wait(
+            for: .exists,
+            element: element(identifier: "screen.settings", in: app),
+            kind: .identifier,
+            selector: "screen.settings",
+            timeout: timeout
+        )
+
+        add(screenshotAttachment(named: "vanmo-ui-screenshot.png"))
+        add(try treeAttachment(for: app, named: "vanmo-ui-tree.json"))
+        print("[VanmoUI] journey=tab-navigation succeeded")
+    }
+
+    private func settingsTabElement(
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) throws -> XCUIElement {
+        let identifiedTab = element(identifier: "tab.settings", in: app)
+        if identifiedTab.waitForExistence(timeout: timeout) {
+            return identifiedTab
+        }
+
+        let labeledTab = element(label: "设置", in: app)
+        guard labeledTab.waitForExistence(timeout: timeout) else {
+            throw CommandError.elementNotFound(
+                kind: SelectorKind.identifier.rawValue,
+                selector: "tab.settings",
+                timeout: timeout
+            )
+        }
+        return labeledTab
+    }
+
+    private func element(identifier: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func element(label: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", label)
+        ).firstMatch
     }
 
     private func selectedElement(

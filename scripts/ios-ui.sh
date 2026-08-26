@@ -5,7 +5,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT_PATH="${ROOT_DIR}/Vanmo.xcodeproj"
 SCHEME="Vanmo"
 CONFIGURATION="Debug"
-DERIVED_DATA_PATH="${ROOT_DIR}/build/DerivedData-UITests"
+DEVICE_DERIVED_DATA_PATH="${ROOT_DIR}/build/DerivedData-UITests"
+SIMULATOR_DERIVED_DATA_PATH="${ROOT_DIR}/build/DerivedData-UITests-sim"
 RUNS_DIR="${ROOT_DIR}/build/ui-cli/runs"
 ONLY_TESTING="VanmoUITests/VanmoDeviceInteractionTests/testExecuteCommand"
 BUNDLE_ID="com.vanmo.app"
@@ -22,6 +23,7 @@ TEXT_VALUE=""
 EXPECTED_STATE=""
 TIMEOUT=""
 DIRECTION=""
+JOURNEY_NAME=""
 
 usage() {
     cat <<'EOF'
@@ -30,30 +32,39 @@ usage() {
   scripts/ios-ui.sh device tree [--device UDID|名称] [--team TEAM] [--output PATH]
   scripts/ios-ui.sh device tap|type|wait|assert (--identifier VALUE | --label VALUE) [选项]
   scripts/ios-ui.sh device swipe --direction up|down|left|right [--device UDID|名称] [--team TEAM]
-  scripts/ios-ui.sh simulator screenshot --output PATH [--device UDID|名称]
+  scripts/ios-ui.sh device journey --name tab-navigation [--device UDID|名称] [--team TEAM] [--timeout SECONDS]
+  scripts/ios-ui.sh simulator screenshot [--device UDID|名称] [--output PATH]
+  scripts/ios-ui.sh simulator tree [--device UDID|名称] [--output PATH]
+  scripts/ios-ui.sh simulator tap|type|wait|assert (--identifier VALUE | --label VALUE) [选项]
+  scripts/ios-ui.sh simulator swipe --direction up|down|left|right [--device UDID|名称]
+  scripts/ios-ui.sh simulator journey --name tab-navigation [--device UDID|名称] [--timeout SECONDS]
   scripts/ios-ui.sh simulator launch|terminate [--device UDID|名称]
 
-[VanmoUI] 真机选项:
-  --device UDID|名称       指定真机；默认使用首个真实 iOS destination
-  --team TEAM              Development Team；默认读取 VANMO_DEVELOPMENT_TEAM
+[VanmoUI] 选项:
+  --device UDID|名称       指定真机或模拟器；默认使用首个可用目标
+  --team TEAM              Development Team；仅真机，默认读取 VANMO_DEVELOPMENT_TEAM
   --output PATH            screenshot/tree 输出路径
   --identifier VALUE       按 accessibility identifier 选择元素
   --label VALUE            按 accessibility label 选择元素
   --text VALUE             type 输入内容（必填；不会输出到日志）
   --state exists|absent    wait/assert 期望状态（必填）
-  --timeout SECONDS        tap/type/wait/assert 超时，范围 0.1...60，默认 10
+  --timeout SECONDS        tap/type/wait/assert/journey 超时，范围 0.1...60，默认 10
   --direction DIRECTION    swipe 方向：up、down、left、right
+  --name JOURNEY           journey 名称；当前仅支持 tab-navigation
 
-[VanmoUI] 默认真机输出:
+[VanmoUI] 默认输出:
   screenshot: ./vanmo-ui-screenshot.png
   tree:       ./vanmo-ui-tree.json
 
+[VanmoUI] 说明:
+  screenshot/tree/tap/type/swipe/wait/assert/journey 走 XCUITest。
+  simulator launch|terminate 仅用 simctl 管理模拟器，不验证 UI。
+
 [VanmoUI] 示例:
-  scripts/ios-ui.sh device screenshot --output /tmp/vanmo.png
-  scripts/ios-ui.sh device tap --identifier play-button --timeout 5
-  scripts/ios-ui.sh device type --label Search --text "example"
-  scripts/ios-ui.sh device wait --identifier player --state exists
-  scripts/ios-ui.sh simulator screenshot --output /tmp/simulator.png
+  scripts/ios-ui.sh simulator tree --output /tmp/vanmo-tree.json
+  scripts/ios-ui.sh simulator assert --identifier screen.library --state exists
+  scripts/ios-ui.sh simulator journey --name tab-navigation
+  scripts/ios-ui.sh device tap --identifier tab.settings --timeout 5
   scripts/ios-ui.sh simulator launch --device "iPhone 17 Pro"
 EOF
 }
@@ -164,6 +175,12 @@ parse_options() {
                 DIRECTION="$2"
                 shift 2
                 ;;
+            --name)
+                require_option_value "$1" "$#" "${2:-}"
+                [[ -z "$JOURNEY_NAME" ]] || die "--name 不能重复"
+                JOURNEY_NAME="$2"
+                shift 2
+                ;;
             -h|--help)
                 usage
                 exit 0
@@ -195,7 +212,11 @@ validate_no_direction() {
     [[ -z "$DIRECTION" ]] || die "${ACTION} 不支持 --direction"
 }
 
-validate_device_command() {
+validate_no_journey_name() {
+    [[ -z "$JOURNEY_NAME" ]] || die "${ACTION} 不支持 --name"
+}
+
+validate_xcuitest_action() {
     case "$ACTION" in
         screenshot)
             [[ -n "$OUTPUT_PATH" ]] || OUTPUT_PATH="${PWD}/vanmo-ui-screenshot.png"
@@ -204,6 +225,7 @@ validate_device_command() {
             validate_no_state
             validate_no_timeout
             validate_no_direction
+            validate_no_journey_name
             ;;
         tree)
             [[ -n "$OUTPUT_PATH" ]] || OUTPUT_PATH="${PWD}/vanmo-ui-tree.json"
@@ -212,6 +234,7 @@ validate_device_command() {
             validate_no_state
             validate_no_timeout
             validate_no_direction
+            validate_no_journey_name
             ;;
         tap)
             [[ -n "$SELECTOR_KIND" ]] || die "tap 必须提供 --identifier 或 --label"
@@ -219,6 +242,7 @@ validate_device_command() {
             validate_no_text
             validate_no_state
             validate_no_direction
+            validate_no_journey_name
             ;;
         type)
             [[ -n "$SELECTOR_KIND" ]] || die "type 必须提供 --identifier 或 --label"
@@ -226,6 +250,7 @@ validate_device_command() {
             [[ -z "$OUTPUT_PATH" ]] || die "type 不支持 --output"
             validate_no_state
             validate_no_direction
+            validate_no_journey_name
             ;;
         wait|assert)
             [[ -n "$SELECTOR_KIND" ]] || die "${ACTION} 必须提供 --identifier 或 --label"
@@ -237,6 +262,7 @@ validate_device_command() {
             [[ -z "$OUTPUT_PATH" ]] || die "${ACTION} 不支持 --output"
             validate_no_text
             validate_no_direction
+            validate_no_journey_name
             ;;
         swipe)
             case "$DIRECTION" in
@@ -249,6 +275,30 @@ validate_device_command() {
             validate_no_text
             validate_no_state
             validate_no_timeout
+            validate_no_journey_name
+            ;;
+        journey)
+            case "$JOURNEY_NAME" in
+                tab-navigation) ;;
+                "") die "journey 必须提供 --name tab-navigation" ;;
+                *) die "--name 仅支持 tab-navigation" ;;
+            esac
+            [[ -z "$OUTPUT_PATH" ]] || die "journey 不支持 --output"
+            validate_no_selector
+            validate_no_text
+            validate_no_state
+            validate_no_direction
+            ;;
+        *)
+            die "${MODE} 不支持命令: ${ACTION}"
+            ;;
+    esac
+}
+
+validate_device_command() {
+    case "$ACTION" in
+        screenshot|tree|tap|type|wait|assert|swipe|journey)
+            validate_xcuitest_action
             ;;
         *)
             die "真机不支持命令: ${ACTION}"
@@ -267,25 +317,26 @@ validate_simulator_command() {
     [[ "$TEAM_OPTION_SET" == false ]] || die "模拟器命令不支持 --team"
 
     case "$ACTION" in
-        tap|type|swipe|wait|assert|tree)
-            die "模拟器 ${ACTION} 不受 simctl 支持；本工具按用户要求不在模拟器启用 XCUITest"
-            ;;
-        screenshot)
-            [[ -n "$OUTPUT_PATH" ]] || die "模拟器 screenshot 必须提供 --output PATH"
+        screenshot|tree|tap|type|wait|assert|swipe|journey)
+            validate_xcuitest_action
             ;;
         launch|terminate)
             [[ -z "$OUTPUT_PATH" ]] || die "模拟器 ${ACTION} 不支持 --output"
+            validate_no_selector
+            validate_no_text
+            validate_no_state
+            validate_no_timeout
+            validate_no_direction
+            validate_no_journey_name
             ;;
         *)
             die "模拟器不支持命令: ${ACTION}"
             ;;
     esac
 
-    validate_no_selector
-    validate_no_text
-    validate_no_state
-    validate_no_timeout
-    validate_no_direction
+    if [[ -n "$TIMEOUT" ]] && ! validate_timeout; then
+        die "--timeout 必须是 0.1 到 60 之间的有限数值"
+    fi
 }
 
 list_ios_destinations() {
@@ -487,9 +538,20 @@ with open(manifest_path, encoding="utf-8") as handle:
 
 exported_names = []
 
+def attachment_name_matches(suggested, wanted):
+    if not isinstance(suggested, str) or not wanted:
+        return False
+    if suggested == wanted:
+        return True
+    stem, dot, suffix = wanted.rpartition(".")
+    if not dot:
+        return suggested.startswith(wanted + "_")
+    return suggested.startswith(stem + "_") and suggested.endswith("." + suffix)
+
 def visit(value):
     if isinstance(value, dict):
-        if value.get("suggestedHumanReadableName") == wanted_name:
+        suggested = value.get("suggestedHumanReadableName")
+        if attachment_name_matches(suggested, wanted_name):
             exported_name = value.get("exportedFileName")
             if isinstance(exported_name, str) and exported_name:
                 exported_names.append(exported_name)
@@ -533,10 +595,14 @@ copy_requested_attachment() {
     log "输出已保存: ${OUTPUT_PATH}"
 }
 
-run_device_command() {
+run_xcuitest_command() {
     local resolved
-    local device_udid
-    local device_name
+    local dest_id
+    local dest_name
+    local dest_state=""
+    local destination
+    local derived_data
+    local platform_label
     local run_id
     local run_dir
     local result_bundle
@@ -551,9 +617,22 @@ run_device_command() {
     local -a xcodebuild_args
     local -a pipeline_status
 
-    resolved=$(resolve_ios_device)
-    IFS='|' read -r device_udid device_name <<< "$resolved"
-    log "目标真机: ${device_name} (${device_udid})"
+    if [[ "$MODE" == "device" ]]; then
+        resolved=$(resolve_ios_device)
+        IFS='|' read -r dest_id dest_name <<< "$resolved"
+        destination="platform=iOS,id=${dest_id}"
+        derived_data="$DEVICE_DERIVED_DATA_PATH"
+        platform_label="真机"
+        log "目标真机: ${dest_name} (${dest_id})"
+    else
+        resolved=$(resolve_simulator)
+        IFS='|' read -r dest_id dest_name dest_state <<< "$resolved"
+        ensure_simulator_booted "$dest_id" "$dest_state"
+        destination="platform=iOS Simulator,id=${dest_id}"
+        derived_data="$SIMULATOR_DERIVED_DATA_PATH"
+        platform_label="模拟器"
+        log "目标模拟器: ${dest_name} (${dest_id})"
+    fi
 
     run_id="$(date '+%Y%m%d-%H%M%S')-$$"
     run_dir="${RUNS_DIR}/${run_id}"
@@ -564,7 +643,7 @@ run_device_command() {
     mkdir -p "$run_dir"
     : >"$xcodebuild_log"
     log "运行目录: ${run_dir}"
-    log "执行真机命令: ${ACTION}"
+    log "执行${platform_label} XCUITest 命令: ${ACTION}"
 
     environment_args=("TEST_RUNNER_VANMO_UI_ACTION=${ACTION}")
     [[ -z "$SELECTOR_KIND" ]] \
@@ -579,26 +658,30 @@ run_device_command() {
         || environment_args+=("TEST_RUNNER_VANMO_UI_TIMEOUT=${TIMEOUT}")
     [[ -z "$DIRECTION" ]] \
         || environment_args+=("TEST_RUNNER_VANMO_UI_DIRECTION=${DIRECTION}")
+    [[ -z "$JOURNEY_NAME" ]] \
+        || environment_args+=("TEST_RUNNER_VANMO_UI_JOURNEY=${JOURNEY_NAME}")
 
     xcodebuild_args=(
         -project "$PROJECT_PATH"
         -scheme "$SCHEME"
         -configuration "$CONFIGURATION"
-        -destination "platform=iOS,id=${device_udid}"
-        -derivedDataPath "$DERIVED_DATA_PATH"
+        -destination "$destination"
+        -derivedDataPath "$derived_data"
         -resultBundlePath "$result_bundle"
         "-only-testing:${ONLY_TESTING}"
         -parallel-testing-enabled NO
         -maximum-concurrent-test-device-destinations 1
         -hideShellScriptEnvironment
-        -allowProvisioningUpdates
         test
     )
-    if [[ -n "$TEAM" ]]; then
-        team_xcconfig="${run_dir}/signing.xcconfig"
-        printf 'DEVELOPMENT_TEAM = %s\n' "$TEAM" >"$team_xcconfig"
-        chmod 600 "$team_xcconfig"
-        xcodebuild_args=(-xcconfig "$team_xcconfig" "${xcodebuild_args[@]}")
+    if [[ "$MODE" == "device" ]]; then
+        xcodebuild_args+=(-allowProvisioningUpdates)
+        if [[ -n "$TEAM" ]]; then
+            team_xcconfig="${run_dir}/signing.xcconfig"
+            printf 'DEVELOPMENT_TEAM = %s\n' "$TEAM" >"$team_xcconfig"
+            chmod 600 "$team_xcconfig"
+            xcodebuild_args=(-xcconfig "$team_xcconfig" "${xcodebuild_args[@]}")
+        fi
     fi
 
     set +e
@@ -634,10 +717,10 @@ run_device_command() {
         return "$post_status"
     fi
 
-    log "真机命令完成；运行目录: ${run_dir}"
+    log "${platform_label}命令完成；运行目录: ${run_dir}"
 }
 
-run_simulator_command() {
+run_simulator_lifecycle_command() {
     local resolved
     local simulator_udid
     local simulator_name
@@ -648,12 +731,6 @@ run_simulator_command() {
     log "目标模拟器: ${simulator_name} (${simulator_udid})"
 
     case "$ACTION" in
-        screenshot)
-            ensure_simulator_booted "$simulator_udid" "$simulator_state"
-            mkdir -p "$(dirname "$OUTPUT_PATH")"
-            xcrun simctl io "$simulator_udid" screenshot "$OUTPUT_PATH"
-            log "输出已保存: ${OUTPUT_PATH}"
-            ;;
         launch)
             ensure_simulator_booted "$simulator_udid" "$simulator_state"
             xcrun simctl launch "$simulator_udid" "$BUNDLE_ID"
@@ -683,11 +760,18 @@ parse_options "$@"
 case "$MODE" in
     device)
         validate_device_command
-        run_device_command
+        run_xcuitest_command
         ;;
     simulator)
         validate_simulator_command
-        run_simulator_command
+        case "$ACTION" in
+            launch|terminate)
+                run_simulator_lifecycle_command
+                ;;
+            *)
+                run_xcuitest_command
+                ;;
+        esac
         ;;
     *)
         die "平台仅支持 device 或 simulator: ${MODE}"

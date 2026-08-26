@@ -14,8 +14,10 @@ struct ContentView: View {
             NavigationStack {
                 LibraryView()
             }
+            .accessibilityIdentifier("screen.library")
             .tabItem {
                 Label(AppTab.library.title, systemImage: AppTab.library.icon)
+                    .accessibilityIdentifier("tab.library")
             }
             .tag(AppTab.library)
 
@@ -46,8 +48,10 @@ struct ContentView: View {
                         }
                     }
             }
+            .accessibilityIdentifier("screen.settings")
             .tabItem {
                 Label(AppTab.settings.title, systemImage: AppTab.settings.icon)
+                    .accessibilityIdentifier("tab.settings")
             }
             .tag(AppTab.settings)
         }

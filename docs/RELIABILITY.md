@@ -43,6 +43,7 @@ swift test --package-path Packages/VanmoCore
 ./scripts/check-ios-ui-cli.sh
 ./scripts/check-app-build.sh ios-simulator
 ./scripts/check-app-build.sh macos
+./scripts/ios-ui.sh simulator journey --name tab-navigation
 swift test --package-path Packages/VanmoCore --filter DownloadTests
 ```
 
@@ -63,33 +64,38 @@ The default path targets an iOS device. Use `--simulator` for iOS Simulator and 
 Use `scripts/ios-ui.sh` for one bounded iOS action at a time:
 
 ```bash
-# Physical device: XCUITest backend
+# Simulator: XCUITest backend
+./scripts/ios-ui.sh simulator screenshot --output /tmp/vanmo-simulator.png
+./scripts/ios-ui.sh simulator tree --output /tmp/vanmo-tree.json
+./scripts/ios-ui.sh simulator tap --identifier tab.settings --timeout 5
+./scripts/ios-ui.sh simulator assert --identifier screen.library --state exists
+./scripts/ios-ui.sh simulator journey --name tab-navigation
+
+# Physical device: the same XCUITest backend
 ./scripts/ios-ui.sh device screenshot --output /tmp/vanmo.png
 ./scripts/ios-ui.sh device tree --output /tmp/vanmo-tree.json
-./scripts/ios-ui.sh device tap --identifier "identifier-from-tree" --timeout 5
+./scripts/ios-ui.sh device tap --identifier tab.settings --timeout 5
 ./scripts/ios-ui.sh device type --label "exact-label-from-tree" --text "example"
 ./scripts/ios-ui.sh device swipe --direction up
-./scripts/ios-ui.sh device assert --identifier "identifier-from-tree" --state exists
+./scripts/ios-ui.sh device assert --identifier screen.library --state exists
 
-# Simulator: simctl backend
-./scripts/ios-ui.sh simulator screenshot --device "iPhone 17 Pro" --output /tmp/vanmo-simulator.png
+# Simulator management only
 ./scripts/ios-ui.sh simulator launch --device "iPhone 17 Pro"
 ./scripts/ios-ui.sh simulator terminate --device "iPhone 17 Pro"
 ```
 
-The physical-device backend runs `VanmoDeviceInteractionTests/testExecuteCommand` through the `Vanmo` scheme. It supports screenshot, flat JSON accessibility-tree export, identifier or exact-label tap/type, directional swipe, and exists/absent wait/assert. Replace the selector placeholders above with values from the current tree output. The script sets `TEST_RUNNER_VANMO_UI_*`; Xcode's test runner is expected to expose those values to the test process as `VANMO_UI_*`, but that delivery path has not been verified on a physical device. Each run retains `result.xcresult`, the `xcodebuild` log, attachment-export diagnostics, and exported attachments under `build/ui-cli/runs/`.
+Device and Simulator screenshot, tree, tap, type, swipe, wait, assert, and journey commands run `VanmoDeviceInteractionTests/testExecuteCommand` through the `Vanmo` scheme. Each command except `journey` launches the app once, so tap and assert cannot preserve navigation across processes. `journey --name tab-navigation` asserts `screen.library`, taps Settings, and asserts `screen.settings` in one process. Replace remaining selector placeholders with identifiers or exact labels from the current tree output. The script sets `TEST_RUNNER_VANMO_UI_*`; Xcode's test runner is expected to expose those values to the test process as `VANMO_UI_*`. Each XCUITest run retains `result.xcresult`, the `xcodebuild` log, attachment-export diagnostics, and exported attachments under `build/ui-cli/runs/`. Simulator XCUITest uses `build/DerivedData-UITests-sim` and does not require a development team.
 
 Physical-device prerequisites are a connected and trusted iOS device, a usable Xcode destination, and valid signing. Select a device with `--device`; provide the development team with `VANMO_DEVELOPMENT_TEAM` or `--team TEAM`. Keep typed values and exported trees/screenshots free of secrets before sharing them.
 
-The simulator backend intentionally uses only `simctl` screenshot, launch, and terminate. It rejects tree, tap, type, swipe, wait, and assert because `simctl` does not provide those interactions and this path does not run XCUITest.
+`simulator launch|terminate` still use `simctl` only to manage the Simulator. They do not capture screenshots or validate UI.
 
 Current evidence as of August 26, 2026:
 
 - XcodeGen generation, target discovery, Bash validation, Swift type-checking, and the full `./scripts/check-ios-ui-cli.sh` static check passed.
-- A simulator `simctl` screenshot completed successfully.
-- `./init.sh --full` compiled both apps: macOS Debug passed, and iOS Simulator Debug failed at the pre-existing non-exhaustive `DownloadStatus` switch in `Vanmo/Features/Settings/Views/SettingsView.swift`, which lacks `.paused`.
-- Full iOS `build-for-testing` remains blocked by the same source error. The failure is unrelated to the UI-test target.
-- No physical-device XCUITest has run. Device signing, `TEST_RUNNER_VANMO_UI_*` argument delivery, command execution, and `xcresult` attachment export therefore remain unverified.
+- Focused `./scripts/check-app-build.sh ios-simulator` passed after the Settings `.paused` label was added. Evidence: `build/app-build-evidence/runs/20260826-145050-52563/ios-simulator`.
+- Simulator XCUITest on iPhone 17 Pro recorded `tree` (`screen.library`, `tab.library`, `tab.settings` present), `assert --identifier screen.library --state exists`, and `journey --name tab-navigation` (`tab.settings` tap, `screen.settings` assert). Journey artifacts: `build/ui-cli/runs/20260826-145830-63647`.
+- `TEST_RUNNER_VANMO_UI_*` delivery succeeded on the Simulator. No physical-device XCUITest has run, so device signing remains unverified.
 
 ### Debug
 
@@ -127,8 +133,9 @@ Each journey must record the source type, platform, configuration, steps perform
 | `VanmoCore` tests | Shared model and infrastructure behavior covered by those tests | App UI, player rendering, platform lifecycle, or real remote services |
 | Static scope check | Declared CloudKit and cross-platform boundaries satisfy the check | Runtime CloudKit synchronization or successful app compilation |
 | iOS UI CLI static check | The declared UI-test target, generated-project reference, Bash interface, and test source satisfy the checker | App compilation, signing, test-runner argument delivery, device interaction, or attachment export |
-| Simulator `simctl` screenshot/lifecycle | The exact recorded simulator command completed | XCUITest interaction, accessibility selectors, physical-device behavior, or a golden journey |
-| Physical-device XCUITest command | The exact recorded action and its retained artifacts completed on that signed device | Other commands, complete UI coverage, Figma fidelity, accessibility quality, or an end-to-end journey |
+| Simulator `simctl` launch/terminate | The exact recorded simulator management command completed | Screenshots, selectors, XCUITest interaction, or a golden journey |
+| Simulator XCUITest command | The exact recorded action or in-process journey completed on that simulator, with retained `xcresult` artifacts | Physical-device signing, Figma fidelity, real-source flows, or product journeys 1–3 |
+| Physical-device XCUITest command | The exact recorded action and its retained artifacts completed on that signed device | Other commands, complete UI coverage, Figma fidelity, accessibility quality, or an end-to-end product journey |
 | Debug app compile check | The selected application target compiled for the recorded Debug configuration and destination | Installation, launch, XCUITest, physical-device signing, UI behavior, real-source flows, or Release CloudKit |
 | App build | A target compiled for the recorded configuration and environment | Launch quality or completion of a user journey |
 | App launch | Startup reached the recorded state | End-to-end playback, downloads, synchronization, or recovery |

@@ -4,7 +4,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
-No completed execution plans are recorded in this durable plan system yet.
+- [`2026-08-26-ios-ui-golden-journey.md`](2026-08-26-ios-ui-golden-journey.md) — Simulator XCUITest tab-navigation journey recorded; iOS Debug compile unblocked; physical-device XCUITest remains optional follow-up.
 
 ## Archival Rules
 

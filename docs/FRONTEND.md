@@ -53,8 +53,8 @@ Features with richer state machines, such as downloads and playback, may add dom
 - Give critical iOS controls stable, semantic accessibility identifiers when they are part of a repeatable interaction or golden journey. Prefer identifiers for automation because visible labels can change with copy or localization.
 - Use an exact accessibility label only as a fallback when no stable identifier exists. Labels must remain meaningful to users and assistive technologies; do not distort user-facing accessibility text solely to make automation convenient.
 - Keep identifiers unique within the active screen and tied to the control's purpose rather than its position or visual implementation.
-- Inspect available identifiers and labels with `./scripts/ios-ui.sh device tree`, then use `--identifier` preferentially or `--label` for the exact-label fallback.
-- `./scripts/ios-ui.sh device ...` uses XCUITest for physical-device screenshot, tree, tap, type, swipe, wait, and assert commands. `./scripts/ios-ui.sh simulator ...` uses `simctl` only for screenshots and app launch/termination; it cannot validate selectors or interactions.
+- Inspect available identifiers and labels with `./scripts/ios-ui.sh simulator tree` or `./scripts/ios-ui.sh device tree`, then use `--identifier` preferentially or `--label` for the exact-label fallback.
+- `./scripts/ios-ui.sh device ...` and `./scripts/ios-ui.sh simulator ...` use XCUITest for screenshot, tree, tap, type, swipe, wait, assert, and `journey --name tab-navigation`. `simulator launch|terminate` still use `simctl` only for Simulator management and cannot validate selectors.
 
 ## Verification Expectations
 
