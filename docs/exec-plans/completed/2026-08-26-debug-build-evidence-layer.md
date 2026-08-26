@@ -10,7 +10,7 @@ execution: code
 
 # Debug Build Evidence Layer - Plan
 
-**Status:** Implemented; first matrix recorded  
+**Status:** Completed
 **Plan type:** Harness infrastructure  
 **Related reliability authority:** [`../../RELIABILITY.md`](../../RELIABILITY.md)
 
@@ -209,7 +209,7 @@ The run-level summary remains available even when one `xcodebuild` process fails
 
 - **Goal:** Prove the evidence layer itself and record the actual repository build state.
 - **Requirements:** R9–R13; AE2, AE5, AE6.
-- **Files:** `docs/exec-plans/active/2026-08-26-debug-build-evidence-layer.md`, `docs/QUALITY_SCORE.md` only when supported by new evidence, and `docs/exec-plans/tech-debt-tracker.md` only when the run confirms new debt.
+- **Files:** `docs/exec-plans/completed/2026-08-26-debug-build-evidence-layer.md`, `docs/QUALITY_SCORE.md` only when supported by new evidence, and `docs/exec-plans/tech-debt-tracker.md` only when the run confirms new debt.
 - **Dependencies:** U1–U3.
 - **Execution note:** Run the fast proof first, one focused platform proof, then `./init.sh --full`. Let full mode's internal `all` call supply the aggregate evidence; invoke `scripts/check-app-build.sh all` directly only when diagnosing orchestration. Preserve an expected red iOS result rather than changing application code during this unit.
 - **Test scenarios:**
@@ -259,8 +259,8 @@ A green two-platform matrix is a later repository-health milestone, not a hidden
 
 - **2026-08-26:** Plan created. The user selected a layered gate: default `./init.sh` remains fast and `./init.sh --full` adds both app builds.
 - **2026-08-26:** Implemented `scripts/check-app-build.sh` and `./init.sh --full`. Fast `./init.sh` passed the four baseline stages and created no `build/app-build-evidence/` directory. Focused `./scripts/check-app-build.sh macos` passed (`xcodebuild` 0, `Vanmo-macOS.app` present). `./init.sh --full` then recorded an honest matrix on a dirty tree at `8f12677`: iOS Simulator Debug failed with `xcodebuild` 65 at `Vanmo/Features/Settings/Views/SettingsView.swift:489` missing `.paused`; macOS Debug passed independently; aggregate exit was 1. Evidence: `build/app-build-evidence/runs/20260826-140652-6333` and `build/app-build-evidence/runs/20260826-141002-10994`. Toolchain: Xcode 26.0.1 / Swift 6.2. The Harness layer is complete; making the iOS compile green remains follow-up work.
+- **2026-08-26:** Closed the plan on clean `34bf345` after the later Settings `.paused` label unblocked iOS compile. Fast `./init.sh` passed 4/4 and created no new evidence run. Focused `./scripts/check-app-build.sh ios-simulator` passed (`xcodebuild` 0, `Vanmo.app` present, generic Simulator destination, no `simctl`). `./init.sh --full` then recorded iOS pass + macOS pass and aggregate exit 0. Evidence: `build/app-build-evidence/runs/20260826-153812-287` and `build/app-build-evidence/runs/20260826-153856-830`. Toolchain: Xcode 26.0.1 / Swift 6.2. The first red iOS matrix remains historical. No launch, XCUITest, or CloudKit claim.
 
 ## Open Decisions
 
-No planning-blocking decisions remain.
-Execution must determine the exact first-run results from real `xcodebuild` output without broadening scope.
+None. The first red iOS matrix and the later green two-platform matrix are both recorded.
