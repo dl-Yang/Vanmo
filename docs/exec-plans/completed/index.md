@@ -4,7 +4,8 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
-- [`2026-08-26-ios-ui-golden-journey.md`](2026-08-26-ios-ui-golden-journey.md) — Simulator XCUITest tab-navigation journey recorded; iOS Debug compile unblocked; physical-device XCUITest remains optional follow-up.
+- [`2026-08-26-ios-ui-golden-journey.md`](2026-08-26-ios-ui-golden-journey.md) — **Completed.** Simulator XCUITest tab-navigation journey recorded; iOS Debug compile unblocked; physical-device XCUITest remains optional follow-up.
+- [`2026-08-26-harness-narrative-consistency.md`](2026-08-26-harness-narrative-consistency.md) — **Completed.** Documentation check now fails on init stage-count and plan-index Status conflicts.
 
 ## Archival Rules
 

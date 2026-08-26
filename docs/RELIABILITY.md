@@ -19,10 +19,10 @@ This resolves shared-package dependencies and then runs four baseline stages:
 
 1. the 36-test `VanmoCore` suite
 2. the CloudKit/multiplatform static scope check
-3. the Advanced Harness document and repository-local Markdown-link check
+3. the Advanced Harness document, repository-local Markdown-link, and live narrative-consistency check
 4. the iOS UI interaction CLI static check
 
-It does not build or launch either app. The fourth stage validates target declarations, generated-project presence, Bash syntax/usage, and Swift type-checking; it does not run XCUITest.
+The third stage checks required files, repository-local Markdown links, the fast-baseline stage count, active/completed plan-index Status, product-spec/plan Status, and QUALITY current-baseline command paths. It does not build or launch either app. The fourth stage validates target declarations, generated-project presence, Bash syntax/usage, and Swift type-checking; it does not run XCUITest.
 
 After the four stages succeed, `./init.sh --full` adds Debug compile evidence for the iOS Simulator and macOS applications:
 

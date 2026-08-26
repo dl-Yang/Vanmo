@@ -543,7 +543,7 @@ The tests cover:
 - Remote-service capability declarations.
 - Schema and foundational enum mappings.
 
-As of August 26, 2026, all four `./init.sh` baseline stages complete with no failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation check, and `./scripts/check-ios-ui-cli.sh`. The iOS UI CLI stage statically checks the target declarations in `project.yml` and the generated project, validates the Bash CLI, and type-checks the XCUITest source.
+As of August 26, 2026, all four `./init.sh` baseline stages complete with no failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check, the Advanced Harness documentation and live narrative-consistency check, and `./scripts/check-ios-ui-cli.sh`. The documentation stage checks required files, repository-local links, init stage count, plan-index Status, spec/plan Status, and QUALITY current-baseline command paths. The iOS UI CLI stage statically checks the target declarations in `project.yml` and the generated project, validates the Bash CLI, and type-checks the XCUITest source.
 
 Focused iOS Simulator Debug compile passed after the Settings `.paused` label was added. Simulator XCUITest on iPhone 17 Pro then recorded tree, default-screen assert, and `journey --name tab-navigation`, including `TEST_RUNNER_VANMO_UI_*` delivery and `xcresult` attachment export. No physical-device XCUITest has run, so signing remains unverified.
 

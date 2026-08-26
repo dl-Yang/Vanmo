@@ -92,6 +92,7 @@ Choose verification proportional to the change:
 
 - `VanmoCore` logic: run `swift test --package-path Packages/VanmoCore`.
 - CloudKit, target-boundary, or cross-platform scope: run `./scripts/check-cloud-sync-multiplatform-scope.sh`.
+- Harness documentation, plan-index Status, and live narrative consistency: run `./scripts/check-harness-docs.sh`.
 - iOS UI target and interaction-CLI structure: run `./scripts/check-ios-ui-cli.sh`.
 - App Debug compile evidence: run `./scripts/check-app-build.sh ios-simulator`, `./scripts/check-app-build.sh macos`, or `./init.sh --full` after the fast baseline.
 - iOS app behavior: build/run with `./run_device.sh` or `--simulator`.
