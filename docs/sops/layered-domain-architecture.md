@@ -49,6 +49,7 @@ platform applications, persistence, synchronization, or Xcode targets.
    ```bash
    swift test --package-path Packages/VanmoCore
    ./scripts/check-cloud-sync-multiplatform-scope.sh
+   ./scripts/check-architecture-guards.sh
    ```
 
 7. Build or run each affected platform through `./run_device.sh`,

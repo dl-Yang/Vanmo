@@ -176,31 +176,11 @@ else
   fail "ContentView still contains #if os(macOS) — macOS UI should live in VanmoMac/"
 fi
 
-# 9) VanmoCore 禁止 UI 框架
-ui_import_hits="$(rg -n '^import (UIKit|AppKit|SwiftUI)' Packages/VanmoCore/Sources/VanmoCore -g '*.swift' || true)"
-if [[ -z "$ui_import_hits" ]]; then
-  pass "VanmoCore has no unconditional UIKit/AppKit/SwiftUI imports"
+# 9) XcodeGen drift, target source whitelist, VanmoCore UI imports
+if "$ROOT/scripts/check-architecture-guards.sh"; then
+  pass "Architecture structure guards passed"
 else
-  fail "VanmoCore contains UI framework imports:\n$ui_import_hits"
-fi
-
-# 10) pbxproj 源文件路径与磁盘一致
-if python3 - <<'PY'
-import re
-from pathlib import Path
-text = Path("Vanmo.xcodeproj/project.pbxproj").read_text()
-prefetch = re.search(r'9814B17DA901EBFF609E8477 /\* Prefetch \*/ = \{.*?children = \((.*?)\);', text, re.S)
-utilities = re.search(r'B0D12706C0A3FA280DE62831 /\* Utilities \*/ = \{.*?children = \((.*?)\);', text, re.S)
-if prefetch:
-    assert 'PlatformCompatibility' not in prefetch.group(1), 'PlatformCompatibility still under Prefetch'
-if utilities:
-    assert 'PlatformCompatibility' in utilities.group(1), 'PlatformCompatibility missing from Utilities'
-assert Path('Vanmo/Shared/Utilities/PlatformCompatibility.swift').is_file(), 'PlatformCompatibility.swift missing on disk'
-PY
-then
-  pass "PlatformCompatibility.swift grouped under Shared/Utilities"
-else
-  fail "PlatformCompatibility.swift pbxproj path/group mismatch"
+  fail "Architecture structure guards failed"
 fi
 
 echo "== Summary: $failures failure(s) =="

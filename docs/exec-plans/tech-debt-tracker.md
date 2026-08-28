@@ -10,6 +10,7 @@ This tracker contains only debt confirmed by current repository sources or recor
 | 2026-08-25 | CloudKit | Real Release-environment CloudKit behavior has no recorded evidence | Static checks and Debug fallback cannot prove account, transport, conflict, or multi-device behavior | Before claiming cloud sync production readiness or shipping a cloud-sync change |
 | 2026-08-28 | macOS player seek | A 2026-08-28 VanmoMac HTTP-via-Emby play logged `SWIFT TASK CONTINUATION MISUSE: seek(to:) leaked its continuation`. `MacKSPlayerEngine.seek(to:)` resumes the continuation only inside the KSPlayer seek callback; a nil player or a skipped callback leaks it | Seeks can still complete at the decoder, but waiting tasks may hang | When changing macOS KSPlayer seek or after the next seek-related hang |
 | 2026-08-25 | Playback/build configuration | Legacy standalone FFmpeg configuration remains although current playback uses FFmpeg through KSPlayer and Swift source does not consume `FFMPEG_ENABLED` | Contributors may mistake the legacy script, bridging path, or flag for a current prerequisite | When changing player dependencies or simplifying build configuration |
+| 2026-08-28 | Harness structure lint | Architecture guards parse `project.yml` and Swift import lines; they do not use SwiftSyntax or a full import graph | Conditional compilation and Swift taste rules can still drift without an AST or SwiftLint gate | When adding taste lint or the later P1 garbage-collection rules |
 
 ## Rules
 

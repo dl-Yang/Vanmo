@@ -56,7 +56,7 @@ swift package resolve --package-path Packages/VanmoCore
 echo "==> 运行 VanmoCore 基线测试"
 swift test --package-path Packages/VanmoCore
 
-echo "==> 检查 CloudKit 与跨平台边界"
+echo "==> 检查 CloudKit、跨平台边界与结构守卫"
 ./scripts/check-cloud-sync-multiplatform-scope.sh
 
 echo "==> 检查 Advanced Harness 文档守卫"

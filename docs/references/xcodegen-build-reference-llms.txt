@@ -33,6 +33,8 @@ STANDARD COMMANDS
 - Compile one Debug application target without launching it:
   ./scripts/check-app-build.sh ios-simulator
   ./scripts/check-app-build.sh macos
+- Check XcodeGen drift, target source whitelist, and VanmoCore UI imports:
+  ./scripts/check-architecture-guards.sh
 - Check the iOS UI target, generated project, Bash CLI, and Swift test source:
   ./scripts/check-ios-ui-cli.sh
 - Run a bounded Simulator XCUITest interaction or journey:
@@ -58,7 +60,8 @@ STANDARD COMMANDS
 COMMAND BOUNDARIES
 - ./init.sh does not build or launch either app by default. After dependency
   resolution, its four baseline stages are VanmoCore tests,
-  ./scripts/check-cloud-sync-multiplatform-scope.sh,
+  ./scripts/check-cloud-sync-multiplatform-scope.sh
+  (including architecture structure guards),
   ./scripts/check-harness-docs.sh, and ./scripts/check-ios-ui-cli.sh.
 - ./init.sh --full runs that fast baseline first, then
   ./scripts/check-app-build.sh all. The focused commands are

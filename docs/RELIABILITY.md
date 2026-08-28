@@ -18,7 +18,7 @@ This document defines how Vanmo proves that the repository and user journeys are
 This resolves shared-package dependencies and then runs four baseline stages:
 
 1. the 36-test `VanmoCore` suite
-2. the CloudKit/multiplatform static scope check
+2. the CloudKit/multiplatform static scope check, including XcodeGen drift, target source whitelist, and VanmoCore UI-import guards
 3. the Advanced Harness document, repository-local Markdown-link, and live narrative-consistency check
 4. the iOS UI interaction CLI static check
 
@@ -39,6 +39,7 @@ These commands compile only. They do not install, launch, test, or archive. Evid
 ```bash
 swift test --package-path Packages/VanmoCore
 ./scripts/check-cloud-sync-multiplatform-scope.sh
+./scripts/check-architecture-guards.sh
 ./scripts/check-harness-docs.sh
 ./scripts/check-ios-ui-cli.sh
 ./scripts/check-app-build.sh ios-simulator
@@ -132,6 +133,7 @@ Each journey must record the source type, platform, configuration, steps perform
 | --- | --- | --- |
 | `VanmoCore` tests | Shared model and infrastructure behavior covered by those tests | App UI, player rendering, platform lifecycle, or real remote services |
 | Static scope check | Declared CloudKit and cross-platform boundaries satisfy the check | Runtime CloudKit synchronization or successful app compilation |
+| Architecture structure guards | `project.yml` target sources and dependency direction stay inside the whitelist, committed `pbxproj`/schemes match a non-mutating XcodeGen generate after format normalization, and `VanmoCore` has no unconditional UIKit/AppKit/SwiftUI imports | App compilation, launch, or that a local Xcode `DEVELOPMENT_TEAM` rewrite is absent |
 | iOS UI CLI static check | The declared UI-test target, generated-project reference, Bash interface, and test source satisfy the checker | App compilation, signing, test-runner argument delivery, device interaction, or attachment export |
 | Simulator `simctl` launch/terminate | The exact recorded simulator management command completed | Screenshots, selectors, XCUITest interaction, or a golden journey |
 | Simulator XCUITest command | The exact recorded action or in-process journey completed on that simulator, with retained `xcresult` artifacts | Physical-device signing, Figma fidelity, real-source flows, or product journeys 1–3 |
