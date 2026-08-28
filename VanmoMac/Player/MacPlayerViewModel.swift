@@ -1487,7 +1487,7 @@ final class MacPlayerViewModel: ObservableObject {
 
     private static func shouldBypassPrefetch(for url: URL) -> Bool {
         switch url.scheme?.lowercased() {
-        case "concat", "smb":
+        case "concat":
             return true
         default:
             return false

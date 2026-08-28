@@ -1,9 +1,13 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import VanmoCore
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
+    @EnvironmentObject private var downloadManager: DownloadManager
+    @State private var isChoosingDirectory = false
+    @State private var directoryError: String?
 
     var body: some View {
         Form {
@@ -54,6 +58,26 @@ struct SettingsView: View {
             }
         } message: {
             Text("确定要重置所有设置为默认值吗？")
+        }
+        .fileImporter(
+            isPresented: $isChoosingDirectory,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            do {
+                guard let url = try result.get().first else { return }
+                try downloadManager.setCustomDirectory(url)
+            } catch {
+                directoryError = error.localizedDescription
+            }
+        }
+        .alert("无法修改下载目录", isPresented: Binding(
+            get: { directoryError != nil },
+            set: { if !$0 { directoryError = nil } }
+        )) {
+            Button("确定") {}
+        } message: {
+            Text(directoryError ?? "")
         }
     }
 
@@ -273,6 +297,14 @@ struct SettingsView: View {
                 Label("下载管理", systemImage: "arrow.down.circle")
             }
 
+            LabeledContent("下载目录", value: downloadManager.destination.rootPath)
+            Button("选择下载文件夹") {
+                isChoosingDirectory = true
+            }
+            Button("恢复默认下载位置") {
+                downloadManager.useDefaultDirectory()
+            }
+
             HStack {
                 Text("缓存大小")
                 Spacer()
@@ -304,199 +336,6 @@ struct SettingsView: View {
             .foregroundStyle(.red)
         } header: {
             Label("关于", systemImage: "info.circle")
-        }
-    }
-}
-
-// MARK: - Downloads
-
-struct DownloadManagementView: View {
-    @EnvironmentObject private var downloadManager: DownloadManager
-    @EnvironmentObject private var appState: AppState
-    @Environment(\.editMode) private var editMode
-    @State private var selection: Set<UUID> = []
-    @State private var isChoosingDirectory = false
-    @State private var deleteConfirmation = false
-    @State private var directoryError: String?
-
-    var body: some View {
-        List(selection: $selection) {
-            directorySection
-            tasksSection
-        }
-        .navigationTitle("下载")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
-            }
-            if editMode?.wrappedValue.isEditing == true, !selection.isEmpty {
-                ToolbarItem(placement: .bottomBar) {
-                    Button("删除所选", role: .destructive) {
-                        deleteConfirmation = true
-                    }
-                }
-            }
-        }
-        .fileImporter(
-            isPresented: $isChoosingDirectory,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            do {
-                guard let url = try result.get().first else { return }
-                try downloadManager.setCustomDirectory(url)
-            } catch {
-                directoryError = error.localizedDescription
-            }
-        }
-        .confirmationDialog("删除选中的下载？", isPresented: $deleteConfirmation) {
-            Button("删除文件和记录", role: .destructive) {
-                Task {
-                    await downloadManager.delete(selection)
-                    selection.removeAll()
-                }
-            }
-            Button("取消", role: .cancel) {}
-        }
-        .alert("无法修改下载目录", isPresented: Binding(
-            get: { directoryError != nil },
-            set: { if !$0 { directoryError = nil } }
-        )) {
-            Button("确定") {}
-        } message: {
-            Text(directoryError ?? "")
-        }
-    }
-
-    private var directorySection: some View {
-        Section("下载位置") {
-            LabeledContent("当前目录", value: downloadManager.destination.rootPath)
-            Button("选择文件夹") {
-                isChoosingDirectory = true
-            }
-            Button("恢复默认位置") {
-                downloadManager.useDefaultDirectory()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var tasksSection: some View {
-        Section("下载项目") {
-            if downloadManager.tasks.isEmpty {
-                ContentUnavailableView("暂无下载", systemImage: "arrow.down.circle")
-            } else {
-                ForEach(downloadManager.tasks) { task in
-                    DownloadTaskRow(task: task) {
-                        play(task)
-                    } retry: {
-                        Task { await downloadManager.retry(task.id) }
-                    }
-                }
-            }
-        }
-    }
-
-    private func play(_ task: DownloadTaskSnapshot) {
-        guard task.status == .completed,
-              let url = try? downloadManager.completedFileURL(for: task.id),
-              FileManager.default.fileExists(atPath: url.path) else {
-            return
-        }
-        let item = MediaItem(
-            title: task.request.displayTitle,
-            fileURL: url,
-            mediaType: task.request.mediaType,
-            fileSize: task.totalBytes
-        )
-        item.showTitle = task.request.showTitle
-        item.seasonNumber = task.request.seasonNumber
-        item.episodeNumber = task.request.episodeNumber
-        item.episodeTitle = task.request.episodeTitle
-        appState.play(item)
-    }
-}
-
-private struct DownloadTaskRow: View {
-    @EnvironmentObject private var downloadManager: DownloadManager
-    let task: DownloadTaskSnapshot
-    let play: () -> Void
-    let retry: () -> Void
-
-    var body: some View {
-        Button(action: play) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(task.request.displayTitle)
-                            .font(.headline)
-                            .lineLimit(1)
-                        if let detailText {
-                            Text(detailText)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    statusView
-                }
-                if task.status == .downloading || task.status == .queued {
-                    ProgressView(value: task.totalBytes > 0 ? task.progress : nil)
-                }
-                if let errorMessage = task.errorMessage {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(task.status != .completed)
-        .swipeActions {
-            if task.status == .failed {
-                Button("重新下载", action: retry)
-                    .tint(.blue)
-            }
-        }
-        .contextMenu {
-            if task.status == .completed,
-               let url = try? downloadManager.completedFileURL(for: task.id) {
-                ShareLink(item: url) {
-                    Label("文件操作", systemImage: "square.and.arrow.up")
-                }
-            }
-            if task.status == .failed {
-                Button(action: retry) {
-                    Label("重新下载", systemImage: "arrow.clockwise")
-                }
-            }
-        }
-    }
-
-    private var detailText: String? {
-        if let season = task.request.seasonNumber, let episode = task.request.episodeNumber {
-            return "第 \(season) 季 · 第 \(episode) 集 · \(task.request.episodeTitle ?? "")"
-        }
-        if task.totalBytes > 0 {
-            return ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file)
-        }
-        return nil
-    }
-
-    @ViewBuilder
-    private var statusView: some View {
-        switch task.status {
-        case .queued:
-            Text("等待中").foregroundStyle(.secondary)
-        case .downloading:
-            Text("\(Int(task.progress * 100))%").foregroundStyle(.blue)
-        case .paused:
-            Text("已暂停").foregroundStyle(.secondary)
-        case .completed:
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .failed:
-            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
         }
     }
 }
@@ -677,6 +516,7 @@ struct ThemePreviewCard: View {
         SettingsView()
     }
     .environmentObject(CloudSyncCoordinator.shared)
+    .environmentObject(DownloadManager.shared)
     .preferredColorScheme(.dark)
 }
 

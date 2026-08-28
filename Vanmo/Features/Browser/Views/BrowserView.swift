@@ -418,7 +418,14 @@ struct ConnectionsView: View {
                 connectionType: connection.type
             )
             try await downloadManager.enqueue(request)
+#if DEBUG
+            print("[Debug][Downloads] enqueued source=browser connection=\(connection.type.rawValue)")
+#endif
         } catch {
+#if DEBUG
+            let nsError = error as NSError
+            print("[Debug][Downloads] enqueue failed source=browser domain=\(nsError.domain) code=\(nsError.code)")
+#endif
             viewModel.errorMessage = error.localizedDescription
             viewModel.showError = true
         }

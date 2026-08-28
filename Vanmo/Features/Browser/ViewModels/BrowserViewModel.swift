@@ -774,7 +774,11 @@ final class ConnectionsViewModel: ObservableObject {
             VanmoLogger.network.error("[Files] Failed to browse \(connection.name): \(error.localizedDescription)")
             files = []
             fileBrowserErrorMessage = userFacingFileBrowserMessage(for: error, connection: connection)
-            connectionStatuses[connection.id] = .failed
+            if case NetworkError.sharePathRequired = error {
+                connectionStatuses[connection.id] = .connected
+            } else {
+                connectionStatuses[connection.id] = .failed
+            }
             isBrowsingFiles = false
             return false
         }

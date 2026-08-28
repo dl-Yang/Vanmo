@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -113,6 +113,7 @@
 		A903761BE1480EB6C6597984 /* ScannedLibraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC98BD4B313AA01607BDF35 /* ScannedLibraryListView.swift */; };
 		AA73A824D51E2ABF1E6394D5 /* ScanSyncBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C765C23D38D32911EEDECB /* ScanSyncBanner.swift */; };
 		AB24AEB3269D3234A4551928 /* MacLibraryHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB8D04491E43FFAB67798BFC /* MacLibraryHomeView.swift */; };
+		ABEBB8DFF54C2614AD4936A4 /* DownloadManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8A754B820B0940F082A42A0 /* DownloadManagementView.swift */; };
 		B0434F7B3AEC579CDD202B36 /* CountryMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5142357466F69E4FBA98C44 /* CountryMapper.swift */; };
 		B68EC4B95F8D05BE5E67DD73 /* MacAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C24C1365789AC10FDE893F /* MacAppState.swift */; };
 		B7A9D4A1B82703BC7469CFD1 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4899D11636AAC1F440051DA /* SearchView.swift */; };
@@ -198,7 +199,7 @@
 		2808E3F2654CF170151A05FD /* box.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = box.png; sourceTree = "<group>"; };
 		2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDesignTokens.swift; sourceTree = "<group>"; };
 		2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaTitleLogoView.swift; sourceTree = "<group>"; };
-		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F0583048E7F8AAC51FA8D37 /* MacScannedShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedShowDetailView.swift; sourceTree = "<group>"; };
 		38C765C23D38D32911EEDECB /* ScanSyncBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSyncBanner.swift; sourceTree = "<group>"; };
 		39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedLibraryListView.swift; sourceTree = "<group>"; };
@@ -284,6 +285,7 @@
 		BEC3480B949E6965C136DCA2 /* MediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailView.swift; sourceTree = "<group>"; };
 		C64BB62C8F69AE1F342C8CE4 /* mega.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = mega.png; sourceTree = "<group>"; };
 		C89DCC7A230E360B69645C74 /* yandexDisk.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = yandexDisk.png; sourceTree = "<group>"; };
+		C8A754B820B0940F082A42A0 /* DownloadManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManagementView.swift; sourceTree = "<group>"; };
 		C94F3DCFB672905D5522C5BC /* EmbyFolderBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyFolderBrowseView.swift; sourceTree = "<group>"; };
 		C9AEA12D55448D2043E54EEB /* AddConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddConnectionView.swift; sourceTree = "<group>"; };
 		CB50A9840B362764031D0025 /* TrackSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackSelectorView.swift; sourceTree = "<group>"; };
@@ -837,6 +839,7 @@
 		D9A087A2FA74E0F1F5D784C0 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				C8A754B820B0940F082A42A0 /* DownloadManagementView.swift */,
 				F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */,
 			);
 			path = Views;
@@ -1051,11 +1054,9 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					0DF5C008C42D8CFE972C79FA = {
-						DevelopmentTeam = L775YJ7YS4;
 						ProvisioningStyle = Automatic;
 					};
 					0F6607F78A5C0B637140BEB4 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					EAFC3AD4DF25F3202D9BB5BC = {
@@ -1078,12 +1079,11 @@
 			packageReferences = (
 				3C7AEAD0E120E191BB94392F /* XCRemoteSwiftPackageReference "KSPlayer" */,
 				A522FF186BB4E4A9E1CFFCC7 /* XCRemoteSwiftPackageReference "Kingfisher" */,
-				3613220DEA85AE84D123C739 /* XCRemoteSwiftPackageReference "SMBClient" */,
+				A710839B90DFF485E760BEBA /* XCRemoteSwiftPackageReference "SMBClient" */,
 				0383DE30F75F95783E318F43 /* XCRemoteSwiftPackageReference "SWXMLHash" */,
 				2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				FA882A96481864BE9677FFD2 /* XCLocalSwiftPackageReference "Packages/VanmoCore" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1268,6 +1268,7 @@
 				73EA987CC7F1298104A70F52 /* ContentView.swift in Sources */,
 				B0434F7B3AEC579CDD202B36 /* CountryMapper.swift in Sources */,
 				2BCE6B2C8BF8958400994F81 /* DominantColorExtractor.swift in Sources */,
+				ABEBB8DFF54C2614AD4936A4 /* DownloadManagementView.swift in Sources */,
 				629533D36025C33335AD711A /* EmbyFolderBrowseView.swift in Sources */,
 				21156474DADE809BFC7E4AF3 /* EmptyStateView.swift in Sources */,
 				737076767678A1A15FEB0257 /* FavoritesListView.swift in Sources */,
@@ -1377,9 +1378,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;
@@ -1475,9 +1474,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1511,10 +1508,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1535,10 +1529,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;
@@ -1680,14 +1671,6 @@
 				minimumVersion = 4.6.0;
 			};
 		};
-		3613220DEA85AE84D123C739 /* XCRemoteSwiftPackageReference "SMBClient" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/kishikawakatsumi/SMBClient.git";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 0.3.1;
-			};
-		};
 		3C7AEAD0E120E191BB94392F /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/kingslay/KSPlayer.git";
@@ -1704,6 +1687,14 @@
 				minimumVersion = 8.8.1;
 			};
 		};
+		A710839B90DFF485E760BEBA /* XCRemoteSwiftPackageReference "SMBClient" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/thatcube/SMBClient.git";
+			requirement = {
+				kind = revision;
+				revision = d8baadc1a4f1287ebf1e8b4702ca38bd6e237fef;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1717,7 +1708,7 @@
 		};
 		5A39B9DEAA17BB6049518605 /* SMBClient */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 3613220DEA85AE84D123C739 /* XCRemoteSwiftPackageReference "SMBClient" */;
+			package = A710839B90DFF485E760BEBA /* XCRemoteSwiftPackageReference "SMBClient" */;
 			productName = SMBClient;
 		};
 		7224CE03286D3158795CD36F /* Kingfisher */ = {

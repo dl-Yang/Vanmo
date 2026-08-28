@@ -17,13 +17,27 @@ final class AppState: ObservableObject {
     /// 通知而来，避免 LibraryView 未挂载期间通知丢失；各页面订阅它做轻量刷新。
     @Published private(set) var favoriteChangeCount = 0
 
+    /// 下载列表点选任务后待打开的媒体详情请求。由下载页消费并 present。
+    @Published private(set) var pendingDownloadDetailRequest: DownloadRequest?
+
     func notifyFavoriteDidChange() {
         favoriteChangeCount += 1
+    }
+
+    func requestDownloadDetail(for request: DownloadRequest) {
+        pendingDownloadDetailRequest = request
+    }
+
+    func consumeDownloadDetailRequest() {
+        pendingDownloadDetailRequest = nil
     }
 
     func play(_ item: MediaItem) {
         currentPlayingItem = item
         isPlayerPresented = true
+#if DEBUG
+        print("[Debug][Player] present mediaType=\(item.mediaType.rawValue) isFile=\(item.fileURL.isFileURL) ext=\(item.fileURL.pathExtension.lowercased())")
+#endif
     }
 
     func stopPlayback() {

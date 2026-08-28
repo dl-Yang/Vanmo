@@ -104,7 +104,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     // MARK: - PlayerEngine Protocol
 
     func load(url: URL, startPosition: CMTime? = nil) async throws {
-        VanmoLogger.player.info("[KSEngine] load() called, url: \(url.absoluteString)")
+        VanmoLogger.player.info("[KSEngine] load() called, url: \(url.safePlaybackLogDescription)")
         await MainActor.run { stop() }
         stateSubject.send(.loading)
 

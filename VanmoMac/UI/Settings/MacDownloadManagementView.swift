@@ -9,6 +9,7 @@ struct MacDownloadManagementView: View {
     @State private var selection: Set<UUID> = []
     @State private var confirmsDeletion = false
     @State private var isSelectionMode = false
+    @State private var lastLoggedTaskSignatures: [UUID: String] = [:]
 
     private var theme: MacThemeColors {
         appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme) ? .dark : .light
@@ -34,6 +35,10 @@ struct MacDownloadManagementView: View {
             }
         }
         .macTheme(theme)
+        .onAppear { logTaskSnapshots(reason: "appear") }
+        .onChange(of: downloadManager.tasks) { _, _ in
+            logTaskSnapshots(reason: "update")
+        }
         .confirmationDialog("删除选中的下载？", isPresented: $confirmsDeletion) {
             Button("删除文件和记录", role: .destructive) {
                 Task {
@@ -91,7 +96,12 @@ struct MacDownloadManagementView: View {
                 if !downloadManager.tasks.isEmpty {
                     if downloadManager.hasPausableTasks {
                         Button("全部暂停") {
-                            Task { await downloadManager.pauseAll() }
+                            Task {
+#if DEBUG
+                                print("[Debug][Downloads] action pauseAll")
+#endif
+                                await downloadManager.pauseAll()
+                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.regular)
@@ -99,7 +109,12 @@ struct MacDownloadManagementView: View {
 
                     if downloadManager.hasResumableTasks {
                         Button("全部继续") {
-                            Task { await downloadManager.resumeAll() }
+                            Task {
+#if DEBUG
+                                print("[Debug][Downloads] action resumeAll")
+#endif
+                                await downloadManager.resumeAll()
+                            }
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.regular)
@@ -249,11 +264,29 @@ struct MacDownloadManagementView: View {
     }
 
     private func openDetail(for task: DownloadTaskSnapshot) {
+#if DEBUG
+        print("[Debug][Downloads] open detail task=\(task.id.uuidString) mediaType=\(task.request.mediaType.rawValue)")
+#endif
         appState.requestDownloadDetail(
             for: task.request,
             focusedEpisode: episodeLocator(for: task.request)
         )
         appState.activateMainWindow()
+    }
+
+    private func logTaskSnapshots(reason: String) {
+#if DEBUG
+        let tasks = downloadManager.tasks
+        print("[Debug][Downloads] \(reason) count=\(tasks.count)")
+        for task in tasks {
+            let percent = task.totalBytes > 0 ? Int(task.progress * 100) : -1
+            let bucket = percent < 0 ? -1 : (percent / 10) * 10
+            let signature = "\(task.status.rawValue)|\(bucket)"
+            guard lastLoggedTaskSignatures[task.id] != signature else { continue }
+            lastLoggedTaskSignatures[task.id] = signature
+            print("[Debug][Downloads] task=\(task.id.uuidString) status=\(task.status.rawValue) progress=\(percent) received=\(task.receivedBytes) total=\(task.totalBytes) type=\(task.request.connectionType?.rawValue ?? "none") media=\(task.request.mediaType.rawValue)")
+        }
+#endif
     }
 
     private func episodeLocator(for request: DownloadRequest) -> MacEpisodeDetailLocator? {

@@ -318,6 +318,9 @@ struct AddConnectionView: View {
         if selectedType.isOfficialCloudDrive {
             return "起始目录 (可选，留空为根目录)"
         }
+        if selectedType == .smb {
+            return "共享名，如 /Movies"
+        }
         return "路径 (可选)"
     }
 
@@ -383,7 +386,7 @@ struct AddConnectionView: View {
         case .webdav:
             return "通用 WebDAV 连接。主机可填写域名或 IP，路径用于指定服务器上的根目录；不确定路径时可留空。"
         case .smb:
-            return "SMB 适用于 fnOS、NAS 或局域网共享，默认端口 445；保存后可从共享根目录继续进入具体文件夹。"
+            return "SMB 适用于 fnOS、NAS 或 Mac「文件共享」。默认端口 445。Mac 需在共享选项中打开 SMB，并为该用户勾选 Windows 文件共享；路径填写共享名（如 /yinguSMB）。"
         case .iptv:
             return "可在主机地址或路径中填写完整 M3U/M3U8 播放列表 URL。"
         case .fnos:

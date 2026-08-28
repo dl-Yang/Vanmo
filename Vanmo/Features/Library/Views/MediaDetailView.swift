@@ -21,6 +21,7 @@ struct MediaDetailView: View {
     @State private var isDownloadPickerPresented = false
     @State private var selectedDownloadEpisodes: [String: EpisodeInfo] = [:]
     @State private var downloadErrorMessage: String?
+    @State private var isEnqueueingDownload = false
     @StateObject private var store = MediaDetailStore()
 
     /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
@@ -470,63 +471,13 @@ struct MediaDetailView: View {
             accentBlue: accentBlue,
             isRefreshing: store.isRefreshingMetadata,
             supportsMetadataRefresh: store.supportsMetadataRefresh(for: item, in: modelContext),
+            downloadTaskID: displayedDownloadTask?.id,
+            isEnqueueingDownload: isEnqueueingDownload,
+            isDownloadDisabled: isDownloadButtonDisabled,
             play: play,
-            download: beginDownload,
+            download: handleDownloadButtonTap,
             refresh: { Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) } }
         )
-    }
-
-    private func circleActionLabel(icon: String, isSystem: Bool = true) -> some View {
-        Group {
-            if isSystem {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-            } else {
-                Image(icon)
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-            }
-        }
-        .foregroundStyle(.primary)
-        .frame(width: 56, height: 56)
-        .background(
-            Circle()
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            Circle()
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-        )
-    }
-
-    private func circleAction(icon: String, isSystem: Bool = true, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Group {
-                if isSystem {
-                    Image(systemName: icon)
-                        .font(.system(size: 20))
-                } else {
-                    Image(icon)
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                }
-            }
-            .foregroundStyle(.primary)
-            .frame(width: 56, height: 56)
-            .background(
-                Circle()
-                    .fill(Color(.secondarySystemBackground))
-            )
-            .overlay(
-                Circle()
-                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - 状态逻辑
@@ -637,20 +588,51 @@ struct MediaDetailView: View {
         appState.play(episodeItem)
     }
 
+    private func handleDownloadButtonTap() {
+        guard !isEnqueueingDownload else { return }
+        if item.mediaType != .tvShow, let task = displayedDownloadTask {
+            switch task.status {
+            case .queued, .downloading:
+                Task { await downloadManager.pause(task.id) }
+                return
+            case .paused:
+                Task { await downloadManager.resume(task.id) }
+                return
+            case .failed:
+                Task { await downloadManager.retry(task.id) }
+                return
+            case .completed:
+                return
+            }
+        }
+        beginDownload()
+    }
+
     private func beginDownload() {
+        guard !isEnqueueingDownload else { return }
         if item.mediaType == .tvShow {
+            guard !isDownloadPickerPresented else { return }
             selectedDownloadEpisodes.removeAll()
             isDownloadPickerPresented = true
             Task { await loadAllEpisodesForDownload() }
         } else {
+            isEnqueueingDownload = true
             Task {
+                defer { isEnqueueingDownload = false }
                 do {
                     let request = try DownloadRequestFactory.make(
                         from: item,
                         connectionType: try sourceConnectionType()
                     )
                     try await downloadManager.enqueue(request)
+#if DEBUG
+                    print("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue) connection=\(request.connectionType?.rawValue ?? "none")")
+#endif
                 } catch {
+#if DEBUG
+                    let nsError = error as NSError
+                    print("[Debug][Downloads] enqueue failed source=detail domain=\(nsError.domain) code=\(nsError.code)")
+#endif
                     downloadErrorMessage = error.localizedDescription
                 }
             }
@@ -669,24 +651,84 @@ struct MediaDetailView: View {
         let episodes = selectedDownloadEpisodes.values.sorted {
             ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber)
         }
-        guard !episodes.isEmpty else { return }
+        guard !episodes.isEmpty, !isEnqueueingDownload else { return }
+        isEnqueueingDownload = true
         Task {
+            defer { isEnqueueingDownload = false }
             do {
                 let connectionType = try sourceConnectionType()
-                for episode in episodes {
-                    let request = try DownloadRequestFactory.make(
-                        from: episode,
+                let requests = try episodes.map {
+                    try DownloadRequestFactory.make(
+                        from: $0,
                         show: item,
                         connectionType: connectionType
                     )
-                    try await downloadManager.enqueue(request)
                 }
+                try await downloadManager.enqueue(requests)
+#if DEBUG
+                print("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count) connection=\(connectionType?.rawValue ?? "none")")
+#endif
                 isDownloadPickerPresented = false
                 selectedDownloadEpisodes.removeAll()
             } catch {
+#if DEBUG
+                let nsError = error as NSError
+                print("[Debug][Downloads] enqueue failed source=detail-episodes domain=\(nsError.domain) code=\(nsError.code)")
+#endif
                 downloadErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    private var displayedDownloadTask: DownloadTaskSnapshot? {
+        let related = downloadManager.tasks.filter { isRelatedDownloadRequest($0.request) }
+        if let downloading = related.first(where: { $0.status == .downloading }) {
+            return downloading
+        }
+        if let queued = related
+            .filter({ $0.status == .queued })
+            .min(by: { $0.createdAt < $1.createdAt }) {
+            return queued
+        }
+        if let paused = related
+            .filter({ $0.status == .paused })
+            .min(by: { $0.createdAt < $1.createdAt }) {
+            return paused
+        }
+        guard !related.isEmpty, related.allSatisfy({ $0.status == .completed }) else {
+            return nil
+        }
+        return related.max(by: { $0.updatedAt < $1.updatedAt })
+    }
+
+    private var isDownloadButtonDisabled: Bool {
+        guard !isEnqueueingDownload else { return true }
+        guard item.mediaType != .tvShow, let task = displayedDownloadTask else { return false }
+        return task.status == .completed
+    }
+
+    private func isRelatedDownloadRequest(_ request: DownloadRequest) -> Bool {
+        guard request.sourceConnectionId == item.sourceConnectionId else { return false }
+        if item.mediaType == .tvShow {
+            let seriesID = item.serverId ?? item.seriesId
+            return request.mediaType == .tvEpisode
+                && (request.sourceMediaItemID == item.id
+                    || (seriesID != nil && request.seriesServerID == seriesID)
+                    || (request.seriesServerID == nil && request.showTitle == item.displayTitle))
+        }
+        if request.sourceMediaItemID == item.id {
+            return true
+        }
+        if let serverID = item.serverId, request.sourceServerID == serverID {
+            return true
+        }
+        if let sourceURL = request.sourceFileURL {
+            return sourceURL.standardizedFileURL == item.fileURL.standardizedFileURL
+        }
+        let expectedPath = request.connectionType == .plex
+            ? item.fileURL.path
+            : (item.serverId ?? item.fileURL.path)
+        return request.remotePath == expectedPath
     }
 
     private func sourceConnectionType() throws -> ConnectionType? {
@@ -1415,6 +1457,9 @@ private struct MediaDetailPanelActions: View {
     let accentBlue: Color
     let isRefreshing: Bool
     let supportsMetadataRefresh: Bool
+    let downloadTaskID: UUID?
+    let isEnqueueingDownload: Bool
+    let isDownloadDisabled: Bool
     let play: () -> Void
     let download: () -> Void
     let refresh: () -> Void
@@ -1437,7 +1482,15 @@ private struct MediaDetailPanelActions: View {
             }
             .buttonStyle(.plain)
 
-            circleAction(icon: "icon_download", isSystem: false, action: download)
+            Button(action: download) {
+                MediaDetailDownloadButtonContent(
+                    taskID: downloadTaskID,
+                    isEnqueueing: isEnqueueingDownload,
+                    accentBlue: accentBlue
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isDownloadDisabled)
 
             Menu {
                 if supportsMetadataRefresh {
@@ -1479,12 +1532,140 @@ private struct MediaDetailPanelActions: View {
                 .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
         )
     }
+}
 
-    private func circleAction(icon: String, isSystem: Bool = true, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            circleActionLabel(icon: icon, isSystem: isSystem)
+private struct MediaDetailDownloadButtonContent: View {
+    @EnvironmentObject private var downloadManager: DownloadManager
+    let taskID: UUID?
+    let isEnqueueing: Bool
+    let accentBlue: Color
+
+    private var task: DownloadTaskSnapshot? {
+        guard let taskID else { return nil }
+        return downloadManager.tasks.first { $0.id == taskID }
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color(.secondarySystemBackground))
+            Circle()
+                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
+
+            if let task {
+                taskGlyph(task)
+            } else if isEnqueueing {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Image("icon_download")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(.primary)
+            }
         }
-        .buttonStyle(.plain)
+        .frame(width: 56, height: 56)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+    }
+
+    @ViewBuilder
+    private func taskGlyph(_ task: DownloadTaskSnapshot) -> some View {
+        let measurable = task.totalBytes > 0 ? task.progress : nil
+        switch task.status {
+        case .queued:
+            MediaDetailDownloadProgressRing(progress: nil, tint: accentBlue)
+            Image(systemName: "stop.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(accentBlue)
+        case .downloading:
+            MediaDetailDownloadProgressRing(progress: measurable, tint: accentBlue)
+            if let measurable {
+                Text("\(Int(measurable * 100))")
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(accentBlue)
+            } else {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(accentBlue)
+            }
+        case .paused:
+            MediaDetailDownloadProgressRing(progress: measurable ?? 0, tint: accentBlue)
+            Image(systemName: "play.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(accentBlue)
+                .offset(x: 1)
+        case .completed:
+            Image(systemName: "checkmark")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.green)
+        case .failed:
+            Image("icon_download")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .foregroundStyle(.primary)
+        }
+    }
+
+    private var accessibilityLabel: String {
+        if isEnqueueing { return "正在加入下载队列" }
+        guard let task else { return "下载" }
+        switch task.status {
+        case .queued: return "暂停等待中的下载"
+        case .downloading: return "暂停下载"
+        case .paused: return "继续下载"
+        case .completed: return "已下载"
+        case .failed: return "重新下载"
+        }
+    }
+
+    private var accessibilityValue: String {
+        guard let task, task.totalBytes > 0 else { return "" }
+        return "\(Int(task.progress * 100))%"
+    }
+}
+
+private struct MediaDetailDownloadProgressRing: View {
+    let progress: Double?
+    let tint: Color
+    @State private var rotation = 0.0
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(tint.opacity(0.2), lineWidth: 3)
+            if let progress {
+                Circle()
+                    .trim(from: 0, to: min(max(progress, 0.02), 1))
+                    .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            } else {
+                Circle()
+                    .trim(from: 0.05, to: 0.32)
+                    .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(rotation - 90))
+            }
+        }
+        .padding(8)
+        .onAppear(perform: startAnimatingIfNeeded)
+        .onChange(of: progress == nil) { _, _ in
+            startAnimatingIfNeeded()
+        }
+    }
+
+    private func startAnimatingIfNeeded() {
+        guard progress == nil else {
+            rotation = 0
+            return
+        }
+        rotation = 0
+        withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) {
+            rotation = 360
+        }
     }
 }
 

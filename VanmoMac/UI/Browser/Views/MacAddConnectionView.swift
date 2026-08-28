@@ -671,6 +671,9 @@ struct MacAddConnectionView: View {
         if selectedType == .iptv {
             return "播放列表路径或 URL"
         }
+        if selectedType == .smb {
+            return "共享名，如 /Movies"
+        }
         return "可选"
     }
 

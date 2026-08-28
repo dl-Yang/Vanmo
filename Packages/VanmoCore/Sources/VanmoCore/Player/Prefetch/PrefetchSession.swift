@@ -5,7 +5,7 @@ public final class PrefetchSession {
     public let token: String
 
     private let cache: RangeCache
-    private let fetcher: RemoteFetcher
+    private let source: any PrefetchByteSource
     private let chunkSize: Int
 
     private var totalSize: Int64?
@@ -25,7 +25,11 @@ public final class PrefetchSession {
     public init(token: String, originalURL: URL, headerProvider: (() async -> [String: String])? = nil) throws {
         self.token = token
         self.cache = try RangeCache(sessionId: token)
-        self.fetcher = RemoteFetcher(originalURL: originalURL, headerProvider: headerProvider)
+        if originalURL.usesSMBScheme {
+            self.source = SMBPrefetchByteSource(url: originalURL)
+        } else {
+            self.source = HTTPPrefetchByteSource(url: originalURL, headerProvider: headerProvider)
+        }
         self.chunkSize = PrefetchConfig.chunkSize
     }
 
@@ -39,6 +43,8 @@ public final class PrefetchSession {
         for (_, t) in activeBodyTasks { t.cancel() }
         activeBodyTasks.removeAll()
         activeBodyTasksLock.unlock()
+        let source = self.source
+        Task { await source.close() }
     }
 
     /// 复用或创建 chunk 的下载 Task。多个 bodyStream pipeline 可共享同一 Task，避免重复回源。
@@ -61,24 +67,7 @@ public final class PrefetchSession {
             }
             do {
                 try Task.checkCancellation()
-                let (data, response) = try await self.fetcher.data(forInclusiveRange: chunkStart...chunkEnd)
-                guard let http = response as? HTTPURLResponse else {
-                    releaseAndCleanup()
-                    throw PrefetchError.badResponse
-                }
-                if http.statusCode == 416 {
-                    releaseAndCleanup()
-                    throw PrefetchError.badRequest
-                }
-                guard (200...299).contains(http.statusCode) else {
-                    releaseAndCleanup()
-                    throw PrefetchError.upstream(http.statusCode)
-                }
-                if self.totalSize == nil,
-                   let crHeader = http.value(forHTTPHeaderField: "Content-Range"),
-                   let t = RemoteFetcher.parseContentRangeTotal(crHeader) {
-                    self.totalSize = t
-                }
+                let data = try await self.source.data(forInclusiveRange: chunkStart...chunkEnd)
                 self.cache.write(globalOffset: chunkStart, data: data)
                 releaseAndCleanup()
                 return data
@@ -95,13 +84,13 @@ public final class PrefetchSession {
     /// 生成响应头与正文流；正文为请求的 Range（含端点）。
     public func makeResponse(rangeHeader: String?) async throws -> (Data, AsyncThrowingStream<Data, Error>) {
         if totalSize == nil {
-            totalSize = try? await fetcher.probeTotalSize()
+            totalSize = try? await source.probeTotalSize()
         }
 
         let inclusive = try await resolveRange(rangeHeader: rangeHeader)
 
         if totalSize == nil {
-            totalSize = try? await fetcher.probeTotalSize()
+            totalSize = try? await source.probeTotalSize()
         }
 
         let totalForHeader = totalSize
@@ -128,7 +117,7 @@ public final class PrefetchSession {
             switch spec {
             case .closed(let r):
                 if totalSize == nil {
-                    totalSize = try? await fetcher.probeTotalSize()
+                    totalSize = try? await source.probeTotalSize()
                 }
                 if let sz = totalSize {
                     let low = max(0, r.lowerBound)
@@ -140,7 +129,7 @@ public final class PrefetchSession {
 
             case .from(let start):
                 if totalSize == nil {
-                    totalSize = try await fetcher.probeTotalSize()
+                    totalSize = try await source.probeTotalSize()
                 }
                 guard let sz = totalSize, sz > 0 else { throw PrefetchError.unknownSize }
                 let low = max(0, start)
@@ -149,7 +138,7 @@ public final class PrefetchSession {
 
             case .lastN(let n):
                 if totalSize == nil {
-                    totalSize = try await fetcher.probeTotalSize()
+                    totalSize = try await source.probeTotalSize()
                 }
                 guard let sz = totalSize, sz > 0 else { throw PrefetchError.unknownSize }
                 let start = max(0, sz - n)
@@ -158,7 +147,7 @@ public final class PrefetchSession {
         }
 
         if totalSize == nil {
-            totalSize = try await fetcher.probeTotalSize()
+            totalSize = try await source.probeTotalSize()
         }
         guard let sz = totalSize, sz > 0 else { throw PrefetchError.unknownSize }
         return 0...(sz - 1)
@@ -224,11 +213,12 @@ public final class PrefetchSession {
                         let sliceHigh = min(last, chunkEnd)
                         let dataStart = Int(sliceLow - chunkStart)
                         let dataEnd = Int(sliceHigh - chunkStart) + 1
-                        if dataEnd > dataStart, dataEnd <= data.count {
-                            let slice = data.subdata(in: dataStart..<dataEnd)
-                            continuation.yield(slice)
+                        guard dataEnd > dataStart, dataEnd <= data.count else {
+                            throw PrefetchError.badResponse
                         }
-                        yieldCursor = chunkEnd + 1
+                        let slice = data.subdata(in: dataStart..<dataEnd)
+                        continuation.yield(slice)
+                        yieldCursor = sliceHigh + 1
                     }
 
                     continuation.finish()

@@ -83,7 +83,7 @@ public enum DownloadDirectoryResolver {
             isAccessing = url.startAccessingSecurityScopedResource()
             guard isAccessing else { throw DownloadError.destinationUnavailable }
         } else {
-            url = URL(fileURLWithPath: destination.rootPath, isDirectory: true)
+            url = relocatedSandboxDirectory(for: destination.rootPath)
         }
 
         do {
@@ -95,5 +95,21 @@ public enum DownloadDirectoryResolver {
             throw DownloadError.destinationUnavailable
         }
         return ResolvedDownloadDirectory(url: url, isAccessingSecurityScopedResource: isAccessing)
+    }
+
+    /// App reinstalls change the container UUID. Tasks persist the old absolute
+    /// `Documents/Downloads` path, while the file now lives in the current container.
+    static func relocatedSandboxDirectory(
+        for rootPath: String,
+        currentDefault: URL = defaultDirectory
+    ) -> URL {
+        let stored = URL(fileURLWithPath: rootPath, isDirectory: true)
+        let isAppContainerPath = rootPath.contains("/Containers/Data/Application/")
+            || (rootPath.contains("/Application/") && rootPath.contains("/Documents/"))
+        guard isAppContainerPath,
+              stored.lastPathComponent == currentDefault.lastPathComponent else {
+            return stored
+        }
+        return currentDefault
     }
 }

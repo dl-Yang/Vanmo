@@ -844,6 +844,9 @@ struct MacMediaDetailView: View {
                         connectionType: try sourceConnectionType()
                     )
                     try await downloadManager.enqueue(request)
+#if DEBUG
+                    print("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue) connection=\(request.connectionType?.rawValue ?? "none")")
+#endif
                 } catch {
                     downloadErrorMessage = error.localizedDescription
                 }
@@ -877,6 +880,9 @@ struct MacMediaDetailView: View {
                     )
                 }
                 try await downloadManager.enqueue(requests)
+#if DEBUG
+                print("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count) connection=\(connectionType?.rawValue ?? "none")")
+#endif
                 isDownloadPickerPresented = false
                 selectedDownloadEpisodes.removeAll()
             } catch {

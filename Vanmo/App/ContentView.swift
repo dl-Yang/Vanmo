@@ -65,6 +65,13 @@ struct ContentView: View {
             connectionsViewModel.setModelContext(modelContext)
             downloadManager.configure(modelContext: modelContext)
             await downloadManager.restoreAndResume()
+#if DEBUG
+            let statuses = downloadManager.tasks.map(\.status.rawValue).joined(separator: ",")
+            print("[Debug][Downloads] restore count=\(downloadManager.tasks.count) statuses=\(statuses)")
+            for task in downloadManager.tasks where task.status != .completed {
+                print("[Debug][Downloads] restore task=\(task.id.uuidString) status=\(task.status.rawValue) received=\(task.receivedBytes) total=\(task.totalBytes)")
+            }
+#endif
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
         }
@@ -90,6 +97,8 @@ private struct PlayerPresentationModifier: ViewModifier {
             .fullScreenCover(isPresented: $appState.isPlayerPresented) {
                 if let item = appState.currentPlayingItem {
                     PlayerView(item: item)
+                } else {
+                    Color.black.ignoresSafeArea()
                 }
             }
     }

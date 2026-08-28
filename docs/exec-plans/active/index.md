@@ -4,7 +4,7 @@ Active plans include not-started, in-progress, or blocked work that still requir
 
 ## Current Plans
 
-There are no active plans.
+None.
 
 ## Rules
 

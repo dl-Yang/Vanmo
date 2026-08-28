@@ -5,7 +5,14 @@ enum PlayerEngineFactory {
     static func engine(for url: URL) -> PlayerEngine {
         let ext = url.pathExtension.lowercased()
         let format = SupportedFormat.detect(from: url)
-        VanmoLogger.player.info("[EngineFactory] URL: \(url.absoluteString), ext: \(ext), format: \(format.logName)")
+        VanmoLogger.player.info("[EngineFactory] URL: \(url.safePlaybackLogDescription), ext: \(ext), format: \(format.logName)")
+
+        // Downloaded Emby/HTTP remuxes are often HEVC/HDR inside .mp4. AVPlayer
+        // treats .mp4 as native and fails on Simulator (and some device profiles).
+        if url.isFileURL, format != .discImage {
+            VanmoLogger.player.info("[EngineFactory] 选择 KSPlayerEngine (本地文件)")
+            return KSPlayerEngine()
+        }
 
         switch format {
         case .native:

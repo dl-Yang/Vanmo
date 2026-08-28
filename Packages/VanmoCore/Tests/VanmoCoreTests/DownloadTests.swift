@@ -153,6 +153,22 @@ final class DownloadTests: XCTestCase {
         XCTAssertEqual(manager.tasks.first(where: { $0.id == ids[0] })?.status, .queued)
     }
 
+    func testStaleSimulatorContainerDownloadPathRelocatesToCurrentDefault() {
+        let current = URL(fileURLWithPath: "/tmp/current-container/Documents/Downloads", isDirectory: true)
+        let stale = "/Users/test/Library/Developer/CoreSimulator/Devices/AAAA/data/Containers/Data/Application/OLD/Documents/Downloads"
+        let remapped = DownloadDirectoryResolver.relocatedSandboxDirectory(
+            for: stale,
+            currentDefault: current
+        )
+        XCTAssertEqual(remapped, current)
+
+        let custom = DownloadDirectoryResolver.relocatedSandboxDirectory(
+            for: "/Users/test/Movies",
+            currentDefault: current
+        )
+        XCTAssertEqual(custom.path, "/Users/test/Movies")
+    }
+
     @MainActor
     func testPlexMediaRequestKeepsStablePartPathWithoutToken() throws {
         let item = MediaItem(

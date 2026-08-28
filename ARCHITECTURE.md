@@ -311,6 +311,7 @@ File-based services implement `RemoteFileService`, which defines:
 - Explicitly unsupported placeholders: the removed Aliyun Drive type, 115, Quark Drive, and MEGA.
 - FTP/SFTP currently establish only a logical connection; directory listing is empty and streaming URLs are unsupported.
 - NFS, DLNA, and other types without dedicated implementations fall back to a generic HTTP placeholder.
+- SMB uses `kishikawakatsumi/SMBClient` via the MIT-licensed [PR #234](https://github.com/kishikawakatsumi/SMBClient/pull/234) fork revision `d8baadc`, which sits on the already-used `66eafaa` signing commit. `SMBService` normalizes `smb://` / UNC hosts and `DOMAIN\user` accounts, negotiates SMB 2.02, 2.10, 3.0, 3.02, and 3.1.1 with signing required, and retries an IPv4 target via reverse DNS plus `_smb._tcp` `.local` names. 3.1.1 sessions can wrap messages with AES-GCM when the server requires encryption. 3.0/3.02 AES-CCM encryption is not implemented. Share listing probes tree connect, hides IPC / `*$` / access-denied entries, and falls back to a configured share when `IPC$` enumeration fails. A guest-downgraded session that cannot open the configured share is treated as a Mac File Sharing NTLM-hash gap, not a successful browse.
 
 `ConnectionType.availableConnectionTypes` therefore represents UI-visible choices, not a guarantee that every protocol is production-ready.
 
@@ -388,6 +389,7 @@ The coordinator does not implement a transport protocol. The CloudKit-enabled Sw
 
 - Native formats use AVFoundation.
 - FFmpeg formats use KSPlayer.
+- `smb://` URLs always use KSPlayer. iOS plays the `smb://` URL directly. macOS serves the file through the localhost prefetch proxy, which range-reads the share with `SMBService` so seeks do not rely on libsmbclient.
 - Disc images and disc structures:
   - iOS currently sends candidates to a KSPlayer proof-of-concept path.
   - macOS explicitly reports them as unsupported and recommends direct `.m2ts` playback.

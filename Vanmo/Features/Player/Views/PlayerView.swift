@@ -29,6 +29,21 @@ struct PlayerView: View {
 
             videoLayer
 
+            if case .error(let message) = viewModel.playbackState {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 28, weight: .medium))
+                    Text("无法播放")
+                        .font(.headline)
+                    Text(message)
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 32)
+            }
+
             SubtitleOverlayView(
                 content: viewModel.currentSubtitleContent,
                 style: viewModel.subtitleStyle

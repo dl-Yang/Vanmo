@@ -50,7 +50,8 @@ public actor PrefetchProxy {
             return nil
         }
 
-        VanmoLogger.prefetch.info("[Prefetch] registered session token=\(token.prefix(8))… port=\(port)")
+        let source = originalURL.usesSMBScheme ? "smb" : "http"
+        VanmoLogger.prefetch.info("[Prefetch] registered session token=\(token.prefix(8))… port=\(port) source=\(source)")
         return PrefetchRegistration(url: url, token: token)
     }
 

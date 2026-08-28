@@ -84,7 +84,7 @@ extension ConnectionType {
         case .alist:
             return "AList 默认端口 5244、WebDAV 路径为 /dav，是否启用 HTTPS 取决于实例配置。"
         case .smb:
-            return "SMB 适用于 fnOS、NAS 或局域网共享，默认端口 445。"
+            return "SMB 适用于 fnOS、NAS 或 Mac「文件共享」。Mac 需打开 SMB 并为该用户勾选 Windows 文件共享；路径填写共享名。"
         case .fnos:
             return "fnOS 按 WebDAV 兼容方式连接：局域网 HTTP 通常为 5005，HTTPS 通常为 5006。"
         case .iptv:

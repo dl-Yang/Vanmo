@@ -78,7 +78,7 @@ final class PlayerViewModel: ObservableObject {
     init(item: MediaItem) {
         self.item = item
         self.subtitleStyle = SubtitleStylePreferences.load()
-        VanmoLogger.player.info("[PlayerVM] init, file: \(item.fileURL.lastPathComponent), URL: \(item.fileURL.absoluteString)")
+        VanmoLogger.player.info("[PlayerVM] init, file: \(item.fileURL.lastPathComponent), URL: \(item.fileURL.safePlaybackLogDescription)")
         self.engine = PlayerEngineFactory.engine(for: item.fileURL)
         VanmoLogger.player.info("[PlayerVM] engine type: \(self.engine.engineType == .avFoundation ? "AVFoundation" : "KSPlayer")")
         setupBindings()
@@ -170,6 +170,10 @@ final class PlayerViewModel: ObservableObject {
             scheduleHideControls()
         } catch {
             VanmoLogger.player.error("[PlayerVM] load failed: \(error.localizedDescription)")
+#if DEBUG
+            let nsError = error as NSError
+            print("[Debug][Player] load failed domain=\(nsError.domain) code=\(nsError.code) ext=\(item.fileURL.pathExtension.lowercased()) isFile=\(item.fileURL.isFileURL)")
+#endif
             playbackState = .error(error.localizedDescription)
         }
     }
@@ -1111,7 +1115,7 @@ final class PlayerViewModel: ObservableObject {
 
     private static func shouldBypassPrefetch(for url: URL) -> Bool {
         switch url.scheme?.lowercased() {
-        case "concat":
+        case "concat", "smb":
             return true
         default:
             return false

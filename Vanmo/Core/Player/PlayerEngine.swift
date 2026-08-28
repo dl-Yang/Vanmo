@@ -135,7 +135,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     // MARK: - Playback Control
 
     func load(url: URL, startPosition: CMTime? = nil) async throws {
-        VanmoLogger.player.info("[AVEngine] load() called, url: \(url.absoluteString)")
+        VanmoLogger.player.info("[AVEngine] load() called, url: \(url.safePlaybackLogDescription)")
         stop()
         stateSubject.send(.loading)
 

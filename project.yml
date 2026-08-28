@@ -32,8 +32,8 @@ packages:
     url: https://github.com/kingslay/KSPlayer.git
     majorVersion: 2.2.0
   SMBClient:
-    url: https://github.com/kishikawakatsumi/SMBClient.git
-    minorVersion: 0.3.1
+    url: https://github.com/thatcube/SMBClient.git
+    revision: d8baadc1a4f1287ebf1e8b4702ca38bd6e237fef
   lottie-ios:
     url: https://github.com/airbnb/lottie-ios.git
     majorVersion: 4.6.0
