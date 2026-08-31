@@ -307,9 +307,9 @@ File-based services implement `RemoteFileService`, which defines:
 
 `RemoteServiceFactory` currently maps connection types as follows:
 
-- Concrete service classes: Local Folder, SMB, WebDAV/AList/fnOS, Baidu Netdisk, Google Drive, OneDrive, Box, pCloud, Yandex.Disk, IPTV, Emby, Jellyfin, and Plex.
+- Concrete service classes: Local Folder, SMB, FTP, WebDAV/AList/fnOS, Baidu Netdisk, Google Drive, OneDrive, Box, pCloud, Yandex.Disk, IPTV, Emby, Jellyfin, and Plex.
 - Explicitly unsupported placeholders: the removed Aliyun Drive type, 115, Quark Drive, and MEGA.
-- FTP/SFTP currently establish only a logical connection; directory listing is empty and streaming URLs are unsupported.
+- SFTP currently establishes only a logical connection; directory listing is empty and streaming URLs are unsupported. FTP is a real RFC 959 client (`PASV`/`EPSV`, `MLSD`/`LIST`, `REST`/`RETR`) with prefetch `source=ftp`.
 - NFS, DLNA, and other types without dedicated implementations fall back to a generic HTTP placeholder.
 - SMB uses `kishikawakatsumi/SMBClient` via the MIT-licensed [PR #234](https://github.com/kishikawakatsumi/SMBClient/pull/234) fork revision `d8baadc`, which sits on the already-used `66eafaa` signing commit. `SMBService` normalizes `smb://` / UNC hosts and `DOMAIN\user` accounts, negotiates SMB 2.02, 2.10, 3.0, 3.02, and 3.1.1 with signing required, and retries an IPv4 target via reverse DNS plus `_smb._tcp` `.local` names. 3.1.1 sessions can wrap messages with AES-GCM when the server requires encryption. 3.0/3.02 AES-CCM encryption is not implemented. Share listing probes tree connect, hides IPC / `*$` / access-denied entries, and falls back to a configured share when `IPC$` enumeration fails. A guest-downgraded session that cannot open the configured share is treated as a Mac File Sharing NTLM-hash gap, not a successful browse.
 
@@ -587,7 +587,7 @@ See `docs/RELIABILITY.md` for the complete command stages and evidence boundarie
 
 1. **Substantial platform-layer duplication.** iOS and macOS maintain separate connection, library, search, and player ViewModels. `VanmoCore` shares infrastructure, but use-case orchestration remains platform-specific.
 2. **Large ViewModels and views.** The iOS `PlayerViewModel`, `ConnectionsViewModel`, `LibraryViewModel`, and their macOS counterparts combine state, network orchestration, mapping, and persistence. Changes require focused data-flow verification.
-3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. FTP/SFTP, NFS, DLNA, and several official cloud-drive integrations require further implementation.
+3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. SFTP, NFS, DLNA, and several official cloud-drive integrations require further implementation. FTP is implemented; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play, and Files-browser download.
 4. **No explicit SwiftData migration strategy.** There is no `VersionedSchema` or `SchemaMigrationPlan`. Container creation calls `fatalError` on failure and has no recovery or fallback path.
 5. **CloudKit is Release-only.** Debug builds can verify local fallback and static boundaries, but cannot prove real CloudKit behavior.
 6. **iOS UI automation still lacks physical-device evidence.** The `VanmoUITests` target and unified XCUITest CLI exist, and the compile-safe Settings `.paused` label unblocks Simulator `build-for-testing`. Physical-device signing and device-side runner-argument delivery remain unverified; broader iOS/macOS player or real-source journeys still depend on later recorded evidence.

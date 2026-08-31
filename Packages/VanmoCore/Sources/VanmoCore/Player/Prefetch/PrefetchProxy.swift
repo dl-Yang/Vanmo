@@ -50,7 +50,14 @@ public actor PrefetchProxy {
             return nil
         }
 
-        let source = originalURL.usesSMBScheme ? "smb" : "http"
+        let source: String
+        if originalURL.usesSMBScheme {
+            source = "smb"
+        } else if originalURL.usesFTPScheme {
+            source = "ftp"
+        } else {
+            source = "http"
+        }
         VanmoLogger.prefetch.info("[Prefetch] registered session token=\(token.prefix(8))… port=\(port) source=\(source)")
         return PrefetchRegistration(url: url, token: token)
     }

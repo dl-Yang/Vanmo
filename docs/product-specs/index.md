@@ -7,6 +7,7 @@ This folder contains current user-visible behavior and acceptance targets. It do
 - [`downloads.md`](downloads.md): macOS download progress, pause controls, detail navigation, and HTTP-via-Emby real-source recovery acceptance; iOS Figma download-page behavior is specified; 2026-08-27 simulator HTTP-via-Emby runs recorded enqueue, progress, complete, play, and `.part` resume; one 2026-08-28 physical-device SMB enqueue, terminate-while-downloading `.part` restore, and completion run is recorded; one 2026-08-28 macOS SMB library-detail mixed run (one movie + three episodes) recorded the eleven-step matrix
 - [`smb-connections.md`](smb-connections.md): SMB connect, browse, and KSPlayer playback for iOS and macOS, including unreadable-share hiding; 2026-08-27 File Sharing runs passed on iOS Simulator and VanmoMac
 - [`smb-311-encryption.md`](smb-311-encryption.md): SMB 3.1.1 AES-GCM encryption-required connect, browse, and play; 2026-08-28 VanmoMac and iOS-device runs recorded `0x311` + `encrypt=true`, a `MacShare` listing, VanmoMac prefetch `source=smb`, and an iOS KSPlayer `smb://` load
+- [`ftp-connections.md`](ftp-connections.md): FTP connect, browse, KSPlayer prefetch play, and Files-browser download; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, play, download, and local play
 
 ## Rules
 

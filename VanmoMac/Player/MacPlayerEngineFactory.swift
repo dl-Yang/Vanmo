@@ -14,17 +14,18 @@ enum MacPlayerEngineFactory {
             "[MacEngineFactory] URL: \(url.safePlaybackLogDescription), ext: \(url.pathExtension.lowercased()), format: \(format.logName)"
         )
 
-        switch format {
-        case .native:
-            VanmoLogger.player.info("[MacEngineFactory] 选择 AVPlayer (原生格式)")
-            return .avFoundation
-        case .ffmpeg:
-            VanmoLogger.player.info("[MacEngineFactory] 选择 MacKSPlayerEngine (KSPlayer/FFmpeg)")
-            return .ksPlayer
-        case .discImage:
+        if format == .discImage {
             VanmoLogger.player.info("[MacEngineFactory] 检测到原盘/ISO，当前 macOS 公开路径不支持")
             return .unsupportedDisc
         }
+
+        if SupportedFormat.prefersKSPlayer(for: url) {
+            VanmoLogger.player.info("[MacEngineFactory] 选择 MacKSPlayerEngine (KSPlayer/FFmpeg)")
+            return .ksPlayer
+        }
+
+        VanmoLogger.player.info("[MacEngineFactory] 选择 AVPlayer (原生格式)")
+        return .avFoundation
     }
 }
 

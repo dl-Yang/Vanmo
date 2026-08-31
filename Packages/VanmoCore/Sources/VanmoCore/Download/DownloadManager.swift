@@ -283,6 +283,11 @@ public final class DownloadManager: ObservableObject {
                     throw DownloadError.unsupportedSource
                 }
                 try await downloadSMB(service: smbService, file: remoteFile, to: partURL, taskID: task.id)
+            } else if type == .ftp {
+                guard let ftpService = service as? FTPService else {
+                    throw DownloadError.unsupportedSource
+                }
+                try await downloadFTP(service: ftpService, file: remoteFile, to: partURL, taskID: task.id)
             } else {
                 let url = try await service.streamURL(for: remoteFile)
                 guard url.scheme == "http" || url.scheme == "https" else {
@@ -368,6 +373,28 @@ public final class DownloadManager: ObservableObject {
 
     private func downloadSMB(
         service: SMBService,
+        file: RemoteFile,
+        to partURL: URL,
+        taskID: UUID
+    ) async throws {
+        try await service.downloadResuming(file: file, to: partURL) { [weak self] received, total in
+            Task { @MainActor in
+                self?.update(taskID) {
+                    $0.receivedBytes = received
+                    if total > 0 { $0.totalBytes = total }
+                }
+            }
+        }
+        let bytes = fileSize(at: partURL)
+        update(taskID) {
+            $0.receivedBytes = bytes
+            if $0.totalBytes == 0 { $0.totalBytes = bytes }
+        }
+        try await persist()
+    }
+
+    private func downloadFTP(
+        service: FTPService,
         file: RemoteFile,
         to partURL: URL,
         taskID: UUID

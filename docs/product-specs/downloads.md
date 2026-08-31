@@ -20,6 +20,10 @@ Three 2026-08-28 Vanmo-macOS SMB runs are recorded. A Files-browser run queued t
 
 This evidence records the SMB multi-item matrix for the 2026-08-28 plan. It does not change the HTTP real-source Current acceptance status below.
 
+A separate 2026-08-30 Vanmo-macOS AList Files-browser run downloaded one remote video and played the completed local file. That run is recorded in [`../exec-plans/completed/2026-08-28-alist-connection-validation.md`](../exec-plans/completed/2026-08-28-alist-connection-validation.md). It does not replace the SMB mixed-run matrix or the HTTP-via-Emby recovery record.
+
+A separate 2026-08-31 Vanmo-macOS FTP Files-browser run downloaded one remote video and played the completed local file. That run is recorded in [`../exec-plans/completed/2026-08-30-ftp-real-source.md`](../exec-plans/completed/2026-08-30-ftp-real-source.md). It does not replace the SMB mixed-run matrix or the HTTP-via-Emby recovery record.
+
 ### iOS Download Progress, Controls, and Navigation
 
 The iOS downloads screen is reached from Settings → 下载管理. It follows iOS Figma Download Light `456:4` and Dark `456:254`: a large title, pause-all or resume-all, select mode, a task summary, and five row states with a 16:9 poster, status copy, and a circular action. Directory selection stays in Settings storage.
@@ -37,6 +41,10 @@ The implemented iOS success flow has the following evidence recorded on 2026-08-
 - physical-device Files-browser enqueue over SMB, same-session resume, terminate while downloading, cold-launch `.part` restore, and completion
 
 This evidence does not establish the macOS HTTP recovery matrix or the separate Vanmo-macOS SMB mixed-run record above.
+
+A separate 2026-08-30 AList Files-browser run on the iOS Simulator downloaded one remote video and played the completed local file. That run is recorded in [`../exec-plans/completed/2026-08-28-alist-connection-validation.md`](../exec-plans/completed/2026-08-28-alist-connection-validation.md). It does not change the HTTP-via-Emby or SMB recovery acceptance below.
+
+A separate 2026-08-31 FTP Files-browser run on the iOS Simulator downloaded one remote video and played the completed local file. That run is recorded in [`../exec-plans/completed/2026-08-30-ftp-real-source.md`](../exec-plans/completed/2026-08-30-ftp-real-source.md). It does not change the HTTP-via-Emby or SMB recovery acceptance below.
 
 ### Real-Source Recovery and Detail Navigation
 

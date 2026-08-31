@@ -572,7 +572,7 @@ final class ConnectionsViewModel: ObservableObject {
 
     private func resetBrowserStateAfterEditing(_ connection: SavedConnection) {
         guard selectedConnectionID == connection.id else { return }
-        currentPath = "/"
+        currentPath = connection.browserRootPath
         pathStack = []
         files = []
         isBrowsingFiles = false
@@ -733,7 +733,7 @@ final class ConnectionsViewModel: ObservableObject {
         let isSameConnection = selectedConnectionID == connection.id
         if !isSameConnection {
             selectedConnectionID = connection.id
-            currentPath = "/"
+            currentPath = connection.browserRootPath
             pathStack = []
             files = []
             fileBrowserErrorMessage = nil
@@ -756,7 +756,7 @@ final class ConnectionsViewModel: ObservableObject {
 
         do {
             let service = try await browserFileService(for: connection)
-            let normalizedPath = normalizedDirectoryPath(path)
+            let normalizedPath = resolvedBrowserPath(path, for: connection)
             let listedFiles = try await service.listDirectory(path: normalizedPath)
             files = listedFiles.sorted(by: fileSortPredicate)
             currentPath = normalizedPath
@@ -860,7 +860,7 @@ final class ConnectionsViewModel: ObservableObject {
         }
 
         selectedConnectionID = savedConnections.first?.id
-        currentPath = "/"
+        currentPath = savedConnections.first?.browserRootPath ?? "/"
         pathStack = []
         files = []
         fileBrowserErrorMessage = nil
@@ -952,6 +952,14 @@ final class ConnectionsViewModel: ObservableObject {
 
     private func normalizedDirectoryPath(_ path: String) -> String {
         path.isEmpty ? "/" : path
+    }
+
+    private func resolvedBrowserPath(_ path: String, for connection: SavedConnection) -> String {
+        let normalized = normalizedDirectoryPath(path)
+        if normalized == "/" {
+            return connection.browserRootPath
+        }
+        return normalized
     }
 
     private func fileSortPredicate(_ lhs: RemoteFile, _ rhs: RemoteFile) -> Bool {
@@ -1090,7 +1098,7 @@ final class ConnectionsViewModel: ObservableObject {
         if connection.type.supportsOAuthLogin {
             return "\(connection.type.displayName) 接入尚未就绪：\(error.localizedDescription)"
         }
-        if connection.type == .ftp || connection.type == .sftp || connection.type == .nfs || connection.type == .dlna {
+        if connection.type == .sftp || connection.type == .nfs || connection.type == .dlna {
             return "\(connection.type.displayName) 文件浏览暂不可用或该目录为空"
         }
         return error.localizedDescription

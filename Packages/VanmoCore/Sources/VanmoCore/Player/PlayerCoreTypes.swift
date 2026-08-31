@@ -96,7 +96,7 @@ public struct Chapter: Identifiable, Equatable, Sendable {
 public enum SupportedFormat: Sendable {
     case native, ffmpeg, discImage
     public static func detect(from url: URL) -> SupportedFormat {
-        if url.usesSMBScheme { return .ffmpeg }
+        if url.usesSMBScheme || url.usesFTPScheme { return .ffmpeg }
         if MediaFormatProbe.isDiscImage(url) { return .discImage }
         let ext = url.pathExtension.lowercased()
         if MediaFormatProbe.nativeVideoExtensions.contains(ext)
@@ -104,11 +104,23 @@ public enum SupportedFormat: Sendable {
             || MediaFormatProbe.playlistExtensions.contains(ext) { return .native }
         return .ffmpeg
     }
+
+    /// 本地下载和远程 HTTP remux（常见 HEVC/HDR 封进 `.mp4`）在 AVPlayer 上会 Cannot Open。
+    /// HLS 播放列表仍留给 AVPlayer。
+    public static func prefersKSPlayer(for url: URL) -> Bool {
+        if detect(from: url) == .ffmpeg { return true }
+        let ext = url.pathExtension.lowercased()
+        return MediaFormatProbe.nativeVideoExtensions.contains(ext)
+    }
 }
 
 public extension URL {
     var usesSMBScheme: Bool {
         scheme?.lowercased() == "smb"
+    }
+
+    var usesFTPScheme: Bool {
+        scheme?.lowercased() == "ftp"
     }
 
     /// Host and path only. Never include userinfo.
@@ -118,7 +130,8 @@ public extension URL {
         }
         let scheme = scheme ?? ""
         let host = host ?? ""
+        let port = port.map { ":\($0)" } ?? ""
         let path = path.isEmpty ? "/" : path
-        return "\(scheme)://\(host)\(path)"
+        return "\(scheme)://\(host)\(port)\(path)"
     }
 }

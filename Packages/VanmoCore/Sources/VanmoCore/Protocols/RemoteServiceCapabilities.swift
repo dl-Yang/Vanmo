@@ -82,6 +82,14 @@ public extension ConnectionType {
                 maxConcurrentDirectoryReads: 4,
                 requestsPerSecond: 6
             )
+        case .ftp:
+            return RemoteServiceCapabilities(
+                listing: .singleShot,
+                playbackPersistence: .stableDirectURL,
+                supportsRangeReads: true,
+                maxConcurrentDirectoryReads: 2,
+                requestsPerSecond: 4
+            )
         case .smb, .nfs:
             return RemoteServiceCapabilities(
                 listing: .singleShot,

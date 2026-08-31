@@ -178,9 +178,9 @@ public enum DownloadEligibility {
     public static func isSupported(connectionType: ConnectionType) -> Bool {
         switch connectionType {
         case .localFolder, .smb, .webdav, .alist, .baiduNetdisk, .googleDrive,
-             .oneDrive, .box, .pCloudDrive, .yandexDisk, .fnos, .plex, .emby, .jellyfin:
+             .oneDrive, .box, .pCloudDrive, .yandexDisk, .fnos, .plex, .emby, .jellyfin, .ftp:
             return true
-        case .ftp, .sftp, .removedOfficialCloudDrive, .drive115, .quarkDrive,
+        case .sftp, .removedOfficialCloudDrive, .drive115, .quarkDrive,
              .mega, .iptv, .nfs, .dlna:
             return false
         }

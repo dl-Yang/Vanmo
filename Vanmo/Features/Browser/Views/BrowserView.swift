@@ -51,6 +51,9 @@ struct ConnectionsView: View {
             viewModel.setModelContext(modelContext)
             await viewModel.loadSavedConnections()
             await openPendingFolderBookmarkIfNeeded()
+#if DEBUG
+            await runDebugSourceAcceptanceIfNeeded()
+#endif
         }
         .onChange(of: viewModel.pendingFolderBookmarkNavigation?.id) { _, _ in
             Task { await openPendingFolderBookmarkIfNeeded() }
@@ -322,6 +325,40 @@ struct ConnectionsView: View {
         let last = (viewModel.currentPath as NSString).lastPathComponent
         return last.isEmpty || last == "/" ? connection.name : last
     }
+
+#if DEBUG
+    private func runDebugSourceAcceptanceIfNeeded() async {
+        let env = ProcessInfo.processInfo.environment
+        guard let name = env["VANMO_DEBUG_OPEN_CONNECTION"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else { return }
+        guard let connection = viewModel.savedConnections.first(where: {
+            $0.name.caseInsensitiveCompare(name) == .orderedSame
+        }) else {
+            print("[Debug][FTP] accept missing connection name=\(name)")
+            return
+        }
+        enter(connection)
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        var video = viewModel.files.first(where: \.isVideo)
+        if video == nil, let folder = viewModel.files.first(where: \.isDirectory) {
+            await viewModel.openDirectory(folder)
+            video = viewModel.files.first(where: \.isVideo)
+        }
+        let actions = Set(
+            (env["VANMO_DEBUG_ACCEPT_ACTIONS"] ?? "")
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        )
+        print("[Debug][FTP] accept listed=\(viewModel.files.count) hasVideo=\(video != nil) actions=\(actions.sorted().joined(separator: ","))")
+        guard let video else { return }
+        if actions.contains("play") {
+            await play(video)
+        }
+        if actions.contains("download") {
+            await download(video, connection: connection)
+        }
+    }
+#endif
 
     private func enter(_ connection: SavedConnection) {
         withAnimation(.easeInOut(duration: 0.25)) {

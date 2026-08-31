@@ -24,8 +24,10 @@ struct ContentView: View {
             NavigationStack {
                 ConnectionsView()
             }
+            .accessibilityIdentifier("screen.files")
             .tabItem {
                 Label(AppTab.connections.title, systemImage: AppTab.connections.icon)
+                    .accessibilityIdentifier("tab.connections")
             }
             .tag(AppTab.connections)
 
@@ -62,6 +64,11 @@ struct ContentView: View {
             appState.notifyFavoriteDidChange()
         }
         .task {
+#if DEBUG
+            if ProcessInfo.processInfo.environment["VANMO_DEBUG_TAB"] == "files" {
+                appState.selectedTab = .connections
+            }
+#endif
             connectionsViewModel.setModelContext(modelContext)
             downloadManager.configure(modelContext: modelContext)
             await downloadManager.restoreAndResume()

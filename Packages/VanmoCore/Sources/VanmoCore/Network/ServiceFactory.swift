@@ -29,8 +29,10 @@ public enum RemoteServiceFactory {
             return IPTVService()
         case .fnos:
             return WebDAVService(type: .fnos)
-        case .ftp, .sftp:
-            return FTPService(useSFTP: type == .sftp)
+        case .ftp:
+            return FTPService()
+        case .sftp:
+            return SFTPPlaceholderService()
         case .emby:
             return EmbyService()
         case .jellyfin:
@@ -72,19 +74,13 @@ public final class UnsupportedOfficialCloudDriveService: RemoteFileService {
     }
 }
 
-public final class FTPService: RemoteFileService {
-    public let type: ConnectionType
+public final class SFTPPlaceholderService: RemoteFileService {
+    public let type: ConnectionType = .sftp
     public private(set) var isConnected = false
-    private let useSFTP: Bool
-
-    public init(useSFTP: Bool = false) {
-        self.useSFTP = useSFTP
-        self.type = useSFTP ? .sftp : .ftp
-    }
 
     public func connect(config: ConnectionConfig) async throws {
         isConnected = true
-        VanmoLogger.network.info("\(self.type.displayName) connected to \(config.host)")
+        VanmoLogger.network.info("SFTP connected to \(config.host)")
     }
 
     public func disconnect() async {

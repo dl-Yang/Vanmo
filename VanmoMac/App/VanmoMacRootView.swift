@@ -110,6 +110,9 @@ struct VanmoMacRootView: View {
             await connectionsViewModel.loadSavedConnections()
             searchViewModel.setConnections(connectionsViewModel.savedConnections)
             await refreshLibrarySections()
+#if DEBUG
+            await runDebugSourceAcceptanceIfNeeded()
+#endif
         }
         .onChange(of: scenePhase) { _, newPhase in
             Task {
@@ -392,6 +395,50 @@ struct VanmoMacRootView: View {
         guard case let .libraryScannedLibrary(_, rawValue) = appState.contentRoute else { return nil }
         return EmbyCollectionType(raw: rawValue)
     }
+
+#if DEBUG
+    private func runDebugSourceAcceptanceIfNeeded() async {
+        let env = ProcessInfo.processInfo.environment
+        guard let name = env["VANMO_DEBUG_OPEN_CONNECTION"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !name.isEmpty else { return }
+        guard let connection = connectionsViewModel.savedConnections.first(where: {
+            $0.name.caseInsensitiveCompare(name) == .orderedSame
+        }) else {
+            print("[Debug][FTP] accept missing connection name=\(name)")
+            return
+        }
+        appState.enterConnectionBrowser(connection)
+        await connectionsViewModel.selectConnection(connection)
+        var video = connectionsViewModel.files.first(where: \.isVideo)
+        if video == nil, let folder = connectionsViewModel.files.first(where: \.isDirectory) {
+            await connectionsViewModel.openDirectory(folder)
+            video = connectionsViewModel.files.first(where: \.isVideo)
+        }
+        let actions = Set(
+            (env["VANMO_DEBUG_ACCEPT_ACTIONS"] ?? "")
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        )
+        print("[Debug][FTP] accept listed=\(connectionsViewModel.files.count) hasVideo=\(video != nil) actions=\(actions.sorted().joined(separator: ","))")
+        guard let video else { return }
+        if actions.contains("play") {
+            await connectionsViewModel.play(video, via: appState)
+        }
+        if actions.contains("download") {
+            do {
+                let request = try DownloadRequestFactory.make(
+                    from: video,
+                    connectionId: connection.id,
+                    connectionType: connection.type
+                )
+                try await downloadManager.enqueue(request)
+                print("[Debug][FTP] accept download enqueued")
+            } catch {
+                print("[Debug][FTP] accept download failed \(error.localizedDescription)")
+            }
+        }
+    }
+#endif
 }
 
 private struct MacMainWindowAccessor: NSViewRepresentable {

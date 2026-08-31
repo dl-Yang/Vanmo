@@ -27,6 +27,8 @@ public final class PrefetchSession {
         self.cache = try RangeCache(sessionId: token)
         if originalURL.usesSMBScheme {
             self.source = SMBPrefetchByteSource(url: originalURL)
+        } else if originalURL.usesFTPScheme {
+            self.source = FTPPrefetchByteSource(url: originalURL)
         } else {
             self.source = HTTPPrefetchByteSource(url: originalURL, headerProvider: headerProvider)
         }

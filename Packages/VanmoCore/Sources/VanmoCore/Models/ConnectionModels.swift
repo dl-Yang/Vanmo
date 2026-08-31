@@ -149,6 +149,24 @@ public enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendabl
         isOAuthCloudDrive || isImplicitOAuthCloudDrive
     }
 
+    /// WebDAV 系连接的浏览根是配置路径（AList 为 `/dav`），不是站点 `/`。
+    public var usesConfiguredDirectoryRoot: Bool {
+        switch self {
+        case .webdav, .alist, .fnos, .ftp:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 文件浏览起始路径。AList 的 `/` 是网页前端，PROPFIND 会 405。
+    public func browserRootPath(configuredPath: String?) -> String {
+        guard usesConfiguredDirectoryRoot else { return "/" }
+        let trimmed = configuredPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty else { return "/" }
+        return trimmed.hasPrefix("/") ? trimmed : "/\(trimmed)"
+    }
+
     /// connect 后仅建立连接与浏览；须用户选定目录后手动触发递归同步入库（Infuse Favorite 模型）。
     /// 媒体服务器（Plex/Emby/Jellyfin）与 IPTV/DLNA 仍保留原有 connect 同步行为。
     public var requiresManualDirectorySync: Bool {
@@ -289,6 +307,10 @@ public final class SavedConnection {
         self.addedAt = Date()
         self.updatedAt = Date()
         self.lastModifiedDeviceId = CloudSyncDevice.id
+    }
+
+    public var browserRootPath: String {
+        type.browserRootPath(configuredPath: path)
     }
 }
 

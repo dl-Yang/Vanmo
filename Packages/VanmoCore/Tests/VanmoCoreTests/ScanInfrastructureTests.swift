@@ -51,6 +51,20 @@ final class RemoteServiceCapabilitiesTests: XCTestCase {
         XCTAssertEqual(caps.playbackPersistence, .stableDirectURL)
         XCTAssertFalse(ConnectionType.webdav.requiresLazyPlaybackURL)
     }
+
+    func testAListBrowserRootUsesConfiguredDavPath() {
+        XCTAssertTrue(ConnectionType.alist.usesConfiguredDirectoryRoot)
+        XCTAssertEqual(ConnectionType.alist.browserRootPath(configuredPath: "/dav"), "/dav")
+        XCTAssertEqual(ConnectionType.alist.browserRootPath(configuredPath: "dav"), "/dav")
+        XCTAssertEqual(ConnectionType.smb.browserRootPath(configuredPath: "/share"), "/")
+    }
+
+    func testWebDAVListingRootUsesMountPath() {
+        XCTAssertEqual(WebDAVService.resolvedListingPath("/", mountPath: "/dav"), "/dav")
+        XCTAssertEqual(WebDAVService.resolvedListingPath("", mountPath: "/dav"), "/dav")
+        XCTAssertEqual(WebDAVService.resolvedListingPath("/dav/Movies", mountPath: "/dav"), "/dav/Movies")
+        XCTAssertEqual(WebDAVService.resolvedListingPath("/", mountPath: nil), "/")
+    }
 }
 
 private final class StubRemoteService: RemoteFileService {

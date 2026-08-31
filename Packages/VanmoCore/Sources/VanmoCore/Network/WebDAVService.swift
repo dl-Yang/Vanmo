@@ -31,7 +31,7 @@ public final class WebDAVService: RemoteFileService {
         }
         self.resolvedBaseURL = base
 
-        let probePath = normalizedPath(config.path ?? "/")
+        let probePath = Self.resolvedListingPath("/", mountPath: config.path)
         let probeURL = appending(path: probePath, to: base)
         VanmoLogger.network.info("[WebDAV] PROPFIND probe: \(probeURL.absoluteString)")
 
@@ -60,14 +60,9 @@ public final class WebDAVService: RemoteFileService {
         case 401, 403:
             throw NetworkError.authenticationFailed
         case 404:
-            switch type {
-            case .alist:
-                throw NetworkError.connectionFailed("路径不存在: \(probePath)。AList 的 WebDAV 路径通常为 /dav，请检查路径设置。")
-            case .fnos:
-                throw NetworkError.connectionFailed("路径不存在: \(probePath)。fnOS WebDAV 路径通常留空，请确认 NAS 已开启 WebDAV 服务并授予文件夹权限。")
-            default:
-                throw NetworkError.connectionFailed("路径不存在: \(probePath)，请检查 WebDAV 根路径或目录权限。")
-            }
+            throw pathMissingError(probePath)
+        case 405:
+            throw methodNotAllowedError(probePath)
         default:
             let bodyPreview = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
             throw NetworkError.connectionFailed("PROPFIND 失败 (\(httpResponse.statusCode)): \(bodyPreview)")
@@ -87,7 +82,7 @@ public final class WebDAVService: RemoteFileService {
             throw NetworkError.notConnected
         }
 
-        let normalized = normalizedPath(path.isEmpty ? (config.path ?? "/") : path)
+        let normalized = Self.resolvedListingPath(path, mountPath: config.path)
         let url = appending(path: normalized, to: base)
         VanmoLogger.network.info("[WebDAV] PROPFIND list: \(url.absoluteString)")
 
@@ -109,6 +104,12 @@ public final class WebDAVService: RemoteFileService {
             VanmoLogger.network.error("[WebDAV] list status \(httpResponse.statusCode)")
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw NetworkError.authenticationFailed
+            }
+            if httpResponse.statusCode == 404 {
+                throw pathMissingError(normalized)
+            }
+            if httpResponse.statusCode == 405 {
+                throw methodNotAllowedError(normalized)
             }
             throw NetworkError.transferFailed("PROPFIND \(httpResponse.statusCode)")
         }
@@ -230,8 +231,17 @@ public final class WebDAVService: RemoteFileService {
         return segment.addingPercentEncoding(withAllowedCharacters: allowed) ?? segment
     }
 
+    /// 浏览 `/` 时落到配置的 WebDAV 挂载点。AList 的站点根是前端，PROPFIND 返回 405。
+    public static func resolvedListingPath(_ path: String, mountPath: String?) -> String {
+        let requested = normalizedPath(path)
+        if requested == "/" {
+            return normalizedPath(mountPath ?? "/")
+        }
+        return requested
+    }
+
     /// 让 path 始终以 `/` 起始，并去掉重复斜杠。
-    private func normalizedPath(_ path: String) -> String {
+    private static func normalizedPath(_ path: String) -> String {
         if path.isEmpty { return "/" }
         var result = path
         if !result.hasPrefix("/") { result = "/" + result }
@@ -239,6 +249,30 @@ public final class WebDAVService: RemoteFileService {
             result = result.replacingOccurrences(of: "//", with: "/")
         }
         return result
+    }
+
+    private func normalizedPath(_ path: String) -> String {
+        Self.normalizedPath(path)
+    }
+
+    private func pathMissingError(_ probePath: String) -> NetworkError {
+        switch type {
+        case .alist:
+            return .connectionFailed("路径不存在: \(probePath)。AList 的 WebDAV 路径通常为 /dav，请检查路径设置。")
+        case .fnos:
+            return .connectionFailed("路径不存在: \(probePath)。fnOS WebDAV 路径通常留空，请确认 NAS 已开启 WebDAV 服务并授予文件夹权限。")
+        default:
+            return .connectionFailed("路径不存在: \(probePath)，请检查 WebDAV 根路径或目录权限。")
+        }
+    }
+
+    private func methodNotAllowedError(_ probePath: String) -> NetworkError {
+        switch type {
+        case .alist:
+            return .connectionFailed("路径 \(probePath) 不支持 WebDAV。AList 请使用 /dav，不要探测站点根路径。")
+        default:
+            return .transferFailed("PROPFIND 405")
+        }
     }
 
     // MARK: - Requests

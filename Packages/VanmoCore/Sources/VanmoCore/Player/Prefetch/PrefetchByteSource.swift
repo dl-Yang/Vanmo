@@ -110,3 +110,80 @@ actor SMBPrefetchByteSource: PrefetchByteSource {
         }
     }
 }
+
+actor FTPPrefetchByteSource: PrefetchByteSource {
+    private let url: URL
+    private var service: FTPService?
+    private var path: String?
+    private var readBusy = false
+    private var readWaiters: [CheckedContinuation<Void, Never>] = []
+
+    init(url: URL) {
+        self.url = url
+    }
+
+    func probeTotalSize() async throws -> Int64 {
+        await acquireRead()
+        defer { releaseRead() }
+        let (service, path) = try await ensureConnected()
+        return try await service.fileSize(at: path)
+    }
+
+    func data(forInclusiveRange range: ClosedRange<Int64>) async throws -> Data {
+        await acquireRead()
+        defer { releaseRead() }
+        let (service, path) = try await ensureConnected()
+        var offset = UInt64(range.lowerBound)
+        let end = UInt64(range.upperBound) + 1
+        var collected = Data()
+        collected.reserveCapacity(Int(min(end - offset, 1_048_576)))
+        while offset < end {
+            let remaining = end - offset
+            let chunk = UInt32(min(remaining, UInt64(PrefetchConfig.chunkSize)))
+            let data = try await service.readRange(at: path, offset: offset, length: chunk)
+            if data.isEmpty {
+                throw PrefetchError.badResponse
+            }
+            collected.append(data)
+            offset += UInt64(data.count)
+        }
+        return collected
+    }
+
+    func close() async {
+        await service?.disconnect()
+        service = nil
+        path = nil
+    }
+
+    private func ensureConnected() async throws -> (FTPService, String) {
+        if let service, let path, service.isConnected {
+            return (service, path)
+        }
+        guard let target = FTPService.playbackTarget(from: url) else {
+            throw NetworkError.invalidURL
+        }
+        let service = FTPService()
+        try await service.connect(config: target.config)
+        self.service = service
+        self.path = target.path
+        return (service, target.path)
+    }
+
+    private func acquireRead() async {
+        if !readBusy {
+            readBusy = true
+            return
+        }
+        await withCheckedContinuation { readWaiters.append($0) }
+    }
+
+    private func releaseRead() {
+        if let next = readWaiters.first {
+            readWaiters.removeFirst()
+            next.resume()
+        } else {
+            readBusy = false
+        }
+    }
+}
