@@ -1,16 +1,16 @@
 import Foundation
 
-public struct FTPPlaybackTarget {
+public struct SFTPPlaybackTarget {
     public let config: ConnectionConfig
     public let path: String
 }
 
-/// Real RFC 959 FTP service. SFTP is a separate Citadel client.
-public final class FTPService: RemoteFileService, @unchecked Sendable {
-    public let type: ConnectionType = .ftp
+/// Password-authenticated SFTP service. SSH keys and known-hosts stay out of scope.
+public final class SFTPService: RemoteFileService, @unchecked Sendable {
+    public let type: ConnectionType = .sftp
     public private(set) var isConnected = false
 
-    private var client: FTPClient?
+    private var session: SFTPSession?
     private var config: ConnectionConfig?
 
     public init() {}
@@ -18,40 +18,42 @@ public final class FTPService: RemoteFileService, @unchecked Sendable {
     public func connect(config: ConnectionConfig) async throws {
         let host = Self.strippedHost(config.host)
         guard !host.isEmpty else { throw NetworkError.connectionFailed("缺少主机地址") }
+        guard let username = config.username?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !username.isEmpty else {
+            throw NetworkError.authenticationFailed
+        }
 
-        let client = FTPClient(
+        let session = SFTPSession(
             host: host,
             port: config.port,
-            username: config.username,
+            username: username,
             password: config.password
         )
-        try await client.login()
-        self.client = client
+        try await session.login()
+        self.session = session
         self.config = ConnectionConfig(
             connectionId: config.connectionId,
-            type: .ftp,
+            type: .sftp,
             host: host,
             port: config.port,
-            username: config.username,
+            username: username,
             password: config.password,
             path: config.path
         )
         isConnected = true
-        VanmoLogger.network.info("[FTP] connected to \(host):\(config.port)")
+        VanmoLogger.network.info("[SFTP] connected to \(host):\(config.port)")
     }
 
     public func disconnect() async {
-        await client?.quit()
-        client = nil
+        await session?.close()
+        session = nil
         config = nil
         isConnected = false
-        VanmoLogger.network.info("[FTP] disconnected")
     }
 
     public func listDirectory(path: String) async throws -> [RemoteFile] {
-        guard isConnected, let client else { throw NetworkError.notConnected }
-        let normalized = FTPListingParser.normalizePath(path)
-        return try await client.listDirectory(path: normalized)
+        guard isConnected, let session else { throw NetworkError.notConnected }
+        return try await session.listDirectory(path: path)
     }
 
     public func streamURL(for file: RemoteFile) async throws -> URL {
@@ -71,13 +73,13 @@ public final class FTPService: RemoteFileService, @unchecked Sendable {
     }
 
     public func fileSize(at path: String) async throws -> Int64 {
-        guard isConnected, let client else { throw NetworkError.notConnected }
-        return try await client.fileSize(at: path)
+        guard isConnected, let session else { throw NetworkError.notConnected }
+        return try await session.fileSize(at: path)
     }
 
     public func readRange(at path: String, offset: UInt64, length: UInt32) async throws -> Data {
-        guard isConnected, let client else { throw NetworkError.notConnected }
-        return try await client.readRange(path: path, offset: offset, length: length)
+        guard isConnected, let session else { throw NetworkError.notConnected }
+        return try await session.readRange(path: path, offset: offset, length: length)
     }
 
     public func downloadResuming(
@@ -85,8 +87,8 @@ public final class FTPService: RemoteFileService, @unchecked Sendable {
         to localURL: URL,
         progress: @escaping @Sendable (Int64, Int64) -> Void
     ) async throws {
-        guard isConnected, let client else { throw NetworkError.notConnected }
-        try await client.downloadResuming(
+        guard isConnected, let session else { throw NetworkError.notConnected }
+        try await session.downloadResuming(
             path: file.path,
             to: localURL,
             expectedSize: file.size,
@@ -94,48 +96,48 @@ public final class FTPService: RemoteFileService, @unchecked Sendable {
         )
     }
 
-    public static func playbackTarget(from url: URL) -> FTPPlaybackTarget? {
-        guard url.usesFTPScheme, let host = url.host, !host.isEmpty else { return nil }
-        let port = url.port ?? 21
-        let filePath = FTPListingParser.normalizePath(url.path)
+    public static func playbackTarget(from url: URL) -> SFTPPlaybackTarget? {
+        guard url.usesSFTPScheme, let host = url.host, !host.isEmpty else { return nil }
+        let port = url.port ?? 22
+        let filePath = SFTPPath.normalize(url.path)
         let parent = (filePath as NSString).deletingLastPathComponent
         let config = ConnectionConfig(
-            type: .ftp,
+            type: .sftp,
             host: host,
             port: port,
             username: url.user,
             password: url.password,
             path: parent == "/" ? nil : parent
         )
-        return FTPPlaybackTarget(config: config, path: filePath)
+        return SFTPPlaybackTarget(config: config, path: filePath)
     }
 
     public static func makeStreamURL(config: ConnectionConfig, filePath: String) throws -> URL {
         let host = strippedHost(config.host)
-        let port = config.port > 0 ? config.port : 21
-        let portSegment = port == 21 ? "" : ":\(port)"
+        let port = config.port > 0 ? config.port : 22
+        let portSegment = port == 22 ? "" : ":\(port)"
         var auth = ""
         if let user = config.username, !user.isEmpty {
-            let encodedUser = user.percentEncodedFTPComponent
+            let encodedUser = user.percentEncodedSFTPComponent
             if let pass = config.password, !pass.isEmpty {
-                auth = "\(encodedUser):\(pass.percentEncodedFTPComponent)@"
+                auth = "\(encodedUser):\(pass.percentEncodedSFTPComponent)@"
             } else {
                 auth = "\(encodedUser)@"
             }
         }
-        let encodedPath = FTPListingParser.normalizePath(filePath)
+        let encodedPath = SFTPPath.normalize(filePath)
             .split(separator: "/")
-            .map { String($0).percentEncodedFTPPathSegment }
+            .map { String($0).percentEncodedSFTPPathSegment }
             .joined(separator: "/")
         let pathSegment = encodedPath.isEmpty ? "" : "/\(encodedPath)"
-        let urlString = "ftp://\(auth)\(host)\(portSegment)\(pathSegment)"
+        let urlString = "sftp://\(auth)\(host)\(portSegment)\(pathSegment)"
         guard let url = URL(string: urlString) else { throw NetworkError.invalidURL }
         return url
     }
 
     private static func strippedHost(_ raw: String) -> String {
         var host = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        for prefix in ["ftp://", "ftps://"] where host.lowercased().hasPrefix(prefix) {
+        for prefix in ["sftp://", "ssh://"] where host.lowercased().hasPrefix(prefix) {
             host = String(host.dropFirst(prefix.count))
         }
         if let slash = host.firstIndex(of: "/") {
@@ -153,13 +155,13 @@ public final class FTPService: RemoteFileService, @unchecked Sendable {
 }
 
 private extension String {
-    var percentEncodedFTPComponent: String {
+    var percentEncodedSFTPComponent: String {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
         return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
     }
 
-    var percentEncodedFTPPathSegment: String {
+    var percentEncodedSFTPPathSegment: String {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~!$&'()*+,;=:@")
         return addingPercentEncoding(withAllowedCharacters: allowed) ?? self

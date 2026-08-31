@@ -96,7 +96,7 @@ public struct Chapter: Identifiable, Equatable, Sendable {
 public enum SupportedFormat: Sendable {
     case native, ffmpeg, discImage
     public static func detect(from url: URL) -> SupportedFormat {
-        if url.usesSMBScheme || url.usesFTPScheme { return .ffmpeg }
+        if url.usesSMBScheme || url.usesFTPScheme || url.usesSFTPScheme { return .ffmpeg }
         if MediaFormatProbe.isDiscImage(url) { return .discImage }
         let ext = url.pathExtension.lowercased()
         if MediaFormatProbe.nativeVideoExtensions.contains(ext)
@@ -121,6 +121,10 @@ public extension URL {
 
     var usesFTPScheme: Bool {
         scheme?.lowercased() == "ftp"
+    }
+
+    var usesSFTPScheme: Bool {
+        scheme?.lowercased() == "sftp"
     }
 
     /// Host and path only. Never include userinfo.

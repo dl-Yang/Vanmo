@@ -9,7 +9,7 @@ A user can add an FTP server from the Files tab using a host/account form (name,
 
 The listing shows directories and files returned by `MLSD` or `LIST`. Playing a listed video uses KSPlayer through the localhost prefetch proxy (`source=ftp`). Files can enqueue a supported video for download; the completed file plays locally.
 
-SFTP remains a separate placeholder and is not covered here.
+SFTP is specified separately in [`sftp-connections.md`](sftp-connections.md) and is not covered here.
 
 **Current acceptance status:** Completed. 2026-08-31 iOS Simulator and VanmoMac runs logged `[FTP] ← 230`, listed 468 then 4 entries, played through KSPlayer plus prefetch (`source=ftp` on iOS; macOS prefetch proxy with FTP `SIZE`/`RETR`), and the operator completed a Files-browser download plus local play on both platforms.
 

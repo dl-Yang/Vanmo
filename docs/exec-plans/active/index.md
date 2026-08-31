@@ -11,14 +11,14 @@ These rules apply to every plan listed below. A validation-only plan does not au
 1. Launch iOS Vanmo with `./run_device.sh --simulator` or a signed device, and VanmoMac with `./run_device.sh --macos`.
 2. Open Files and add the named connection type. Implemented protocols save or complete OAuth login. Official-cloud placeholders (115, Quark, MEGA) stop at the disabled Save control and the official-access caption; do not require a saved connection or listing.
 3. Confirm connect using that plan's log prefix. A compile, launch, or unit test is not a real connection.
-4. Confirm the first listing shows readable directories, files, or media items. SFTP, NFS, and DLNA instead confirm the documented empty list or unsupported stream. Official-cloud placeholders do not reach listing.
+4. Confirm the first listing shows readable directories, files, or media items. NFS and DLNA instead confirm the documented empty list or unsupported stream. Official-cloud placeholders do not reach listing.
 5. For implemented protocols, play one listed video and record the engine path. iOS often uses a direct URL or KSPlayer. macOS remote HTTP should use the localhost prefetch proxy.
 6. Copy sanitized Console lines. Do not record passwords, tokens, complete authenticated URLs, or private media titles.
 7. iOS evidence does not prove macOS. Both platforms must pass before a plan can move to `../completed/`.
 
 Out of default scope for this set: downloads, library scan persistence, playback-progress sync, CloudKit, physical-device XCUITest, and Figma changes.
 
-Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local folder, Google Drive, Baidu Netdisk. Advance one plan at a time. AList connect, list, play, and Files-browser download are recorded under `docs/exec-plans/completed/`. FTP real-source connect, list, play, and download are recorded under `docs/exec-plans/completed/`. The FTP placeholder expected-failure record remains under `docs/exec-plans/completed/`.
+Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local folder, Google Drive, Baidu Netdisk. Advance one plan at a time. AList connect, list, play, and Files-browser download are recorded under `docs/exec-plans/completed/`. FTP real-source connect, list, play, and download are recorded under `docs/exec-plans/completed/`. SFTP password connect, list, prefetch play, and Files-browser download are recorded under `docs/exec-plans/completed/`. The FTP placeholder expected-failure record remains under `docs/exec-plans/completed/`.
 
 ## Current Plans
 
@@ -40,7 +40,6 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 
 ### Placeholder or unsupported expected failure
 
-- [`2026-08-28-sftp-connection-validation.md`](2026-08-28-sftp-connection-validation.md) — **Not started.** Logical connect, empty listing, unsupported stream
 - [`2026-08-28-nfs-connection-validation.md`](2026-08-28-nfs-connection-validation.md) — **Not started.** Generic HTTP placeholder, empty listing
 - [`2026-08-28-dlna-connection-validation.md`](2026-08-28-dlna-connection-validation.md) — **Not started.** Generic HTTP placeholder, no SSDP discovery
 - [`2026-08-28-drive115-connection-validation.md`](2026-08-28-drive115-connection-validation.md) — **Not started.** Official-cloud placeholder; save disabled

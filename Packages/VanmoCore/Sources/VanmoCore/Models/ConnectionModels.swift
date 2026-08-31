@@ -152,7 +152,7 @@ public enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendabl
     /// WebDAV 系连接的浏览根是配置路径（AList 为 `/dav`），不是站点 `/`。
     public var usesConfiguredDirectoryRoot: Bool {
         switch self {
-        case .webdav, .alist, .fnos, .ftp:
+        case .webdav, .alist, .fnos, .ftp, .sftp:
             return true
         default:
             return false

@@ -88,7 +88,8 @@ final class FTPListingParserTests: XCTestCase {
         XCTAssertTrue(ConnectionType.ftp.usesConfiguredDirectoryRoot)
         XCTAssertEqual(ConnectionType.ftp.browserRootPath(configuredPath: nil), "/")
         XCTAssertEqual(ConnectionType.ftp.browserRootPath(configuredPath: "media"), "/media")
-        XCTAssertFalse(ConnectionType.sftp.usesConfiguredDirectoryRoot)
+        XCTAssertTrue(ConnectionType.sftp.usesConfiguredDirectoryRoot)
+        XCTAssertEqual(ConnectionType.sftp.browserRootPath(configuredPath: "media"), "/media")
     }
 
     func testStreamURLOmitsDefaultPort() throws {

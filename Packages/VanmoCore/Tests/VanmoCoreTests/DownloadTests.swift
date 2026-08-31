@@ -12,8 +12,9 @@ final class DownloadTests: XCTestCase {
         XCTAssertFalse(DownloadEligibility.isEligible(file: bdmv, connectionType: .smb))
         XCTAssertFalse(DownloadEligibility.isEligible(file: iso, connectionType: .iptv))
         XCTAssertTrue(DownloadEligibility.isSupported(connectionType: .ftp))
-        XCTAssertFalse(DownloadEligibility.isSupported(connectionType: .sftp))
+        XCTAssertTrue(DownloadEligibility.isSupported(connectionType: .sftp))
         XCTAssertTrue(DownloadEligibility.isEligible(file: iso, connectionType: .ftp))
+        XCTAssertTrue(DownloadEligibility.isEligible(file: iso, connectionType: .sftp))
     }
 
     func testDownloadSnapshotRoundTripsThroughManifest() async throws {

@@ -1097,7 +1097,7 @@ final class MacConnectionsViewModel: ObservableObject {
         if connection.type.supportsOAuthLogin {
             return "\(connection.type.displayName) 接入尚未就绪：\(error.localizedDescription)"
         }
-        if connection.type == .sftp || connection.type == .nfs || connection.type == .dlna {
+        if connection.type == .nfs || connection.type == .dlna {
             return "\(connection.type.displayName) 文件浏览暂不可用或该目录为空"
         }
         return error.localizedDescription

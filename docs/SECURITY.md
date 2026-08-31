@@ -50,6 +50,9 @@ Use the documented scripts for normal builds and checks. Never weaken sandboxing
 
 - Add dependencies only through `project.yml` or `Packages/VanmoCore/Package.swift`, with a documented need, ownership boundary, license/trust review, and verification plan.
 - The SMB stack currently pins `thatcube/SMBClient` revision `d8baadc` (open upstream PR #234, MIT, based on `66eafaa`) so 3.1.1 AES-GCM encryption can be negotiated. Return the URL to `kishikawakatsumi/SMBClient` when that commit is on `main`. Do not unpin to a floating branch.
+- SFTP uses `orlandos-nl/Citadel` 0.12.1 (MIT) from `Packages/VanmoCore/Package.swift`. Citadel 0.12.1 depends on SwiftNIO, Swift Crypto, and the `Wellz26/swift-nio-ssh` 0.3.x fork rather than `apple/swift-nio-ssh`. Keep the Citadel version pin; do not float to `main`.
+- First-version SFTP host-key policy is Citadel `.acceptAnything()`. There is no known-hosts UI or TOFU store. Use only with operator-entered hosts the user intends to trust.
+- `sftp://user:pass@host/path` may be persisted on `MediaItem.fileURL`, matching the existing FTP/SMB credential-in-URL trade-off. Logs must use `safePlaybackLogDescription` and must not print passwords.
 - Regenerate the Xcode project after `project.yml` dependency or target changes; never hand-edit `project.pbxproj`.
 - Security-sensitive changes require focused tests plus platform or environment evidence appropriate to the risk.
 - Changes to Keychain/OAuth storage, SwiftData store assignment, CloudKit scope, URL resolution, proxy authorization, filesystem access, sandbox entitlements, or download destinations require explicit review.

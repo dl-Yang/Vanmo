@@ -307,9 +307,9 @@ File-based services implement `RemoteFileService`, which defines:
 
 `RemoteServiceFactory` currently maps connection types as follows:
 
-- Concrete service classes: Local Folder, SMB, FTP, WebDAV/AList/fnOS, Baidu Netdisk, Google Drive, OneDrive, Box, pCloud, Yandex.Disk, IPTV, Emby, Jellyfin, and Plex.
+- Concrete service classes: Local Folder, SMB, FTP, SFTP, WebDAV/AList/fnOS, Baidu Netdisk, Google Drive, OneDrive, Box, pCloud, Yandex.Disk, IPTV, Emby, Jellyfin, and Plex.
 - Explicitly unsupported placeholders: the removed Aliyun Drive type, 115, Quark Drive, and MEGA.
-- SFTP currently establishes only a logical connection; directory listing is empty and streaming URLs are unsupported. FTP is a real RFC 959 client (`PASV`/`EPSV`, `MLSD`/`LIST`, `REST`/`RETR`) with prefetch `source=ftp`.
+- FTP is a real RFC 959 client (`PASV`/`EPSV`, `MLSD`/`LIST`, `REST`/`RETR`) with prefetch `source=ftp`. SFTP is a password-authenticated Citadel client (SSH + SFTP subsystem) with prefetch `source=sftp`. First-version host-key policy accepts any server key. SSH public-key and known-hosts UI are not implemented.
 - NFS, DLNA, and other types without dedicated implementations fall back to a generic HTTP placeholder.
 - SMB uses `kishikawakatsumi/SMBClient` via the MIT-licensed [PR #234](https://github.com/kishikawakatsumi/SMBClient/pull/234) fork revision `d8baadc`, which sits on the already-used `66eafaa` signing commit. `SMBService` normalizes `smb://` / UNC hosts and `DOMAIN\user` accounts, negotiates SMB 2.02, 2.10, 3.0, 3.02, and 3.1.1 with signing required, and retries an IPv4 target via reverse DNS plus `_smb._tcp` `.local` names. 3.1.1 sessions can wrap messages with AES-GCM when the server requires encryption. 3.0/3.02 AES-CCM encryption is not implemented. Share listing probes tree connect, hides IPC / `*$` / access-denied entries, and falls back to a configured share when `IPC$` enumeration fails. A guest-downgraded session that cannot open the configured share is treated as a Mac File Sharing NTLM-hash gap, not a successful browse.
 
@@ -338,6 +338,7 @@ Scanning persists catalog URLs in the `vanmo://playback/...` form instead of sto
 - Each item receives a token and a `PrefetchSession`.
 - `RemoteFetcher`, `RangeCache`, and temporary files handle remote Range requests and caching.
 - Header providers inject dynamic credentials such as Google Drive bearer tokens and the Baidu Netdisk User-Agent.
+- `smb://`, `ftp://`, and `sftp://` registrations use protocol-specific byte sources. KSPlayer loads the localhost proxy for FTP and SFTP on both platforms.
 
 ### 6.5 Downloads
 
@@ -347,7 +348,7 @@ Scanning persists catalog URLs in the `vanmo://playback/...` form instead of sto
 - It restores unfinished downloads after relaunch.
 - A single worker currently consumes the queue serially.
 - Local files use chunked copying.
-- SMB uses resumable downloads.
+- SMB, FTP, and SFTP use resumable downloads.
 - HTTP(S) uses 4 MiB Range chunks and handles refreshed URLs after 401/403 responses as well as 200, 206, and 416 responses.
 - Completed files are moved through a temporary destination into the default or security-scoped custom directory.
 
@@ -390,6 +391,7 @@ The coordinator does not implement a transport protocol. The CloudKit-enabled Sw
 - Native formats use AVFoundation.
 - FFmpeg formats use KSPlayer.
 - `smb://` URLs always use KSPlayer. iOS plays the `smb://` URL directly. macOS serves the file through the localhost prefetch proxy, which range-reads the share with `SMBService` so seeks do not rely on libsmbclient.
+- `ftp://` and `sftp://` URLs always use KSPlayer through the localhost prefetch proxy on both platforms. iOS KSPlayer builds typically lack libssh, so raw `sftp://` is not loaded.
 - Disc images and disc structures:
   - iOS currently sends candidates to a KSPlayer proof-of-concept path.
   - macOS explicitly reports them as unsupported and recommends direct `.m2ts` playback.
@@ -587,7 +589,7 @@ See `docs/RELIABILITY.md` for the complete command stages and evidence boundarie
 
 1. **Substantial platform-layer duplication.** iOS and macOS maintain separate connection, library, search, and player ViewModels. `VanmoCore` shares infrastructure, but use-case orchestration remains platform-specific.
 2. **Large ViewModels and views.** The iOS `PlayerViewModel`, `ConnectionsViewModel`, `LibraryViewModel`, and their macOS counterparts combine state, network orchestration, mapping, and persistence. Changes require focused data-flow verification.
-3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. SFTP, NFS, DLNA, and several official cloud-drive integrations require further implementation. FTP is implemented; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play, and Files-browser download.
+3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. NFS, DLNA, and several official cloud-drive integrations require further implementation. FTP is implemented; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play, and Files-browser download. SFTP is implemented as a password-authenticated Citadel client; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play (`source=sftp`), and Files-browser download.
 4. **No explicit SwiftData migration strategy.** There is no `VersionedSchema` or `SchemaMigrationPlan`. Container creation calls `fatalError` on failure and has no recovery or fallback path.
 5. **CloudKit is Release-only.** Debug builds can verify local fallback and static boundaries, but cannot prove real CloudKit behavior.
 6. **iOS UI automation still lacks physical-device evidence.** The `VanmoUITests` target and unified XCUITest CLI exist, and the compile-safe Settings `.paused` label unblocks Simulator `build-for-testing`. Physical-device signing and device-side runner-argument delivery remain unverified; broader iOS/macOS player or real-source journeys still depend on later recorded evidence.

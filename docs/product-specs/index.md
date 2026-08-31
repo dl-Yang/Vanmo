@@ -8,6 +8,7 @@ This folder contains current user-visible behavior and acceptance targets. It do
 - [`smb-connections.md`](smb-connections.md): SMB connect, browse, and KSPlayer playback for iOS and macOS, including unreadable-share hiding; 2026-08-27 File Sharing runs passed on iOS Simulator and VanmoMac
 - [`smb-311-encryption.md`](smb-311-encryption.md): SMB 3.1.1 AES-GCM encryption-required connect, browse, and play; 2026-08-28 VanmoMac and iOS-device runs recorded `0x311` + `encrypt=true`, a `MacShare` listing, VanmoMac prefetch `source=smb`, and an iOS KSPlayer `smb://` load
 - [`ftp-connections.md`](ftp-connections.md): FTP connect, browse, KSPlayer prefetch play, and Files-browser download; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, play, download, and local play
+- [`sftp-connections.md`](sftp-connections.md): SFTP connect, browse, KSPlayer prefetch play, and Files-browser download; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, play, download, and local play
 
 ## Rules
 

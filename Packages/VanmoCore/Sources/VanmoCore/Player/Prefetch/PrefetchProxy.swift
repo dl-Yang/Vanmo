@@ -55,6 +55,8 @@ public actor PrefetchProxy {
             source = "smb"
         } else if originalURL.usesFTPScheme {
             source = "ftp"
+        } else if originalURL.usesSFTPScheme {
+            source = "sftp"
         } else {
             source = "http"
         }

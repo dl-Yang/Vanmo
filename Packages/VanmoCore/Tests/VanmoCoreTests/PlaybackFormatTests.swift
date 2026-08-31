@@ -36,6 +36,15 @@ final class PlaybackFormatTests: XCTestCase {
         XCTAssertFalse(url.safePlaybackLogDescription.contains("secret"))
     }
 
+    func testSFTPMP4UsesFFmpegPath() {
+        let url = URL(string: "sftp://user:secret@192.168.31.59/Movies/clip.mp4")!
+        XCTAssertEqual(SupportedFormat.detect(from: url), .ffmpeg)
+        XCTAssertTrue(url.usesSFTPScheme)
+        XCTAssertTrue(SupportedFormat.prefersKSPlayer(for: url))
+        XCTAssertEqual(url.safePlaybackLogDescription, "sftp://192.168.31.59/Movies/clip.mp4")
+        XCTAssertFalse(url.safePlaybackLogDescription.contains("secret"))
+    }
+
     func testSafePlaybackLogStripsUserInfo() {
         let url = URL(string: "smb://user:secret@192.168.1.10/share/movie.mp4")!
         XCTAssertEqual(

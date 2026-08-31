@@ -126,6 +126,6 @@ None.
 
 ## Follow-ups
 
-- SFTP remains `SFTPPlaceholderService`.
+- SFTP is a separate Citadel client; 2026-08-31 dual-platform real-source evidence is recorded under [`2026-08-28-sftp-connection-validation.md`](2026-08-28-sftp-connection-validation.md).
 - macOS os.Logger privacy redacts FTP command text and prefetch `source=`; iOS Console remains the clearer evidence path.
 - `ftp://user:pass@host/path` on `MediaItem.fileURL` remains the known credential-in-URL trade-off.

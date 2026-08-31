@@ -29,6 +29,8 @@ public final class PrefetchSession {
             self.source = SMBPrefetchByteSource(url: originalURL)
         } else if originalURL.usesFTPScheme {
             self.source = FTPPrefetchByteSource(url: originalURL)
+        } else if originalURL.usesSFTPScheme {
+            self.source = SFTPPrefetchByteSource(url: originalURL)
         } else {
             self.source = HTTPPrefetchByteSource(url: originalURL, headerProvider: headerProvider)
         }

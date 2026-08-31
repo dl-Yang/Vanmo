@@ -32,7 +32,7 @@ public enum RemoteServiceFactory {
         case .ftp:
             return FTPService()
         case .sftp:
-            return SFTPPlaceholderService()
+            return SFTPService()
         case .emby:
             return EmbyService()
         case .jellyfin:
@@ -71,33 +71,6 @@ public final class UnsupportedOfficialCloudDriveService: RemoteFileService {
 
     public func download(file: RemoteFile, to localURL: URL, progress: @escaping (Double) -> Void) async throws {
         throw NetworkError.unsupportedProtocol
-    }
-}
-
-public final class SFTPPlaceholderService: RemoteFileService {
-    public let type: ConnectionType = .sftp
-    public private(set) var isConnected = false
-
-    public func connect(config: ConnectionConfig) async throws {
-        isConnected = true
-        VanmoLogger.network.info("SFTP connected to \(config.host)")
-    }
-
-    public func disconnect() async {
-        isConnected = false
-    }
-
-    public func listDirectory(path: String) async throws -> [RemoteFile] {
-        guard isConnected else { throw NetworkError.notConnected }
-        return []
-    }
-
-    public func streamURL(for file: RemoteFile) async throws -> URL {
-        throw NetworkError.unsupportedProtocol
-    }
-
-    public func download(file: RemoteFile, to localURL: URL, progress: @escaping (Double) -> Void) async throws {
-        guard isConnected else { throw NetworkError.notConnected }
     }
 }
 
