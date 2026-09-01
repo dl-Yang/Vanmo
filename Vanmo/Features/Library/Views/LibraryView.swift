@@ -206,25 +206,16 @@ struct LibraryView: View {
     private var syncPillText: String? {
         guard connectionsViewModel.librarySyncMessage == nil else { return nil }
 
-        let connections = connectionsViewModel.savedConnections
-        guard !connections.isEmpty else { return nil }
-
-        let libraryCount = connections.reduce(0) { partial, connection in
+        let syncedCount = connectionsViewModel.savedConnections.filter { connection in
+            guard serverErrorMessage(for: connection) == nil else { return false }
             if usesServerCollectionAPI(connection) {
-                return partial + viewModel.homeVisibleFolders(for: connection.id).count
-            } else {
-                return partial + viewModel.homeVisibleScannedFolders(for: connection.id).count
+                return !viewModel.homeVisibleFolders(for: connection.id).isEmpty
             }
-        }
+            return !viewModel.homeVisibleScannedFolders(for: connection.id).isEmpty
+        }.count
 
-        let sourceCount = connections.filter(\.type.isMediaServer).count
-        let prefix = sourceCount > 1
-            ? L10n.tr("%d 个媒体服务器已同步", sourceCount)
-            : L10n.tr("已同步")
-        let count = libraryCount > 0 ? libraryCount : connections.count
-        return libraryCount > 0
-            ? L10n.tr("%@ · %d 个库", prefix, count)
-            : L10n.tr("%@ · %d 个源", prefix, count)
+        guard syncedCount >= 1 else { return nil }
+        return L10n.tr("已同步 · %d 个服务器", syncedCount)
     }
 
     private func syncPill(_ text: String) -> some View {
@@ -357,11 +348,11 @@ struct LibraryView: View {
         } else {
             ForEach(viewModel.orderedEmbyConnections) { connection in
                 if let errorMessage = serverErrorMessage(for: connection) {
-                    serverErrorSection(serverName: connection.name, message: errorMessage)
+                    serverErrorSection(connection: connection, message: errorMessage)
                 } else {
                     let folders = viewModel.homeVisibleFolders(for: connection.id)
                     if !folders.isEmpty {
-                        collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
+                        collectionFolderSection(folders: folders, connection: connection)
                     }
                 }
             }
@@ -372,23 +363,22 @@ struct LibraryView: View {
     private var scannedLibrarySections: some View {
         ForEach(viewModel.orderedScannedConnections) { connection in
             if let errorMessage = serverErrorMessage(for: connection) {
-                serverErrorSection(serverName: connection.name, message: errorMessage)
+                serverErrorSection(connection: connection, message: errorMessage)
             } else {
                 let folders = viewModel.homeVisibleScannedFolders(for: connection.id)
                 if !folders.isEmpty {
-                    collectionFolderSection(serverName: connection.name, folders: folders, connection: connection)
+                    collectionFolderSection(folders: folders, connection: connection)
                 }
             }
         }
     }
 
     private func collectionFolderSection(
-        serverName: String,
         folders: [CollectionFolder],
         connection: SavedConnection
     ) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            serverSectionHeader(serverName: serverName, folderCount: folders.count)
+            serverSectionHeader(connection: connection, folderCount: folders.count)
 
             ForEach(folders) { folder in
                 folderRow(folder: folder, connection: connection)
@@ -400,9 +390,9 @@ struct LibraryView: View {
         viewModel.serverConnectionErrors[connection.id] ?? connectionsViewModel.connectionErrorMessage(for: connection)
     }
 
-    private func serverErrorSection(serverName: String, message: String) -> some View {
+    private func serverErrorSection(connection: SavedConnection, message: String) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            serverErrorHeader(serverName: serverName)
+            serverErrorHeader(connection: connection)
 
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -434,20 +424,18 @@ struct LibraryView: View {
         }
     }
 
-    private func serverErrorHeader(serverName: String) -> some View {
+    private func serverErrorHeader(connection: SavedConnection) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
                     .fill(Color.vanmoAccent.opacity(0.14))
 
-                Image(systemName: "server.rack")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.vanmoAccent)
+                ConnectionProviderIcon(type: connection.type, size: 22, fallbackTint: Color.vanmoAccent)
             }
             .frame(width: 42, height: 42)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(serverName)
+                Text(connection.name)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(HomeDesign.onSurface)
                     .lineLimit(1)
@@ -468,20 +456,18 @@ struct LibraryView: View {
         .padding(.horizontal, 24)
     }
 
-    private func serverSectionHeader(serverName: String, folderCount: Int) -> some View {
+    private func serverSectionHeader(connection: SavedConnection, folderCount: Int) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(HomeDesign.serverIconFill)
+                    .fill(.white)
 
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(HomeDesign.accent)
+                ConnectionProviderIcon(type: connection.type, size: 22, fallbackTint: HomeDesign.accent)
             }
             .frame(width: 42, height: 42)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(serverName)
+                Text(connection.name)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(HomeDesign.onSurface)
                     .lineLimit(1)

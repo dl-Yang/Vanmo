@@ -155,13 +155,21 @@ struct AddConnectionView: View {
         Section(L10n.tr("连接类型")) {
             if isEditing {
                 LabeledContent(L10n.tr("协议")) {
-                    Text(selectedType.displayName)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        ConnectionProviderIcon(type: selectedType, size: 18)
+                        Text(selectedType.displayName)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             } else {
                 Picker(L10n.tr("协议"), selection: $selectedType) {
                     ForEach(ConnectionType.availableConnectionTypes) { type in
-                        Text(type.displayName).tag(type)
+                        Label {
+                            Text(type.displayName)
+                        } icon: {
+                            ConnectionProviderIcon(type: type, size: 18)
+                        }
+                        .tag(type)
                     }
                 }
                 .pickerStyle(.menu)

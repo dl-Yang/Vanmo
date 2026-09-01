@@ -5873,6 +5873,22 @@
         }
       }
     },
+    "已同步 · %d 个服务器": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synced · %d servers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已同步 · %d 个服务器"
+          }
+        }
+      }
+    },
     "已同步 · %d 个源": {
       "localizations": {
         "en": {

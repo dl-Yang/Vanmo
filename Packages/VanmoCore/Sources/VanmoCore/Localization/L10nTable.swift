@@ -195,6 +195,7 @@ enum L10nTable {
         "已同步": "Synced",
         "已同步 %d 项...": "Synced %d items...",
         "已同步 · %d 个库": "Synced · %d libraries",
+        "已同步 · %d 个服务器": "Synced · %d servers",
         "已同步 · %d 个源": "Synced · %d sources",
         "已同步媒体": "Synced media",
         "已同步媒体 · %@": "Synced media · %@",

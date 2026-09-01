@@ -24,7 +24,7 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 
 ### In progress
 
-- None.
+- [`2026-09-01-ios-home-server-logos.md`](2026-09-01-ios-home-server-logos.md) — **In progress.** Home pill counts synced servers; home and Add Connection use brand logos
 
 ### Implemented, ready to run
 

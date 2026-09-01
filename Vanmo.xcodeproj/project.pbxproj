@@ -153,6 +153,7 @@
 		E8761CCFA33636AA4AA9D229 /* SWXMLHash in Frameworks */ = {isa = PBXBuildFile; productRef = 8023341C67DBE97AAEFDD222 /* SWXMLHash */; };
 		EB215A56D1547DDFADF6C4C4 /* iptv.png in Resources */ = {isa = PBXBuildFile; fileRef = 6D6524ADADB8CC750BE7000A /* iptv.png */; };
 		EB758A74342A89D52B40C26B /* loadingSpinner.json in Resources */ = {isa = PBXBuildFile; fileRef = 1FFCF33F1D900A4B2797C123 /* loadingSpinner.json */; };
+		EBE3CFC47BAB98876DCD20FA /* ConnectionProviderIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7553292EBCA6B2F858ABC102 /* ConnectionProviderIcon.swift */; };
 		EEE94A8BC9E412841A4FA59F /* SubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B7332CE86F10F0D7D0A3A4 /* SubtitleOverlayView.swift */; };
 		EF67AFEA69D6D34EF1AC1A4E /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B3D0B1F917828F998055F1 /* LibraryView.swift */; };
 		F031D0424EB370CEC07AA037 /* MacScannedLibraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */; };
@@ -247,6 +248,7 @@
 		730DA18B0B85AE160E3B54BE /* MacCollectionFolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCollectionFolderListView.swift; sourceTree = "<group>"; };
 		736B4DD3127AB97D0DC63402 /* KSPlayerMediaProbeProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerMediaProbeProvider.swift; sourceTree = "<group>"; };
 		7387B492C566DB95D6C62D0C /* VanmoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VanmoApp.swift; sourceTree = "<group>"; };
+		7553292EBCA6B2F858ABC102 /* ConnectionProviderIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionProviderIcon.swift; sourceTree = "<group>"; };
 		75DD80E300987DB0FA023D4B /* DominantColorExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DominantColorExtractor.swift; sourceTree = "<group>"; };
 		781055690453E6D2950A0933 /* KSPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerEngine.swift; sourceTree = "<group>"; };
 		7B45846B6B09E717C245CFD9 /* MacScanSyncBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScanSyncBanner.swift; sourceTree = "<group>"; };
@@ -609,6 +611,7 @@
 			isa = PBXGroup;
 			children = (
 				1A15784CA3D10BE58DA67E69 /* BackdropHeader.swift */,
+				7553292EBCA6B2F858ABC102 /* ConnectionProviderIcon.swift */,
 				86D3F3AD3CCD5F63E8C40925 /* EmptyStateView.swift */,
 				B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */,
 				47EA488509E18DC2C884AAA5 /* LoadingView.swift */,
@@ -1282,6 +1285,7 @@
 				197EEEB941D6C6F3220D8584 /* BrowserViewModel.swift in Sources */,
 				F718C85431A1FB9EDC16E6A2 /* CollectionFolderListView.swift in Sources */,
 				7D4AF0FCDB253C55CCFAD2E2 /* Color+Vanmo.swift in Sources */,
+				EBE3CFC47BAB98876DCD20FA /* ConnectionProviderIcon.swift in Sources */,
 				73EA987CC7F1298104A70F52 /* ContentView.swift in Sources */,
 				B0434F7B3AEC579CDD202B36 /* CountryMapper.swift in Sources */,
 				2BCE6B2C8BF8958400994F81 /* DominantColorExtractor.swift in Sources */,
