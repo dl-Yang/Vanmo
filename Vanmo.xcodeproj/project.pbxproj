@@ -36,6 +36,7 @@
 		2DD0D4B83BF763364628E6FC /* PosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7719C17F340864CF4664CC1 /* PosterCard.swift */; };
 		30959071F71C0B440438117B /* MacMediaDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D8461209C8EBA629A3ED361 /* MacMediaDetailStore.swift */; };
 		3327E030E931885C3DF57DEA /* MacSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 420028D7778B000899098985 /* MacSidebarView.swift */; };
+		33DFE73FD27998678079F407 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = ADF90EC697DE5562B3A3B90F /* PrivacyInfo.xcprivacy */; };
 		3429123E6329B78C98DD493E /* smb.png in Resources */ = {isa = PBXBuildFile; fileRef = 9142879B3AF4CF446473F7C7 /* smb.png */; };
 		348399A49CBCA143089052E9 /* MacEpisodeSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259F1B52F67CBB129B0214E9 /* MacEpisodeSelectorView.swift */; };
 		363D00137C601237B884871A /* sftp.png in Resources */ = {isa = PBXBuildFile; fileRef = F6D9D90CEE03512262E3FDBC /* sftp.png */; };
@@ -61,6 +62,7 @@
 		4D1FF76F2DBB43A073DBFCAF /* PlayerProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */; };
 		4F8C56D3F3B56E7D44BFAA44 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61585942DFE77AC7C9FD50CC /* FlowLayout.swift */; };
 		558D973A7C068676AFC8BBC7 /* FilterChipsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */; };
+		56F6B2D07D2C19179CC22965 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F3B5CE22DF92AFDBFF290E19 /* PrivacyInfo.xcprivacy */; };
 		5B2320B08EB85AFDAD074129 /* dlna.png in Resources */ = {isa = PBXBuildFile; fileRef = A0D8D11C5099204A05B18286 /* dlna.png */; };
 		5E684842C9D68BC1AAC3E89E /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = CC22613DF4EB53BCA7154AF5 /* Lottie */; };
 		60FA29961D5E179227A2CCF0 /* MacConnectionsBrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEB926F219094145468942FF /* MacConnectionsBrowseView.swift */; };
@@ -280,6 +282,7 @@
 		ABB1277459ADB58B16AE80D3 /* Vanmo-Mac-Cloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac-Cloud.entitlements"; sourceTree = "<group>"; };
 		ABF5F0C14AD796EE9479119E /* MacEmbyFolderBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacEmbyFolderBrowseView.swift; sourceTree = "<group>"; };
 		AD11C496362FE830670827E2 /* TimeInterval+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TimeInterval+Formatting.swift"; sourceTree = "<group>"; };
+		ADF90EC697DE5562B3A3B90F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B09C32D3BB0EC025D1769F53 /* baiduNetdisk.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = baiduNetdisk.png; sourceTree = "<group>"; };
 		B7719C17F340864CF4664CC1 /* PosterCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterCard.swift; sourceTree = "<group>"; };
 		B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingIndicatorView.swift; sourceTree = "<group>"; };
@@ -322,6 +325,7 @@
 		F0FEED6C64943C9903BD8BF9 /* googleDrive.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = googleDrive.png; sourceTree = "<group>"; };
 		F1FADA4CEAA0809689C8B825 /* FavoritesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesListView.swift; sourceTree = "<group>"; };
 		F3672B86EB9D1CDEA999C55B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F3B5CE22DF92AFDBFF290E19 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F4899D11636AAC1F440051DA /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F6C0E5923BE6FFCEFCB6C4DC /* BrowserViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserViewModel.swift; sourceTree = "<group>"; };
@@ -405,6 +409,7 @@
 				8975545DA300E57FD1C133D1 /* Info.plist */,
 				2555C3687A591D420018290D /* InfoPlist.xcstrings */,
 				A73A98C67D1020444BFEC4D4 /* loadingSpinner.json */,
+				ADF90EC697DE5562B3A3B90F /* PrivacyInfo.xcprivacy */,
 				179A074839A61DF46EB44FA9 /* Fonts */,
 				0D650AD66912B79518250229 /* Localizable */,
 			);
@@ -471,6 +476,7 @@
 				EC27A159B320F156FA413559 /* Info-Mac.plist */,
 				D672C6AFDA04BC432035478A /* InfoPlist.xcstrings */,
 				1FFCF33F1D900A4B2797C123 /* loadingSpinner.json */,
+				F3B5CE22DF92AFDBFF290E19 /* PrivacyInfo.xcprivacy */,
 				E51DAC90345202C71FB5B8D2 /* ConnectionIcons */,
 			);
 			path = Resources;
@@ -1109,6 +1115,7 @@
 				6C559DE8C613197CDED94D0C /* Assets.xcassets in Resources */,
 				4B135F675D6C38BA06F4803F /* Info-Mac.plist in Resources */,
 				A0D150072046D2A198EEF6DD /* InfoPlist.xcstrings in Resources */,
+				33DFE73FD27998678079F407 /* PrivacyInfo.xcprivacy in Resources */,
 				DDE0739230E75BEA0D4173E5 /* loadingSpinner.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1119,6 +1126,7 @@
 			files = (
 				FD5DBDF14CEE83144B800138 /* Assets.xcassets in Resources */,
 				D930CAE97EB033B3F87D6E2A /* InfoPlist.xcstrings in Resources */,
+				56F6B2D07D2C19179CC22965 /* PrivacyInfo.xcprivacy in Resources */,
 				6484EA3D669FB29D06AB2868 /* alist.png in Resources */,
 				2A402C34049B43CAABC0F0B6 /* aliyunDrive.png in Resources */,
 				CB6685A01E4B0E6B419481F1 /* baiduNetdisk.png in Resources */,

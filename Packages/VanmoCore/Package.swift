@@ -28,6 +28,7 @@ let package = Package(
                 .product(name: "Citadel", package: "Citadel"),
             ],
             resources: [
+                .copy("PrivacyInfo.xcprivacy"),
                 .process("Localization/Resources"),
             ],
             swiftSettings: [

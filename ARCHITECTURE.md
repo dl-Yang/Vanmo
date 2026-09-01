@@ -1,6 +1,6 @@
 # Vanmo Architecture
 
-> This document describes the repository as of August 31, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
+> This document describes the repository as of September 1, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
 > If this document conflicts with the code, treat `project.yml`, `Packages/VanmoCore/Package.swift`, and the current implementation as the sources of truth.
 
 ## 1. System Overview
@@ -116,6 +116,10 @@ Boundary rules:
 - Debug configurations use entitlements without iCloud capabilities, which allows personal development-team signing.
 - Release configurations use `Vanmo-Cloud.entitlements` and `Vanmo-Mac-Cloud.entitlements`.
 - Application code must not assume CloudKit is available in Debug builds.
+
+### 3.4 Privacy Manifests
+
+iOS, macOS, and `VanmoCore` each ship `PrivacyInfo.xcprivacy`. The files declare no tracking, the Required Reason APIs used by first-party code (User Defaults and File Timestamp), and the CloudKit plus online-subtitle data types. They do not cover third-party package binaries. The durable privacy rules live in [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## 4. iOS Application Architecture
 

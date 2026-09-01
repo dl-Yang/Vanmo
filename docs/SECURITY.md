@@ -27,6 +27,44 @@ This document defines Vanmo's durable rules for credentials, persisted data, URL
 - The localhost prefetch proxy must remain bound to loopback and use unguessable per-item session tokens.
 - Device debugging uses local console output. Remote log collection or telemetry requires explicit authorization and a separate security review.
 
+## Privacy Manifests
+
+Vanmo does not track users under Apple's App Tracking Transparency definition. There is no advertising identifier use, no analytics SDK, and no tracking domains.
+
+Each shipping binary includes `PrivacyInfo.xcprivacy`:
+
+- `Vanmo/Resources/PrivacyInfo.xcprivacy` for the iOS app
+- `VanmoMac/Resources/PrivacyInfo.xcprivacy` for the macOS app
+- `Packages/VanmoCore/Sources/VanmoCore/PrivacyInfo.xcprivacy` for the shared package
+
+The four required lists are complete in each file:
+
+| List | Current declaration |
+| --- | --- |
+| `NSPrivacyTracking` | `false` |
+| `NSPrivacyTrackingDomains` | empty |
+| `NSPrivacyCollectedDataTypes` | User ID, Device ID, Product Interaction, and Other User Content; linked to the iCloud user; App Functionality only |
+| `NSPrivacyAccessedAPITypes` | User Defaults `CA92.1`; File Timestamp `C617.1` and `3B52.1` |
+
+Collected types map to current code, not speculative future collection:
+
+- User ID: the iCloud identity used by Release CloudKit
+- Device ID: `CloudSyncDevice.id` written onto `CloudMediaState.lastModifiedDeviceId`
+- Product Interaction: playback position, watched state, and favorites in `CloudMediaState`
+- Other User Content: CloudKit-synced connection configuration and folder bookmarks; media title or filename sent to the user-enabled online-subtitle providers
+
+Do not declare data that stays on-device or that the user sends only to a server they configured (NAS, Emby, Plex, SMB, and similar). Connection passwords and OAuth tokens stay in Keychain and are not CloudKit fields. If the user enables OpenSubtitles login, the stored username is sent to that provider for App Functionality and is covered by Other User Content; it is not a CloudKit credential.
+
+Required Reason API reasons match current use:
+
+- `CA92.1`: `UserDefaults` / `@AppStorage` for preferences that belong only to this app
+- `C617.1`: `MediaScanner.scanLocalDirectory` reads file timestamps of the scanned directory, including paths inside the app container
+- `3B52.1`: `LocalFolderService` reads timestamps of user-granted folders from the document picker
+
+Cache-size inventory uses `totalFileAllocatedSizeKey`, not volume-capacity APIs, so Disk Space is not declared. Do not add Disk Space, System Boot Time, or Active Keyboard categories unless first-party code starts calling those APIs. Do not add a tracking domain or flip `NSPrivacyTracking` without a separate privacy review and App Tracking Transparency work.
+
+Third-party packages (Kingfisher, KSPlayer, Lottie, SMBClient, Citadel) must ship their own manifests. First-party files cannot cover those binaries.
+
 ## Untrusted Inputs
 
 - Treat remote directory entries, playlists, metadata, subtitles, NFO/XML, server responses, filenames, and user-selected files as untrusted.
@@ -55,5 +93,5 @@ Use the documented scripts for normal builds and checks. Never weaken sandboxing
 - `sftp://user:pass@host/path` may be persisted on `MediaItem.fileURL`, matching the existing FTP/SMB credential-in-URL trade-off. Logs must use `safePlaybackLogDescription` and must not print passwords.
 - Regenerate the Xcode project after `project.yml` dependency or target changes; never hand-edit `project.pbxproj`.
 - Security-sensitive changes require focused tests plus platform or environment evidence appropriate to the risk.
-- Changes to Keychain/OAuth storage, SwiftData store assignment, CloudKit scope, URL resolution, proxy authorization, filesystem access, sandbox entitlements, or download destinations require explicit review.
+- Changes to Keychain/OAuth storage, SwiftData store assignment, CloudKit scope, privacy manifests, URL resolution, proxy authorization, filesystem access, sandbox entitlements, or download destinations require explicit review.
 - Repeated security findings should become tests, static checks, or durable rules.
