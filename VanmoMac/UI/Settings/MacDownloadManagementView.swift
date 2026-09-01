@@ -39,8 +39,8 @@ struct MacDownloadManagementView: View {
         .onChange(of: downloadManager.tasks) { _, _ in
             logTaskSnapshots(reason: "update")
         }
-        .confirmationDialog("删除选中的下载？", isPresented: $confirmsDeletion) {
-            Button("删除文件和记录", role: .destructive) {
+        .confirmationDialog(L10n.tr("删除选中的下载？"), isPresented: $confirmsDeletion) {
+            Button(L10n.tr("删除文件和记录"), role: .destructive) {
                 Task {
                     await downloadManager.delete(selection)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -49,14 +49,14 @@ struct MacDownloadManagementView: View {
                     }
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button(L10n.tr("取消"), role: .cancel) {}
         }
     }
 
     private var headerBar: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("下载")
+                Text(L10n.tr("下载"))
                     .font(MacDesignTokens.Typography.sectionTitle)
                     .foregroundStyle(theme.primaryText)
                 Text(summaryText)
@@ -72,7 +72,7 @@ struct MacDownloadManagementView: View {
                 }
 
                 let allSelected = !downloadManager.tasks.isEmpty && selection.count == downloadManager.tasks.count
-                Button(allSelected ? "取消全选" : "全选") {
+                Button(allSelected ? L10n.tr("取消全选") : L10n.tr("全选")) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         if allSelected {
                             selection.removeAll()
@@ -84,7 +84,7 @@ struct MacDownloadManagementView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
 
-                Button("取消") {
+                Button(L10n.tr("取消")) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         isSelectionMode = false
                         selection.removeAll()
@@ -95,7 +95,7 @@ struct MacDownloadManagementView: View {
             } else {
                 if !downloadManager.tasks.isEmpty {
                     if downloadManager.hasPausableTasks {
-                        Button("全部暂停") {
+                        Button(L10n.tr("全部暂停")) {
                             Task {
 #if DEBUG
                                 print("[Debug][Downloads] action pauseAll")
@@ -108,7 +108,7 @@ struct MacDownloadManagementView: View {
                     }
 
                     if downloadManager.hasResumableTasks {
-                        Button("全部继续") {
+                        Button(L10n.tr("全部继续")) {
                             Task {
 #if DEBUG
                                 print("[Debug][Downloads] action resumeAll")
@@ -121,7 +121,7 @@ struct MacDownloadManagementView: View {
                         .tint(MacDesignTokens.accentBlue)
                     }
 
-                    Button("选择") {
+                    Button(L10n.tr("选择")) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             isSelectionMode = true
                         }
@@ -158,7 +158,7 @@ struct MacDownloadManagementView: View {
 
     private var summaryText: String {
         let total = downloadManager.tasks.count
-        guard total > 0 else { return "暂无任务" }
+        guard total > 0 else { return L10n.tr("暂无任务") }
         let active = downloadManager.tasks.filter {
             $0.status == .downloading || $0.status == .queued
         }.count
@@ -175,7 +175,7 @@ struct MacDownloadManagementView: View {
             parts.append("\(failed) 失败")
         }
         if parts.count == 1 {
-            parts.append("全部完成")
+            parts.append(L10n.tr("全部完成"))
         }
         return parts.joined(separator: " · ")
     }
@@ -187,11 +187,11 @@ struct MacDownloadManagementView: View {
             emptyIcon
                 .padding(.bottom, 8)
 
-            Text("暂无下载")
+            Text(L10n.tr("暂无下载"))
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(theme.primaryText)
 
-            Text("从媒体详情或文件浏览器发起下载后，任务会显示在这里。")
+            Text(L10n.tr("从媒体详情或文件浏览器发起下载后，任务会显示在这里。"))
                 .font(.system(size: 13))
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
@@ -408,17 +408,17 @@ private struct MacDownloadTaskRow: View {
             }
         }
         .contextMenu {
-            Button("查看详情", action: openDetail)
+            Button(L10n.tr("查看详情"), action: openDetail)
             Divider()
             if task.status == .queued || task.status == .downloading {
-                Button("暂停", action: pause)
+                Button(L10n.tr("暂停"), action: pause)
             } else if task.status == .paused {
-                Button("继续", action: resume)
+                Button(L10n.tr("继续"), action: resume)
             } else if task.status == .completed {
-                Button("播放", action: play)
-                Button("在 Finder 中显示", action: reveal)
+                Button(L10n.tr("播放"), action: play)
+                Button(L10n.tr("在 Finder 中显示"), action: reveal)
             } else if task.status == .failed {
-                Button("重新下载", action: retry)
+                Button(L10n.tr("重新下载"), action: retry)
             }
         }
     }
@@ -448,14 +448,14 @@ private struct MacDownloadTaskRow: View {
     @ViewBuilder
     private var actionButtons: some View {
         if task.status == .queued || task.status == .downloading {
-            queueControlButton(title: "暂停", action: pause)
+            queueControlButton(title: L10n.tr("暂停"), action: pause)
         } else if task.status == .paused {
-            queueControlButton(title: "继续", action: resume)
+            queueControlButton(title: L10n.tr("继续"), action: resume)
         } else if task.status == .completed {
             if #available(macOS 26.0, *) {
                 GlassEffectContainer(spacing: 8) {
                     HStack(spacing: 8) {
-                        Button("播放", action: play)
+                        Button(L10n.tr("播放"), action: play)
                             .buttonStyle(.glassProminent)
                             .controlSize(.small)
                             .tint(MacDesignTokens.accentBlue)
@@ -465,12 +465,12 @@ private struct MacDownloadTaskRow: View {
                         }
                         .buttonStyle(.glass)
                         .controlSize(.small)
-                        .help("在 Finder 中显示")
+                        .help(L10n.tr("在 Finder 中显示"))
                     }
                 }
             } else {
                 HStack(spacing: 8) {
-                    Button("播放", action: play)
+                    Button(L10n.tr("播放"), action: play)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                     Button(action: reveal) {
@@ -478,17 +478,17 @@ private struct MacDownloadTaskRow: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .help("在 Finder 中显示")
+                    .help(L10n.tr("在 Finder 中显示"))
                 }
             }
         } else if task.status == .failed {
             if #available(macOS 26.0, *) {
-                Button("重新下载", action: retry)
+                Button(L10n.tr("重新下载"), action: retry)
                     .buttonStyle(.glass)
                     .controlSize(.small)
                     .tint(MacDesignTokens.accentBlue)
             } else {
-                Button("重新下载", action: retry)
+                Button(L10n.tr("重新下载"), action: retry)
                     .buttonStyle(.bordered)
                     .controlSize(.small)
             }
@@ -554,10 +554,10 @@ private struct MacDownloadTaskRow: View {
     private var statusText: String {
         switch task.status {
         case .queued: return "等待中"
-        case .downloading: return task.totalBytes > 0 ? "\(Int(task.progress * 100))%" : "下载中"
-        case .paused: return "已暂停"
-        case .completed: return "已完成"
-        case .failed: return "失败"
+        case .downloading: return task.totalBytes > 0 ? "\(Int(task.progress * 100))%" : L10n.tr("下载中")
+        case .paused: return L10n.tr("已暂停")
+        case .completed: return L10n.tr("已完成")
+        case .failed: return L10n.tr("失败")
         }
     }
 

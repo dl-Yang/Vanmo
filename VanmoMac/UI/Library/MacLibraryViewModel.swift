@@ -825,7 +825,7 @@ final class MacLibraryViewModel: ObservableObject {
             if !movieItems.isEmpty {
                 let folder = makeScannedFolder(
                     id: scannedFolderId(connectionId: connection.id, collectionType: .movies),
-                    name: "电影",
+                    name: L10n.tr("电影"),
                     collectionType: .movies,
                     connection: connection
                 )
@@ -839,7 +839,7 @@ final class MacLibraryViewModel: ObservableObject {
             if !showItems.isEmpty {
                 let folder = makeScannedFolder(
                     id: scannedFolderId(connectionId: connection.id, collectionType: .tvshows),
-                    name: "电视剧",
+                    name: L10n.tr("电视剧"),
                     collectionType: .tvshows,
                     connection: connection
                 )

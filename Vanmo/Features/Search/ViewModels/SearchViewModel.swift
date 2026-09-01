@@ -122,7 +122,7 @@ final class SearchViewModel: ObservableObject {
                 return SearchResultSection(
                     id: sourceSectionId(sourceId),
                     title: snapshot?.name ?? localSourceTitle(for: sourceId),
-                    subtitle: snapshot.map { "已同步媒体 · \($0.type.displayName)" } ?? "已同步媒体",
+                    subtitle: snapshot.map { "已同步媒体 · \($0.type.displayName)" } ?? L10n.tr("已同步媒体"),
                     items: items
                 )
             }
@@ -150,7 +150,7 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func localSourceTitle(for sourceId: UUID?) -> String {
-        sourceId == nil ? "本地媒体库" : "已同步来源"
+        sourceId == nil ? L10n.tr("本地媒体库") : L10n.tr("已同步来源")
     }
 
     private func sourceSectionId(_ sourceId: UUID?) -> String {

@@ -79,7 +79,7 @@ struct MacLibraryHomeView: View {
 
     private var continueWatchingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            MacLibrarySectionHeader(title: "历史记录")
+            MacLibrarySectionHeader(title: L10n.tr("历史记录"))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
@@ -110,7 +110,7 @@ struct MacLibraryHomeView: View {
     private var folderBookmarksSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             MacLibrarySectionHeaderRow(
-                title: "文件夹书签",
+                title: L10n.tr("文件夹书签"),
                 subtitle: "\(libraryViewModel.folderBookmarks.count) 个快捷入口"
             )
 
@@ -132,7 +132,7 @@ struct MacLibraryHomeView: View {
     @ViewBuilder
     private var embyCollectionSections: some View {
         if libraryViewModel.isLoadingEmbyHome && libraryViewModel.serverCollectionFolders.isEmpty {
-            ProgressView("正在加载媒体库…")
+            ProgressView(L10n.tr("正在加载媒体库…"))
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             ForEach(libraryViewModel.orderedEmbyConnections) { connection in
@@ -324,7 +324,7 @@ private struct MacHomeFolderPreviewRow: View, Equatable {
             MacLibrarySectionHeaderRow(
                 title: folder.name,
                 subtitle: folder.collectionType.displayName,
-                actionTitle: "查看全部",
+                actionTitle: L10n.tr("查看全部"),
                 action: onOpenFolder
             )
 

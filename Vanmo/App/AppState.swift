@@ -60,10 +60,10 @@ enum AppTab: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .library: return "媒体库"
-        case .connections: return "文件"
-        case .search: return "搜索"
-        case .settings: return "设置"
+        case .library: return L10n.tr("媒体库")
+        case .connections: return L10n.tr("文件")
+        case .search: return L10n.tr("搜索")
+        case .settings: return L10n.tr("设置")
         }
     }
 

@@ -69,14 +69,14 @@ struct AddConnectionView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.vanmoBackground)
-            .navigationTitle(isEditing ? "编辑连接" : "添加连接")
+            .navigationTitle(isEditing ? L10n.tr("编辑连接") : L10n.tr("添加连接"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(L10n.tr("取消")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
+                    Button(L10n.tr("保存")) { save() }
                         .disabled(!isValid)
                 }
             }
@@ -99,14 +99,14 @@ struct AddConnectionView: View {
     // MARK: - Sections
 
     private var typeSection: some View {
-        Section("连接类型") {
+        Section(L10n.tr("连接类型")) {
             if isEditing {
-                LabeledContent("协议") {
+                LabeledContent(L10n.tr("协议")) {
                     Text(selectedType.displayName)
                         .foregroundStyle(.secondary)
                 }
             } else {
-                Picker("协议", selection: $selectedType) {
+                Picker(L10n.tr("协议"), selection: $selectedType) {
                     ForEach(ConnectionType.availableConnectionTypes) { type in
                         Text(type.displayName).tag(type)
                     }
@@ -131,8 +131,8 @@ struct AddConnectionView: View {
     }
 
     private var localFolderSection: some View {
-        Section("本地文件夹") {
-            TextField("名称", text: $name)
+        Section(L10n.tr("本地文件夹")) {
+            TextField(L10n.tr("名称"), text: $name)
                 .textContentType(.name)
 
             Button {
@@ -140,13 +140,13 @@ struct AddConnectionView: View {
             } label: {
                 HStack {
                     Image(systemName: "folder.badge.plus")
-                    Text(folderURL == nil ? "选择文件夹..." : "更换文件夹")
+                    Text(folderURL == nil ? L10n.tr("选择文件夹...") : L10n.tr("更换文件夹"))
                     Spacer()
                 }
             }
 
             if let folderURL {
-                LabeledContent("已选目录") {
+                LabeledContent(L10n.tr("已选目录")) {
                     Text(folderURL.lastPathComponent)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -168,8 +168,8 @@ struct AddConnectionView: View {
     }
 
     private var remoteServerSection: some View {
-        Section("服务器信息") {
-            TextField("名称", text: $name)
+        Section(L10n.tr("服务器信息")) {
+            TextField(L10n.tr("名称"), text: $name)
                 .textContentType(.name)
 
             TextField(
@@ -190,7 +190,7 @@ struct AddConnectionView: View {
                     }
             }
 
-            TextField("端口", text: $port)
+            TextField(L10n.tr("端口"), text: $port)
                 .keyboardType(.numberPad)
 
             TextField(pathPlaceholder, text: $path)
@@ -215,16 +215,16 @@ struct AddConnectionView: View {
     }
 
     private var authSection: some View {
-        Section("认证") {
-            TextField("用户名", text: $username)
+        Section(L10n.tr("认证")) {
+            TextField(L10n.tr("用户名"), text: $username)
                 .textContentType(.username)
                 .autocapitalization(.none)
 
-            SecureField("密码", text: $password)
+            SecureField(L10n.tr("密码"), text: $password)
                 .textContentType(.password)
 
             if isEditing {
-                Text("留空则保留现有密码。")
+                Text(L10n.tr("留空则保留现有密码。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -232,8 +232,8 @@ struct AddConnectionView: View {
     }
 
     private var officialCloudDriveSection: some View {
-        Section("官方接入") {
-            TextField("名称", text: $name)
+        Section(L10n.tr("官方接入")) {
+            TextField(L10n.tr("名称"), text: $name)
                 .textContentType(.name)
 
             TextField(hostPlaceholder, text: $host)
@@ -253,9 +253,9 @@ struct AddConnectionView: View {
     }
 
     private var oauthCloudDriveSection: some View {
-        Section("账号登录") {
+        Section(L10n.tr("账号登录")) {
             if isEditing {
-                TextField("名称", text: $name)
+                TextField(L10n.tr("名称"), text: $name)
                     .textContentType(.name)
             }
 
@@ -303,7 +303,7 @@ struct AddConnectionView: View {
             return "服务器地址（如 https://emby.example.com）"
         }
         if selectedType == .iptv {
-            return "播放列表 URL 或主机地址"
+            return L10n.tr("播放列表 URL 或主机地址")
         }
         if selectedType.isOfficialCloudDrive {
             return "开放平台域名或应用参数"
@@ -313,13 +313,13 @@ struct AddConnectionView: View {
 
     private var pathPlaceholder: String {
         if selectedType == .iptv {
-            return "播放列表路径或 URL"
+            return L10n.tr("播放列表路径或 URL")
         }
         if selectedType.isOfficialCloudDrive {
             return "起始目录 (可选，留空为根目录)"
         }
         if selectedType == .smb {
-            return "共享名，如 /Movies"
+            return L10n.tr("共享名，如 /Movies")
         }
         return "路径 (可选)"
     }
@@ -330,7 +330,7 @@ struct AddConnectionView: View {
             return folderBookmark != nil
         }
         if selectedType.supportsOAuthLogin {
-            // 新建走登录按钮直接创建连接；编辑时允许通过"保存"改名。
+            // 新建走登录按钮直接创建连接；编辑时允许通过L10n.tr("保存")改名。
             return isEditing
         }
         guard !host.isEmpty else { return false }
@@ -366,7 +366,7 @@ struct AddConnectionView: View {
 
     private var formValidationMessage: String? {
         if !isPortValid {
-            return selectedType == .iptv ? "端口需为 0-65535，或留空使用播放列表 URL。" : "端口需为 1-65535。"
+            return selectedType == .iptv ? "端口需为 0-65535，或留空使用播放列表 URL。" : L10n.tr("端口需为 1-65535。")
         }
         if !isRemotePathValid {
             return "WebDAV 路径需以 / 开头；不确定时可留空。"
@@ -582,7 +582,7 @@ struct AddConnectionView: View {
             guard let url = urls.first else { return }
 
             guard url.startAccessingSecurityScopedResource() else {
-                folderPickerError = "无法获取该文件夹的访问权限"
+                folderPickerError = L10n.tr("无法获取该文件夹的访问权限")
                 return
             }
             defer { url.stopAccessingSecurityScopedResource() }
@@ -684,7 +684,7 @@ struct AddConnectionView: View {
         if success {
             dismiss()
         } else {
-            oauthErrorMessage = viewModel.errorMessage.isEmpty ? "登录失败，请重试" : viewModel.errorMessage
+            oauthErrorMessage = viewModel.errorMessage.isEmpty ? L10n.tr("登录失败，请重试") : viewModel.errorMessage
         }
     }
 }

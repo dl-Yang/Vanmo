@@ -51,6 +51,6 @@ public enum CloudSyncAvailability {
     }
 
     public static var unavailableMessage: String {
-        "当前构建未启用 CloudKit。iCloud 同步仅在 Release 构建（需付费开发者账号）中可用。"
+        L10n.tr("当前构建未启用 CloudKit。iCloud 同步仅在 Release 构建（需付费开发者账号）中可用。")
     }
 }

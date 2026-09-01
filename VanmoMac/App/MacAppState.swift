@@ -12,9 +12,9 @@ enum MacSidebarSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .home: "Home"
-        case .favorites: "Favorites"
-        case .history: "History"
+        case .home: L10n.tr("首页")
+        case .favorites: L10n.tr("收藏")
+        case .history: L10n.tr("历史记录")
         }
     }
 
@@ -38,11 +38,11 @@ enum MacLibraryFilter: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .all: "All"
-        case .unwatched: "Unwatched"
-        case .recentlyAdded: "Recently Added"
-        case .movies: "Movies"
-        case .tvShows: "TV Shows"
+        case .all: L10n.tr("全部")
+        case .unwatched: L10n.tr("未观看")
+        case .recentlyAdded: L10n.tr("最近添加")
+        case .movies: L10n.tr("电影")
+        case .tvShows: L10n.tr("电视剧")
         }
     }
 }
@@ -63,9 +63,9 @@ enum MacAppearanceMode: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system: "跟随系统"
-        case .light: "浅色"
-        case .dark: "深色"
+        case .system: L10n.tr("跟随系统")
+        case .light: L10n.tr("浅色")
+        case .dark: L10n.tr("深色")
         }
     }
 

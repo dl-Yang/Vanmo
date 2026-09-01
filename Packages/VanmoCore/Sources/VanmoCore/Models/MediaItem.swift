@@ -117,7 +117,11 @@ public final class MediaItem {
            let showTitle,
            let season = seasonNumber,
            let episode = episodeNumber {
-            return "\(showTitle) S\(String(format: "%02d", season))E\(String(format: "%02d", episode))"
+            return LocalizedFormat.showEpisodeTitle(
+                showTitle: showTitle,
+                season: season,
+                episode: episode
+            )
         }
         return title
     }
@@ -146,17 +150,17 @@ public enum MediaType: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .movie: return "电影"
-        case .tvShow: return "电视剧"
-        case .tvEpisode: return "单集"
-        case .season: return "季"
-        case .folder: return "文件夹"
-        case .collectionFolder: return "媒体库"
-        case .boxSet: return "合集"
-        case .audio: return "音频"
-        case .musicAlbum: return "专辑"
-        case .photo: return "照片"
-        case .other: return "其他"
+        case .movie: return L10n.tr("电影")
+        case .tvShow: return L10n.tr("电视剧")
+        case .tvEpisode: return L10n.tr("单集")
+        case .season: return L10n.tr("季")
+        case .folder: return L10n.tr("文件夹")
+        case .collectionFolder: return L10n.tr("媒体库")
+        case .boxSet: return L10n.tr("合集")
+        case .audio: return L10n.tr("音频")
+        case .musicAlbum: return L10n.tr("专辑")
+        case .photo: return L10n.tr("照片")
+        case .other: return L10n.tr("其他")
         }
     }
 
@@ -256,7 +260,7 @@ public struct SubtitleTrackInfo: Codable, Identifiable, Hashable {
         var parts: [String] = []
         if let title { parts.append(title) }
         if let language { parts.append(language) }
-        parts.append(isEmbedded ? "内嵌" : "外挂")
+        parts.append(isEmbedded ? L10n.tr("内嵌") : L10n.tr("外挂"))
         return parts.isEmpty ? "Subtitle \(id)" : parts.joined(separator: " · ")
     }
 }

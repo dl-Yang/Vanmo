@@ -95,7 +95,7 @@ Choose verification proportional to the change:
 - XcodeGen drift, target source whitelist, or `VanmoCore` UI-import direction: run `./scripts/check-architecture-guards.sh`. The CloudKit/multiplatform static stage invokes this guard.
 - Harness documentation, plan-index Status, and live narrative consistency: run `./scripts/check-harness-docs.sh`.
 - iOS UI target and interaction-CLI structure: run `./scripts/check-ios-ui-cli.sh`.
-- App Debug compile evidence: run `./scripts/check-app-build.sh ios-simulator`, `./scripts/check-app-build.sh macos`, or `./init.sh --full` after the fast baseline.
+- App Debug compile evidence: run `./scripts/check-app-build.sh ios-simulator` or `./scripts/check-app-build.sh macos` serially, or `./init.sh --full` after the fast baseline. Never start both script platforms as parallel processes, and do not point Xcode at `build/app-build-evidence/SourcePackages`. An Xcode Incremental Build does not replace this script. Details are in [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
 - iOS app behavior: build/run with `./run_device.sh` or `--simulator`.
 - iOS UI interaction and evidence capture: use `./scripts/ios-ui.sh device ...` or `./scripts/ios-ui.sh simulator ...` for XCUITest screenshot, tree, tap, type, swipe, wait, assert, and `journey --name tab-navigation`. `simulator launch|terminate` still use `simctl` only for simulator management.
 - macOS app behavior: build/run with `./run_device.sh --macos`.

@@ -176,7 +176,7 @@ final class ConnectionsViewModel: ObservableObject {
         }
 
         // 优先恢复所有本地文件夹的 security-scoped access，让媒体库里的本地视频
-        // 在 App 启动后无需用户重新进入"连接"页就能直接播放。
+        // 在 App 启动后无需用户重新进入L10n.tr("连接")页就能直接播放。
         await restoreLocalFolderAccess()
 
         // 优先重连上次激活的媒体服务器；否则回退到 lastConnectedAt 最近的连接。
@@ -283,8 +283,8 @@ final class ConnectionsViewModel: ObservableObject {
             var partialSyncNotice: String?
 
             if shouldScanRemoteFiles {
-                loadingMessage = forceFullScan ? "全量重扫 \(connection.name)..." : "扫描媒体文件..."
-                librarySyncMessage = "正在同步数据..."
+                loadingMessage = forceFullScan ? "全量重扫 \(connection.name)..." : L10n.tr("扫描媒体文件...")
+                librarySyncMessage = L10n.tr("正在同步数据...")
             } else {
                 loadingMessage = "已连接 \(connection.name)"
                 librarySyncMessage = nil
@@ -1076,7 +1076,7 @@ final class ConnectionsViewModel: ObservableObject {
         case .cancelled:
             scanToastMessage = "同步已取消，已保留 \(result.insertedItems.count + result.updatedCount) 项变更"
         case .failed:
-            partialSyncNotice = result.issues.last?.message ?? "同步失败"
+            partialSyncNotice = result.issues.last?.message ?? L10n.tr("同步失败")
             if showErrorAlert {
                 scanToastMessage = partialSyncNotice
             }

@@ -19,6 +19,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 - [`2026-08-26-ios-ui-golden-journey.md`](2026-08-26-ios-ui-golden-journey.md) — **Completed.** Simulator XCUITest tab-navigation journey recorded; iOS Debug compile unblocked; physical-device XCUITest remains optional follow-up.
 - [`2026-08-26-harness-narrative-consistency.md`](2026-08-26-harness-narrative-consistency.md) — **Completed.** Documentation check now fails on init stage-count and plan-index Status conflicts.
 - [`2026-08-28-architecture-structure-guards.md`](2026-08-28-architecture-structure-guards.md) — **Completed.** Stage 2 now rejects XcodeGen drift, illegal target sources, and unconditional VanmoCore UI imports; fast baseline stays at four stages.
+- [`2026-08-31-app-language-switching.md`](2026-08-31-app-language-switching.md) — **Completed.** Chinese / English / Follow System on Appearance; 2026-09-01 iOS Simulator and macOS operator walks plus isolated `check-app-build.sh all` passed.
 
 ## Archival Rules
 

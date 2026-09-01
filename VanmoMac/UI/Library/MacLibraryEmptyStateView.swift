@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 /// LibraryHome 空状态（Figma `Empty-Light` / `Empty-Dark`）
 struct MacLibraryEmptyStateView: View {
@@ -14,20 +15,20 @@ struct MacLibraryEmptyStateView: View {
             iconGraphic
                 .padding(.bottom, 32)
 
-            Text("No Media Found")
+            Text(L10n.tr("没有找到媒体内容"))
                 .font(.system(size: 22, weight: .bold))
                 .tracking(-0.81)
                 .foregroundStyle(theme.primaryText)
                 .padding(.bottom, 16)
 
             VStack(spacing: 0) {
-                Text("Your media library is currently empty.")
+                Text(L10n.tr("您的媒体库目前空空如也。"))
                     .font(.system(size: 14))
                     .tracking(-0.15)
                     .foregroundStyle(theme.emptyDescriptionText)
                     .multilineTextAlignment(.center)
 
-                Text("Please connect your NAS or Emby server to sync your media library content.")
+                Text(L10n.tr("请先连接您的 NAS 或 Emby 服务器以同步您的媒体库内容。"))
                     .font(.system(size: 14))
                     .tracking(-0.15)
                     .foregroundStyle(theme.emptyDescriptionText)
@@ -38,7 +39,7 @@ struct MacLibraryEmptyStateView: View {
 
             Button(action: onAddServer) {
                 HStack(spacing: 8) {
-                    Text("Add Server")
+                    Text(L10n.tr("添加服务器"))
                         .font(.system(size: 16, weight: .bold))
                         .tracking(-0.31)
 
@@ -56,7 +57,7 @@ struct MacLibraryEmptyStateView: View {
                 .shadow(color: MacDesignTokens.ctaBlue.opacity(0.25), radius: 10, y: 5)
             }
             .buttonStyle(.plain)
-            .help("添加服务器")
+            .help(L10n.tr("添加服务器"))
 
             Spacer(minLength: 0)
         }

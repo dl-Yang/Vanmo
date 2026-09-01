@@ -57,21 +57,21 @@ struct MacMediaDetailView: View {
                 self.mediaPurgeHandlerId = nil
             }
         }
-        .alert("收藏失败", isPresented: favoriteErrorBinding) {
-            Button("确定") {}
+        .alert(L10n.tr("收藏失败"), isPresented: favoriteErrorBinding) {
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(store.favoriteErrorMessage ?? "")
         }
-        .alert("刷新失败", isPresented: refreshErrorBinding) {
-            Button("确定") {}
+        .alert(L10n.tr("刷新失败"), isPresented: refreshErrorBinding) {
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(store.refreshErrorMessage ?? "")
         }
-        .alert("下载失败", isPresented: Binding(
+        .alert(L10n.tr("下载失败"), isPresented: Binding(
             get: { downloadErrorMessage != nil },
             set: { if !$0 { downloadErrorMessage = nil } }
         )) {
-            Button("确定") {}
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(downloadErrorMessage ?? "")
         }
@@ -186,7 +186,7 @@ struct MacMediaDetailView: View {
 
             if item.mediaType == .tvShow {
                 metadataDot
-                metadataChip("TV Show")
+                metadataChip(L10n.tr("电视剧"))
                 metadataDot
                 Text(episodeCountText)
                     .font(.system(size: 14, weight: .medium))
@@ -250,7 +250,7 @@ struct MacMediaDetailView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("Play")
+                    Text(L10n.tr("播放"))
                         .font(.system(size: 16, weight: .semibold))
                 }
                 .padding(.horizontal, 16)
@@ -264,7 +264,7 @@ struct MacMediaDetailView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 16, weight: .semibold))
-                    Text("Play")
+                    Text(L10n.tr("播放"))
                         .font(.system(size: 16, weight: .semibold))
                 }
                 .foregroundStyle(.white)
@@ -315,7 +315,7 @@ struct MacMediaDetailView: View {
             }
         }
         .disabled(store.isUpdatingFavorite)
-        .help(isFav ? "取消收藏" : "收藏")
+        .help(isFav ? L10n.tr("取消收藏") : L10n.tr("收藏"))
     }
 
     @ViewBuilder
@@ -348,7 +348,7 @@ struct MacMediaDetailView: View {
             }
         }
         .disabled(isDownloadButtonDisabled)
-        .help(item.mediaType == .tvShow ? "选择剧集下载" : "下载")
+        .help(item.mediaType == .tvShow ? L10n.tr("选择剧集下载") : L10n.tr("下载"))
     }
 
     @ViewBuilder
@@ -389,7 +389,7 @@ struct MacMediaDetailView: View {
             }
         }
         .disabled(store.isUpdatingWatched)
-        .help(isWatched ? "标记未看" : "标记已看")
+        .help(isWatched ? L10n.tr("标记未看") : L10n.tr("标记已看"))
     }
 
     @ViewBuilder
@@ -398,14 +398,14 @@ struct MacMediaDetailView: View {
             Button {
                 Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) }
             } label: {
-                Label("刷新元数据", systemImage: "arrow.clockwise")
+                Label(L10n.tr("刷新元数据"), systemImage: "arrow.clockwise")
             }
             .disabled(store.isRefreshingMetadata)
 
             Button {
                 Task { await store.toggleWatched(for: item, modelContext: modelContext) }
             } label: {
-                Label(item.isWatched ? "标记未看" : "标记已看", systemImage: "checkmark.circle")
+                Label(item.isWatched ? L10n.tr("标记未看") : L10n.tr("标记已看"), systemImage: "checkmark.circle")
             }
         }
 
@@ -420,7 +420,7 @@ struct MacMediaDetailView: View {
             .buttonStyle(.glass)
             .controlSize(.large)
             .buttonBorderShape(.circle)
-            .help("更多")
+            .help(L10n.tr("更多"))
         } else {
             Menu {
                 menuContent
@@ -433,7 +433,7 @@ struct MacMediaDetailView: View {
                     .clipShape(Circle())
             }
             .menuStyle(.borderlessButton)
-            .help("更多")
+            .help(L10n.tr("更多"))
         }
     }
 
@@ -462,7 +462,7 @@ struct MacMediaDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 
                 HStack{
-                    Text("剧集")
+                    Text(L10n.tr("剧集"))
                         .font(MacDesignTokens.Typography.detailSectionTitle)
                         .foregroundStyle(theme.primaryText)
                     
@@ -476,7 +476,7 @@ struct MacMediaDetailView: View {
                             }
                         )) {
                             ForEach(store.seasonNumbers, id: \.self) { season in
-                                Text("第 \(season) 季").tag(season)
+                                Text(LocalizedFormat.seasonLabel(season)).tag(season)
                             }
                         }
                         .pickerStyle(.automatic)
@@ -491,7 +491,7 @@ struct MacMediaDetailView: View {
 //                        .frame(maxWidth: .infinity, alignment: .leading)
 //                        .padding(.vertical, 24)
                 } else if store.currentSeasonEpisodes.isEmpty {
-                    Text("暂无季集数据")
+                    Text(L10n.tr("暂无季集数据"))
                         .font(.subheadline)
                         .foregroundStyle(theme.secondaryText)
                 } else {
@@ -554,7 +554,7 @@ struct MacMediaDetailView: View {
                         )
                 }
 
-                Text(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : "\(episode.episodeNumber) \(episode.title)")
+                Text(episode.title.isEmpty ? LocalizedFormat.episodeLabel(episode.episodeNumber) : "\(episode.episodeNumber) \(episode.title)")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
@@ -612,7 +612,7 @@ struct MacMediaDetailView: View {
         let collections = store.content?.collections ?? []
         if !collections.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Collections")
+                Text(L10n.tr("合集"))
                     .font(MacDesignTokens.Typography.detailSectionTitle)
                     .foregroundStyle(theme.primaryText)
 
@@ -651,7 +651,7 @@ struct MacMediaDetailView: View {
             let members = castMembers
             if !members.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Cast & Crew")
+                    Text(L10n.tr("演职人员"))
                         .font(MacDesignTokens.Typography.detailSectionTitle)
                         .foregroundStyle(theme.primaryText)
                         .padding(.top, 24)
@@ -797,9 +797,9 @@ struct MacMediaDetailView: View {
     private var episodeCountText: String {
         let count = store.episodeTotalCount
         if count == 0 {
-            return "Episodes"
+            return L10n.tr("剧集")
         }
-        return "本季 \(count) 集"
+        return L10n.tr("本季 %d 集", count)
     }
 
     private var castMembers: [CastMemberDisplay] {
@@ -1031,15 +1031,15 @@ private struct MacEpisodeDownloadPicker: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("选择下载剧集")
+                Text(L10n.tr("选择下载剧集"))
                     .font(.title2.bold())
                 Spacer()
-                Picker("季", selection: Binding(
+                Picker(L10n.tr("季"), selection: Binding(
                     get: { selectedSeason ?? seasonNumbers.first ?? 1 },
                     set: onSelectSeason
                 )) {
                     ForEach(seasonNumbers, id: \.self) { season in
-                        Text("第 \(season) 季").tag(season)
+                        Text(LocalizedFormat.seasonLabel(season)).tag(season)
                     }
                 }
                 .frame(width: 120)
@@ -1048,7 +1048,7 @@ private struct MacEpisodeDownloadPicker: View {
             .padding()
 
             HStack {
-                Button(allCurrentSeasonSelected ? "取消全选本季" : "全选本季") {
+                Button(allCurrentSeasonSelected ? L10n.tr("取消全选本季") : L10n.tr("全选本季")) {
                     toggleCurrentSeason()
                 }
                 .disabled(isConfirming)
@@ -1064,7 +1064,7 @@ private struct MacEpisodeDownloadPicker: View {
                     } label: {
                         HStack {
                             Image(systemName: selectedEpisodes[episode.id] == nil ? "circle" : "checkmark.circle.fill")
-                            Text("第 \(episode.episodeNumber) 集 · \(episode.title)")
+                            Text("\(LocalizedFormat.episodeLabel(episode.episodeNumber)) · \(episode.title)")
                             Spacer()
                             if episode.duration > 0 {
                                 Text(MacFormatters.formatDuration(episode.duration))
@@ -1080,7 +1080,7 @@ private struct MacEpisodeDownloadPicker: View {
 
             HStack {
                 Spacer()
-                Button("取消") { dismiss() }
+                Button(L10n.tr("取消")) { dismiss() }
                     .disabled(isConfirming)
                 if #available(macOS 26.0, *) {
                     Button(confirmButtonTitle, action: onConfirm)

@@ -33,12 +33,13 @@ final class SettingsViewModel: ObservableObject {
     @AppStorage("metadata.autoDownload") var metadataAutoDownload = true
 
     @AppStorage(ColorTheme.storageKey) var theme: ColorTheme = .system
+    @AppStorage(AppLanguagePreference.storageKey) var languagePreference: AppLanguagePreference = .chinese
 
     @AppStorage(CloudSyncPreferences.enabledKey) var cloudSyncEnabled = true
     @Published var cloudSyncStatusMessage: String?
 
-    @Published var cacheSize: String = "计算中..."
-    @Published var metadataCacheSize: String = "计算中..."
+    @Published var cacheSize: String = L10n.tr("计算中...")
+    @Published var metadataCacheSize: String = L10n.tr("计算中...")
     @Published var showClearCacheAlert = false
     @Published var showClearMetadataCacheAlert = false
     @Published var showResetAlert = false
@@ -62,11 +63,10 @@ final class SettingsViewModel: ObservableObject {
 
     var cloudSyncLastUpdatedText: String {
         guard let lastSyncAt = CloudSyncPreferences.lastSyncAt else {
-            return "尚未同步"
+            return L10n.tr("尚未同步")
         }
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter.localizedString(for: lastSyncAt, relativeTo: Date())
+        return LocalizedFormat.relativeDate(lastSyncAt)
     }
 
     func bindCloudSyncCoordinator(_ coordinator: CloudSyncCoordinator) {
@@ -83,7 +83,7 @@ final class SettingsViewModel: ObservableObject {
     func calculateCacheSize() async {
         let cachePath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
         guard let cachePath else {
-            cacheSize = "未知"
+            cacheSize = L10n.tr("未知")
             return
         }
 
@@ -93,7 +93,7 @@ final class SettingsViewModel: ObservableObject {
             includingPropertiesForKeys: Array(resourceKeys),
             options: .skipsHiddenFiles
         ) else {
-            cacheSize = "未知"
+            cacheSize = L10n.tr("未知")
             return
         }
 
@@ -134,7 +134,7 @@ final class SettingsViewModel: ObservableObject {
                 username: openSubtitlesUsername.trimmingCharacters(in: .whitespacesAndNewlines),
                 password: openSubtitlesPassword
             )
-            openSubtitlesStatusMessage = "OpenSubtitles 配置已保存"
+            openSubtitlesStatusMessage = L10n.tr("OpenSubtitles 配置已保存")
         } catch {
             openSubtitlesStatusMessage = error.localizedDescription
         }
@@ -148,8 +148,8 @@ final class SettingsViewModel: ObservableObject {
 
         do {
             let response = try await OpenSubtitlesProvider.testLogin()
-            let quota = response.user.allowedDownloads.map { "，下载额度 \($0)" } ?? ""
-            openSubtitlesStatusMessage = "登录成功：\(response.user.level ?? "OpenSubtitles")\(quota)"
+            let quota = response.user.allowedDownloads.map { L10n.tr("，下载额度 %d", $0) } ?? ""
+            openSubtitlesStatusMessage = L10n.tr("登录成功：%@%@", response.user.level ?? "OpenSubtitles", quota)
         } catch {
             openSubtitlesStatusMessage = error.localizedDescription
         }
@@ -161,7 +161,7 @@ final class SettingsViewModel: ObservableObject {
         openSubtitlesAPIKey = ""
         openSubtitlesUsername = ""
         openSubtitlesPassword = ""
-        openSubtitlesStatusMessage = "OpenSubtitles 配置已清除"
+            openSubtitlesStatusMessage = L10n.tr("OpenSubtitles 配置已清除")
     }
 
     func resetAllSettings() {
@@ -182,6 +182,7 @@ final class SettingsViewModel: ObservableObject {
         showUnwatchedBadge = true
         metadataAutoDownload = true
         theme = .system
+        languagePreference = .chinese
         cloudSyncEnabled = true
         CloudSyncPreferences.isEnabled = true
     }

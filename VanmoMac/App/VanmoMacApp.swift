@@ -5,6 +5,7 @@ import VanmoCore
 @main
 struct VanmoMacApp: App {
     init() {
+        AppLanguage.lockForCurrentProcess()
         OAuthCoordinator.shared.presentationContextProvider = AppKitOAuthPresentationContextProvider.shared
         PrefetchTemporaryStore.cleanupOrphans()
         MediaProbeBootstrap.configure()
@@ -41,42 +42,42 @@ struct VanmoMacApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
 
-            CommandMenu("播放") {
-                Button("播放/暂停") {
+            CommandMenu(L10n.tr("播放")) {
+                Button(L10n.tr("播放/暂停")) {
                     MacPlayerCommandRouter.post(.macPlayerTogglePlayPause)
                 }
                 .keyboardShortcut(.space, modifiers: [])
 
-                Button("后退 15 秒") {
+                Button(L10n.tr("后退 15 秒")) {
                     MacPlayerCommandRouter.post(.macPlayerSkipBackward)
                 }
                 .keyboardShortcut(.leftArrow, modifiers: [])
 
-                Button("前进 15 秒") {
+                Button(L10n.tr("前进 15 秒")) {
                     MacPlayerCommandRouter.post(.macPlayerSkipForward)
                 }
                 .keyboardShortcut(.rightArrow, modifiers: [])
 
                 Divider()
 
-                Button("增大音量") {
+                Button(L10n.tr("增大音量")) {
                     MacPlayerCommandRouter.post(.macPlayerVolumeUp)
                 }
                 .keyboardShortcut(.upArrow, modifiers: [])
 
-                Button("减小音量") {
+                Button(L10n.tr("减小音量")) {
                     MacPlayerCommandRouter.post(.macPlayerVolumeDown)
                 }
                 .keyboardShortcut(.downArrow, modifiers: [])
 
                 Divider()
 
-                Button("切换全屏") {
+                Button(L10n.tr("切换全屏")) {
                     MacPlayerCommandRouter.post(.macPlayerToggleFullScreen)
                 }
                 .keyboardShortcut("f", modifiers: [])
 
-                Button("关闭播放器") {
+                Button(L10n.tr("关闭播放器")) {
                     MacPlayerCommandRouter.post(.macPlayerClose)
                 }
                 .keyboardShortcut(.escape, modifiers: [])
@@ -84,7 +85,7 @@ struct VanmoMacApp: App {
 
         }
 
-        Window("下载", id: "downloads") {
+        Window(L10n.tr("下载"), id: "downloads") {
             MacDownloadManagementView()
                 .environmentObject(downloadManager)
                 .environmentObject(appState)
@@ -118,15 +119,15 @@ struct VanmoMacApp: App {
                         .font(.headline)
                 }
 
-                Button(appState.isPlayerPlaying ? "暂停" : "播放") {
+                Button(appState.isPlayerPlaying ? L10n.tr("暂停") : L10n.tr("播放")) {
                     MacPlayerCommandRouter.post(.macPlayerTogglePlayPause)
                 }
 
-                Button("关闭播放器") {
+                Button(L10n.tr("关闭播放器")) {
                     MacPlayerCommandRouter.post(.macPlayerClose)
                 }
             } else {
-                Text("未在播放")
+                Text(L10n.tr("未在播放"))
                     .foregroundStyle(.secondary)
             }
         } label: {

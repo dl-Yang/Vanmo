@@ -39,7 +39,7 @@ struct EmptyStateView: View {
 
             if let action {
                 Button(action: action) {
-                    Text("添加媒体源")
+                    Text(L10n.tr("添加媒体源"))
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .padding(.horizontal, 24)

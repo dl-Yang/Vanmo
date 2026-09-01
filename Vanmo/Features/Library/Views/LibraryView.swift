@@ -56,7 +56,7 @@ struct LibraryView: View {
             guard newValue > 0 else { return }
             Task {
                 await viewModel.refreshAfterLibrarySync(connections: connectionsViewModel.savedConnections)
-                showSyncToast("数据同步完成")
+                showSyncToast(L10n.tr("数据同步完成"))
             }
         }
         .onChange(of: appState.selectedTab) { _, newValue in
@@ -157,11 +157,11 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("首页")
+                    Text(L10n.tr("首页"))
                         .font(.system(size: 34, weight: .bold))
                         .foregroundStyle(HomeDesign.onSurface)
 
-                    Text("继续观看、收藏和你的全部媒体库")
+                    Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
                         .font(.system(size: 13))
                         .foregroundStyle(HomeDesign.subtitle)
                 }
@@ -196,7 +196,7 @@ struct LibraryView: View {
                 .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("搜索")
+        .accessibilityLabel(L10n.tr("搜索"))
     }
 
     private var syncPillText: String? {
@@ -212,10 +212,13 @@ struct LibraryView: View {
         }
 
         let sourceCount = connections.filter(\.type.isMediaServer).count
-        let prefix = sourceCount > 1 ? "\(sourceCount) 个媒体服务器已同步" : "已同步"
+        let prefix = sourceCount > 1
+            ? L10n.tr("%d 个媒体服务器已同步", sourceCount)
+            : L10n.tr("已同步")
         let count = libraryCount > 0 ? libraryCount : connections.count
-        let unit = libraryCount > 0 ? "个库" : "个源"
-        return "\(prefix) · \(count) \(unit)"
+        return libraryCount > 0
+            ? L10n.tr("%@ · %d 个库", prefix, count)
+            : L10n.tr("%@ · %d 个源", prefix, count)
     }
 
     private func syncPill(_ text: String) -> some View {
@@ -242,7 +245,7 @@ struct LibraryView: View {
     private var continueWatchingSection: some View {
         if !viewModel.recentlyPlayed.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
-                Text("历史记录")
+                Text(L10n.tr("历史记录"))
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(HomeDesign.onSurface)
                     .padding(.horizontal, 24)
@@ -301,11 +304,11 @@ struct LibraryView: View {
                 .frame(width: 42, height: 42)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("文件夹书签")
+                    Text(L10n.tr("文件夹书签"))
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(HomeDesign.onSurface)
 
-                    Text("\(viewModel.folderBookmarks.count) 个快捷入口")
+                    Text(L10n.tr("%d 个快捷入口", viewModel.folderBookmarks.count))
                         .font(.system(size: 12))
                         .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
                 }
@@ -403,7 +406,7 @@ struct LibraryView: View {
                     .background(Color.vanmoAccent.opacity(0.14), in: Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("连接服务器失败")
+                    Text(L10n.tr("连接服务器失败"))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(HomeDesign.onSurface)
 
@@ -443,14 +446,14 @@ struct LibraryView: View {
                     .foregroundStyle(HomeDesign.onSurface)
                     .lineLimit(1)
 
-                Text("连接异常")
+                Text(L10n.tr("连接异常"))
                     .font(.system(size: 12))
                     .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
             }
 
             Spacer(minLength: 12)
 
-            Text("失败")
+            Text(L10n.tr("失败"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.vanmoAccent)
                 .frame(minWidth: 42, minHeight: 28)
@@ -477,7 +480,7 @@ struct LibraryView: View {
                     .foregroundStyle(HomeDesign.onSurface)
                     .lineLimit(1)
 
-                Text("\(folderCount) 个媒体库")
+                Text(L10n.tr("%d 个媒体库", folderCount))
                     .font(.system(size: 12))
                     .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
             }
@@ -508,7 +511,7 @@ struct LibraryView: View {
                 NavigationLink {
                     folderDestination(folder: folder, connection: connection)
                 } label: {
-                    Text("查看全部")
+                    Text(L10n.tr("查看全部"))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(HomeDesign.onSurface.opacity(0.84))
                         .padding(.horizontal, 12)
@@ -634,7 +637,7 @@ struct LibraryView: View {
         .padding(.leading, 16)
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("正在同步数据")
+        .accessibilityLabel(L10n.tr("正在同步数据"))
         .accessibilityValue(message)
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
@@ -661,16 +664,16 @@ struct LibraryView: View {
     private var emptyHeaderSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("首页")
+                Text(L10n.tr("首页"))
                     .font(.system(size: 34, weight: .bold))
                     .foregroundStyle(HomeDesign.onSurface)
 
-                Text("继续观看、收藏和你的全部媒体库")
+                Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
                     .font(.system(size: 13))
                     .foregroundStyle(HomeDesign.subtitle)
             }
 
-            syncPill("未连接到媒体库")
+            syncPill(L10n.tr("未连接到媒体库"))
                 .padding(.top, 14)
         }
         .padding(.horizontal, 24)
@@ -826,13 +829,13 @@ private struct LibraryEmptyContentView: View {
             iconBadge
                 .padding(.bottom, 24)
 
-            Text("没有找到媒体内容")
+            Text(L10n.tr("没有找到媒体内容"))
                 .font(.system(size: 22, weight: .bold))
                 .tracking(-0.55)
                 .foregroundStyle(HomeDesign.emptyHeading)
                 .padding(.bottom, 12)
 
-            Text("您的媒体库目前空空如也。\n请先连接您的 NAS 或 Emby 服务器以同步您的媒体库内容。")
+            Text(L10n.tr("您的媒体库目前空空如也。\n请先连接您的 NAS 或 Emby 服务器以同步您的媒体库内容。"))
                 .font(.system(size: 14))
                 .foregroundStyle(HomeDesign.emptyParagraph)
                 .multilineTextAlignment(.center)
@@ -877,7 +880,7 @@ private struct LibraryEmptyContentView: View {
     private var addServerButton: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Text("添加服务器")
+                Text(L10n.tr("添加服务器"))
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
 
@@ -902,7 +905,7 @@ private struct LibraryEmptyContentView: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("添加服务器")
+        .accessibilityLabel(L10n.tr("添加服务器"))
     }
 }
 
@@ -959,7 +962,7 @@ private struct ContinueWatchingCard: View {
                     .foregroundStyle(HomeDesign.onSurface)
                     .lineLimit(1)
                 
-                Text("\(item.lastPlaybackPosition.shortDuration) · 共 \(item.duration.shortDuration)")
+                Text(L10n.tr("%@ · 共 %@", item.lastPlaybackPosition.shortDuration, item.duration.shortDuration))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(HomeDesign.onSurface.opacity(0.7))
                     .lineLimit(1)
@@ -986,7 +989,7 @@ private struct HomeFavoritesCard: View {
 
             Spacer(minLength: 5)
             VStack(alignment: .leading, spacing: 10) {
-                Text("收藏")
+                Text(L10n.tr("收藏"))
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(HomeDesign.onSurface)
 
@@ -996,15 +999,15 @@ private struct HomeFavoritesCard: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 5) {
-                Text("\(totalCount) 部收藏")
+                Text(L10n.tr("%d 部收藏", totalCount))
                     .font(.system(size: 12))
                     .foregroundStyle(HomeDesign.onSurface.opacity(0.76))
 
-                Text("\(movieCount) · 电影")
+                Text(L10n.tr("%d · 电影", movieCount))
                     .font(.system(size: 12))
                     .foregroundStyle(HomeDesign.onSurface.opacity(0.76))
 
-                Text("\(tvShowCount) · 剧集")
+                Text(L10n.tr("%d · 剧集", tvShowCount))
                     .font(.system(size: 12))
                     .foregroundStyle(HomeDesign.onSurface.opacity(0.76))
             }
@@ -1024,11 +1027,11 @@ private struct HomeFavoritesCard: View {
 //                .stroke(HomeDesign.cardStroke, lineWidth: 1)
 //        }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("收藏，共 \(totalCount) 部")
+        .accessibilityLabel(L10n.tr("收藏，共 %d 部", totalCount))
     }
 
     private var viewAllPill: some View {
-        Text("查看全部")
+        Text(L10n.tr("查看全部"))
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(HomeDesign.onSurface.opacity(0.94))
             .padding(.horizontal, 14)

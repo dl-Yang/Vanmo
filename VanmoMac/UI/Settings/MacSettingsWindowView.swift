@@ -18,15 +18,15 @@ enum MacSettingsPane: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .playback: "Playback"
-        case .audio: "Audio"
-        case .subtitles: "Subtitles"
-        case .cloudSync: "iCloud Sync"
-        case .library: "Library"
-        case .metadata: "Metadata"
-        case .appearance: "Appearance"
-        case .storage: "Storage"
-        case .about: "About"
+        case .playback: L10n.tr("播放")
+        case .audio: L10n.tr("音频")
+        case .subtitles: L10n.tr("字幕")
+        case .cloudSync: L10n.tr("iCloud 同步")
+        case .library: L10n.tr("媒体库")
+        case .metadata: L10n.tr("元数据")
+        case .appearance: L10n.tr("外观")
+        case .storage: L10n.tr("存储")
+        case .about: L10n.tr("关于")
         }
     }
 
@@ -55,9 +55,9 @@ enum MacSettingsPaneGroup: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .playback: "PLAYBACK"
-        case .dataAndSync: "DATA & SYNC"
-        case .general: "GENERAL"
+        case .playback: L10n.tr("播放").uppercased()
+        case .dataAndSync: L10n.tr("数据与同步").uppercased()
+        case .general: L10n.tr("通用").uppercased()
         }
     }
 
@@ -80,6 +80,7 @@ struct MacSettingsWindowView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedPane: MacSettingsPane? = .playback
+    @State private var showLanguageRestartAlert = false
 
 //    private var isDark: Bool {
 //        appState.appearanceMode.resolvedIsDark(systemColorScheme: colorScheme)
@@ -127,6 +128,11 @@ struct MacSettingsWindowView: View {
                 appState.syncAppearance(with: newScheme)
             }
             .modifier(MacSettingsAlertModifier(viewModel: viewModel, appState: appState, colorScheme: colorScheme))
+            .alert(L10n.tr("语言"), isPresented: $showLanguageRestartAlert) {
+                Button(L10n.tr("确定"), role: .cancel) {}
+            } message: {
+                Text(L10n.tr("语言将在下次启动后生效"))
+            }
     }
 
     private var settingsLayout: some View {
@@ -207,7 +213,7 @@ struct MacSettingsWindowView: View {
 
     private var cloudSyncPane: some View {
         settingsCard {
-            Toggle("iCloud 同步", isOn: Binding(
+            Toggle(L10n.tr("iCloud 同步"), isOn: Binding(
                 get: { viewModel.cloudSyncEnabled },
                 set: { viewModel.updateCloudSyncEnabled($0, coordinator: cloudSyncCoordinator) }
             ))
@@ -219,7 +225,7 @@ struct MacSettingsWindowView: View {
                     .foregroundStyle(theme.secondaryText)
             }
 
-            settingsRow(label: "上次同步", value: viewModel.cloudSyncLastUpdatedText)
+            settingsRow(label: L10n.tr("上次同步"), value: viewModel.cloudSyncLastUpdatedText)
 
             if let message = viewModel.cloudSyncStatusMessage ?? cloudSyncCoordinator.statusMessage {
                 Text(message)
@@ -227,7 +233,7 @@ struct MacSettingsWindowView: View {
                     .foregroundStyle(theme.secondaryText)
             }
 
-            Text("通过 CloudKit 同步服务器配置、播放进度、收藏和文件夹书签。密码与 OAuth 凭据保存在本机 Keychain。")
+            Text(L10n.tr("通过 CloudKit 同步服务器配置、播放进度、收藏和文件夹书签。密码与 OAuth 凭据保存在本机 Keychain。"))
                 .font(.caption)
                 .foregroundStyle(theme.secondaryText)
         }
@@ -235,12 +241,12 @@ struct MacSettingsWindowView: View {
 
     private var playbackPane: some View {
         settingsCard {
-            Toggle("自动播放下一集", isOn: $viewModel.autoPlayNext)
-            Toggle("断点续播", isOn: $viewModel.resumePlayback)
-            Toggle("硬件解码优先", isOn: $viewModel.hardwareDecoding)
+            Toggle(L10n.tr("自动播放下一集"), isOn: $viewModel.autoPlayNext)
+            Toggle(L10n.tr("断点续播"), isOn: $viewModel.resumePlayback)
+            Toggle(L10n.tr("硬件解码优先"), isOn: $viewModel.hardwareDecoding)
 
             HStack {
-                Text("默认播放速度")
+                Text(L10n.tr("默认播放速度"))
                     .foregroundStyle(theme.primaryText)
                 Spacer()
                 Picker("", selection: $viewModel.defaultRate) {
@@ -256,13 +262,13 @@ struct MacSettingsWindowView: View {
 
     private var audioPane: some View {
         settingsCard {
-            Picker("输出模式", selection: $viewModel.audioOutputMode) {
+            Picker(L10n.tr("输出模式"), selection: $viewModel.audioOutputMode) {
                 ForEach(AudioOutputMode.allCases, id: \.self) { mode in
                     Label(mode.displayName, systemImage: mode.icon).tag(mode)
                 }
             }
 
-            Text("「自动」根据当前输出设备自动选择最佳音频模式。连接支持杜比的耳机或音箱时将启用空间音频。")
+            Text(L10n.tr("「自动」根据当前输出设备自动选择最佳音频模式。连接支持杜比的耳机或音箱时将启用空间音频。"))
                 .font(.caption)
                 .foregroundStyle(theme.secondaryText)
         }
@@ -270,10 +276,10 @@ struct MacSettingsWindowView: View {
 
     private var subtitlePane: some View {
         settingsCard {
-            Toggle("自动加载字幕", isOn: $viewModel.subtitleAutoLoad)
+            Toggle(L10n.tr("自动加载字幕"), isOn: $viewModel.subtitleAutoLoad)
 
             HStack {
-                Text("字幕大小")
+                Text(L10n.tr("字幕大小"))
                     .foregroundStyle(theme.primaryText)
                 Spacer()
                 Stepper(
@@ -284,24 +290,24 @@ struct MacSettingsWindowView: View {
                 )
             }
 
-            Picker("首选语言", selection: $viewModel.subtitlePreferredLanguage) {
-                Text("中文").tag("zh")
+            Picker(L10n.tr("首选语言"), selection: $viewModel.subtitlePreferredLanguage) {
+                Text(L10n.tr("中文")).tag("zh")
                 Text("English").tag("en")
                 Text("日本語").tag("ja")
             }
 
-            Picker("字幕位置", selection: $viewModel.subtitlePosition) {
+            Picker(L10n.tr("字幕位置"), selection: $viewModel.subtitlePosition) {
                 ForEach(MacSubtitlePosition.allCases) { position in
                     Text(position.title).tag(position)
                 }
             }
 
-            ColorPicker("文字颜色", selection: Binding(
+            ColorPicker(L10n.tr("文字颜色"), selection: Binding(
                 get: { viewModel.subtitleTextColor },
                 set: { viewModel.subtitleTextColor = $0 }
             ))
 
-            ColorPicker("背景颜色", selection: Binding(
+            ColorPicker(L10n.tr("背景颜色"), selection: Binding(
                 get: { viewModel.subtitleBackgroundColor },
                 set: { viewModel.subtitleBackgroundColor = $0 }
             ))
@@ -310,22 +316,22 @@ struct MacSettingsWindowView: View {
 
     private var libraryPane: some View {
         settingsCard {
-            Toggle("自动扫描新文件", isOn: $viewModel.libraryAutoScan)
+            Toggle(L10n.tr("自动扫描新文件"), isOn: $viewModel.libraryAutoScan)
         }
     }
 
     private var metadataPane: some View {
         settingsCard {
-            Toggle("自动从媒体服务器下载元数据", isOn: $viewModel.metadataAutoDownload)
+            Toggle(L10n.tr("自动从媒体服务器下载元数据"), isOn: $viewModel.metadataAutoDownload)
 
-            settingsRow(label: "元数据缓存大小", value: viewModel.metadataCacheSize)
+            settingsRow(label: L10n.tr("元数据缓存大小"), value: viewModel.metadataCacheSize)
 
-            Button("删除所有元数据缓存") {
+            Button(L10n.tr("删除所有元数据缓存")) {
                 viewModel.showClearMetadataCacheAlert = true
             }
             .foregroundStyle(.red)
 
-            Text("仅 Emby、Jellyfin、Plex 媒体条目支持元数据刷新。关闭自动下载后，仍可在详情页手动更新。")
+            Text(L10n.tr("仅 Emby、Jellyfin、Plex 媒体条目支持元数据刷新。关闭自动下载后，仍可在详情页手动更新。"))
                 .font(.caption)
                 .foregroundStyle(theme.secondaryText)
         }
@@ -333,38 +339,59 @@ struct MacSettingsWindowView: View {
 
     private var appearancePane: some View {
         settingsCard {
-            Picker("主题", selection: $viewModel.appearanceMode) {
+            Picker(L10n.tr("主题"), selection: $viewModel.appearanceMode) {
                 ForEach(MacAppearanceMode.allCases) { mode in
                     Text(mode.displayName).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
 
-            Text("跟随系统时，界面外观随 macOS 系统深浅色自动切换。")
+            Text(L10n.tr("跟随系统时，界面外观随 macOS 系统深浅色自动切换。"))
+                .font(.caption)
+                .foregroundStyle(theme.secondaryText)
+
+            Picker(L10n.tr("语言"), selection: languageSelection) {
+                ForEach(AppLanguagePreference.allCases, id: \.self) { preference in
+                    Text(preference.displayName).tag(preference)
+                }
+            }
+
+            Text(L10n.tr("语言将在下次启动后生效"))
                 .font(.caption)
                 .foregroundStyle(theme.secondaryText)
         }
     }
 
+    private var languageSelection: Binding<AppLanguagePreference> {
+        Binding(
+            get: { viewModel.languagePreference },
+            set: { newValue in
+                guard newValue != viewModel.languagePreference else { return }
+                viewModel.languagePreference = newValue
+                showLanguageRestartAlert = true
+            }
+        )
+    }
+
     private var storagePane: some View {
         settingsCard {
-            settingsRow(label: "下载位置", value: downloadManager.destination.rootPath)
+            settingsRow(label: L10n.tr("下载位置"), value: downloadManager.destination.rootPath)
 
             HStack {
-                Button("下载管理") {
+                Button(L10n.tr("下载管理")) {
                     openWindow(id: "downloads")
                 }
-                Button("选择下载目录") {
+                Button(L10n.tr("选择下载目录")) {
                     chooseDownloadDirectory()
                 }
-                Button("恢复默认目录") {
+                Button(L10n.tr("恢复默认目录")) {
                     downloadManager.useDefaultDirectory()
                 }
             }
 
-            settingsRow(label: "缓存大小", value: viewModel.cacheSize)
+            settingsRow(label: L10n.tr("缓存大小"), value: viewModel.cacheSize)
 
-            Button("清除缓存") {
+            Button(L10n.tr("清除缓存")) {
                 viewModel.showClearCacheAlert = true
             }
             .foregroundStyle(.red)
@@ -373,9 +400,9 @@ struct MacSettingsWindowView: View {
 
     private var aboutPane: some View {
         settingsCard {
-            settingsRow(label: "版本", value: viewModel.appVersion)
+            settingsRow(label: L10n.tr("版本"), value: viewModel.appVersion)
 
-            Button("重置所有设置") {
+            Button(L10n.tr("重置所有设置")) {
                 viewModel.showResetAlert = true
             }
             .foregroundStyle(.red)
@@ -406,7 +433,7 @@ struct MacSettingsWindowView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "选择"
+        panel.prompt = L10n.tr("选择")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try downloadManager.setCustomDirectory(url)
@@ -425,25 +452,25 @@ private struct MacSettingsAlertModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert("清除缓存", isPresented: $viewModel.showClearCacheAlert) {
-                Button("取消", role: .cancel) {}
-                Button("清除", role: .destructive) {
+            .alert(L10n.tr("清除缓存"), isPresented: $viewModel.showClearCacheAlert) {
+                Button(L10n.tr("取消"), role: .cancel) {}
+                Button(L10n.tr("清除"), role: .destructive) {
                     Task { await viewModel.clearCache() }
                 }
             } message: {
-                Text("确定要清除所有缓存数据吗？这不会删除已下载的文件。")
+                Text(L10n.tr("确定要清除所有缓存数据吗？这不会删除已下载的文件。"))
             }
-            .alert("删除元数据缓存", isPresented: $viewModel.showClearMetadataCacheAlert) {
-                Button("取消", role: .cancel) {}
-                Button("删除", role: .destructive) {
+            .alert(L10n.tr("删除元数据缓存"), isPresented: $viewModel.showClearMetadataCacheAlert) {
+                Button(L10n.tr("取消"), role: .cancel) {}
+                Button(L10n.tr("删除"), role: .destructive) {
                     Task { await viewModel.clearMetadataCache() }
                 }
             } message: {
-                Text("确定要删除所有元数据缓存吗？已保存的媒体信息不会被删除，但 Logo、演职人员头像和单集封面等缓存图片将被移除。")
+                Text(L10n.tr("确定要删除所有元数据缓存吗？已保存的媒体信息不会被删除，但 Logo、演职人员头像和单集封面等缓存图片将被移除。"))
             }
-            .alert("重置设置", isPresented: $viewModel.showResetAlert) {
-                Button("取消", role: .cancel) {}
-                Button("重置", role: .destructive) {
+            .alert(L10n.tr("重置设置"), isPresented: $viewModel.showResetAlert) {
+                Button(L10n.tr("取消"), role: .cancel) {}
+                Button(L10n.tr("重置"), role: .destructive) {
                     viewModel.resetAllSettings()
                     appState.appearanceMode = .system
                     appState.syncAppearance(with: colorScheme)
@@ -453,7 +480,7 @@ private struct MacSettingsAlertModifier: ViewModifier {
                     }
                 }
             } message: {
-                Text("确定要重置所有设置为默认值吗？")
+                Text(L10n.tr("确定要重置所有设置为默认值吗？"))
             }
     }
 }

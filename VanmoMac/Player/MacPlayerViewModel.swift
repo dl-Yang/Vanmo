@@ -301,7 +301,7 @@ final class MacPlayerViewModel: ObservableObject {
             do {
                 let results = try await OnlineSubtitleService.shared.search(for: self.item)
                 self.onlineSubtitleResults = results
-                self.onlineSubtitleStatusMessage = results.isEmpty ? "未找到匹配的在线字幕" : nil
+                self.onlineSubtitleStatusMessage = results.isEmpty ? L10n.tr("未找到匹配的在线字幕") : nil
                 self.isSearchingOnlineSubtitles = false
             } catch {
                 self.onlineSubtitleResults = []
@@ -929,10 +929,10 @@ final class MacPlayerViewModel: ObservableObject {
                     return false
                 }
             case .ass:
-                alertMessage = "Mac 播放器暂不支持 ASS 外挂字幕"
+                alertMessage = L10n.tr("Mac 播放器暂不支持 ASS 外挂字幕")
                 return false
             case .unknown:
-                alertMessage = "不支持的字幕格式"
+                alertMessage = L10n.tr("不支持的字幕格式")
                 return false
             }
         }
@@ -1090,9 +1090,9 @@ final class MacPlayerViewModel: ObservableObject {
     private func languageAliases(for preferredLanguage: String) -> Set<String> {
         switch preferredLanguage {
         case "zh":
-            return ["zh", "zho", "chi", "chs", "cht", "cn", "chinese", "中文", "简体", "繁体"]
+            return ["zh", "zho", "chi", "chs", "cht", "cn", "chinese", L10n.tr("中文"), "简体", "繁体"]
         case "en":
-            return ["en", "eng", "english", "英文"]
+            return ["en", "eng", "english", L10n.tr("英文")]
         case "ja":
             return ["ja", "jpn", "japanese", "日语", "日本語"]
         case "ko":
@@ -1616,11 +1616,11 @@ struct MacPlayerEpisode: Identifiable, Equatable {
     }
 
     var displayTitle: String {
-        title.isEmpty ? "第 \(episodeNumber) 集" : title
+        title.isEmpty ? LocalizedFormat.episodeLabel(episodeNumber) : title
     }
 
     var episodeCode: String {
-        "S\(String(format: "%02d", seasonNumber))E\(String(format: "%02d", episodeNumber))"
+        LocalizedFormat.episodeCode(season: seasonNumber, episode: episodeNumber)
     }
 }
 

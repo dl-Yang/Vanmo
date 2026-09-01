@@ -102,8 +102,8 @@ struct MediaDetailView: View {
                 }
             }
         }
-        .alert("收藏失败", isPresented: favoriteErrorBinding) {
-            Button("确定") {}
+        .alert(L10n.tr("收藏失败"), isPresented: favoriteErrorBinding) {
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(favoriteErrorMessage ?? "")
         }
@@ -124,11 +124,11 @@ struct MediaDetailView: View {
                 onConfirm: enqueueSelectedEpisodes
             )
         }
-        .alert("下载失败", isPresented: Binding(
+        .alert(L10n.tr("下载失败"), isPresented: Binding(
             get: { downloadErrorMessage != nil },
             set: { if !$0 { downloadErrorMessage = nil } }
         )) {
-            Button("确定") {}
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(downloadErrorMessage ?? "")
         }
@@ -279,7 +279,7 @@ struct MediaDetailView: View {
                     .progressViewStyle(.circular)
                     .tint(.white)
 
-                Text("加载中")
+                Text(L10n.tr("加载中"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
             }
@@ -292,7 +292,7 @@ struct MediaDetailView: View {
                     .background(Color.black.opacity(0.25), in: Circle())
                     .overlay { Circle().strokeBorder(.white.opacity(0.4), lineWidth: 1) }
 
-                Text("上滑查看详情")
+                Text(L10n.tr("上滑查看详情"))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
             }
@@ -376,7 +376,7 @@ struct MediaDetailView: View {
             MediaDetailDetailsSection(
                 director: store.content?.director,
                 genres: displayGenres,
-                directorLabel: "导演"
+                directorLabel: L10n.tr("导演")
             )
         }
     }
@@ -417,7 +417,7 @@ struct MediaDetailView: View {
             MediaDetailDetailsSection(
                 director: store.content?.director,
                 genres: displayGenres,
-                directorLabel: "主创"
+                directorLabel: L10n.tr("主创")
             )
         }
     }
@@ -511,8 +511,8 @@ struct MediaDetailView: View {
         }
         .buttonStyle(.plain)
         .disabled(isUpdatingFavorite)
-        .accessibilityLabel(item.isFavorite ? "取消收藏" : "收藏")
-        .accessibilityValue(isUpdatingFavorite ? "正在更新" : "")
+        .accessibilityLabel(item.isFavorite ? L10n.tr("取消收藏") : L10n.tr("收藏"))
+        .accessibilityValue(isUpdatingFavorite ? L10n.tr("正在更新") : "")
     }
 
     private var favoriteErrorBinding: Binding<Bool> {
@@ -784,14 +784,14 @@ struct MediaDetailView: View {
                 .transition(.opacity)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(sheet == .synopsis ? "简介" : "详情")
+                Text(sheet == .synopsis ? L10n.tr("简介") : L10n.tr("详情"))
                     .font(.system(size: 22, weight: .black))
                     .foregroundStyle(.primary)
                     .padding(.top, 20)
 
                 if sheet == .synopsis {
                     ScrollView {
-                        Text(displayOverview ?? "暂无简介")
+                        Text(displayOverview ?? L10n.tr("暂无简介"))
                             .font(.system(size: 14))
                             .lineSpacing(8)
                             .foregroundStyle(.secondary)
@@ -1365,8 +1365,8 @@ private struct MediaDetailRefreshErrorPresenter: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert("刷新失败", isPresented: refreshErrorBinding) {
-                Button("确定") {}
+            .alert(L10n.tr("刷新失败"), isPresented: refreshErrorBinding) {
+                Button(L10n.tr("确定")) {}
             } message: {
                 Text(store.refreshErrorMessage ?? "")
             }
@@ -1470,7 +1470,7 @@ private struct MediaDetailPanelActions: View {
                 HStack(spacing: 8) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 18, weight: .bold))
-                    Text("播放")
+                    Text(L10n.tr("播放"))
                         .font(.system(size: 18, weight: .bold))
                 }
                 .foregroundStyle(.white)
@@ -1497,7 +1497,7 @@ private struct MediaDetailPanelActions: View {
                     Button {
                         refresh()
                     } label: {
-                        Label("刷新", systemImage: "arrow.clockwise")
+                        Label(L10n.tr("刷新"), systemImage: "arrow.clockwise")
                     }
                     .disabled(isRefreshing)
                 }
@@ -1613,13 +1613,13 @@ private struct MediaDetailDownloadButtonContent: View {
 
     private var accessibilityLabel: String {
         if isEnqueueing { return "正在加入下载队列" }
-        guard let task else { return "下载" }
+        guard let task else { return L10n.tr("下载") }
         switch task.status {
         case .queued: return "暂停等待中的下载"
         case .downloading: return "暂停下载"
         case .paused: return "继续下载"
         case .completed: return "已下载"
-        case .failed: return "重新下载"
+        case .failed: return L10n.tr("重新下载")
         }
     }
 
@@ -1683,20 +1683,20 @@ private struct EpisodeDownloadPicker: View {
         NavigationStack {
             List {
                 Section {
-                    Picker("季", selection: Binding(
+                    Picker(L10n.tr("季"), selection: Binding(
                         get: { selectedSeason ?? seasonNumbers.first ?? 1 },
                         set: onSelectSeason
                     )) {
                         ForEach(seasonNumbers, id: \.self) { season in
-                            Text("第 \(season) 季").tag(season)
+                            Text(LocalizedFormat.seasonLabel(season)).tag(season)
                         }
                     }
-                    Button(allCurrentSeasonSelected ? "取消全选本季" : "全选本季") {
+                    Button(allCurrentSeasonSelected ? L10n.tr("取消全选本季") : L10n.tr("全选本季")) {
                         toggleCurrentSeason()
                     }
                 }
 
-                Section("选择剧集") {
+                Section(L10n.tr("选择剧集")) {
                     ForEach(episodes) { episode in
                         Button {
                             toggle(episode)
@@ -1705,7 +1705,7 @@ private struct EpisodeDownloadPicker: View {
                                 Image(systemName: selectedEpisodes[episode.id] == nil ? "circle" : "checkmark.circle.fill")
                                     .foregroundStyle(selectedEpisodes[episode.id] == nil ? .secondary : Color.vanmoAccent)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("第 \(episode.episodeNumber) 集 · \(episode.title)")
+                                    Text("\(LocalizedFormat.episodeLabel(episode.episodeNumber)) · \(episode.title)")
                                         .foregroundStyle(.primary)
                                     if episode.duration > 0 {
                                         Text(episode.duration.shortDuration)
@@ -1725,10 +1725,10 @@ private struct EpisodeDownloadPicker: View {
                     }
                 }
             }
-            .navigationTitle("选择下载剧集")
+            .navigationTitle(L10n.tr("选择下载剧集"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(L10n.tr("取消")) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
@@ -1765,7 +1765,7 @@ private struct MediaDetailCastSection: View {
     var body: some View {
         if !members.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
-                Text("主演")
+                Text(L10n.tr("主演"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.primary)
 
@@ -1832,7 +1832,7 @@ private struct MediaDetailCollectionsSection: View {
     var body: some View {
         if !collections.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
-                Text("合集")
+                Text(L10n.tr("合集"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.primary)
 
@@ -1920,10 +1920,10 @@ private struct MediaDetailSynopsisSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("简介")
+            Text(L10n.tr("简介"))
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.primary)
-            Text(overview ?? "暂无简介")
+            Text(overview ?? L10n.tr("暂无简介"))
                 .font(.system(size: 15))
                 .lineSpacing(4)
                 .foregroundStyle(.secondary)
@@ -1941,7 +1941,7 @@ private struct MediaDetailDetailsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("详情")
+            Text(L10n.tr("详情"))
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.primary)
                 .padding(.bottom, 8)
@@ -1950,7 +1950,7 @@ private struct MediaDetailDetailsSection: View {
                 detailRow(title: directorLabel, value: director)
             }
             if !genres.isEmpty {
-                detailRow(title: "类型", value: genres.joined(separator: " / "))
+                detailRow(title: L10n.tr("类型"), value: genres.joined(separator: " / "))
             }
         }
     }
@@ -1987,7 +1987,7 @@ private struct MediaDetailEpisodesSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("剧集")
+                Text(L10n.tr("剧集"))
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.primary)
 
@@ -1995,11 +1995,11 @@ private struct MediaDetailEpisodesSection: View {
                     Spacer()
                     Menu {
                         ForEach(seasonNumbers, id: \.self) { season in
-                            Button("第 \(season) 季") { selectedSeason = season }
+                            Button(LocalizedFormat.seasonLabel(season)) { selectedSeason = season }
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text("第 \(selectedSeason ?? seasonNumbers.first ?? 1) 季")
+                            Text(LocalizedFormat.seasonLabel(selectedSeason ?? seasonNumbers.first ?? 1))
                                 .font(.system(size: 14, weight: .semibold))
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 10, weight: .bold))
@@ -2017,7 +2017,7 @@ private struct MediaDetailEpisodesSection: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
             } else if episodes.isEmpty {
-                Text("暂无剧集")
+                Text(L10n.tr("暂无剧集"))
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -2078,17 +2078,17 @@ private struct MediaDetailEpisodesSection: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .top) {
-                        Text("\(episode.episodeNumber). \(episode.title.isEmpty ? "第 \(episode.episodeNumber) 集" : episode.title)")
+                        Text("\(episode.episodeNumber). \(episode.title.isEmpty ? LocalizedFormat.episodeLabel(episode.episodeNumber) : episode.title)")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
                         Spacer()
-                        Text(episode.duration > 0 ? episode.duration.shortDuration : "-- 分钟")
+                        Text(episode.duration > 0 ? episode.duration.shortDuration : LocalizedFormat.unknownDuration())
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
 
-                    Text(episode.overview ?? "暂无简介")
+                    Text(episode.overview ?? L10n.tr("暂无简介"))
                         .font(.system(size: 12))
                         .lineSpacing(3)
                         .foregroundStyle(.secondary)

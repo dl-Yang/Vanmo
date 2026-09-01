@@ -91,9 +91,9 @@ struct FilterChipsRow: View {
     }
 
     private var selectionSummary: String {
-        guard !selection.isEmpty else { return "全部" }
+        guard !selection.isEmpty else { return L10n.tr("全部") }
         let sortedSelection = Array(selection).sorted()
-        guard let first = sortedSelection.first else { return "全部" }
+        guard let first = sortedSelection.first else { return L10n.tr("全部") }
         return sortedSelection.count == 1 ? first : "\(first) +\(sortedSelection.count - 1)"
     }
 

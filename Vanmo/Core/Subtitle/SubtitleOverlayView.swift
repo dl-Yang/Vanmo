@@ -203,21 +203,21 @@ struct SubtitleSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("字体") {
+                Section(L10n.tr("字体")) {
                     HStack {
-                        Text("大小")
+                        Text(L10n.tr("大小"))
                         Spacer()
                         Stepper("\(Int(style.fontSize))pt", value: $style.fontSize, in: 12...36, step: 2)
                     }
 
-                    ColorPicker("文字颜色", selection: $style.textColor)
+                    ColorPicker(L10n.tr("文字颜色"), selection: $style.textColor)
                 }
 
-                Section("背景") {
-                    ColorPicker("背景颜色", selection: $style.backgroundColor)
+                Section(L10n.tr("背景")) {
+                    ColorPicker(L10n.tr("背景颜色"), selection: $style.backgroundColor)
                 }
 
-                Section("时间偏移") {
+                Section(L10n.tr("时间偏移")) {
                     HStack {
                         Text(String(format: "%+.1fs", delay))
                             .monospacedDigit()
@@ -230,7 +230,7 @@ struct SubtitleSettingsView: View {
                         Button("-0.5s") { delay -= 0.5 }
                             .buttonStyle(.bordered)
                         Spacer()
-                        Button("重置") { delay = 0 }
+                        Button(L10n.tr("重置")) { delay = 0 }
                             .buttonStyle(.bordered)
                         Spacer()
                         Button("+0.5s") { delay += 0.5 }
@@ -238,19 +238,19 @@ struct SubtitleSettingsView: View {
                     }
                 }
 
-                Section("位置") {
-                    Picker("位置", selection: $style.position) {
-                        Text("顶部").tag(SubtitleStyle.SubtitlePosition.top)
-                        Text("底部").tag(SubtitleStyle.SubtitlePosition.bottom)
+                Section(L10n.tr("位置")) {
+                    Picker(L10n.tr("位置"), selection: $style.position) {
+                        Text(L10n.tr("顶部")).tag(SubtitleStyle.SubtitlePosition.top)
+                        Text(L10n.tr("底部")).tag(SubtitleStyle.SubtitlePosition.bottom)
                     }
                     .pickerStyle(.segmented)
                 }
             }
-            .navigationTitle("字幕设置")
+            .navigationTitle(L10n.tr("字幕设置"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button(L10n.tr("完成")) { dismiss() }
                 }
             }
         }

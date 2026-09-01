@@ -15,7 +15,7 @@ struct MacScanSyncBanner: View {
                     .controlSize(.small)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("正在同步媒体库")
+                    Text(L10n.tr("正在同步媒体库"))
                         .font(.subheadline.weight(.semibold))
                     Text(progress.summaryMessage)
                         .font(.caption)
@@ -26,12 +26,12 @@ struct MacScanSyncBanner: View {
                 Spacer(minLength: 8)
 
                 if coordinator.controlState == .paused {
-                    Button("继续", action: onResume)
+                    Button(L10n.tr("继续"), action: onResume)
                 } else {
-                    Button("暂停", action: onPause)
+                    Button(L10n.tr("暂停"), action: onPause)
                 }
 
-                Button("取消", role: .destructive, action: onCancel)
+                Button(L10n.tr("取消"), role: .destructive, action: onCancel)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -69,7 +69,7 @@ struct MacLowConfidenceItemsSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title)
                     if let confidence = item.identificationConfidence {
-                        Text(String(format: "置信度 %.0f%%", confidence * 100))
+                        Text(String(format: L10n.tr("置信度 %.0f%%"), confidence * 100))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -83,7 +83,7 @@ struct MacLowConfidenceItemsSheet: View {
             .navigationTitle("\(connectionName) · 待确认")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { dismiss() }
+                    Button(L10n.tr("关闭")) { dismiss() }
                 }
             }
         }

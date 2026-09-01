@@ -15,7 +15,7 @@ struct ScanSyncBanner: View {
                     .controlSize(.small)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("正在同步媒体库")
+                    Text(L10n.tr("正在同步媒体库"))
                         .font(.subheadline.weight(.semibold))
                     Text(progress.summaryMessage)
                         .font(.caption)
@@ -26,14 +26,14 @@ struct ScanSyncBanner: View {
                 Spacer(minLength: 8)
 
                 if coordinator.controlState == .paused {
-                    Button("继续", action: onResume)
+                    Button(L10n.tr("继续"), action: onResume)
                         .font(.caption.weight(.semibold))
                 } else {
-                    Button("暂停", action: onPause)
+                    Button(L10n.tr("暂停"), action: onPause)
                         .font(.caption.weight(.semibold))
                 }
 
-                Button("取消", role: .destructive, action: onCancel)
+                Button(L10n.tr("取消"), role: .destructive, action: onCancel)
                     .font(.caption.weight(.semibold))
             }
             .padding(.horizontal, 16)
@@ -75,7 +75,7 @@ struct LowConfidenceItemsSheet: View {
                     Text(item.title)
                         .font(.headline)
                     if let confidence = item.identificationConfidence {
-                        Text(String(format: "置信度 %.0f%%", confidence * 100))
+                        Text(String(format: L10n.tr("置信度 %.0f%%"), confidence * 100))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -90,7 +90,7 @@ struct LowConfidenceItemsSheet: View {
             .navigationTitle("\(connectionName) · 待确认")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭") { dismiss() }
+                    Button(L10n.tr("关闭")) { dismiss() }
                 }
             }
         }

@@ -152,7 +152,7 @@ struct VanmoMacRootView: View {
             Task {
                 // 扫描完成：只重载本地扫描/高亮/书签，不再重复拉取 Emby live 与 folder preview。
                 await refreshLibrarySections(refreshEmbyLive: false)
-                showSyncToast("数据同步完成")
+                showSyncToast(L10n.tr("数据同步完成"))
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in

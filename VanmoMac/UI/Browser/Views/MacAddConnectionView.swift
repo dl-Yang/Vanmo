@@ -76,8 +76,8 @@ struct MacAddConnectionView: View {
             port = "\(defaultPort(for: selectedType, useHTTPS: useHTTPS))"
             applyDefaults(for: selectedType)
         }
-        .alert("错误", isPresented: $viewModel.showError) {
-            Button("确定") {}
+        .alert(L10n.tr("错误"), isPresented: $viewModel.showError) {
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(viewModel.errorMessage)
         }
@@ -211,14 +211,14 @@ struct MacAddConnectionView: View {
 
     private var localFolderForm: some View {
         VStack(alignment: .leading, spacing: 16) {
-            formRow(label: "名称") {
-                macTextField("我的文件夹", text: $name)
+            formRow(label: L10n.tr("名称")) {
+                macTextField(L10n.tr("我的文件夹"), text: $name)
             }
 
             Button(action: pickLocalFolder) {
                 HStack {
                     Image(systemName: "folder.badge.plus")
-                    Text(folderURL == nil ? "选择文件夹..." : "更换文件夹")
+                    Text(folderURL == nil ? L10n.tr("选择文件夹...") : L10n.tr("更换文件夹"))
                     Spacer()
                 }
                 .font(.system(size: 13))
@@ -252,11 +252,11 @@ struct MacAddConnectionView: View {
 
     private var remoteServerForm: some View {
         VStack(alignment: .leading, spacing: 16) {
-            formRow(label: "名称") {
-                macTextField("我的服务器", text: $name)
+            formRow(label: L10n.tr("名称")) {
+                macTextField(L10n.tr("我的服务器"), text: $name)
             }
 
-            formRow(label: "主机") {
+            formRow(label: L10n.tr("主机")) {
                 macTextField(hostPlaceholder, text: $host)
                     .onChange(of: host) { _, _ in
                         applyHostSchemeDefaults()
@@ -264,7 +264,7 @@ struct MacAddConnectionView: View {
             }
 
             if supportsHTTPS(for: selectedType) {
-                formRow(label: "连接") {
+                formRow(label: L10n.tr("连接")) {
                     HStack(spacing: 12) {
                         Text("HTTPS")
                             .font(.system(size: 13))
@@ -277,7 +277,7 @@ struct MacAddConnectionView: View {
                                 applyHTTPSPortDefault(newValue)
                             }
 
-                        Text("端口")
+                        Text(L10n.tr("端口"))
                             .font(.system(size: 13))
                             .foregroundStyle(theme.secondaryText)
                             .padding(.leading, 8)
@@ -287,13 +287,13 @@ struct MacAddConnectionView: View {
                     }
                 }
             } else {
-                formRow(label: "端口") {
+                formRow(label: L10n.tr("端口")) {
                     macTextField("\(selectedType.defaultPort)", text: $port)
                         .frame(width: 120)
                 }
             }
 
-            formRow(label: "路径") {
+            formRow(label: L10n.tr("路径")) {
                 macTextField(pathPlaceholder, text: $path)
             }
 
@@ -312,11 +312,11 @@ struct MacAddConnectionView: View {
                 .padding(.leading, 72)
                 .padding(.top, 8)
 
-            formRow(label: "用户名") {
+            formRow(label: L10n.tr("用户名")) {
                 macTextField("", text: $username)
             }
 
-            formRow(label: "密码") {
+            formRow(label: L10n.tr("密码")) {
                 SecureField("", text: $password)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
@@ -330,7 +330,7 @@ struct MacAddConnectionView: View {
             }
 
             if isEditing {
-                Text("留空则保留现有密码。")
+                Text(L10n.tr("留空则保留现有密码。"))
                     .font(.system(size: 12))
                     .foregroundStyle(theme.tertiaryText)
                     .padding(.leading, 72)
@@ -343,7 +343,7 @@ struct MacAddConnectionView: View {
     private var oauthForm: some View {
         VStack(alignment: .leading, spacing: 16) {
             if isEditing {
-                formRow(label: "名称") {
+                formRow(label: L10n.tr("名称")) {
                     macTextField(selectedType.displayName, text: $name)
                 }
             }
@@ -386,7 +386,7 @@ struct MacAddConnectionView: View {
 
     private var officialCloudDriveForm: some View {
         VStack(alignment: .leading, spacing: 16) {
-            formRow(label: "名称") {
+            formRow(label: L10n.tr("名称")) {
                 macTextField(selectedType.displayName, text: $name)
             }
 
@@ -401,10 +401,10 @@ struct MacAddConnectionView: View {
         HStack(spacing: 12) {
             Spacer()
 
-            Button("取消") { dismiss() }
+            Button(L10n.tr("取消")) { dismiss() }
                 .buttonStyle(MacSecondaryActionButtonStyle(theme: theme))
 
-            Button("保存") { save() }
+            Button(L10n.tr("保存")) { save() }
                 .buttonStyle(MacPrimaryActionButtonStyle())
                 .disabled(!isValid || viewModel.isLoading)
         }
@@ -452,7 +452,7 @@ struct MacAddConnectionView: View {
 
     private var loadingMessageText: String {
         let trimmed = viewModel.loadingMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "处理中..." : trimmed
+        return trimmed.isEmpty ? L10n.tr("处理中...") : trimmed
     }
 
     private var loadingOverlay: some View {
@@ -546,12 +546,12 @@ struct MacAddConnectionView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.prompt = "选择"
+        panel.prompt = L10n.tr("选择")
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         guard url.startAccessingSecurityScopedResource() else {
-            folderPickerError = "无法获取该文件夹的访问权限"
+            folderPickerError = L10n.tr("无法获取该文件夹的访问权限")
             return
         }
         defer { url.stopAccessingSecurityScopedResource() }
@@ -649,7 +649,7 @@ struct MacAddConnectionView: View {
         if success {
             dismiss()
         } else {
-            oauthErrorMessage = viewModel.errorMessage.isEmpty ? "登录失败，请重试" : viewModel.errorMessage
+            oauthErrorMessage = viewModel.errorMessage.isEmpty ? L10n.tr("登录失败，请重试") : viewModel.errorMessage
         }
     }
 
@@ -662,19 +662,19 @@ struct MacAddConnectionView: View {
             return "https://example.com"
         }
         if selectedType == .iptv {
-            return "播放列表 URL 或主机地址"
+            return L10n.tr("播放列表 URL 或主机地址")
         }
         return "https://example.com"
     }
 
     private var pathPlaceholder: String {
         if selectedType == .iptv {
-            return "播放列表路径或 URL"
+            return L10n.tr("播放列表路径或 URL")
         }
         if selectedType == .smb {
-            return "共享名，如 /Movies"
+            return L10n.tr("共享名，如 /Movies")
         }
-        return "可选"
+        return L10n.tr("可选")
     }
 
     private var isValid: Bool {
@@ -716,7 +716,7 @@ struct MacAddConnectionView: View {
 
     private var formValidationMessage: String? {
         if !isPortValid {
-            return selectedType == .iptv ? "端口需为 0-65535，或留空使用播放列表 URL。" : "端口需为 1-65535。"
+            return selectedType == .iptv ? "端口需为 0-65535，或留空使用播放列表 URL。" : L10n.tr("端口需为 1-65535。")
         }
         if !isRemotePathValid {
             return "WebDAV 路径需以 / 开头；不确定时可留空。"

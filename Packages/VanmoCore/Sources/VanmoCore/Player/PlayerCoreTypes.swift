@@ -15,9 +15,9 @@ public enum VideoScaleMode: String, CaseIterable, Sendable {
     case fit, fill, stretch
     public var displayName: String {
         switch self {
-        case .fit: return "适应"
-        case .fill: return "填充"
-        case .stretch: return "拉伸"
+        case .fit: return L10n.tr("适应")
+        case .fill: return L10n.tr("填充")
+        case .stretch: return L10n.tr("拉伸")
         }
     }
     public var icon: String {
@@ -57,9 +57,9 @@ public enum AudioOutputMode: String, CaseIterable, Sendable {
     case auto, stereo, surround
     public var displayName: String {
         switch self {
-        case .auto: return "自动"
-        case .stereo: return "立体声"
-        case .surround: return "环绕声 / 空间音频"
+        case .auto: return L10n.tr("自动")
+        case .stereo: return L10n.tr("立体声")
+        case .surround: return L10n.tr("环绕声 / 空间音频")
         }
     }
     public var icon: String {

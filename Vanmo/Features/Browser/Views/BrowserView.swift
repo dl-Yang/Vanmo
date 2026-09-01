@@ -39,11 +39,11 @@ struct ConnectionsView: View {
                 onCancel: { viewModel.cancelScan() }
             )
         }
-        .alert("同步", isPresented: Binding(
+        .alert(L10n.tr("同步"), isPresented: Binding(
             get: { viewModel.scanToastMessage != nil },
             set: { if !$0 { viewModel.scanToastMessage = nil } }
         )) {
-            Button("确定") { viewModel.scanToastMessage = nil }
+            Button(L10n.tr("确定")) { viewModel.scanToastMessage = nil }
         } message: {
             Text(viewModel.scanToastMessage ?? "")
         }
@@ -58,8 +58,8 @@ struct ConnectionsView: View {
         .onChange(of: viewModel.pendingFolderBookmarkNavigation?.id) { _, _ in
             Task { await openPendingFolderBookmarkIfNeeded() }
         }
-        .alert("错误", isPresented: $viewModel.showError) {
-            Button("确定") {}
+        .alert(L10n.tr("错误"), isPresented: $viewModel.showError) {
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(viewModel.errorMessage)
         }
@@ -75,7 +75,7 @@ struct ConnectionsView: View {
 
     private var connectionsRoot: some View {
         VStack(spacing: 0) {
-            FilesHeader(title: "文件") {
+            FilesHeader(title: L10n.tr("文件")) {
                 FilesCircleButton(asset: nil, systemName: "plus", tint: FilesDesign.accent, background: FilesDesign.addButtonBackground) {
                     viewModel.showAddConnection = true
                 }
@@ -83,7 +83,7 @@ struct ConnectionsView: View {
                     Button {
                         Task { await viewModel.loadSavedConnections() }
                     } label: {
-                        Label("刷新", systemImage: "arrow.clockwise")
+                        Label(L10n.tr("刷新"), systemImage: "arrow.clockwise")
                     }
                 } label: {
                     FilesMenuGlyph()
@@ -93,15 +93,15 @@ struct ConnectionsView: View {
             if viewModel.savedConnections.isEmpty {
                 EmptyStateView(
                     icon: "folder.badge.plus",
-                    title: "暂无文件来源",
-                    message: "使用右上角按钮添加本地文件夹或服务器连接"
+                    title: L10n.tr("暂无文件来源"),
+                    message: L10n.tr("使用右上角按钮添加本地文件夹或服务器连接")
                 ) {
                     viewModel.showAddConnection = true
                 }
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        FilesSectionHeader(title: "网络")
+                        FilesSectionHeader(title: L10n.tr("网络"))
                         VStack(spacing: 4) {
                             ForEach(viewModel.savedConnections) { connection in
                                 connectionRow(connection)
@@ -130,30 +130,30 @@ struct ConnectionsView: View {
             Button {
                 editingConnection = connection
             } label: {
-                Label("编辑", systemImage: "pencil")
+                Label(L10n.tr("编辑"), systemImage: "pencil")
             }
             if connection.type.requiresManualDirectorySync {
                 Button {
                     Task { await viewModel.connectAndScan(connection) }
                 } label: {
-                    Label("连接", systemImage: "link")
+                    Label(L10n.tr("连接"), systemImage: "link")
                 }
             } else {
                 Button {
                     Task { await viewModel.connectAndScan(connection) }
                 } label: {
-                    Label("同步到媒体库", systemImage: "arrow.triangle.2.circlepath")
+                    Label(L10n.tr("同步到媒体库"), systemImage: "arrow.triangle.2.circlepath")
                 }
                 Button {
                     Task { await viewModel.connectAndScan(connection, forceFullScan: true) }
                 } label: {
-                    Label("全量重扫", systemImage: "arrow.clockwise")
+                    Label(L10n.tr("全量重扫"), systemImage: "arrow.clockwise")
                 }
             }
             Button(role: .destructive) {
                 viewModel.deleteConnection(connection)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label(L10n.tr("删除"), systemImage: "trash")
             }
         }
     }
@@ -167,12 +167,12 @@ struct ConnectionsView: View {
                     Button {
                         Task { await viewModel.refreshCurrentDirectory() }
                     } label: {
-                        Label("刷新", systemImage: "arrow.clockwise")
+                        Label(L10n.tr("刷新"), systemImage: "arrow.clockwise")
                     }
                     Button {
                         Task { await viewModel.scanCurrentDirectory() }
                     } label: {
-                        Label("同步当前目录", systemImage: "square.and.arrow.down")
+                        Label(L10n.tr("同步当前目录"), systemImage: "square.and.arrow.down")
                     }
                 } label: {
                     FilesMenuGlyph()
@@ -189,18 +189,18 @@ struct ConnectionsView: View {
             VStack(spacing: 10) {
                 ProgressView()
                     .tint(FilesDesign.accent)
-                Text("正在加载目录...")
+                Text(L10n.tr("正在加载目录..."))
                     .font(.subheadline)
                     .foregroundStyle(FilesDesign.subtitle)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let message = viewModel.fileBrowserErrorMessage {
-            FilesMessageView(icon: "exclamationmark.triangle", title: "无法加载目录", message: message)
+            FilesMessageView(icon: "exclamationmark.triangle", title: L10n.tr("无法加载目录"), message: message)
         } else if viewModel.files.isEmpty {
             if isIPTVBrowsing {
-                FilesMessageView(icon: "tv.slash", title: "暂无频道", message: "播放列表为空或无法解析，请检查 M3U 源后点击右上角刷新")
+                FilesMessageView(icon: "tv.slash", title: L10n.tr("暂无频道"), message: "播放列表为空或无法解析，请检查 M3U 源后点击右上角刷新")
             } else {
-                FilesMessageView(icon: "folder", title: "文件夹为空", message: "此目录下没有可显示的文件")
+                FilesMessageView(icon: "folder", title: L10n.tr("文件夹为空"), message: L10n.tr("此目录下没有可显示的文件"))
             }
         } else if isIPTVBrowsing {
             iptvChannelList
@@ -232,16 +232,16 @@ struct ConnectionsView: View {
                 Button {
                     Task { await viewModel.openDirectory(file) }
                 } label: {
-                    Label("打开", systemImage: "folder")
+                    Label(L10n.tr("打开"), systemImage: "folder")
                 }
                 if viewModel.canBookmarkFoldersInSelectedConnection {
                     Button {
                         viewModel.toggleFolderBookmark(file)
                     } label: {
                         if viewModel.isFolderBookmarked(file) {
-                            Label("取消书签", systemImage: "bookmark.slash")
+                            Label(L10n.tr("取消书签"), systemImage: "bookmark.slash")
                         } else {
-                            Label("添加书签", systemImage: "bookmark")
+                            Label(L10n.tr("添加书签"), systemImage: "bookmark")
                         }
                     }
                 }
@@ -250,14 +250,14 @@ struct ConnectionsView: View {
                 Button {
                     Task { await play(file) }
                 } label: {
-                    Label("播放", systemImage: "play.fill")
+                    Label(L10n.tr("播放"), systemImage: "play.fill")
                 }
                 if let connection = viewModel.selectedConnection,
                    DownloadEligibility.isEligible(file: file, connectionType: connection.type) {
                     Button {
                         Task { await download(file, connection: connection) }
                     } label: {
-                        Label("下载", systemImage: "arrow.down.circle")
+                        Label(L10n.tr("下载"), systemImage: "arrow.down.circle")
                     }
                 }
             }
@@ -310,7 +310,7 @@ struct ConnectionsView: View {
         var order: [String] = []
         var grouped: [String: [RemoteFile]] = [:]
         for file in files {
-            let group = (file.groupTitle?.isEmpty == false ? file.groupTitle : nil) ?? "未分组"
+            let group = (file.groupTitle?.isEmpty == false ? file.groupTitle : nil) ?? L10n.tr("未分组")
             if grouped[group] == nil { order.append(group) }
             grouped[group, default: []].append(file)
         }
@@ -320,7 +320,7 @@ struct ConnectionsView: View {
     // MARK: - 导航 & 标题
 
     private var browserTitle: String {
-        guard let connection = viewModel.selectedConnection else { return "文件" }
+        guard let connection = viewModel.selectedConnection else { return L10n.tr("文件") }
         if viewModel.pathStack.isEmpty { return connection.name }
         let last = (viewModel.currentPath as NSString).lastPathComponent
         return last.isEmpty || last == "/" ? connection.name : last
@@ -660,10 +660,10 @@ private struct ConnectionCard: View {
 
     private var statusText: String {
         switch status {
-        case .idle:       return "未连接"
-        case .connecting: return "连接中"
-        case .connected:  return "已连接"
-        case .failed:     return "离线"
+        case .idle:       return L10n.tr("未连接")
+        case .connecting: return L10n.tr("连接中")
+        case .connected:  return L10n.tr("已连接")
+        case .failed:     return L10n.tr("离线")
         }
     }
 
@@ -715,7 +715,7 @@ private struct FileCard: View {
     @ViewBuilder
     private var subtitle: some View {
         if file.isDirectory {
-            Text("文件夹")
+            Text(L10n.tr("文件夹"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(FilesDesign.subtitle)
         } else if file.size > 0 {
@@ -765,7 +765,7 @@ private struct IPTVChannelCard: View {
                     .truncationMode(.tail)
 
                 if isPlaybackFailed {
-                    Text("无法播放，请检查频道源")
+                    Text(L10n.tr("无法播放，请检查频道源"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.red)
                         .lineLimit(1)
@@ -781,7 +781,7 @@ private struct IPTVChannelCard: View {
                             .lineLimit(1)
                     }
                 } else if isLoadingEPG, channel.tvgId?.isEmpty == false {
-                    Text("节目单加载中...")
+                    Text(L10n.tr("节目单加载中..."))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(FilesDesign.subtitle)
                         .lineLimit(1)
@@ -895,12 +895,12 @@ private extension ConnectionType {
 private extension RemoteFileType {
     var filesDisplayName: String {
         switch self {
-        case .video:     return "视频"
-        case .subtitle:  return "字幕"
-        case .audio:     return "音频"
-        case .image:     return "图片"
-        case .directory: return "文件夹"
-        case .other:     return "文件"
+        case .video:     return L10n.tr("视频")
+        case .subtitle:  return L10n.tr("字幕")
+        case .audio:     return L10n.tr("音频")
+        case .image:     return L10n.tr("图片")
+        case .directory: return L10n.tr("文件夹")
+        case .other:     return L10n.tr("文件")
         }
     }
 }

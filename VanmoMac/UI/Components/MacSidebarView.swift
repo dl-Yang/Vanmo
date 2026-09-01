@@ -16,7 +16,7 @@ struct MacSearchField: View {
                 .foregroundStyle(theme.searchPlaceholder)
                 .padding(.leading, 10)
 
-            TextField("Search", text: $text)
+            TextField(L10n.tr("搜索"), text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 14))
                 .foregroundStyle(theme.primaryText)
@@ -108,7 +108,7 @@ struct MacConnectionSidebarRow: View {
                         .font(MacDesignTokens.Typography.sidebarItem)
                         .lineLimit(1)
                     if status == .failed {
-                        Text("连接失败")
+                        Text(L10n.tr("连接失败"))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.orange)
                             .lineLimit(1)
@@ -147,7 +147,7 @@ struct MacConnectionSidebarRow: View {
 
     private var failureHelpText: String {
         guard status == .failed else { return "" }
-        return connectionsViewModel.connectionErrorMessage(for: connection) ?? "连接失败"
+        return connectionsViewModel.connectionErrorMessage(for: connection) ?? L10n.tr("连接失败")
     }
 }
 
@@ -197,7 +197,7 @@ struct MacSidebarView: View {
                     }
 
                     HStack {
-                        Text("CONNECTIONS")
+                        Text(L10n.tr("连接").uppercased())
                             .font(MacDesignTokens.Typography.sidebarSection)
                             .foregroundStyle(theme.sectionHeader)
                             .tracking(0.6)
@@ -213,7 +213,7 @@ struct MacSidebarView: View {
                                 .frame(width: 20, height: 20)
                         }
                         .buttonStyle(.plain)
-                        .help("添加连接")
+                        .help(L10n.tr("添加连接"))
                     }
                     .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding + 4)
                     .padding(.top, 24)
@@ -234,7 +234,7 @@ struct MacSidebarView: View {
                             Button {
                                 appState.presentEditConnection(connection)
                             } label: {
-                                Label("编辑", systemImage: "pencil")
+                                Label(L10n.tr("编辑"), systemImage: "pencil")
                             }
                             Button {
                                 syncConnection(connection)
@@ -248,20 +248,20 @@ struct MacSidebarView: View {
                                 Button {
                                     Task { _ = await connectionsViewModel.syncAllBookmarks(for: connection) }
                                 } label: {
-                                    Label("同步全部书签", systemImage: "bookmark.circle")
+                                    Label(L10n.tr("同步全部书签"), systemImage: "bookmark.circle")
                                 }
                             }
                             if !connection.type.requiresManualDirectorySync {
                                 Button {
                                     fullRescanConnection(connection)
                                 } label: {
-                                    Label("全量重扫", systemImage: "arrow.clockwise")
+                                    Label(L10n.tr("全量重扫"), systemImage: "arrow.clockwise")
                                 }
                             }
                             Button(role: .destructive) {
                                 deleteConnection(connection)
                             } label: {
-                                Label("删除", systemImage: "trash")
+                                Label(L10n.tr("删除"), systemImage: "trash")
                             }
                         }
                     }
@@ -340,7 +340,7 @@ struct MacSidebarView: View {
 
     private var settingsFooter: some View {
         MacSidebarRow(
-            title: "Settings",
+            title: L10n.tr("设置"),
             systemImage: "gearshape",
             isSelected: false
         ) {
@@ -358,10 +358,10 @@ struct MacSidebarView: View {
     private func sidebarSyncLabel(for connection: SavedConnection) -> String {
         if connection.type.requiresManualDirectorySync {
             return connectionsViewModel.selectedConnection?.id == connection.id
-                ? "同步当前目录"
-                : "连接"
+                ? L10n.tr("同步当前目录")
+                : L10n.tr("连接")
         }
-        return "同步到媒体库"
+        return L10n.tr("同步到媒体库")
     }
 
     private func sidebarSyncIcon(for connection: SavedConnection) -> String {

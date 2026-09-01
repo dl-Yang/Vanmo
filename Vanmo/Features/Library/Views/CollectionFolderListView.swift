@@ -31,14 +31,14 @@ struct CollectionFolderListView: View {
             } else if let errorMessage {
                 EmptyStateView(
                     icon: "exclamationmark.triangle",
-                    title: "无法加载内容",
+                    title: L10n.tr("无法加载内容"),
                     message: errorMessage
                 )
             } else if items.isEmpty {
                 EmptyStateView(
                     icon: folder.collectionType.icon,
-                    title: "媒体库为空",
-                    message: "此媒体库下没有可显示的项目"
+                    title: L10n.tr("媒体库为空"),
+                    message: L10n.tr("此媒体库下没有可显示的项目")
                 )
             } else {
                 ScrollView {
@@ -109,7 +109,7 @@ struct CollectionFolderListView: View {
                     .font(.caption)
                     .fontWeight(.semibold)
 
-                Text("加载中断")
+                Text(L10n.tr("加载中断"))
                     .font(.caption)
                     .fontWeight(.medium)
             }
@@ -121,7 +121,7 @@ struct CollectionFolderListView: View {
                 ProgressView()
                     .tint(Color.vanmoAccent)
 
-                Text("继续加载...")
+                Text(L10n.tr("继续加载..."))
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)
@@ -149,7 +149,7 @@ struct CollectionFolderListView: View {
         if totalRecordCount > 0 {
             return "已加载全部 \(totalRecordCount) 项"
         }
-        return "已加载全部"
+        return L10n.tr("已加载全部")
     }
 
     @ViewBuilder
@@ -158,7 +158,7 @@ struct CollectionFolderListView: View {
             Button {
                 appState.play(item)
             } label: {
-                Label("播放", systemImage: "play.fill")
+                Label(L10n.tr("播放"), systemImage: "play.fill")
             }
         }
     }
@@ -299,9 +299,9 @@ private struct CollectionFolderListHeader: View {
             }
 
             HStack(spacing: 8) {
-                CollectionFolderListStat(value: "\(loadedCount)", label: "条目", icon: "square.grid.2x2")
-                CollectionFolderListStat(value: "\(movieCount)", label: "电影", icon: "film")
-                CollectionFolderListStat(value: "\(seriesCount)", label: "剧集", icon: "tv")
+                CollectionFolderListStat(value: "\(loadedCount)", label: L10n.tr("条目"), icon: "square.grid.2x2")
+                CollectionFolderListStat(value: "\(movieCount)", label: L10n.tr("电影"), icon: "film")
+                CollectionFolderListStat(value: "\(seriesCount)", label: L10n.tr("剧集"), icon: "tv")
             }
         }
         .padding(16)

@@ -108,6 +108,7 @@
 		9CD389B71AFA7599F298FD22 /* RatingBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC6ABD1126A2D309D76CC059 /* RatingBadge.swift */; };
 		9D5C0C22F03C464455806E82 /* oneDrive.png in Resources */ = {isa = PBXBuildFile; fileRef = BE379EC1C792DAB020AA6723 /* oneDrive.png */; };
 		9EA8C99DA7B3E943A02D77F6 /* localFolder.png in Resources */ = {isa = PBXBuildFile; fileRef = 9C62E417F824B6FF71459817 /* localFolder.png */; };
+		A0D150072046D2A198EEF6DD /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2555C3687A591D420018290D /* InfoPlist.xcstrings */; };
 		A17779D3C9E993EEC64D149D /* MacLibraryEmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EC988F514EC1CDBAADD33DB /* MacLibraryEmptyStateView.swift */; };
 		A17971186D7534886BB049DB /* MacPlayerControlsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D8C775D60C0C27275EBC99 /* MacPlayerControlsOverlay.swift */; };
 		A903761BE1480EB6C6597984 /* ScannedLibraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC98BD4B313AA01607BDF35 /* ScannedLibraryListView.swift */; };
@@ -135,6 +136,7 @@
 		CB6685A01E4B0E6B419481F1 /* baiduNetdisk.png in Resources */ = {isa = PBXBuildFile; fileRef = B09C32D3BB0EC025D1769F53 /* baiduNetdisk.png */; };
 		D442E93B0F496CD0726CDA47 /* KSPlayerMediaProbeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86786584DACF6F5FC223B219 /* KSPlayerMediaProbeProvider.swift */; };
 		D59F902EE7228DE91DADB286 /* mega.png in Resources */ = {isa = PBXBuildFile; fileRef = C64BB62C8F69AE1F342C8CE4 /* mega.png */; };
+		D930CAE97EB033B3F87D6E2A /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D672C6AFDA04BC432035478A /* InfoPlist.xcstrings */; };
 		DB26E3C4BEC970BA23430A51 /* Int64+FileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A521F383F9593A5453CA43 /* Int64+FileSize.swift */; };
 		DC9562451E2BA559CAD83594 /* MacPlayerCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F280E2A3DEE8284306203CA /* MacPlayerCommands.swift */; };
 		DD63854EBFCF830BA275350B /* MacHeaderToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A076FE8593DEDD875F5BAA8 /* MacHeaderToolbar.swift */; };
@@ -195,6 +197,7 @@
 		231BF52C85B85529779336BB /* MacFavoritesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacFavoritesListView.swift; sourceTree = "<group>"; };
 		2375890C4120A60A9A76B30F /* MediaListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaListRow.swift; sourceTree = "<group>"; };
 		237FCC0D25C4262103CAEA13 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
+		2555C3687A591D420018290D /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		259F1B52F67CBB129B0214E9 /* MacEpisodeSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacEpisodeSelectorView.swift; sourceTree = "<group>"; };
 		2808E3F2654CF170151A05FD /* box.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = box.png; sourceTree = "<group>"; };
 		2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDesignTokens.swift; sourceTree = "<group>"; };
@@ -298,6 +301,7 @@
 		D09B8FEDE094A9A00BE8EC90 /* Vanmo-Mac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac.entitlements"; sourceTree = "<group>"; };
 		D28884D0283563E4720407AA /* MacMediaListRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaListRow.swift; sourceTree = "<group>"; };
 		D66F1E32A5FB3FEDDD125127 /* Color+Mac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Mac.swift"; sourceTree = "<group>"; };
+		D672C6AFDA04BC432035478A /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		D7C304ACAE13AD2BF266BE9E /* MacSettingsWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsWindowView.swift; sourceTree = "<group>"; };
 		DA597E508F1FD4192290F715 /* MacAVPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAVPlayerView.swift; sourceTree = "<group>"; };
 		DD83E98C75F323D9F3C45579 /* Int64+FileSize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Int64+FileSize.swift"; sourceTree = "<group>"; };
@@ -399,6 +403,7 @@
 				FAE01D009AD30867E0E07D15 /* Assets.xcassets */,
 				58FD915D4042EB1C1A80D05C /* Info-Mac.plist */,
 				8975545DA300E57FD1C133D1 /* Info.plist */,
+				2555C3687A591D420018290D /* InfoPlist.xcstrings */,
 				A73A98C67D1020444BFEC4D4 /* loadingSpinner.json */,
 				179A074839A61DF46EB44FA9 /* Fonts */,
 				0D650AD66912B79518250229 /* Localizable */,
@@ -464,6 +469,7 @@
 			children = (
 				F7EAF9744D82A3777B67CA4F /* Assets.xcassets */,
 				EC27A159B320F156FA413559 /* Info-Mac.plist */,
+				D672C6AFDA04BC432035478A /* InfoPlist.xcstrings */,
 				1FFCF33F1D900A4B2797C123 /* loadingSpinner.json */,
 				E51DAC90345202C71FB5B8D2 /* ConnectionIcons */,
 			);
@@ -1073,6 +1079,7 @@
 			knownRegions = (
 				Base,
 				en,
+				"zh-Hans",
 			);
 			mainGroup = 47A253A5BD2F57DDD9C75880;
 			minimizedProjectReferenceProxies = 1;
@@ -1101,6 +1108,7 @@
 			files = (
 				6C559DE8C613197CDED94D0C /* Assets.xcassets in Resources */,
 				4B135F675D6C38BA06F4803F /* Info-Mac.plist in Resources */,
+				A0D150072046D2A198EEF6DD /* InfoPlist.xcstrings in Resources */,
 				DDE0739230E75BEA0D4173E5 /* loadingSpinner.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1110,6 +1118,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FD5DBDF14CEE83144B800138 /* Assets.xcassets in Resources */,
+				D930CAE97EB033B3F87D6E2A /* InfoPlist.xcstrings in Resources */,
 				6484EA3D669FB29D06AB2868 /* alist.png in Resources */,
 				2A402C34049B43CAABC0F0B6 /* aliyunDrive.png in Resources */,
 				CB6685A01E4B0E6B419481F1 /* baiduNetdisk.png in Resources */,

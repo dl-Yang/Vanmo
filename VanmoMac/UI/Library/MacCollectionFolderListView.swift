@@ -33,14 +33,14 @@ struct MacCollectionFolderListView: View {
 
             Group {
                 if isLoading {
-                    ProgressView("加载中...")
+                    ProgressView(L10n.tr("加载中..."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if items.isEmpty {
-                    Text("此媒体库下没有可显示的项目")
+                    Text(L10n.tr("此媒体库下没有可显示的项目"))
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {

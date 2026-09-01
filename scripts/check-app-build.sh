@@ -20,6 +20,14 @@ Usage:
 
 Build Debug compile evidence for one or both application targets.
 This command does not install, launch, test, archive, or regenerate the Xcode project.
+
+This script uses isolated caches under build/app-build-evidence/, not Xcode's
+Incremental Build cache. A first run often spends a long time on Resolve
+Package Graph before it compiles Vanmo sources.
+
+Do not start ios-simulator and macos as two concurrent processes; they share
+SourcePackages. Use this script's all mode, or run the two platforms one after
+the other. Do not point Xcode at build/app-build-evidence/SourcePackages.
 EOF
 }
 
@@ -254,7 +262,43 @@ SUMMARY_PATH="${RUN_DIR}/summary.txt"
 AGGREGATE=pass
 FAILED_COUNT=0
 
-mkdir -p "$RUN_DIR"
+mkdir -p "$RUN_DIR" "$EVIDENCE_ROOT"
+
+SOURCE_PACKAGES_LOCK_DIR="${EVIDENCE_ROOT}/SourcePackages.lockdir"
+SOURCE_PACKAGES_LOCK_PID="${SOURCE_PACKAGES_LOCK_DIR}/pid"
+
+acquire_source_packages_lock() {
+    if mkdir "$SOURCE_PACKAGES_LOCK_DIR" 2>/dev/null; then
+        printf '%s\n' "$$" >"$SOURCE_PACKAGES_LOCK_PID"
+        return 0
+    fi
+
+    local owner_pid=""
+    if [[ -f "$SOURCE_PACKAGES_LOCK_PID" ]]; then
+        owner_pid="$(tr -d '[:space:]' <"$SOURCE_PACKAGES_LOCK_PID" || true)"
+    fi
+    if [[ -n "$owner_pid" ]] && ! kill -0 "$owner_pid" 2>/dev/null; then
+        rm -rf "$SOURCE_PACKAGES_LOCK_DIR"
+        if mkdir "$SOURCE_PACKAGES_LOCK_DIR" 2>/dev/null; then
+            printf '%s\n' "$$" >"$SOURCE_PACKAGES_LOCK_PID"
+            return 0
+        fi
+    fi
+
+    printf 'ERROR: another check-app-build.sh is using %s\n' "$SOURCE_PACKAGES_DIR" >&2
+    printf 'ERROR: run ios-simulator and macos serially, or use this script'\''s all mode.\n' >&2
+    printf 'ERROR: do not start this script while another instance still holds the evidence package cache.\n' >&2
+    if [[ -n "$owner_pid" ]]; then
+        printf 'ERROR: lock owner pid=%s\n' "$owner_pid" >&2
+    fi
+    return 1
+}
+
+acquire_source_packages_lock || exit 1
+cleanup_source_packages_lock() {
+    rm -rf "$SOURCE_PACKAGES_LOCK_DIR"
+}
+trap cleanup_source_packages_lock EXIT
 
 {
     printf 'run_id=%s\n' "$RUN_ID"

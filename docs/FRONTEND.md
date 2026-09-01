@@ -17,6 +17,15 @@ This document defines stable UI expectations for Vanmo's SwiftUI applications.
 - Share a SwiftUI component only when both apps need the same platform-neutral behavior. Do not force shared navigation or player presentation to remove superficial duplication.
 - Only the shared views explicitly listed in `project.yml` are compiled directly into the macOS target.
 
+## Localization
+
+- User-visible chrome, buttons, empty states, alerts, and section titles go through `L10n.tr` in `VanmoCore`.
+- Chinese is the source language. English lives in the shared catalog and table.
+- Keep brand and protocol names (Vanmo, iCloud, CloudKit, Google Drive, SMB, Emby, Plex, and similar) in their original form.
+- Do not translate server-provided media titles, cast names, or `error.localizedDescription`.
+- Duration and season/episode labels use `LocalizedFormat`, not mixed `h`/`m` or `S01E01` chrome in Chinese.
+- Changing the Appearance language setting does not require a live UI refresh; the next launch applies it.
+
 ## SwiftUI Expectations
 
 - Keep View bodies small and move orchestration into the existing ViewModel or Store boundary.

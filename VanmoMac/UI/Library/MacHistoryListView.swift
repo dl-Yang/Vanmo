@@ -53,10 +53,10 @@ struct MacHistoryListView: View {
     @ViewBuilder
     private var content: some View {
         if viewModel.isLoading && viewModel.items.isEmpty {
-            ProgressView("正在加载历史记录…")
+            ProgressView(L10n.tr("正在加载历史记录…"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if viewModel.items.isEmpty {
-            Text("还没有观看记录")
+            Text(L10n.tr("还没有观看记录"))
                 .foregroundStyle(theme.secondaryText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -96,7 +96,7 @@ struct MacHistoryListView: View {
 
     private var header: some View {
         HStack {
-            Text("历史记录")
+            Text(L10n.tr("历史记录"))
                 .font(MacDesignTokens.Typography.headerTitle)
 
             Spacer()

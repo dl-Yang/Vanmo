@@ -30,7 +30,7 @@ struct MacScannedLibraryListView: View {
 
             Group {
                 if isLoading {
-                    ProgressView("加载中...")
+                    ProgressView(L10n.tr("加载中..."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage {
                     Text(errorMessage)

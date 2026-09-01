@@ -21,14 +21,14 @@ struct ScannedShowDetailView: View {
             } else if let errorMessage {
                 EmptyStateView(
                     icon: "exclamationmark.triangle",
-                    title: "无法加载分集",
+                    title: L10n.tr("无法加载分集"),
                     message: errorMessage
                 )
             } else if episodes.isEmpty {
                 EmptyStateView(
                     icon: "tv",
-                    title: "暂无分集",
-                    message: "此剧集下没有可显示的分集"
+                    title: L10n.tr("暂无分集"),
+                    message: L10n.tr("此剧集下没有可显示的分集")
                 )
             } else {
                 ScrollView {

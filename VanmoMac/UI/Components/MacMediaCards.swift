@@ -66,7 +66,7 @@ struct MacContinueWatchingMoreCard: View {
                     HStack(spacing: 8) {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 16, weight: .medium))
-                        Text("查看更多")
+                        Text(L10n.tr("查看更多"))
                             .font(MacDesignTokens.Typography.cardAction)
                     }
                     .foregroundStyle(theme.secondaryText)
@@ -76,7 +76,7 @@ struct MacContinueWatchingMoreCard: View {
                     height: MacDesignTokens.Layout.continueWatchingThumbHeight
                 )
 
-                Text("全部历史记录")
+                Text(L10n.tr("全部历史记录"))
                     .font(MacDesignTokens.Typography.cardTitle)
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
@@ -85,7 +85,7 @@ struct MacContinueWatchingMoreCard: View {
             .frame(width: MacDesignTokens.Layout.continueWatchingWidth, alignment: .leading)
         }
         .buttonStyle(.plain)
-        .help("查看全部历史记录")
+        .help(L10n.tr("查看全部历史记录"))
     }
 }
 

@@ -408,7 +408,7 @@ enum PlayerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .loadFailed(let msg): return "加载失败: \(msg)"
-        case .unsupportedFormat: return "不支持的视频格式"
+        case .unsupportedFormat: return L10n.tr("不支持的视频格式")
         case .networkError(let msg): return "网络错误: \(msg)"
         }
     }

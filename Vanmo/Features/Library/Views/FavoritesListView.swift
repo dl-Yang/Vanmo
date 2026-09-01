@@ -52,8 +52,8 @@ struct FavoritesListView: View {
         .onChange(of: viewModel.scope) { _, _ in
             Task { await viewModel.reload() }
         }
-        .alert("加载失败", isPresented: $viewModel.showError) {
-            Button("确定") {}
+        .alert(L10n.tr("加载失败"), isPresented: $viewModel.showError) {
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(viewModel.errorMessage)
         }
@@ -89,9 +89,9 @@ struct FavoritesListView: View {
                         .frame(width: 24, height: 32)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("返回")
+                .accessibilityLabel(L10n.tr("返回"))
 
-                Text("收藏")
+                Text(L10n.tr("收藏"))
                     .font(.system(size: 24, weight: .bold))
                     .tracking(-0.53)
                     .foregroundStyle(FavoritesDesign.textPrimary)
@@ -120,7 +120,7 @@ struct FavoritesListView: View {
 
     private var filterButton: some View {
         Menu {
-            Picker("收藏类型", selection: $viewModel.scope) {
+            Picker(L10n.tr("收藏类型"), selection: $viewModel.scope) {
                 ForEach(FavoriteLibraryScope.allCases) { scope in
                     Text(scope.title).tag(scope)
                 }
@@ -132,7 +132,7 @@ struct FavoritesListView: View {
                 .frame(width: 32, height: 32)
                 .background(FavoritesDesign.accentSoft, in: Circle())
         }
-        .accessibilityLabel("筛选")
+        .accessibilityLabel(L10n.tr("筛选"))
     }
 
     private var searchButton: some View {
@@ -146,7 +146,7 @@ struct FavoritesListView: View {
                 .frame(width: 32, height: 32)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isSearching ? "关闭搜索" : "搜索")
+        .accessibilityLabel(isSearching ? L10n.tr("关闭搜索") : L10n.tr("搜索"))
     }
 
     private var searchField: some View {
@@ -154,7 +154,7 @@ struct FavoritesListView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(FavoritesDesign.textSecondary)
-            TextField("搜索收藏", text: $searchText)
+            TextField(L10n.tr("搜索收藏"), text: $searchText)
                 .font(.system(size: 15))
                 .foregroundStyle(FavoritesDesign.textPrimary)
                 .autocorrectionDisabled()
@@ -220,7 +220,7 @@ struct FavoritesListView: View {
                 Button(role: .destructive) {
                     Task { await viewModel.unfavorite(item) }
                 } label: {
-                    Label("取消收藏", systemImage: "heart.slash")
+                    Label(L10n.tr("取消收藏"), systemImage: "heart.slash")
                 }
                 .disabled(viewModel.isUpdatingFavorite(item))
             }
@@ -243,7 +243,7 @@ struct FavoritesListView: View {
             Button {
                 isEditing.toggle()
             } label: {
-                Text(isEditing ? "完成" : "编辑")
+                Text(isEditing ? L10n.tr("完成") : L10n.tr("编辑"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(FavoritesDesign.editBlue)
             }
@@ -263,7 +263,7 @@ struct FavoritesListView: View {
                 Spacer()
             }
         } else if !viewModel.hasMore && !viewModel.items.isEmpty {
-            Text("已加载全部收藏")
+            Text(L10n.tr("已加载全部收藏"))
                 .font(.system(size: 12))
                 .foregroundStyle(FavoritesDesign.textSecondary.opacity(0.7))
                 .frame(maxWidth: .infinity)
@@ -372,7 +372,7 @@ private struct FavoritePosterCard: View {
             .buttonStyle(.plain)
             .disabled(isUpdating)
             .padding(6)
-            .accessibilityLabel("取消收藏")
+            .accessibilityLabel(L10n.tr("取消收藏"))
         }
     }
 
@@ -420,7 +420,7 @@ private struct FavoritesEmptyView: View {
             }
             .padding(.bottom, 24)
 
-            Text("还没有收藏")
+            Text(L10n.tr("还没有收藏"))
                 .font(.system(size: 20, weight: .bold))
                 .tracking(-0.45)
                 .foregroundStyle(FavoritesDesign.textPrimary)
@@ -436,7 +436,7 @@ private struct FavoritesEmptyView: View {
                 .padding(.bottom, 32)
 
             Button(action: onBrowse) {
-                Text("浏览文件")
+                Text(L10n.tr("浏览文件"))
                     .font(.system(size: 16, weight: .semibold))
                     .tracking(-0.31)
                     .foregroundStyle(FavoritesDesign.browseButtonForeground)
@@ -458,7 +458,7 @@ private struct FavoritesLoadingView: View {
     var body: some View {
         VStack(spacing: 16) {
             FavoritesSpinner()
-            Text("正在加载收藏…")
+            Text(L10n.tr("正在加载收藏…"))
                 .font(.system(size: 14, weight: .medium))
                 .tracking(-0.15)
                 .foregroundStyle(FavoritesDesign.textSecondary)
@@ -478,7 +478,7 @@ private struct FavoritesSpinner: View {
             .rotationEffect(.degrees(isAnimating ? 360 : 0))
             .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: isAnimating)
             .onAppear { isAnimating = true }
-            .accessibilityLabel("加载中")
+            .accessibilityLabel(L10n.tr("加载中"))
     }
 }
 
@@ -711,15 +711,15 @@ enum FavoriteLibraryScope: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .all: return "全部"
-        case .movie: return "电影"
-        case .tvShow: return "电视剧"
+        case .all: return L10n.tr("全部")
+        case .movie: return L10n.tr("电影")
+        case .tvShow: return L10n.tr("电视剧")
         }
     }
 
     var emptyTitle: String {
         switch self {
-        case .all: return "还没有收藏"
+        case .all: return L10n.tr("还没有收藏")
         case .movie: return "还没有收藏电影"
         case .tvShow: return "还没有收藏电视剧"
         }

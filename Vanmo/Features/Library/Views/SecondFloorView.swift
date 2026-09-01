@@ -71,7 +71,7 @@ struct SecondFloorView: View {
 
             Spacer()
 
-            Text("继续观看")
+            Text(L10n.tr("继续观看"))
                 .font(.headline)
                 .foregroundStyle(.white)
 

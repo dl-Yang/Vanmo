@@ -34,16 +34,16 @@ public enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendabl
 
     public var displayName: String {
         switch self {
-        case .localFolder: return "本地文件夹"
+        case .localFolder: return L10n.tr("本地文件夹")
         case .smb: return "SMB"
         case .ftp: return "FTP"
         case .sftp: return "SFTP"
         case .webdav: return "WebDAV"
-        case .alist: return "AList 网盘"
-        case .removedOfficialCloudDrive: return "已移除的网盘连接"
-        case .baiduNetdisk: return "百度网盘"
-        case .drive115: return "115 网盘"
-        case .quarkDrive: return "夸克网盘"
+        case .alist: return L10n.tr("AList 网盘")
+        case .removedOfficialCloudDrive: return L10n.tr("已移除的网盘连接")
+        case .baiduNetdisk: return L10n.tr("百度网盘")
+        case .drive115: return L10n.tr("115 网盘")
+        case .quarkDrive: return L10n.tr("夸克网盘")
         case .googleDrive: return "Google Drive"
         case .oneDrive: return "OneDrive"
         case .box: return "Box"
@@ -51,7 +51,7 @@ public enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendabl
         case .yandexDisk: return "Yandex.Disk"
         case .mega: return "MEGA"
         case .iptv: return "IPTV"
-        case .fnos: return "飞牛 fnOS"
+        case .fnos: return L10n.tr("飞牛 fnOS")
         case .nfs: return "NFS"
         case .dlna: return "DLNA"
         case .plex: return "Plex"

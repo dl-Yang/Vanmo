@@ -28,7 +28,7 @@ struct MacSearchResultsView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 48))
                 .foregroundStyle(theme.tertiaryText)
-            Text("搜索你的媒体库")
+            Text(L10n.tr("搜索你的媒体库"))
                 .font(.subheadline)
                 .foregroundStyle(theme.secondaryText)
         }
@@ -38,7 +38,7 @@ struct MacSearchResultsView: View {
     private var loadingState: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("搜索中...")
+            Text(L10n.tr("搜索中..."))
                 .font(.subheadline)
                 .foregroundStyle(theme.secondaryText)
         }
@@ -130,7 +130,7 @@ private struct MacSearchResultRow: View {
                             .font(.caption)
                             .foregroundStyle(theme.secondaryText)
                     }
-                    Text(item.mediaType == .tvShow ? "TV Show" : "Movie")
+                    Text(item.mediaType.displayName)
                         .font(.caption)
                         .foregroundStyle(theme.secondaryText)
                 }
@@ -142,7 +142,7 @@ private struct MacSearchResultRow: View {
                 Image(systemName: "bolt.horizontal.circle")
                     .font(.subheadline)
                     .foregroundStyle(theme.secondaryText)
-                    .help("远程实时结果")
+                    .help(L10n.tr("远程实时结果"))
             }
         }
         .padding(12)

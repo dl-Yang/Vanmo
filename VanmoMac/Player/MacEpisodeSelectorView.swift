@@ -28,10 +28,10 @@ struct MacEpisodeSelectorView: View {
                 .listStyle(.inset)
             }
             .padding(.top, 12)
-            .navigationTitle("选集")
+            .navigationTitle(L10n.tr("选集"))
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button(L10n.tr("完成")) { dismiss() }
                 }
             }
         }
@@ -45,7 +45,7 @@ struct MacEpisodeSelectorView: View {
                     Button {
                         viewModel.selectedEpisodeSeason = group.seasonNumber
                     } label: {
-                        Text("第 \(group.seasonNumber) 季")
+                        Text(LocalizedFormat.seasonLabel(group.seasonNumber))
                             .font(.subheadline)
                             .fontWeight(isSelectedSeason(group.seasonNumber) ? .semibold : .regular)
                             .foregroundStyle(isSelectedSeason(group.seasonNumber) ? MacDesignTokens.accentBlue : .secondary)
@@ -68,10 +68,10 @@ struct MacEpisodeSelectorView: View {
     private func episodeRow(_ episode: MacPlayerEpisode) -> some View {
         HStack(spacing: 12) {
             VStack(spacing: 2) {
-                Text("E\(String(format: "%02d", episode.episodeNumber))")
+                Text(LocalizedFormat.compactEpisodeCode(episode.episodeNumber))
                     .font(.caption)
                     .fontWeight(.bold)
-                Text("S\(String(format: "%02d", episode.seasonNumber))")
+                Text(LocalizedFormat.compactSeasonCode(episode.seasonNumber))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

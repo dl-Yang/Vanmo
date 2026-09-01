@@ -33,7 +33,7 @@ struct PlayerView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 28, weight: .medium))
-                    Text("无法播放")
+                    Text(L10n.tr("无法播放"))
                         .font(.headline)
                     Text(message)
                         .font(.footnote)
@@ -97,7 +97,7 @@ struct PlayerView: View {
             Alert(
                 title: Text(notice.title),
                 message: Text(notice.message),
-                dismissButton: .default(Text("知道了"))
+                dismissButton: .default(Text(L10n.tr("知道了")))
             )
         }
         .sheet(isPresented: $viewModel.showTrackSelector) {
@@ -270,7 +270,7 @@ struct PlayerView: View {
                             .foregroundStyle(.white)
                     }
                     .disabled(viewModel.avPlayer != nil && !pictureInPicture.isPossible && !pictureInPicture.isActive)
-                    .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "退出画中画" : "进入画中画")
+                    .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? L10n.tr("退出画中画") : L10n.tr("进入画中画"))
                 }
 
                 if viewModel.canSelectEpisode {
@@ -308,7 +308,7 @@ struct PlayerView: View {
                         .font(.title3)
                         .foregroundStyle(.white)
                 }
-                .accessibilityLabel("字幕设置")
+                .accessibilityLabel(L10n.tr("字幕设置"))
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -789,11 +789,11 @@ struct EpisodeSelectorView: View {
                 .listStyle(.plain)
             }
             .padding(.top, 12)
-            .navigationTitle("选集")
+            .navigationTitle(L10n.tr("选集"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button(L10n.tr("完成")) { dismiss() }
                 }
             }
         }
@@ -808,7 +808,7 @@ struct EpisodeSelectorView: View {
                             viewModel.selectedEpisodeSeason = group.seasonNumber
                         }
                     } label: {
-                        Text("第 \(group.seasonNumber) 季")
+                        Text(LocalizedFormat.seasonLabel(group.seasonNumber))
                             .font(.subheadline)
                             .fontWeight(isSelectedSeason(group.seasonNumber) ? .semibold : .regular)
                             .foregroundStyle(isSelectedSeason(group.seasonNumber) ? Color.vanmoPrimary : .secondary)
@@ -832,10 +832,10 @@ struct EpisodeSelectorView: View {
     private func episodeRow(_ episode: PlayerEpisode) -> some View {
         HStack(spacing: 12) {
             VStack(spacing: 2) {
-                Text("E\(String(format: "%02d", episode.episodeNumber))")
+                Text(LocalizedFormat.compactEpisodeCode(episode.episodeNumber))
                     .font(.caption)
                     .fontWeight(.bold)
-                Text("S\(String(format: "%02d", episode.seasonNumber))")
+                Text(LocalizedFormat.compactSeasonCode(episode.seasonNumber))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -916,11 +916,11 @@ struct ChapterListView: View {
                     .tint(.primary)
                 }
             }
-            .navigationTitle("章节")
+            .navigationTitle(L10n.tr("章节"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button(L10n.tr("完成")) { dismiss() }
                 }
             }
         }

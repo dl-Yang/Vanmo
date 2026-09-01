@@ -28,8 +28,8 @@ struct FavoritesStackedCard: View {
         totalCount: Int,
         movieCount: Int,
         tvShowCount: Int,
-        title: String = "我的收藏",
-        countUnit: String = "部作品",
+        title: String = L10n.tr("我的收藏"),
+        countUnit: String = L10n.tr("部作品"),
         badges: [BadgeEntry]? = nil,
         badgeIcon: String = "heart.fill",
         badgeColors: [Color] = [Color.pink, Color.red.opacity(0.9)],
@@ -210,7 +210,7 @@ struct FavoritesStackedCard: View {
         let items = Array(entries.prefix(3))
         guard items.isEmpty else { return items }
         return Array(
-            repeating: FavoriteEntry(title: "收藏", subtitle: "Favorite", posterURL: nil),
+            repeating: FavoriteEntry(title: L10n.tr("收藏"), subtitle: "Favorite", posterURL: nil),
             count: 3
         )
     }

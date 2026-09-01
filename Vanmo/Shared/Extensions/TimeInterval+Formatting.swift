@@ -16,12 +16,6 @@ extension TimeInterval {
     }
 
     var shortDuration: String {
-        let totalMinutes = Int(self) / 60
-        if totalMinutes >= 60 {
-            let hours = totalMinutes / 60
-            let mins = totalMinutes % 60
-            return mins > 0 ? "\(hours)h \(mins)m" : "\(hours)h"
-        }
-        return "\(totalMinutes)m"
+        LocalizedFormat.shortDuration(self)
     }
 }

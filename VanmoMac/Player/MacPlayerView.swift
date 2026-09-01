@@ -47,7 +47,7 @@ struct MacPlayerView: View {
 
             MacPlayerControlsOverlay(
                 viewModel: viewModel,
-                title: appState.playerItem?.displayTitle ?? appState.playerItem?.title ?? "Player",
+                title: appState.playerItem?.displayTitle ?? appState.playerItem?.title ?? L10n.tr("播放器"),
                 onClose: closePlayer
             )
         }
@@ -129,8 +129,8 @@ struct MacPlayerView: View {
         .sheet(isPresented: $viewModel.showEpisodeSelector) {
             MacEpisodeSelectorView(viewModel: viewModel)
         }
-        .alert("提示", isPresented: alertBinding) {
-            Button("确定", role: .cancel) {
+        .alert(L10n.tr("提示"), isPresented: alertBinding) {
+            Button(L10n.tr("确定"), role: .cancel) {
                 viewModel.alertMessage = nil
             }
         } message: {

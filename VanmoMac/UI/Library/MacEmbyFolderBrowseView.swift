@@ -23,14 +23,14 @@ struct MacEmbyFolderBrowseView: View {
 
             Group {
                 if isLoading {
-                    ProgressView("加载中...")
+                    ProgressView(L10n.tr("加载中..."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if children.isEmpty {
-                    Text("此目录下没有可显示的项目")
+                    Text(L10n.tr("此目录下没有可显示的项目"))
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -46,7 +46,7 @@ struct MacEmbyFolderBrowseView: View {
                                 .buttonStyle(.plain)
                                 .contextMenu {
                                     if child.mediaType == .movie || child.mediaType == .tvEpisode {
-                                        Button("播放") {
+                                        Button(L10n.tr("播放")) {
                                             appState.play(makeChildItem(child))
                                         }
                                     }
@@ -98,7 +98,7 @@ struct MacEmbyFolderBrowseView: View {
             return
         }
         guard let parentId = container.serverId else {
-            errorMessage = "缺少服务器条目 ID"
+            errorMessage = L10n.tr("缺少服务器条目 ID")
             isLoading = false
             return
         }

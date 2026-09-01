@@ -10,20 +10,20 @@ struct MacMediaItemContextMenu: View {
         Button {
             appState.play(item, from: item.lastPlaybackPosition)
         } label: {
-            Label("播放", systemImage: "play.fill")
+            Label(L10n.tr("播放"), systemImage: "play.fill")
         }
 
         Button {
             appState.openDetail(item)
         } label: {
-            Label("查看详情", systemImage: "info.circle")
+            Label(L10n.tr("查看详情"), systemImage: "info.circle")
         }
 
         if item.fileURL.isFileURL {
             Button {
                 MacQuickLookPresenter.preview(item.fileURL)
             } label: {
-                Label("Quick Look 预览", systemImage: "eye")
+                Label(L10n.tr("Quick Look 预览"), systemImage: "eye")
             }
         }
     }

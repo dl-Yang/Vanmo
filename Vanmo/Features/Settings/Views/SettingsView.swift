@@ -23,7 +23,7 @@ struct SettingsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.vanmoBackground)
-        .navigationTitle("设置")
+        .navigationTitle(L10n.tr("设置"))
         .task {
             await viewModel.calculateCacheSize()
             await viewModel.calculateMetadataCacheSize()
@@ -35,29 +35,29 @@ struct SettingsView: View {
         .onChange(of: cloudSyncCoordinator.lastSyncAt) { _, _ in
             viewModel.bindCloudSyncCoordinator(cloudSyncCoordinator)
         }
-        .alert("清除缓存", isPresented: $viewModel.showClearCacheAlert) {
-            Button("取消", role: .cancel) {}
-            Button("清除", role: .destructive) {
+        .alert(L10n.tr("清除缓存"), isPresented: $viewModel.showClearCacheAlert) {
+            Button(L10n.tr("取消"), role: .cancel) {}
+            Button(L10n.tr("清除"), role: .destructive) {
                 Task { await viewModel.clearCache() }
             }
         } message: {
-            Text("确定要清除所有缓存数据吗？这不会删除已下载的文件。")
+            Text(L10n.tr("确定要清除所有缓存数据吗？这不会删除已下载的文件。"))
         }
-        .alert("删除元数据缓存", isPresented: $viewModel.showClearMetadataCacheAlert) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
+        .alert(L10n.tr("删除元数据缓存"), isPresented: $viewModel.showClearMetadataCacheAlert) {
+            Button(L10n.tr("取消"), role: .cancel) {}
+            Button(L10n.tr("删除"), role: .destructive) {
                 Task { await viewModel.clearMetadataCache() }
             }
         } message: {
-            Text("确定要删除所有元数据缓存吗？已保存的媒体信息不会被删除，但 Logo、演职人员头像和单集封面等缓存图片将被移除。")
+            Text(L10n.tr("确定要删除所有元数据缓存吗？已保存的媒体信息不会被删除，但 Logo、演职人员头像和单集封面等缓存图片将被移除。"))
         }
-        .alert("重置设置", isPresented: $viewModel.showResetAlert) {
-            Button("取消", role: .cancel) {}
-            Button("重置", role: .destructive) {
+        .alert(L10n.tr("重置设置"), isPresented: $viewModel.showResetAlert) {
+            Button(L10n.tr("取消"), role: .cancel) {}
+            Button(L10n.tr("重置"), role: .destructive) {
                 viewModel.resetAllSettings()
             }
         } message: {
-            Text("确定要重置所有设置为默认值吗？")
+            Text(L10n.tr("确定要重置所有设置为默认值吗？"))
         }
         .fileImporter(
             isPresented: $isChoosingDirectory,
@@ -71,11 +71,11 @@ struct SettingsView: View {
                 directoryError = error.localizedDescription
             }
         }
-        .alert("无法修改下载目录", isPresented: Binding(
+        .alert(L10n.tr("无法修改下载目录"), isPresented: Binding(
             get: { directoryError != nil },
             set: { if !$0 { directoryError = nil } }
         )) {
-            Button("确定") {}
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(directoryError ?? "")
         }
@@ -85,7 +85,7 @@ struct SettingsView: View {
 
     private var cloudSyncSection: some View {
         Section {
-            Toggle("iCloud 同步", isOn: Binding(
+            Toggle(L10n.tr("iCloud 同步"), isOn: Binding(
                 get: { viewModel.cloudSyncEnabled },
                 set: { viewModel.updateCloudSyncEnabled($0, coordinator: cloudSyncCoordinator) }
             ))
@@ -98,7 +98,7 @@ struct SettingsView: View {
             }
 
             HStack {
-                Text("上次同步")
+                Text(L10n.tr("上次同步"))
                 Spacer()
                 Text(viewModel.cloudSyncLastUpdatedText)
                     .foregroundStyle(.secondary)
@@ -110,20 +110,20 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Label("云同步", systemImage: "icloud")
+            Label(L10n.tr("云同步"), systemImage: "icloud")
         } footer: {
-            Text("通过 CloudKit 同步服务器配置、非 Emby/Plex 播放进度、收藏和文件夹书签。密码与 OAuth 凭据仍保存在本机 Keychain，不会进入 iCloud。")
+            Text(L10n.tr("通过 CloudKit 同步服务器配置、非 Emby/Plex 播放进度、收藏和文件夹书签。密码与 OAuth 凭据仍保存在本机 Keychain，不会进入 iCloud。"))
         }
     }
 
     private var playbackSection: some View {
         Section {
-            Toggle("自动播放下一集", isOn: $viewModel.autoPlayNext)
-            Toggle("断点续播", isOn: $viewModel.resumePlayback)
-            Toggle("硬件解码优先", isOn: $viewModel.hardwareDecoding)
+            Toggle(L10n.tr("自动播放下一集"), isOn: $viewModel.autoPlayNext)
+            Toggle(L10n.tr("断点续播"), isOn: $viewModel.resumePlayback)
+            Toggle(L10n.tr("硬件解码优先"), isOn: $viewModel.hardwareDecoding)
 
             HStack {
-                Text("默认播放速度")
+                Text(L10n.tr("默认播放速度"))
                 Spacer()
                 Picker("", selection: $viewModel.defaultRate) {
                     ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
@@ -133,32 +133,32 @@ struct SettingsView: View {
                 .pickerStyle(.menu)
             }
         } header: {
-            Label("播放", systemImage: "play.circle")
+            Label(L10n.tr("播放"), systemImage: "play.circle")
         } footer: {
-            Text("硬件解码优先仅影响 KSPlayer 播放路径，并在下一次加载视频时生效；如果硬解初始化失败，播放器会自动尝试软解。")
+            Text(L10n.tr("硬件解码优先仅影响 KSPlayer 播放路径，并在下一次加载视频时生效；如果硬解初始化失败，播放器会自动尝试软解。"))
         }
     }
 
     private var audioSection: some View {
         Section {
-            Picker("输出模式", selection: $viewModel.audioOutputMode) {
+            Picker(L10n.tr("输出模式"), selection: $viewModel.audioOutputMode) {
                 ForEach(AudioOutputMode.allCases, id: \.self) { mode in
                     Label(mode.displayName, systemImage: mode.icon).tag(mode)
                 }
             }
         } header: {
-            Label("音频", systemImage: "hifispeaker.2")
+            Label(L10n.tr("音频"), systemImage: "hifispeaker.2")
         } footer: {
-            Text("「自动」根据当前输出设备自动选择最佳音频模式。连接支持杜比的耳机或音箱时将启用空间音频。")
+            Text(L10n.tr("「自动」根据当前输出设备自动选择最佳音频模式。连接支持杜比的耳机或音箱时将启用空间音频。"))
         }
     }
 
     private var subtitleSection: some View {
         Section {
-            Toggle("自动加载字幕", isOn: $viewModel.subtitleAutoLoad)
+            Toggle(L10n.tr("自动加载字幕"), isOn: $viewModel.subtitleAutoLoad)
 
             HStack {
-                Text("字幕大小")
+                Text(L10n.tr("字幕大小"))
                 Spacer()
                 Stepper(
                     "\(Int(viewModel.subtitleFontSize))pt",
@@ -168,43 +168,43 @@ struct SettingsView: View {
                 )
             }
 
-            Picker("首选语言", selection: $viewModel.subtitlePreferredLanguage) {
-                Text("中文").tag("zh")
+            Picker(L10n.tr("首选语言"), selection: $viewModel.subtitlePreferredLanguage) {
+                Text(L10n.tr("中文")).tag("zh")
                 Text("English").tag("en")
                 Text("日本語").tag("ja")
                 Text("한국어").tag("ko")
             }
 
-            ColorPicker("文字颜色", selection: Binding(
+            ColorPicker(L10n.tr("文字颜色"), selection: Binding(
                 get: { viewModel.subtitleTextColor },
                 set: { viewModel.subtitleTextColor = $0 }
             ))
 
-            ColorPicker("背景颜色", selection: Binding(
+            ColorPicker(L10n.tr("背景颜色"), selection: Binding(
                 get: { viewModel.subtitleBackgroundColor },
                 set: { viewModel.subtitleBackgroundColor = $0 }
             ), supportsOpacity: true)
 
-            Picker("字幕位置", selection: $viewModel.subtitlePositionRaw) {
-                Text("顶部").tag(SubtitleStyle.SubtitlePosition.top.rawValue)
-                Text("底部").tag(SubtitleStyle.SubtitlePosition.bottom.rawValue)
+            Picker(L10n.tr("字幕位置"), selection: $viewModel.subtitlePositionRaw) {
+                Text(L10n.tr("顶部")).tag(SubtitleStyle.SubtitlePosition.top.rawValue)
+                Text(L10n.tr("底部")).tag(SubtitleStyle.SubtitlePosition.bottom.rawValue)
             }
 
-            Toggle("启用 OpenSubtitles", isOn: $viewModel.openSubtitlesEnabled)
+            Toggle(L10n.tr("启用 OpenSubtitles"), isOn: $viewModel.openSubtitlesEnabled)
 
             if viewModel.openSubtitlesEnabled {
                 TextField("OpenSubtitles API Key", text: $viewModel.openSubtitlesAPIKey)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
-                TextField("用户名", text: $viewModel.openSubtitlesUsername)
+                TextField(L10n.tr("用户名"), text: $viewModel.openSubtitlesUsername)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
-                SecureField("密码", text: $viewModel.openSubtitlesPassword)
+                SecureField(L10n.tr("密码"), text: $viewModel.openSubtitlesPassword)
 
                 HStack {
-                    Button("保存配置") {
+                    Button(L10n.tr("保存配置")) {
                         viewModel.saveOpenSubtitlesCredentials()
                     }
 
@@ -216,13 +216,13 @@ struct SettingsView: View {
                         if viewModel.isTestingOpenSubtitles {
                             ProgressView()
                         } else {
-                            Text("测试登录")
+                            Text(L10n.tr("测试登录"))
                         }
                     }
                     .disabled(viewModel.isTestingOpenSubtitles)
                 }
 
-                Button("清除 OpenSubtitles 配置", role: .destructive) {
+                Button(L10n.tr("清除 OpenSubtitles 配置"), role: .destructive) {
                     viewModel.clearOpenSubtitlesCredentials()
                 }
 
@@ -233,40 +233,40 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            Label("字幕", systemImage: "captions.bubble")
+            Label(L10n.tr("字幕"), systemImage: "captions.bubble")
         } footer: {
-            Text("字幕外观为全局默认值，进入播放器后仍可临时调整。OpenSubtitles 搜索使用官方 REST API；下载需要账户额度，API Key、用户名和密码会保存在 Keychain。")
+            Text(L10n.tr("字幕外观为全局默认值，进入播放器后仍可临时调整。OpenSubtitles 搜索使用官方 REST API；下载需要账户额度，API Key、用户名和密码会保存在 Keychain。"))
         }
     }
 
     private var librarySection: some View {
         Section {
-            Toggle("自动扫描新文件", isOn: $viewModel.libraryAutoScan)
-            Toggle("显示未观看标记", isOn: $viewModel.showUnwatchedBadge)
+            Toggle(L10n.tr("自动扫描新文件"), isOn: $viewModel.libraryAutoScan)
+            Toggle(L10n.tr("显示未观看标记"), isOn: $viewModel.showUnwatchedBadge)
         } header: {
-            Label("媒体库", systemImage: "film.stack")
+            Label(L10n.tr("媒体库"), systemImage: "film.stack")
         }
     }
 
     private var metadataSection: some View {
         Section {
-            Toggle("自动从媒体服务器下载元数据", isOn: $viewModel.metadataAutoDownload)
+            Toggle(L10n.tr("自动从媒体服务器下载元数据"), isOn: $viewModel.metadataAutoDownload)
 
             HStack {
-                Text("元数据缓存大小")
+                Text(L10n.tr("元数据缓存大小"))
                 Spacer()
                 Text(viewModel.metadataCacheSize)
                     .foregroundStyle(.secondary)
             }
 
-            Button("删除所有元数据缓存") {
+            Button(L10n.tr("删除所有元数据缓存")) {
                 viewModel.showClearMetadataCacheAlert = true
             }
             .foregroundStyle(.red)
         } header: {
-            Label("元数据", systemImage: "photo.on.rectangle.angled")
+            Label(L10n.tr("元数据"), systemImage: "photo.on.rectangle.angled")
         } footer: {
-            Text("仅 Emby、Jellyfin、Plex 媒体条目支持元数据刷新。关闭自动下载后，仍可在详情页通过「更多 → 刷新」手动更新。")
+            Text(L10n.tr("仅 Emby、Jellyfin、Plex 媒体条目支持元数据刷新。关闭自动下载后，仍可在详情页通过「更多 → 刷新」手动更新。"))
         }
     }
 
@@ -277,65 +277,65 @@ struct SettingsView: View {
                     ThemeSwatch(theme: viewModel.theme)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("配色主题")
+                        Text(L10n.tr("外观"))
                             .font(.subheadline)
                             .fontWeight(.medium)
-                        Text(viewModel.theme.displayName)
+                        Text("\(viewModel.theme.displayName) · \(viewModel.languagePreference.displayName)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
         } header: {
-            Label("外观", systemImage: "paintbrush")
+            Label(L10n.tr("外观"), systemImage: "paintbrush")
         }
     }
 
     private var storageSection: some View {
         Section {
             NavigationLink(value: SettingsRoute.downloads) {
-                Label("下载管理", systemImage: "arrow.down.circle")
+                Label(L10n.tr("下载管理"), systemImage: "arrow.down.circle")
             }
 
-            LabeledContent("下载目录", value: downloadManager.destination.rootPath)
-            Button("选择下载文件夹") {
+            LabeledContent(L10n.tr("下载目录"), value: downloadManager.destination.rootPath)
+            Button(L10n.tr("选择下载文件夹")) {
                 isChoosingDirectory = true
             }
-            Button("恢复默认下载位置") {
+            Button(L10n.tr("恢复默认下载位置")) {
                 downloadManager.useDefaultDirectory()
             }
 
             HStack {
-                Text("缓存大小")
+                Text(L10n.tr("缓存大小"))
                 Spacer()
                 Text(viewModel.cacheSize)
                     .foregroundStyle(.secondary)
             }
 
-            Button("清除缓存") {
+            Button(L10n.tr("清除缓存")) {
                 viewModel.showClearCacheAlert = true
             }
             .foregroundStyle(.red)
         } header: {
-            Label("存储", systemImage: "internaldrive")
+            Label(L10n.tr("存储"), systemImage: "internaldrive")
         }
     }
 
     private var aboutSection: some View {
         Section {
             HStack {
-                Text("版本")
+                Text(L10n.tr("版本"))
                 Spacer()
                 Text(viewModel.appVersion)
                     .foregroundStyle(.secondary)
             }
 
-            Button("重置所有设置") {
+            Button(L10n.tr("重置所有设置")) {
                 viewModel.showResetAlert = true
             }
             .foregroundStyle(.red)
         } header: {
-            Label("关于", systemImage: "info.circle")
+            Label(L10n.tr("关于"), systemImage: "info.circle")
         }
     }
 }
@@ -528,9 +528,21 @@ struct ThemePreviewCard: View {
 /// `.id(theme)` 触发的 `ContentView` 重建依然保留。
 struct AppearanceSettingsView: View {
     @AppStorage(ColorTheme.storageKey) private var theme: ColorTheme = .system
+    @AppStorage(AppLanguagePreference.storageKey) private var languagePreference: AppLanguagePreference = .chinese
+    @State private var showLanguageRestartAlert = false
 
     var body: some View {
         Form {
+            Section {
+                Picker(L10n.tr("语言"), selection: languageSelection) {
+                    ForEach(AppLanguagePreference.allCases, id: \.self) { preference in
+                        Text(preference.displayName).tag(preference)
+                    }
+                }
+            } footer: {
+                Text(L10n.tr("语言将在下次启动后生效"))
+            }
+
             Section {
                 ThemePickerGrid(selection: $theme)
                     .listRowBackground(Color.clear)
@@ -541,8 +553,24 @@ struct AppearanceSettingsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.vanmoBackground)
-        .navigationTitle("外观")
+        .navigationTitle(L10n.tr("外观"))
         .navigationBarTitleDisplayMode(.inline)
+        .alert(L10n.tr("语言"), isPresented: $showLanguageRestartAlert) {
+            Button(L10n.tr("确定"), role: .cancel) {}
+        } message: {
+            Text(L10n.tr("语言将在下次启动后生效"))
+        }
+    }
+
+    private var languageSelection: Binding<AppLanguagePreference> {
+        Binding(
+            get: { languagePreference },
+            set: { newValue in
+                guard newValue != languagePreference else { return }
+                languagePreference = newValue
+                showLanguageRestartAlert = true
+            }
+        )
     }
 }
 

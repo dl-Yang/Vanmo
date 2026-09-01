@@ -61,23 +61,23 @@ enum ColorTheme: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .system:       return "跟随系统"
-        case .light:        return "系统浅色"
-        case .dark:         return "系统深色"
-        case .warmEarth:    return "栗咖薄荷"
-        case .forestCream:  return "墨蓝橄榄"
-        case .roseLilac:    return "胭脂丁香"
+        case .system:       return L10n.tr("跟随系统")
+        case .light:        return L10n.tr("系统浅色")
+        case .dark:         return L10n.tr("系统深色")
+        case .warmEarth:    return L10n.tr("栗咖薄荷")
+        case .forestCream:  return L10n.tr("墨蓝橄榄")
+        case .roseLilac:    return L10n.tr("胭脂丁香")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .system:       return "随系统外观自动切换浅 / 深色"
-        case .light:        return "标准浅色界面 · 暖咖主色"
-        case .dark:         return "标准深色界面 · 柔咖主色"
-        case .warmEarth:    return "深咖 · 米色 · 薄荷绿"
-        case .forestCream:  return "墨蓝 · 奶油 · 橄榄绿"
-        case .roseLilac:    return "胭脂 · 雪粉 · 丁香紫"
+        case .system:       return L10n.tr("随系统外观自动切换浅 / 深色")
+        case .light:        return L10n.tr("标准浅色界面 · 暖咖主色")
+        case .dark:         return L10n.tr("标准深色界面 · 柔咖主色")
+        case .warmEarth:    return L10n.tr("深咖 · 米色 · 薄荷绿")
+        case .forestCream:  return L10n.tr("墨蓝 · 奶油 · 橄榄绿")
+        case .roseLilac:    return L10n.tr("胭脂 · 雪粉 · 丁香紫")
         }
     }
 

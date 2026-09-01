@@ -31,16 +31,16 @@ struct MacConnectionsBrowseView: View {
                 onCancel: { connectionsViewModel.cancelScan() }
             )
         }
-        .alert("同步", isPresented: Binding(
+        .alert(L10n.tr("同步"), isPresented: Binding(
             get: { connectionsViewModel.scanToastMessage != nil },
             set: { if !$0 { connectionsViewModel.scanToastMessage = nil } }
         )) {
-            Button("确定") { connectionsViewModel.scanToastMessage = nil }
+            Button(L10n.tr("确定")) { connectionsViewModel.scanToastMessage = nil }
         } message: {
             Text(connectionsViewModel.scanToastMessage ?? "")
         }
-        .alert("错误", isPresented: $connectionsViewModel.showError) {
-            Button("确定") {}
+        .alert(L10n.tr("错误"), isPresented: $connectionsViewModel.showError) {
+            Button(L10n.tr("确定")) {}
         } message: {
             Text(connectionsViewModel.errorMessage)
         }
@@ -73,7 +73,7 @@ struct MacConnectionsBrowseView: View {
                         .foregroundStyle(theme.tertiaryText)
                 }
             } else {
-                Text("连接浏览")
+                Text(L10n.tr("连接浏览"))
                     .font(MacDesignTokens.Typography.headerTitle)
                     .foregroundStyle(theme.primaryText)
             }
@@ -89,7 +89,7 @@ struct MacConnectionsBrowseView: View {
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
-                .help("刷新当前目录")
+                .help(L10n.tr("刷新当前目录"))
 
                 Button {
                     Task { await connectionsViewModel.scanCurrentDirectory() }
@@ -99,7 +99,7 @@ struct MacConnectionsBrowseView: View {
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
-                .help("同步当前目录到媒体库")
+                .help(L10n.tr("同步当前目录到媒体库"))
 
                 Menu {
                     connectionContextMenu
@@ -109,7 +109,7 @@ struct MacConnectionsBrowseView: View {
                         .frame(width: 28, height: 28)
                 }
                 .menuStyle(.borderlessButton)
-                .help("更多操作")
+                .help(L10n.tr("更多操作"))
             }
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
@@ -131,35 +131,35 @@ struct MacConnectionsBrowseView: View {
             Button {
                 Task { await connectionsViewModel.refreshCurrentDirectory() }
             } label: {
-                Label("刷新", systemImage: "arrow.clockwise")
+                Label(L10n.tr("刷新"), systemImage: "arrow.clockwise")
             }
             Button {
                 Task { await connectionsViewModel.scanCurrentDirectory() }
             } label: {
-                Label("同步当前目录", systemImage: "square.and.arrow.down")
+                Label(L10n.tr("同步当前目录"), systemImage: "square.and.arrow.down")
             }
             Button {
                 appState.presentEditConnection(connection)
             } label: {
-                Label("编辑", systemImage: "pencil")
+                Label(L10n.tr("编辑"), systemImage: "pencil")
             }
             if !connection.type.requiresManualDirectorySync {
                 Button {
                     Task { await fullRescanConnection(connection) }
                 } label: {
-                    Label("全量重扫", systemImage: "arrow.clockwise")
+                    Label(L10n.tr("全量重扫"), systemImage: "arrow.clockwise")
                 }
             } else {
                 Button {
                     Task { await connectionsViewModel.scanCurrentDirectory(forceFullScan: true) }
                 } label: {
-                    Label("全量重扫当前目录", systemImage: "arrow.clockwise")
+                    Label(L10n.tr("全量重扫当前目录"), systemImage: "arrow.clockwise")
                 }
             }
             Button(role: .destructive) {
                 deleteConnection(connection)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label(L10n.tr("删除"), systemImage: "trash")
             }
         }
     }
@@ -205,9 +205,9 @@ struct MacConnectionsBrowseView: View {
         } else if connectionsViewModel.isBrowsingFiles {
             loadingState
         } else if let message = connectionsViewModel.fileBrowserErrorMessage {
-            messageState(icon: "exclamationmark.triangle", title: "无法加载目录", message: message)
+            messageState(icon: "exclamationmark.triangle", title: L10n.tr("无法加载目录"), message: message)
         } else if connectionsViewModel.files.isEmpty {
-            messageState(icon: "folder", title: "文件夹为空", message: "此目录下没有可显示的文件")
+            messageState(icon: "folder", title: L10n.tr("文件夹为空"), message: L10n.tr("此目录下没有可显示的文件"))
         } else {
             fileList
         }
@@ -243,7 +243,7 @@ struct MacConnectionsBrowseView: View {
             Button {
                 Task { await connectionsViewModel.openDirectory(file) }
             } label: {
-                Label("打开", systemImage: "folder")
+                Label(L10n.tr("打开"), systemImage: "folder")
             }
 
             if connectionsViewModel.canBookmarkFoldersInSelectedConnection {
@@ -251,9 +251,9 @@ struct MacConnectionsBrowseView: View {
                     toggleFolderBookmark(file)
                 } label: {
                     if connectionsViewModel.isFolderBookmarked(file) {
-                        Label("取消书签", systemImage: "bookmark.slash")
+                        Label(L10n.tr("取消书签"), systemImage: "bookmark.slash")
                     } else {
-                        Label("添加书签", systemImage: "bookmark")
+                        Label(L10n.tr("添加书签"), systemImage: "bookmark")
                     }
                 }
             }
@@ -263,7 +263,7 @@ struct MacConnectionsBrowseView: View {
             Button {
                 Task { await play(file) }
             } label: {
-                Label("播放", systemImage: "play.fill")
+                Label(L10n.tr("播放"), systemImage: "play.fill")
             }
 
             if let connection = connectionsViewModel.selectedConnection,
@@ -271,7 +271,7 @@ struct MacConnectionsBrowseView: View {
                 Button {
                     Task { await download(file, connection: connection) }
                 } label: {
-                    Label("下载", systemImage: "arrow.down.circle")
+                    Label(L10n.tr("下载"), systemImage: "arrow.down.circle")
                 }
             }
 
@@ -279,7 +279,7 @@ struct MacConnectionsBrowseView: View {
                 Button {
                     Task { await quickLook(file) }
                 } label: {
-                    Label("Quick Look 预览", systemImage: "eye")
+                    Label(L10n.tr("Quick Look 预览"), systemImage: "eye")
                 }
             }
         }
@@ -289,25 +289,25 @@ struct MacConnectionsBrowseView: View {
             Button {
                 appState.presentEditConnection(connection)
             } label: {
-                Label("编辑", systemImage: "pencil")
+                Label(L10n.tr("编辑"), systemImage: "pencil")
             }
             if connection.type.requiresManualDirectorySync {
                 Button {
                     Task { await connectionsViewModel.scanCurrentDirectory(forceFullScan: true) }
                 } label: {
-                    Label("全量重扫当前目录", systemImage: "arrow.clockwise")
+                    Label(L10n.tr("全量重扫当前目录"), systemImage: "arrow.clockwise")
                 }
             } else {
                 Button {
                     Task { await fullRescanConnection(connection) }
                 } label: {
-                    Label("全量重扫", systemImage: "arrow.clockwise")
+                    Label(L10n.tr("全量重扫"), systemImage: "arrow.clockwise")
                 }
             }
             Button(role: .destructive) {
                 deleteConnection(connection)
             } label: {
-                Label("删除", systemImage: "trash")
+                Label(L10n.tr("删除"), systemImage: "trash")
             }
         }
     }
@@ -315,15 +315,15 @@ struct MacConnectionsBrowseView: View {
     private var emptySelectionState: some View {
         messageState(
             icon: "externaldrive",
-            title: "未选择连接",
-            message: "请从侧边栏选择一个连接以浏览文件"
+            title: L10n.tr("未选择连接"),
+            message: L10n.tr("请从侧边栏选择一个连接以浏览文件")
         )
     }
 
     private var loadingState: some View {
         VStack(spacing: 10) {
             ProgressView()
-            Text("正在加载目录...")
+            Text(L10n.tr("正在加载目录..."))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(theme.tertiaryText)
         }
@@ -387,13 +387,13 @@ struct MacConnectionsBrowseView: View {
     private func connectionStatusText(for connection: SavedConnection) -> String {
         switch connectionsViewModel.connectionStatus(for: connection) {
         case .idle:
-            return "未连接"
+            return L10n.tr("未连接")
         case .connecting:
-            return "连接中"
+            return L10n.tr("连接中")
         case .connected:
-            return "已连接"
+            return L10n.tr("已连接")
         case .failed:
-            return connectionsViewModel.connectionErrorMessage(for: connection) ?? "连接失败"
+            return connectionsViewModel.connectionErrorMessage(for: connection) ?? L10n.tr("连接失败")
         }
     }
 
@@ -527,7 +527,7 @@ private struct MacConnectionFileRow: View {
 
     private var subtitle: String {
         if file.isDirectory {
-            return "文件夹"
+            return L10n.tr("文件夹")
         }
         if file.size > 0 {
             return MacBrowseFormatters.fileSize(file.size)
@@ -564,12 +564,12 @@ private enum MacBrowseFormatters {
 private extension RemoteFileType {
     var macBrowseDisplayName: String {
         switch self {
-        case .video: "视频"
-        case .subtitle: "字幕"
-        case .audio: "音频"
-        case .image: "图片"
-        case .directory: "文件夹"
-        case .other: "文件"
+        case .video: L10n.tr("视频")
+        case .subtitle: L10n.tr("字幕")
+        case .audio: L10n.tr("音频")
+        case .image: L10n.tr("图片")
+        case .directory: L10n.tr("文件夹")
+        case .other: L10n.tr("文件")
         }
     }
 }

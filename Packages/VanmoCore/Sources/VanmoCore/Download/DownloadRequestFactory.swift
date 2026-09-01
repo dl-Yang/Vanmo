@@ -72,7 +72,11 @@ public enum DownloadRequestFactory {
         }
 
         let showTitle = show.showTitle ?? show.title
-        let displayTitle = "\(showTitle) S\(String(format: "%02d", episode.seasonNumber))E\(String(format: "%02d", episode.episodeNumber))"
+        let displayTitle = LocalizedFormat.showEpisodeTitle(
+            showTitle: showTitle,
+            season: episode.seasonNumber,
+            episode: episode.episodeNumber
+        )
         let fileName = fileName(
             title: displayTitle,
             preferredName: episode.originalFileName,

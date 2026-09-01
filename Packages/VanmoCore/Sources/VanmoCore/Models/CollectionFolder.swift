@@ -17,9 +17,9 @@ public enum EmbyCollectionType: String, Codable, Hashable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .movies: return "电影"
-        case .tvshows: return "电视剧"
-        case .playlists: return "播放列表"
+        case .movies: return L10n.tr("电影")
+        case .tvshows: return L10n.tr("电视剧")
+        case .playlists: return L10n.tr("播放列表")
         }
     }
 

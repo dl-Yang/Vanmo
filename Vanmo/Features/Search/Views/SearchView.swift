@@ -14,15 +14,15 @@ struct SearchView: View {
             if viewModel.searchText.isEmpty {
                 emptySearchState
             } else if viewModel.isSearching {
-                LoadingView("搜索中...")
+                LoadingView(L10n.tr("搜索中..."))
             } else {
                 searchResults
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.vanmoBackground)
-        .navigationTitle("搜索")
-        .searchable(text: $viewModel.searchText, prompt: "搜索电影、剧集...")
+        .navigationTitle(L10n.tr("搜索"))
+        .searchable(text: $viewModel.searchText, prompt: L10n.tr("搜索电影、剧集..."))
         .onChange(of: viewModel.searchText) { _, _ in
             viewModel.search()
         }
@@ -44,7 +44,7 @@ struct SearchView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 48))
                 .foregroundStyle(.tertiary)
-            Text("搜索你的媒体库")
+            Text(L10n.tr("搜索你的媒体库"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -84,7 +84,7 @@ struct SearchView: View {
                                         Image(systemName: "bolt.horizontal.circle")
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
-                                            .accessibilityLabel("远程实时结果")
+                                            .accessibilityLabel(L10n.tr("远程实时结果"))
                                     }
                                 }
                             }

@@ -59,6 +59,7 @@ targets:
       - path: Vanmo/Resources/Assets.xcassets
       - path: Vanmo/Resources/Info.plist
       - path: Vanmo/Resources/loadingSpinner.json
+      - path: Vanmo/Resources/InfoPlist.xcstrings
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app
@@ -151,6 +152,7 @@ targets:
       - path: VanmoMac/Resources/Info-Mac.plist
       - path: VanmoMac/Resources/Assets.xcassets
       - path: VanmoMac/Resources/loadingSpinner.json
+      - path: VanmoMac/Resources/InfoPlist.xcstrings
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app.mac

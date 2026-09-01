@@ -4,7 +4,7 @@ import VanmoCore
 struct LoadingView: View {
     let message: String
 
-    init(_ message: String = "加载中...") {
+    init(_ message: String = L10n.tr("加载中...")) {
         self.message = message
     }
 

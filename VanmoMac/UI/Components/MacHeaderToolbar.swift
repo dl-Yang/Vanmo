@@ -1,4 +1,5 @@
 import SwiftUI
+import VanmoCore
 
 struct MacLibraryViewControls: View {
     @EnvironmentObject private var appState: MacAppState
@@ -20,7 +21,7 @@ struct MacLibraryViewControls: View {
 
             if showsSortMenu {
                 Menu {
-                    Picker("排序", selection: $libraryViewModel.sortOption) {
+                    Picker(L10n.tr("排序"), selection: $libraryViewModel.sortOption) {
                         ForEach(MacLibrarySortOption.allCases) { option in
                             Text(option.displayName).tag(option)
                         }
@@ -32,7 +33,7 @@ struct MacLibraryViewControls: View {
                         .frame(width: 20, height: 20)
                 }
                 .menuStyle(.borderlessButton)
-                .help("排序")
+                .help(L10n.tr("排序"))
             }
         }
     }
@@ -73,7 +74,7 @@ struct MacSidebarToggleButton: View {
             }
             .frame(width: 28, height: 28)
             .buttonStyle(.plain)
-            .help(appState.isSidebarExpanded ? "收起侧边栏" : "展开侧边栏")
+            .help(appState.isSidebarExpanded ? L10n.tr("收起侧边栏") : L10n.tr("展开侧边栏"))
            
             Button {
                 appState.goBack()
@@ -86,7 +87,7 @@ struct MacSidebarToggleButton: View {
             }
             .frame(width: 28, height: 28)
             .buttonStyle(.plain)
-            .help("返回上一步")
+            .help(L10n.tr("返回上一步"))
             
             Spacer()
             
@@ -99,7 +100,7 @@ struct MacSidebarToggleButton: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("查看下载列表")
+            .help(L10n.tr("查看下载列表"))
         }
     }
 }

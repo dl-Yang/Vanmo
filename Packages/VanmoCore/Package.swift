@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "VanmoCore",
+    defaultLocalization: "zh-Hans",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
@@ -25,6 +26,9 @@ let package = Package(
                 .product(name: "SWXMLHash", package: "SWXMLHash"),
                 .product(name: "SMBClient", package: "SMBClient"),
                 .product(name: "Citadel", package: "Citadel"),
+            ],
+            resources: [
+                .process("Localization/Resources"),
             ],
             swiftSettings: [
                 .define("CLOUDKIT_SYNC_ENABLED", .when(configuration: .release)),

@@ -38,15 +38,15 @@ struct DownloadManagementView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isSelectionMode ? .hidden : .automatic, for: .tabBar)
-        .confirmationDialog("删除选中的下载？", isPresented: $deleteConfirmation) {
-            Button("删除文件和记录", role: .destructive) {
+        .confirmationDialog(L10n.tr("删除选中的下载？"), isPresented: $deleteConfirmation) {
+            Button(L10n.tr("删除文件和记录"), role: .destructive) {
                 Task {
                     await downloadManager.delete(selection)
                     selection.removeAll()
                     isSelectionMode = false
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button(L10n.tr("取消"), role: .cancel) {}
         }
         .onAppear {
             logTaskSnapshots(reason: "appear")
@@ -76,7 +76,7 @@ struct DownloadManagementView: View {
     }
 
     private var header: some View {
-        Text("下载")
+        Text(L10n.tr("下载"))
             .font(.system(size: 34, weight: .bold))
             .tracking(-0.85)
             .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
@@ -94,13 +94,13 @@ struct DownloadManagementView: View {
                 let allSelected = !downloadManager.tasks.isEmpty
                     && selection.count == downloadManager.tasks.count
                 if !selection.isEmpty {
-                    selectionAction("删除", role: .destructive) {
+                    selectionAction(L10n.tr("删除"), role: .destructive) {
                         deleteConfirmation = true
                     }
                     .accessibilityIdentifier("downloads.deleteSelected")
                 }
 
-                selectionAction(allSelected ? "取消全选" : "全选") {
+                selectionAction(allSelected ? L10n.tr("取消全选") : L10n.tr("全选")) {
                     if allSelected {
                         selection.removeAll()
                     } else {
@@ -108,20 +108,20 @@ struct DownloadManagementView: View {
                     }
                 }
 
-                selectionAction("取消") {
+                selectionAction(L10n.tr("取消")) {
                     isSelectionMode = false
                     selection.removeAll()
                 }
             } else if !downloadManager.tasks.isEmpty {
                 if downloadManager.hasPausableTasks {
-                    Button("全部暂停") {
+                    Button(L10n.tr("全部暂停")) {
                         Task { await downloadManager.pauseAll() }
                     }
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(actionBlue)
                     .accessibilityIdentifier("downloads.pauseAll")
                 } else if downloadManager.hasResumableTasks {
-                    Button("全部继续") {
+                    Button(L10n.tr("全部继续")) {
                         Task { await downloadManager.resumeAll() }
                     }
                     .font(.system(size: 15, weight: .medium))
@@ -129,7 +129,7 @@ struct DownloadManagementView: View {
                     .accessibilityIdentifier("downloads.resumeAll")
                 }
 
-                Button("选择") {
+                Button(L10n.tr("选择")) {
                     isSelectionMode = true
                 }
                 .font(.system(size: 15, weight: .medium))
@@ -199,10 +199,10 @@ struct DownloadManagementView: View {
             Image(systemName: "arrow.down.circle")
                 .font(.system(size: 34, weight: .light))
                 .foregroundStyle(actionBlue)
-            Text("暂无下载")
+            Text(L10n.tr("暂无下载"))
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
-            Text("从媒体详情或文件浏览器发起下载后，任务会显示在这里。")
+            Text(L10n.tr("从媒体详情或文件浏览器发起下载后，任务会显示在这里。"))
                 .font(.system(size: 13))
                 .foregroundStyle(secondaryGray)
                 .multilineTextAlignment(.center)
@@ -215,24 +215,24 @@ struct DownloadManagementView: View {
 
     private var summaryText: String {
         let total = downloadManager.tasks.count
-        guard total > 0 else { return "暂无任务" }
+        guard total > 0 else { return L10n.tr("暂无任务") }
         let active = downloadManager.tasks.filter {
             $0.status == .downloading || $0.status == .queued
         }.count
         let paused = downloadManager.tasks.filter { $0.status == .paused }.count
         let failed = downloadManager.tasks.filter { $0.status == .failed }.count
-        var parts = ["\(total) 项"]
+        var parts = [L10n.tr("%d 项", total)]
         if active > 0 {
-            parts.append("\(active) 进行中")
+            parts.append(L10n.tr("%d 进行中", active))
         }
         if paused > 0 {
-            parts.append("\(paused) 已暂停")
+            parts.append(L10n.tr("%d 已暂停", paused))
         }
         if failed > 0 {
-            parts.append("\(failed) 失败")
+            parts.append(L10n.tr("%d 失败", failed))
         }
         if parts.count == 1 {
-            parts.append("全部完成")
+            parts.append(L10n.tr("全部完成"))
         }
         return parts.joined(separator: " · ")
     }
@@ -434,15 +434,15 @@ private struct DownloadTaskRow: View {
                 .frame(height: 0.6)
         }
         .contextMenu {
-            Button("查看详情", action: openDetail)
+            Button(L10n.tr("查看详情"), action: openDetail)
             if task.status == .queued || task.status == .downloading {
-                Button("暂停", action: pause)
+                Button(L10n.tr("暂停"), action: pause)
             } else if task.status == .paused {
-                Button("继续", action: resume)
+                Button(L10n.tr("继续"), action: resume)
             } else if task.status == .completed {
-                Button("播放", action: play)
+                Button(L10n.tr("播放"), action: play)
             } else if task.status == .failed {
-                Button("重新下载", action: retry)
+                Button(L10n.tr("重新下载"), action: retry)
             }
         }
         .accessibilityElement(children: .contain)
@@ -473,25 +473,25 @@ private struct DownloadTaskRow: View {
         let received = formattedBytes(task.receivedBytes)
         switch task.status {
         case .queued:
-            return "等待中 · 即将开始"
+            return L10n.tr("等待中 · 即将开始")
         case .downloading:
             if task.totalBytes > 0 {
-                return "下载中 \(Int(task.progress * 100))% · \(received) / \(total)"
+                return L10n.tr("下载中 %d%% · %@ / %@", Int(task.progress * 100), received, total)
             }
-            return "下载中"
+            return L10n.tr("下载中")
         case .paused:
             if task.totalBytes > 0 {
-                return "已暂停 · \(received) / \(total)"
+                return L10n.tr("已暂停 · %@", "\(received) / \(total)")
             }
-            return "已暂停"
+            return L10n.tr("已暂停")
         case .completed:
-            return total.isEmpty ? "已完成" : "已完成 · \(total)"
+            return total.isEmpty ? L10n.tr("已完成") : L10n.tr("已完成 · %@", total)
         case .failed:
             let reason = task.errorMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
             if let reason, !reason.isEmpty {
-                return "下载失败 · \(reason)"
+                return L10n.tr("下载失败 · %@", reason)
             }
-            return "下载失败"
+            return L10n.tr("下载失败")
         }
     }
 
@@ -576,10 +576,10 @@ private struct DownloadCircularActionButton: View {
 
     private var actionLabel: String {
         switch task.status {
-        case .queued, .downloading: return "暂停"
-        case .paused: return "继续"
-        case .completed: return "播放"
-        case .failed: return "重新下载"
+        case .queued, .downloading: return L10n.tr("暂停")
+        case .paused: return L10n.tr("继续")
+        case .completed: return L10n.tr("播放")
+        case .failed: return L10n.tr("重新下载")
         }
     }
 

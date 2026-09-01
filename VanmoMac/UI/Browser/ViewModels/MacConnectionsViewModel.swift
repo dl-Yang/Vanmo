@@ -275,7 +275,7 @@ final class MacConnectionsViewModel: ObservableObject {
         if connection.type == .localFolder {
             await ensureLocalFolderAccess(for: connection)
             guard let service = activeLocalServices[connection.id] else {
-                throw NetworkError.connectionFailed("本地文件夹访问未恢复，请在连接页重新选择文件夹")
+                throw NetworkError.connectionFailed(L10n.tr("本地文件夹访问未恢复，请在连接页重新选择文件夹"))
             }
             return service
         }
@@ -810,8 +810,8 @@ final class MacConnectionsViewModel: ObservableObject {
             if shouldScanRemoteFiles {
                 loadingMessage = forceFullScan
                     ? "全量重扫 \(connection.name)..."
-                    : "扫描媒体文件..."
-                librarySyncMessage = "正在同步数据..."
+                    : L10n.tr("扫描媒体文件...")
+                librarySyncMessage = L10n.tr("正在同步数据...")
             } else {
                 loadingMessage = "已连接 \(connection.name)"
                 librarySyncMessage = nil
@@ -1208,7 +1208,7 @@ final class MacConnectionsViewModel: ObservableObject {
         case .cancelled:
             scanToastMessage = "同步已取消，已保留 \(result.insertedItems.count + result.updatedCount) 项变更"
         case .failed:
-            partialSyncNotice = result.issues.last?.message ?? "同步失败"
+            partialSyncNotice = result.issues.last?.message ?? L10n.tr("同步失败")
             if showErrorAlert { scanToastMessage = partialSyncNotice }
         }
     }

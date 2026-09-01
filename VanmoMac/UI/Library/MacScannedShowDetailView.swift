@@ -24,14 +24,14 @@ struct MacScannedShowDetailView: View {
 
             Group {
                 if isLoading {
-                    ProgressView("加载中...")
+                    ProgressView(L10n.tr("加载中..."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if aliveEpisodes.isEmpty {
-                    Text("此剧集下没有可显示的分集")
+                    Text(L10n.tr("此剧集下没有可显示的分集"))
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {

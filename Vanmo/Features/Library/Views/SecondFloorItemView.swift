@@ -78,7 +78,7 @@ struct SecondFloorItemView: View {
         Button(action: onPlay) {
             HStack(spacing: 8) {
                 Image(systemName: "play.fill")
-                Text(item.playbackProgress > 0 ? "继续播放" : "播放")
+                Text(item.playbackProgress > 0 ? L10n.tr("继续播放") : L10n.tr("播放"))
                     .fontWeight(.semibold)
             }
             .frame(maxWidth: .infinity)

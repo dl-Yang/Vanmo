@@ -8,6 +8,7 @@ import VanmoCore
 @main
 struct VanmoApp: App {
     init() {
+        AppLanguage.lockForCurrentProcess()
         OAuthCoordinator.shared.presentationContextProvider = UIKitOAuthPresentationContextProvider.shared
         PrefetchTemporaryStore.cleanupOrphans()
         MediaProbeBootstrap.configure()

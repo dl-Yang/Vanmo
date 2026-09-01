@@ -1,5 +1,5 @@
 import SwiftUI
-
+import VanmoCore
 import Lottie
 
 struct LoadingIndicatorView: View {
@@ -10,7 +10,7 @@ struct LoadingIndicatorView: View {
             LottieView(animation: animation)
                 .playing(loopMode: .loop)
                 .frame(width: size, height: size)
-                .accessibilityLabel("加载中")
+                .accessibilityLabel(L10n.tr("加载中"))
         } else {
             systemProgressView
         }
@@ -21,7 +21,7 @@ struct LoadingIndicatorView: View {
         ProgressView()
             .controlSize(size >= 40 ? .large : .small)
             .frame(width: size, height: size)
-            .accessibilityLabel("加载中")
+            .accessibilityLabel(L10n.tr("加载中"))
     }
 }
 

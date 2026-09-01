@@ -11,10 +11,10 @@ enum MacLibrarySortOption: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .addedDate: "添加日期"
-        case .title: "标题"
-        case .year: "年份"
-        case .rating: "评分"
+        case .addedDate: L10n.tr("添加日期")
+        case .title: L10n.tr("标题")
+        case .year: L10n.tr("年份")
+        case .rating: L10n.tr("评分")
         }
     }
 }

@@ -1,6 +1,6 @@
 # Vanmo Architecture
 
-> This document describes the repository as of August 26, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
+> This document describes the repository as of August 31, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
 > If this document conflicts with the code, treat `project.yml`, `Packages/VanmoCore/Package.swift`, and the current implementation as the sources of truth.
 
 ## 1. System Overview
@@ -123,6 +123,7 @@ Boundary rules:
 
 `VanmoApp` performs the following global setup:
 
+- Locks the interface language for the process from `AppLanguagePreference`.
 - Installs `UIKitOAuthPresentationContextProvider`.
 - Removes orphaned prefetch temporary files.
 - Registers the KSPlayer media-probe provider.
@@ -185,13 +186,13 @@ When the app enters the foreground, it resumes downloads, performs synchronizati
   - `SearchViewModel` searches both the local SwiftData library and remote connections.
   - Remote searches are limited to four concurrent sources. Media servers use server-side search when available; file services use bounded recursive search.
 - `Features/Settings`
-  - Settings cover playback, subtitles, downloads, library behavior, appearance, metadata, and iCloud synchronization.
+  - Settings cover playback, subtitles, downloads, library behavior, appearance (including interface language), metadata, and iCloud synchronization.
 
 ## 5. macOS Application Architecture
 
 ### 5.1 Scenes and Global Objects
 
-`VanmoMacApp` configures the AppKit OAuth provider, prefetch cleanup, media probing, and online subtitle providers. It creates:
+`VanmoMacApp` locks the interface language, then configures the AppKit OAuth provider, prefetch cleanup, media probing, and online subtitle providers. It creates:
 
 - `MacAppState`
 - `MacLibraryViewModel`
@@ -382,6 +383,18 @@ Metadata has two complementary paths:
 
 The coordinator does not implement a transport protocol. The CloudKit-enabled SwiftData `ModelConfiguration` performs the underlying synchronization.
 
+### 6.9 Interface Language
+
+`VanmoCore` owns the interface-language preference, process lock, string catalog, and duration/episode formatters. It still must not import SwiftUI, UIKit, or AppKit.
+
+- `AppLanguagePreference` stores `chinese`, `english`, or `system` under `app.interfaceLanguage`. The default is Chinese.
+- `AppLanguage.lockForCurrentProcess()` runs at iOS and macOS app launch. Changing the preference does not restyle the current process.
+- `L10n.tr` reads Chinese source keys from `Localizable.xcstrings` and an embedded English table.
+- Follow System maps system Chinese to `zh-Hans` and every other system language to `en`.
+- Brand and protocol names stay in their original form. Server titles and system `localizedDescription` values are not translated.
+
+Appearance settings on both apps expose the three options and remind the user that the next launch applies the change.
+
 ## 7. Playback Architecture
 
 ### 7.1 Engine Selection
@@ -570,7 +583,8 @@ Other verification entry points:
 # Check the iOS UI target and CLI statically without running XCUITest
 ./scripts/check-ios-ui-cli.sh
 
-# Compile one application target without launching it
+# Compile one application target without launching it.
+# Run the two platforms serially; they share SourcePackages and stay off Xcode's cache.
 ./scripts/check-app-build.sh ios-simulator
 ./scripts/check-app-build.sh macos
 

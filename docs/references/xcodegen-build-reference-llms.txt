@@ -1,5 +1,5 @@
 VANMO XCODEGEN AND BUILD REFERENCE FOR LLMS
-Last reviewed: 2026-08-26
+Last reviewed: 2026-08-31
 
 CONFIGURATION AUTHORITY
 - project.yml is the source of truth for application targets, package
@@ -71,6 +71,12 @@ COMMAND BOUNDARIES
   successful compile proves only that the selected Debug target built in the
   recorded environment. It does not prove launch, UI, device, or CloudKit
   behavior.
+- check-app-build.sh uses isolated DerivedData and
+  build/app-build-evidence/SourcePackages, not Xcode Incremental Build
+  cache. An Xcode Incremental Build does not replace this script. Never
+  run ios-simulator and macos as two concurrent processes; use all or
+  run them one after the other. Do not point Xcode at the evidence
+  SourcePackages directory.
 - The Harness documentation check requires Python 3 and fails when required
   governance files, routing links, or repository-local Markdown targets are
   missing.

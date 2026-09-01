@@ -1,20 +1,16 @@
 import Foundation
+import VanmoCore
 
 enum MacFormatters {
     static func remainingDuration(position: TimeInterval, total: TimeInterval) -> String {
-        let remaining = max(total - position, 0)
-        return formatDuration(remaining) + " remaining"
+        LocalizedFormat.remainingDuration(position: position, total: total)
     }
 
     static func formatDuration(_ interval: TimeInterval) -> String {
-        guard interval.isFinite, interval > 0 else { return "0m" }
-        let totalMinutes = Int(interval.rounded()) / 60
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        if hours > 0 {
-            return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+        guard interval.isFinite, interval > 0 else {
+            return LocalizedFormat.shortDuration(0)
         }
-        return "\(max(minutes, 1))m"
+        return LocalizedFormat.shortDuration(interval)
     }
 
     static func playerTimestamp(_ interval: TimeInterval) -> String {

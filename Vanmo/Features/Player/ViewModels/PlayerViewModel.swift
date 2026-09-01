@@ -415,14 +415,14 @@ final class PlayerViewModel: ObservableObject {
         guard let ksEngine = engine as? KSPlayerEngine else { return }
         if !ksEngine.isPictureInPictureSupported {
             showNotice(
-                title: "画中画不可用",
+                title: L10n.tr("画中画不可用"),
                 message: "当前 KSPlayer 路径暂无法启动画中画。可尝试 MP4/MOV/HLS 等 AVFoundation 原生格式。"
             )
             return
         }
         if !ksEngine.togglePictureInPicture() {
             showNotice(
-                title: "画中画暂不可用",
+                title: L10n.tr("画中画暂不可用"),
                 message: "系统尚未允许当前视频进入画中画，请稍后重试或确认设备支持画中画。"
             )
         }
@@ -451,7 +451,7 @@ final class PlayerViewModel: ObservableObject {
                 let results = try await OnlineSubtitleService.shared.search(for: self.item)
                 await MainActor.run {
                     self.onlineSubtitleResults = results
-                    self.onlineSubtitleStatusMessage = results.isEmpty ? "未找到匹配的在线字幕" : nil
+                    self.onlineSubtitleStatusMessage = results.isEmpty ? L10n.tr("未找到匹配的在线字幕") : nil
                     self.isSearchingOnlineSubtitles = false
                 }
             } catch {
@@ -495,7 +495,7 @@ final class PlayerViewModel: ObservableObject {
                     self.isDownloadingOnlineSubtitle = false
                     self.downloadingOnlineSubtitleID = nil
                     self.onlineSubtitleStatusMessage = error.localizedDescription
-                    self.showNotice(title: "在线字幕不可用", message: error.localizedDescription)
+                    self.showNotice(title: L10n.tr("在线字幕不可用"), message: error.localizedDescription)
                 }
             }
         }
@@ -550,7 +550,7 @@ final class PlayerViewModel: ObservableObject {
                 activeExternalSubtitleID = nil
                 activeRichSubtitleID = nil
                 currentSubtitleContent = nil
-                showNotice(title: "字幕不可用", message: error.localizedDescription)
+                showNotice(title: L10n.tr("字幕不可用"), message: error.localizedDescription)
             }
         } else {
             activeExternalSubtitleID = nil
@@ -694,9 +694,9 @@ final class PlayerViewModel: ObservableObject {
     private func languageAliases(for preferredLanguage: String) -> Set<String> {
         switch preferredLanguage {
         case "zh":
-            return ["zh", "zho", "chi", "chs", "cht", "cn", "chinese", "中文", "简体", "繁体"]
+            return ["zh", "zho", "chi", "chs", "cht", "cn", "chinese", L10n.tr("中文"), "简体", "繁体"]
         case "en":
-            return ["en", "eng", "english", "英文"]
+            return ["en", "eng", "english", L10n.tr("英文")]
         case "ja":
             return ["ja", "jpn", "japanese", "日语", "日本語"]
         case "ko":
@@ -1077,14 +1077,14 @@ final class PlayerViewModel: ObservableObject {
         guard MediaFormatProbe.isDiscImage(url) else { return url }
         guard url.isFileURL else {
             showNotice(
-                title: "远程原盘将直接尝试播放",
+                title: L10n.tr("远程原盘将直接尝试播放"),
                 message: "远程 BDMV/ISO 的 playlist 随机读取尚受限，当前会先交给 KSPlayer 直接尝试。"
             )
             return url
         }
         guard url.pathExtension.lowercased() != "iso" else {
             showNotice(
-                title: "ISO playlist 解析暂不可用",
+                title: L10n.tr("ISO playlist 解析暂不可用"),
                 message: "当前未引入 UDF/libbluray，ISO 会先交给 KSPlayer 直接尝试播放；未加密 BDMV 目录和 .mpls 已支持 playlist 解析。"
             )
             return url
@@ -1100,13 +1100,13 @@ final class PlayerViewModel: ObservableObject {
                 return playbackURL
             }
             showNotice(
-                title: "原盘 playlist 已解析",
+                title: L10n.tr("原盘 playlist 已解析"),
                 message: "已识别 \(playlist.id)，但播放片段路径无法定位，将回退为直接播放原始路径。"
             )
         } catch {
             VanmoLogger.player.error("[PlayerVM] BDMV playlist parse failed: \(error.localizedDescription)")
             showNotice(
-                title: "原盘解析失败",
+                title: L10n.tr("原盘解析失败"),
                 message: "\(error.localizedDescription)。将回退为 KSPlayer 直接尝试播放。"
             )
         }
@@ -1476,10 +1476,10 @@ struct PlayerEpisode: Identifiable, Equatable {
     }
 
     var displayTitle: String {
-        title.isEmpty ? "第 \(episodeNumber) 集" : title
+        title.isEmpty ? LocalizedFormat.episodeLabel(episodeNumber) : title
     }
 
     var episodeCode: String {
-        "S\(String(format: "%02d", seasonNumber))E\(String(format: "%02d", episodeNumber))"
+        LocalizedFormat.episodeCode(season: seasonNumber, episode: episodeNumber)
     }
 }

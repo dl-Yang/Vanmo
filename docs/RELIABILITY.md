@@ -34,6 +34,24 @@ After the four stages succeed, `./init.sh --full` adds Debug compile evidence fo
 
 These commands compile only. They do not install, launch, test, or archive. Evidence is retained under `build/app-build-evidence/`.
 
+#### Debug compile caches
+
+`scripts/check-app-build.sh` uses isolated caches on purpose:
+
+- DerivedData: `build/app-build-evidence/DerivedData/ios-simulator` or `.../macos`
+- Swift package checkout: `build/app-build-evidence/SourcePackages`
+
+Xcode's Incremental Build uses `~/Library/Developer/Xcode/DerivedData` and the IDE package cache. That path is usually already warm. The script path often starts with Resolve Package Graph and remote package updates, so a first script run can sit on `Updating from …` for a long time before it compiles Vanmo sources.
+
+An Xcode Incremental Build does not replace this script. The isolated caches exist so the recorded `.app` path, command line, and package checkout stay independent of the operator's IDE DerivedData.
+
+Follow these two rules:
+
+1. **Run script platforms one at a time.** `./scripts/check-app-build.sh all` already builds iOS Simulator then macOS in one process. Do not start `ios-simulator` and `macos` as two concurrent processes. The script refuses a second instance that would share `SourcePackages`. After the shared package cache has resolved once, a later serial script run can increment.
+2. **Do not share the evidence package cache.** Keep Xcode on its default DerivedData. Do not point Xcode at `build/app-build-evidence/SourcePackages`. Do not start the script while another `check-app-build.sh` or an `xcodebuild` using that same `clonedSourcePackagesDirPath` is still running.
+
+A second serial script run is faster than the first because the isolated package checkout already exists. It is still not the same cache as Xcode.
+
 ### Focused Verification
 
 ```bash
@@ -139,6 +157,7 @@ Each journey must record the source type, platform, configuration, steps perform
 | Simulator XCUITest command | The exact recorded action or in-process journey completed on that simulator, with retained `xcresult` artifacts | Physical-device signing, Figma fidelity, real-source flows, or product journeys 1–3 |
 | Physical-device XCUITest command | The exact recorded action and its retained artifacts completed on that signed device | Other commands, complete UI coverage, Figma fidelity, accessibility quality, or an end-to-end product journey |
 | Debug app compile check | The selected application target compiled for the recorded Debug configuration and destination | Installation, launch, XCUITest, physical-device signing, UI behavior, real-source flows, or Release CloudKit |
+| `check-app-build.sh` Debug compile | The selected target compiled in the isolated evidence DerivedData and SourcePackages | An Xcode Incremental Build, launch, or that iOS and macOS can share one DerivedData or run as two parallel processes |
 | App build | A target compiled for the recorded configuration and environment | Launch quality or completion of a user journey |
 | App launch | Startup reached the recorded state | End-to-end playback, downloads, synchronization, or recovery |
 | Manual golden journey | The exact recorded flow worked in that environment | Other source types, platforms, accounts, or configurations |

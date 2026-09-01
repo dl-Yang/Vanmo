@@ -26,13 +26,13 @@ struct ScannedLibraryListView: View {
             } else if let errorMessage {
                 EmptyStateView(
                     icon: "exclamationmark.triangle",
-                    title: "无法加载内容",
+                    title: L10n.tr("无法加载内容"),
                     message: errorMessage
                 )
             } else if isEmpty {
                 EmptyStateView(
                     icon: collectionType.icon,
-                    title: "媒体库为空",
+                    title: L10n.tr("媒体库为空"),
                     message: "此连接下没有可显示的\(collectionType.displayName)"
                 )
             } else {
@@ -128,7 +128,7 @@ struct ScannedLibraryListView: View {
                         Button {
                             appState.play(item)
                         } label: {
-                            Label("播放", systemImage: "play.fill")
+                            Label(L10n.tr("播放"), systemImage: "play.fill")
                         }
                     }
                 }

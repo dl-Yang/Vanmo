@@ -11,9 +11,9 @@ enum MacFavoriteLibraryScope: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .all: "全部"
-        case .movie: "电影"
-        case .tvShow: "电视剧"
+        case .all: L10n.tr("全部")
+        case .movie: L10n.tr("电影")
+        case .tvShow: L10n.tr("电视剧")
         }
     }
 
@@ -56,10 +56,10 @@ struct MacFavoritesListView: View {
 
             Group {
                 if viewModel.isLoading && viewModel.items.isEmpty {
-                    ProgressView("正在加载收藏…")
+                    ProgressView(L10n.tr("正在加载收藏…"))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if viewModel.items.isEmpty {
-                    Text("还没有收藏")
+                    Text(L10n.tr("还没有收藏"))
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -126,13 +126,13 @@ struct MacFavoritesListView: View {
     private var header: some View {
         HStack {
 
-            Text("收藏")
+            Text(L10n.tr("收藏"))
                 .font(MacDesignTokens.Typography.headerTitle)
 
             Spacer()
 
             Menu {
-                Picker("收藏类型", selection: $viewModel.scope) {
+                Picker(L10n.tr("收藏类型"), selection: $viewModel.scope) {
                     ForEach(MacFavoriteLibraryScope.allCases) { scope in
                         Text(scope.title).tag(scope)
                     }
@@ -161,7 +161,7 @@ struct MacFavoritesListView: View {
         HStack {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(theme.secondaryText)
-            TextField("搜索收藏", text: $searchText)
+            TextField(L10n.tr("搜索收藏"), text: $searchText)
                 .textFieldStyle(.plain)
         }
         .padding(.horizontal, 12)

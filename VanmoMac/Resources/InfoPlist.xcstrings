@@ -1,0 +1,22 @@
+{
+  "sourceLanguage": "zh-Hans",
+  "strings": {
+    "NSLocalNetworkUsageDescription": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vanmo needs local network access to discover and connect to NAS devices, DLNA devices, and media servers."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vanmo 需要访问本地网络以发现和连接 NAS、DLNA 设备及媒体服务器。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

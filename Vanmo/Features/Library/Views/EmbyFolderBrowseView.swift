@@ -16,18 +16,18 @@ struct EmbyFolderBrowseView: View {
     var body: some View {
         Group {
             if isLoading {
-                LoadingView("加载中...")
+                LoadingView(L10n.tr("加载中..."))
             } else if let errorMessage {
                 EmptyStateView(
                     icon: "exclamationmark.triangle",
-                    title: "无法加载内容",
+                    title: L10n.tr("无法加载内容"),
                     message: errorMessage
                 )
             } else if children.isEmpty {
                 EmptyStateView(
                     icon: container.mediaType.icon,
-                    title: "文件夹为空",
-                    message: "此目录下没有可显示的项目"
+                    title: L10n.tr("文件夹为空"),
+                    message: L10n.tr("此目录下没有可显示的项目")
                 )
             } else {
                 List(children, id: \.serverId) { child in
@@ -57,14 +57,14 @@ struct EmbyFolderBrowseView: View {
             Button {
                 appState.play(makeChildItem(child))
             } label: {
-                Label("播放", systemImage: "play.fill")
+                Label(L10n.tr("播放"), systemImage: "play.fill")
             }
         }
     }
 
     private func loadChildren() async {
         guard let parentId = container.serverId else {
-            errorMessage = "缺少服务器条目 ID"
+            errorMessage = L10n.tr("缺少服务器条目 ID")
             isLoading = false
             return
         }

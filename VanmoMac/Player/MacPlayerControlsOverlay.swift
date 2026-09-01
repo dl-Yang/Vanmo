@@ -27,7 +27,7 @@ struct MacPlayerControlsOverlay: View {
                 Spacer()
 
                 if viewModel.canSelectEpisode {
-                    Button("选集") {
+                    Button(L10n.tr("选集")) {
                         viewModel.showEpisodeSelector = true
                     }
                     .buttonStyle(.plain)

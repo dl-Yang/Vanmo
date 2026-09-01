@@ -11,9 +11,9 @@ enum MacConnectionTypeGroup: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .localAndProtocol: "本地与协议"
-        case .mediaServer: "媒体服务器"
-        case .cloudDrive: "账号云盘"
+        case .localAndProtocol: L10n.tr("本地与协议")
+        case .mediaServer: L10n.tr("媒体服务器")
+        case .cloudDrive: L10n.tr("账号云盘")
         }
     }
 
@@ -65,8 +65,8 @@ extension ConnectionType {
         switch self {
         case .alist: "AList"
         case .removedOfficialCloudDrive: "阿里云盘"
-        case .drive115: "115 网盘"
-        case .quarkDrive: "夸克网盘"
+        case .drive115: L10n.tr("115 网盘")
+        case .quarkDrive: L10n.tr("夸克网盘")
         case .pCloudDrive: "pCloud"
         case .yandexDisk: "Yandex.Disk"
         default: displayName

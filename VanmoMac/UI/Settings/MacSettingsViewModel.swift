@@ -16,8 +16,8 @@ enum MacSubtitlePosition: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .top: "顶部"
-        case .bottom: "底部"
+        case .top: L10n.tr("顶部")
+        case .bottom: L10n.tr("底部")
         }
     }
 }
@@ -41,12 +41,13 @@ final class MacSettingsViewModel: ObservableObject {
     @AppStorage("library.autoScan") var libraryAutoScan = true
     @AppStorage("metadata.autoDownload") var metadataAutoDownload = true
     @AppStorage(MacAppearanceMode.storageKey) var appearanceMode: MacAppearanceMode = .system
+    @AppStorage(AppLanguagePreference.storageKey) var languagePreference: AppLanguagePreference = .chinese
 
     @AppStorage(CloudSyncPreferences.enabledKey) var cloudSyncEnabled = true
     @Published var cloudSyncStatusMessage: String?
 
-    @Published var cacheSize: String = "计算中..."
-    @Published var metadataCacheSize: String = "计算中..."
+    @Published var cacheSize: String = L10n.tr("计算中...")
+    @Published var metadataCacheSize: String = L10n.tr("计算中...")
     @Published var showClearCacheAlert = false
     @Published var showClearMetadataCacheAlert = false
     @Published var showResetAlert = false
@@ -74,11 +75,10 @@ final class MacSettingsViewModel: ObservableObject {
 
     var cloudSyncLastUpdatedText: String {
         guard let lastSyncAt = CloudSyncPreferences.lastSyncAt else {
-            return "尚未同步"
+            return L10n.tr("尚未同步")
         }
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        return formatter.localizedString(for: lastSyncAt, relativeTo: Date())
+        return LocalizedFormat.relativeDate(lastSyncAt)
     }
 
     func bindCloudSyncCoordinator(_ coordinator: CloudSyncCoordinator) {
@@ -95,7 +95,7 @@ final class MacSettingsViewModel: ObservableObject {
     func calculateCacheSize() async {
         let cachePath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
         guard let cachePath else {
-            cacheSize = "未知"
+            cacheSize = L10n.tr("未知")
             return
         }
 
@@ -103,7 +103,7 @@ final class MacSettingsViewModel: ObservableObject {
             Self.directorySize(at: cachePath)
         }.value
 
-        cacheSize = totalSize.map(\.formattedFileSize) ?? "未知"
+        cacheSize = totalSize.map(\.formattedFileSize) ?? L10n.tr("未知")
     }
 
     func calculateMetadataCacheSize() async {
@@ -144,6 +144,7 @@ final class MacSettingsViewModel: ObservableObject {
         libraryAutoScan = true
         metadataAutoDownload = true
         appearanceMode = .system
+        languagePreference = .chinese
         cloudSyncEnabled = true
         CloudSyncPreferences.isEnabled = true
     }
