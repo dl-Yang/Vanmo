@@ -17,8 +17,14 @@ public enum ServerMediaItemMapper {
         item.backdropURL = serverItem.backdropURL
         item.logoURL = serverItem.logoURL
         item.rating = serverItem.rating
+        item.contentRating = serverItem.contentRating
         item.originalFileName = serverItem.originalFileName
         item.container = serverItem.container
+        item.videoWidth = serverItem.videoWidth
+        item.videoHeight = serverItem.videoHeight
+        if let dynamicRange = serverItem.dynamicRange {
+            item.dynamicRange = dynamicRange
+        }
         item.genres = serverItem.genres
         item.director = serverItem.director
         item.cast = serverItem.cast

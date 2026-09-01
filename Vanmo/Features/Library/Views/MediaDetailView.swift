@@ -430,6 +430,7 @@ struct MediaDetailView: View {
             rating: store.content?.rating ?? item.rating,
             logoURL: store.content?.logoURL ?? item.logoURL,
             metaValues: panelMetaValues,
+            tags: capabilityTags,
             starYellow: starYellow
         )
     }
@@ -452,6 +453,19 @@ struct MediaDetailView: View {
     private var displayGenres: [String] {
         let genres = store.content?.genres ?? []
         return genres.isEmpty ? item.genres : genres
+    }
+
+    private var capabilityTags: [String] {
+        MediaCapabilityTags.displayTags(
+            contentRating: store.content?.contentRating ?? item.contentRating,
+            width: store.videoWidth ?? item.videoWidth,
+            height: store.videoHeight ?? item.videoHeight,
+            dynamicRange: store.dynamicRange ?? item.dynamicRange,
+            audioTracks: item.audioTracks,
+            fileName: [item.originalFileName, item.title, item.fileURL.lastPathComponent, store.episodeFileNameHint]
+                .compactMap { $0 }
+                .joined(separator: " ")
+        )
     }
 
     private func tagView(_ text: String) -> some View {
@@ -835,6 +849,7 @@ private enum MediaDetailSheet: Identifiable, Equatable {
 /// 详情页信息面板的聚合快照：所有异步数据一次性组装，供 UI 单次刷新。
 struct MediaDetailContent {
     var rating: Double?
+    var contentRating: String?
     var logoURL: URL?
     var overview: String?
     var genres: [String]
@@ -854,6 +869,10 @@ final class MediaDetailStore: ObservableObject {
     @Published private(set) var isLoadingMoreEpisodes = false
     @Published private(set) var hasMoreEpisodes = false
     @Published private(set) var isRefreshingMetadata = false
+    @Published private(set) var videoWidth: Int?
+    @Published private(set) var episodeFileNameHint: String?
+    @Published private(set) var videoHeight: Int?
+    @Published private(set) var dynamicRange: String?
     @Published var refreshErrorMessage: String?
 
     private var loadedKey: String?
@@ -899,6 +918,13 @@ final class MediaDetailStore: ObservableObject {
 
         isLoading = true
         content = nil
+        #if DEBUG
+        print("[Debug][Detail] load type=\(item.mediaType.rawValue) title=\(item.title)")
+        #endif
+        videoWidth = item.videoWidth
+        videoHeight = item.videoHeight
+        dynamicRange = item.dynamicRange
+        episodeFileNameHint = nil
         resetEpisodePagingState()
 
         await performAggregate(
@@ -972,11 +998,17 @@ final class MediaDetailStore: ObservableObject {
         var castMembers = record?.makeCastDisplays(rootDirectory: root) ?? []
         if castMembers.isEmpty {
             let names = (enriched?.cast.isEmpty == false) ? (enriched?.cast ?? []) : item.cast
-            castMembers = names.map { CastMemberDisplay(id: $0, name: $0, role: nil, profileURL: nil) }
+            castMembers = names.enumerated().map { index, name in
+                CastMemberDisplay(id: "\(index)-\(name)", name: name, role: nil, profileURL: nil)
+            }
         }
+
+        persistTechnicalFields(from: enriched, onto: item, in: modelContext)
 
         let snapshot = MediaDetailContent(
             rating: record?.rating ?? item.rating,
+            contentRating: MediaCapabilityTags.normalizedContentRating(enriched?.contentRating)
+                ?? item.contentRating,
             logoURL: record?.resolvedLogoURL(rootDirectory: root) ?? item.logoURL,
             overview: resolvedOverview(enriched: enriched, item: item),
             genres: resolvedGenres(enriched: enriched, item: item),
@@ -989,6 +1021,9 @@ final class MediaDetailStore: ObservableObject {
         // 代际校验：加载期间若切换到其它 item，丢弃本次结果。
         guard generation == loadGeneration else { return }
 
+        videoWidth = item.videoWidth
+        videoHeight = item.videoHeight
+        dynamicRange = item.dynamicRange
         content = snapshot
         let previousSeason = selectedSeason
         if let previousSeason, loadedSeasons.contains(where: { $0.seasonNumber == previousSeason }) {
@@ -1000,7 +1035,90 @@ final class MediaDetailStore: ObservableObject {
 
         if item.mediaType == .tvShow, selectedSeason != nil {
             await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
+        } else {
+            await probeTechnicalFieldsIfNeeded(
+                item: item,
+                modelContext: modelContext,
+                generation: generation
+            )
         }
+    }
+
+    private func probeTechnicalFieldsIfNeeded(
+        item: MediaItem,
+        modelContext: ModelContext,
+        generation: Int
+    ) async {
+        guard MediaProbeApplicator.shouldProbe(item: item) else { return }
+        await MediaProbeQueue.shared.enqueue(items: [item], in: modelContext)
+        guard generation == loadGeneration else { return }
+        videoWidth = item.videoWidth
+        videoHeight = item.videoHeight
+        dynamicRange = item.dynamicRange
+    }
+
+    private func persistTechnicalFields(
+        from enriched: ServerMediaItem?,
+        onto item: MediaItem,
+        in modelContext: ModelContext
+    ) {
+        var didChange = false
+        if let rating = MediaCapabilityTags.normalizedContentRating(enriched?.contentRating) {
+            item.contentRating = rating
+            didChange = true
+        }
+        if let width = enriched?.videoWidth, width > 0 {
+            item.videoWidth = width
+            didChange = true
+        }
+        if let height = enriched?.videoHeight, height > 0 {
+            item.videoHeight = height
+            didChange = true
+        }
+        if let dynamicRange = enriched?.dynamicRange, !dynamicRange.isEmpty {
+            item.dynamicRange = dynamicRange
+            didChange = true
+        }
+        if didChange {
+            try? modelContext.save()
+        }
+    }
+
+    private func applyTechnicalFields(
+        from episodes: [EpisodeInfo],
+        onto item: MediaItem,
+        in modelContext: ModelContext
+    ) {
+        let names = episodes.compactMap(\.originalFileName).joined(separator: " ")
+        episodeFileNameHint = names.isEmpty ? nil : names
+
+        let match = episodes.first {
+            ($0.videoWidth ?? 0) > 0 || ($0.videoHeight ?? 0) > 0
+        }
+        #if DEBUG
+        print("[Debug][Detail] tvTags episodes=\(episodes.count) width=\(match?.videoWidth ?? 0) height=\(match?.videoHeight ?? 0) files=\(names.isEmpty ? "none" : "yes")")
+        #endif
+        guard let match else { return }
+
+        var didChange = false
+        if let width = match.videoWidth, width > 0, (item.videoWidth ?? 0) <= 0 {
+            item.videoWidth = width
+            didChange = true
+        }
+        if let height = match.videoHeight, height > 0, (item.videoHeight ?? 0) <= 0 {
+            item.videoHeight = height
+            didChange = true
+        }
+        if let range = match.dynamicRange, !range.isEmpty, item.dynamicRange == nil {
+            item.dynamicRange = range
+            didChange = true
+        }
+        if didChange {
+            try? modelContext.save()
+        }
+        videoWidth = item.videoWidth ?? match.videoWidth
+        videoHeight = item.videoHeight ?? match.videoHeight
+        dynamicRange = item.dynamicRange ?? match.dynamicRange
     }
 
     private func resetEpisodePagingState() {
@@ -1122,6 +1240,8 @@ final class MediaDetailStore: ObservableObject {
                 hasMoreEpisodes = false
             }
         }
+
+        applyTechnicalFields(from: seasonEpisodes, onto: item, in: modelContext)
     }
 
     private func fetchEpisodesPage(
@@ -1278,7 +1398,10 @@ final class MediaDetailStore: ObservableObject {
                 fileSize: episode.fileSize,
                 originalFileName: episode.originalFileName,
                 container: episode.container,
-                remotePath: episode.remotePath
+                remotePath: episode.remotePath,
+                videoWidth: episode.videoWidth,
+                videoHeight: episode.videoHeight,
+                dynamicRange: episode.dynamicRange
             )
         }
     }
@@ -1394,6 +1517,7 @@ private struct MediaDetailPanelHeader: View {
     let rating: Double?
     let logoURL: URL?
     let metaValues: [String]
+    let tags: [String]
     let starYellow: Color
 
     var body: some View {
@@ -1406,13 +1530,15 @@ private struct MediaDetailPanelHeader: View {
 
             MediaDetailMetaRow(values: metaValues, style: .header)
 
-            HStack(spacing: 6) {
-                tagView("TV-MA")
-                tagView("4K")
-                tagView("DOLBY")
-            }
+            if rating != nil || !tags.isEmpty {
+                HStack(spacing: 8) {
+                    MediaDetailRatingRow(rating: rating, starYellow: starYellow)
 
-            MediaDetailRatingRow(rating: rating, starYellow: starYellow)
+                    ForEach(Array(tags.enumerated()), id: \.offset) { _, tag in
+                        tagView(tag)
+                    }
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
@@ -1443,10 +1569,6 @@ private struct MediaDetailRatingRow: View {
                 Text(String(format: "%.1f", rating))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
-
-                Text("(450K Reviews)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
             }
             .animation(.easeInOut(duration: 0.25), value: rating)
         }
@@ -1492,19 +1614,21 @@ private struct MediaDetailPanelActions: View {
             .buttonStyle(.plain)
             .disabled(isDownloadDisabled)
 
-            Menu {
-                if supportsMetadataRefresh {
-                    Button {
-                        refresh()
-                    } label: {
-                        Label(L10n.tr("刷新"), systemImage: "arrow.clockwise")
+            if supportsMetadataRefresh {
+                Button(action: refresh) {
+                    if isRefreshing {
+                        ProgressView()
+                            .tint(.primary)
+                            .frame(width: 56, height: 56)
+                            .background(Circle().fill(Color(.secondarySystemBackground)))
+                    } else {
+                        circleActionLabel(icon: "arrow.clockwise")
                     }
-                    .disabled(isRefreshing)
                 }
-            } label: {
-                circleActionLabel(icon: "ellipsis")
+                .buttonStyle(.plain)
+                .disabled(isRefreshing)
+                .accessibilityLabel(L10n.tr("刷新"))
             }
-            .disabled(isRefreshing || !supportsMetadataRefresh)
         }
     }
 

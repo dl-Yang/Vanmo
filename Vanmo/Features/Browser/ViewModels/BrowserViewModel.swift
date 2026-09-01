@@ -385,6 +385,17 @@ final class ConnectionsViewModel: ObservableObject {
             bookmarkData: bookmarkData
         )
 
+        do {
+            try await verifyConnectionAccess(connection, password: password)
+        } catch is CancellationError {
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+
+        if Task.isCancelled { return false }
+
         modelContext?.insert(connection)
 
         if let password, !password.isEmpty {
@@ -397,10 +408,28 @@ final class ConnectionsViewModel: ObservableObject {
         await loadSavedConnections()
         if let saved = savedConnections.first(where: { $0.id == connection.id }) {
             await selectConnection(saved)
-            // 添加连接后立即建立连接；目录型源须用户在浏览页手动「同步当前目录」入库。
-            return await connectAndScan(saved, showErrorAlert: true)
+            // 地址和凭据已通过；扫描失败不回退入库，也不把「无法保存」回给添加页。
+            _ = await connectAndScan(saved, showErrorAlert: false)
         }
-        return false
+        return true
+    }
+
+    /// 先验证地址可达且凭据有效，不写入 SwiftData。
+    private func verifyConnectionAccess(_ connection: SavedConnection, password: String?) async throws {
+        if Task.isCancelled { throw CancellationError() }
+
+        if connection.type == .localFolder {
+            let local = LocalFolderService()
+            try await local.connect(config: ConnectionConfig(from: connection))
+            await local.disconnect()
+            return
+        }
+
+        let config = ConnectionConfig(from: connection, password: password)
+        let remote = RemoteServiceFactory.create(for: connection.type)
+        try await remote.connect(config: config)
+        await remote.disconnect()
+        if Task.isCancelled { throw CancellationError() }
     }
 
     @discardableResult
@@ -463,7 +492,6 @@ final class ConnectionsViewModel: ObservableObject {
             try OAuthCredentialStore.save(credential, connectionId: connectionId)
         } catch {
             errorMessage = error.localizedDescription
-            showError = true
             return false
         }
 
@@ -500,7 +528,6 @@ final class ConnectionsViewModel: ObservableObject {
             try OAuthCredentialStore.save(credential, connectionId: connection.id)
         } catch {
             errorMessage = error.localizedDescription
-            showError = true
             return false
         }
 

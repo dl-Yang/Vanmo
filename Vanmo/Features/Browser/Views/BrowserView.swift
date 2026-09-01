@@ -49,7 +49,6 @@ struct ConnectionsView: View {
         }
         .task {
             viewModel.setModelContext(modelContext)
-            await viewModel.loadSavedConnections()
             await openPendingFolderBookmarkIfNeeded()
 #if DEBUG
             await runDebugSourceAcceptanceIfNeeded()
@@ -79,15 +78,6 @@ struct ConnectionsView: View {
                 FilesCircleButton(asset: nil, systemName: "plus", tint: FilesDesign.accent, background: FilesDesign.addButtonBackground) {
                     viewModel.showAddConnection = true
                 }
-                Menu {
-                    Button {
-                        Task { await viewModel.loadSavedConnections() }
-                    } label: {
-                        Label(L10n.tr("刷新"), systemImage: "arrow.clockwise")
-                    }
-                } label: {
-                    FilesMenuGlyph()
-                }
             }
 
             if viewModel.savedConnections.isEmpty {
@@ -116,16 +106,12 @@ struct ConnectionsView: View {
     }
 
     private func connectionRow(_ connection: SavedConnection) -> some View {
-        let status = viewModel.connectionStatus(for: connection)
-        let isOffline = status == .failed
-
-        return Button {
+        Button {
             enter(connection)
         } label: {
-            ConnectionCard(connection: connection, status: status)
+            ConnectionCard(connection: connection)
         }
         .buttonStyle(FilesRowButtonStyle())
-        .opacity(isOffline ? 0.5 : 1)
         .contextMenu {
             Button {
                 editingConnection = connection
@@ -609,7 +595,6 @@ private struct FilesMenuGlyph: View {
 
 private struct ConnectionCard: View {
     let connection: SavedConnection
-    let status: ConnectionStatus
 
     var body: some View {
         HStack(spacing: 0) {
@@ -628,47 +613,22 @@ private struct ConnectionCard: View {
                     .foregroundStyle(FilesDesign.title)
                     .lineLimit(1)
 
-                HStack(spacing: 6) {
-                    Text(connection.type.displayName)
-                        .textCase(.uppercase)
-                        .foregroundStyle(FilesDesign.subtitle)
-
-                    Circle()
-                        .fill(FilesDesign.connectionDot)
-                        .frame(width: 4, height: 4)
-
-                    Text(statusText)
-                        .textCase(.uppercase)
-                        .foregroundStyle(statusColor)
-                }
-                .font(.system(size: 13, weight: .medium))
-                .padding(.top, 2)
+                Text(connection.type.displayName)
+                    .textCase(.uppercase)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(FilesDesign.subtitle)
+                    .padding(.top, 2)
             }
             .padding(.leading, 16)
 
             Spacer(minLength: 8)
 
-            if status != .failed {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(FilesDesign.chevron)
-                    .frame(width: 20, height: 20)
-            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(FilesDesign.chevron)
+                .frame(width: 20, height: 20)
         }
         .padding(12)
-    }
-
-    private var statusText: String {
-        switch status {
-        case .idle:       return L10n.tr("未连接")
-        case .connecting: return L10n.tr("连接中")
-        case .connected:  return L10n.tr("已连接")
-        case .failed:     return L10n.tr("离线")
-        }
-    }
-
-    private var statusColor: Color {
-        status == .connected ? FilesDesign.statusConnected : FilesDesign.subtitle
     }
 }
 

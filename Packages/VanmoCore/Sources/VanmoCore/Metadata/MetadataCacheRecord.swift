@@ -114,17 +114,17 @@ public struct MetadataCacheRecord: Codable, Sendable {
 
     public func makeCastDisplays(rootDirectory: URL) -> [CastMemberDisplay] {
         if !castMembers.isEmpty {
-            return castMembers.map { member in
+            return castMembers.enumerated().map { index, member in
                 CastMemberDisplay(
-                    id: member.id,
+                    id: "\(index)-\(member.id)",
                     name: member.name,
                     role: member.role,
                     profileURL: member.resolvedProfileURL(rootDirectory: rootDirectory)
                 )
             }
         }
-        return cast.map { name in
-            CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
+        return cast.enumerated().map { index, name in
+            CastMemberDisplay(id: "\(index)-\(name)", name: name, role: nil, profileURL: nil)
         }
     }
 

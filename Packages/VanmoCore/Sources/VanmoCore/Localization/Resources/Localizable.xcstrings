@@ -3281,6 +3281,166 @@
         }
       }
     },
+    "无法保存连接": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t save the connection"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存连接"
+          }
+        }
+      }
+    },
+    "无法连接到服务器，请检查地址和凭据": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t connect. Check the address and credentials."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接到服务器，请检查地址和凭据"
+          }
+        }
+      }
+    },
+    "正在验证连接...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verifying connection..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在验证连接..."
+          }
+        }
+      }
+    },
+    "正在确认地址和凭据，通过后才会保存": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking the address and credentials. It is saved only after this succeeds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在确认地址和凭据，通过后才会保存"
+          }
+        }
+      }
+    },
+    "完成登录后才会保存此连接": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This connection is saved only after sign-in succeeds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成登录后才会保存此连接"
+          }
+        }
+      }
+    },
+    "请先选择本地文件夹": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a local folder first"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先选择本地文件夹"
+          }
+        }
+      }
+    },
+    "正在保存连接...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving connection..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在保存连接..."
+          }
+        }
+      }
+    },
+    "正在登录...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signing in..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在登录..."
+          }
+        }
+      }
+    },
+    "正在连接...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在连接..."
+          }
+        }
+      }
+    },
+    "正在与服务器协商安全连接。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Negotiating secure connection to the server."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在与服务器协商安全连接。"
+          }
+        }
+      }
+    },
     "正在同步数据": {
       "localizations": {
         "en": {
@@ -3398,7 +3558,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connection failed"
+            "value": "Connection Failed"
           }
         },
         "zh-Hans": {
@@ -4833,6 +4993,22 @@
         }
       }
     },
+    "重试": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        }
+      }
+    },
     "重新下载": {
       "localizations": {
         "en": {
@@ -5037,6 +5213,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "服务器信息"
+          }
+        }
+      }
+    },
+    "服务器无响应或地址不正确。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The server is unresponsive or the address is incorrect."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器无响应或地址不正确。"
           }
         }
       }

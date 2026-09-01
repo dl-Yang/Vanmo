@@ -22,6 +22,10 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 
 ## Current Plans
 
+### In progress
+
+- None.
+
 ### Implemented, ready to run
 
 - [`2026-08-28-plex-connection-validation.md`](2026-08-28-plex-connection-validation.md) — **Not started.** plex.tv sign-in, PMS listing, and play

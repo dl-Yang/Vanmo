@@ -28,11 +28,6 @@ struct LibraryView: View {
                 .scrollIndicators(.hidden)
             }
 
-            if let message = connectionsViewModel.librarySyncMessage {
-                librarySyncStatusOverlay(message: message)
-                    .zIndex(3)
-            }
-
             if let syncToastMessage {
                 LibrarySyncToast(message: syncToastMessage)
                     .padding(.top, 12)
@@ -75,15 +70,7 @@ struct LibraryView: View {
     private var backdropLayer: some View {
         GeometryReader { geo in
             ZStack {
-                if let url = heroBackdropURL {
-                    KFImage(url)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .clipped()
-                        .blur(radius: 21)
-                        .opacity(0.45)
-                }
+                heroBackdropFill(size: geo.size)
 
                 LinearGradient(
                     stops: [
@@ -105,6 +92,25 @@ struct LibraryView: View {
             return item.backdropURL ?? item.posterURL
         }
         return viewModel.favorites.first?.posterURL
+    }
+
+    @ViewBuilder
+    private func heroBackdropFill(size: CGSize) -> some View {
+        Group {
+            if let url = heroBackdropURL {
+                KFImage(url)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image("DefaultHeroBackdrop")
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .clipped()
+        .blur(radius: 21)
+        .opacity(0.45)
     }
 
     // MARK: - Library Content
@@ -155,21 +161,19 @@ struct LibraryView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L10n.tr("首页"))
-                        .font(.system(size: 34, weight: .bold))
-                        .foregroundStyle(HomeDesign.onSurface)
+            Text(L10n.tr("首页"))
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(HomeDesign.onSurface)
 
-                    Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
-                        .font(.system(size: 13))
-                        .foregroundStyle(HomeDesign.subtitle)
-                }
-
-                Spacer(minLength: 8)
-//                  隐藏搜索按钮
-//                searchButton
+            if let message = connectionsViewModel.librarySyncMessage {
+                headerSyncStatus(message: message)
+                    .padding(.top, 10)
             }
+
+            Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
+                .font(.system(size: 13))
+                .foregroundStyle(HomeDesign.subtitle)
+                .padding(.top, 8)
 
             if let syncPillText {
                 syncPill(syncPillText)
@@ -200,6 +204,8 @@ struct LibraryView: View {
     }
 
     private var syncPillText: String? {
+        guard connectionsViewModel.librarySyncMessage == nil else { return nil }
+
         let connections = connectionsViewModel.savedConnections
         guard !connections.isEmpty else { return nil }
 
@@ -618,28 +624,19 @@ struct LibraryView: View {
 
     // MARK: - Sync Status / Toast
 
-    private func librarySyncStatusOverlay(message: String) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                SyncActivityIndicator()
-                    .frame(width: 22, height: 22)
+    private func headerSyncStatus(message: String) -> some View {
+        HStack(spacing: 8) {
+            SyncActivityIndicator()
+                .frame(width: 18, height: 18)
 
-                Text(message)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.7))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: 140, alignment: .leading)
-            }
-
-            Spacer(minLength: 0)
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(HomeDesign.onSurface.opacity(0.7))
+                .lineLimit(2)
         }
-        .padding(.leading, 16)
-        .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L10n.tr("正在同步数据"))
         .accessibilityValue(message)
-        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     // MARK: - Empty State
@@ -663,18 +660,24 @@ struct LibraryView: View {
 
     private var emptyHeaderSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(L10n.tr("首页"))
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
+            Text(L10n.tr("首页"))
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(HomeDesign.onSurface)
 
-                Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
-                    .font(.system(size: 13))
-                    .foregroundStyle(HomeDesign.subtitle)
+            if let message = connectionsViewModel.librarySyncMessage {
+                headerSyncStatus(message: message)
+                    .padding(.top, 10)
             }
 
-            syncPill(L10n.tr("未连接到媒体库"))
-                .padding(.top, 14)
+            Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
+                .font(.system(size: 13))
+                .foregroundStyle(HomeDesign.subtitle)
+                .padding(.top, 8)
+
+            if connectionsViewModel.librarySyncMessage == nil {
+                syncPill(L10n.tr("未连接到媒体库"))
+                    .padding(.top, 14)
+            }
         }
         .padding(.horizontal, 24)
     }
@@ -1039,30 +1042,40 @@ private struct HomeFavoritesCard: View {
             .background(HomeDesign.neutralPill, in: Capsule())
     }
 
+    @ViewBuilder
     private var posterStack: some View {
-        let urls = paddedEntries
-        return ZStack {
-            favoritePoster(urls[0])
-                .rotationEffect(.degrees(6))
-                .offset(x: -34, y: 2)
+        let urls = Array(entries.prefix(3))
+        switch urls.count {
+        case 0:
+            EmptyView()
+        case 1:
+            favoritePoster(urls[0], width: 64, height: 80)
+        case 2:
+            ZStack {
+                favoritePoster(urls[0])
+                    .rotationEffect(.degrees(-6))
+                    .offset(x: -22, y: 2)
+                favoritePoster(urls[1])
+                    .rotationEffect(.degrees(6))
+                    .offset(x: 22, y: -2)
+            }
+        default:
+            ZStack {
+                favoritePoster(urls[0])
+                    .rotationEffect(.degrees(6))
+                    .offset(x: -34, y: 2)
 
-            favoritePoster(urls[2])
-                .rotationEffect(.degrees(-6))
-                .offset(x: 34, y: -2)
+                favoritePoster(urls[2])
+                    .rotationEffect(.degrees(-6))
+                    .offset(x: 34, y: -2)
 
-            favoritePoster(urls[1])
-                .offset(x: 0, y: -4)
+                favoritePoster(urls[1])
+                    .offset(x: 0, y: -4)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private var paddedEntries: [URL?] {
-        var urls = entries
-        while urls.count < 3 { urls.append(nil) }
-        return urls
-    }
-
-    private func favoritePoster(_ url: URL?) -> some View {
+    private func favoritePoster(_ url: URL?, width: CGFloat = 58, height: CGFloat = 76) -> some View {
         KFImage(url)
             .placeholder {
                 ZStack {
@@ -1075,7 +1088,7 @@ private struct HomeFavoritesCard: View {
             .fade(duration: 0.2)
             .resizable()
             .scaledToFill()
-            .frame(width: 58, height: 76)
+            .frame(width: width, height: height)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 8)
     }

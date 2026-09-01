@@ -24,6 +24,9 @@ struct AddConnectionView: View {
 
     @State private var isAuthenticatingOAuth = false
     @State private var oauthErrorMessage: String?
+    @State private var isSaving = false
+    @State private var saveErrorMessage: String?
+    @State private var workTask: Task<Void, Never>?
 
     init(viewModel: BrowserViewModel, editingConnection: SavedConnection? = nil) {
         self.viewModel = viewModel
@@ -73,11 +76,11 @@ struct AddConnectionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.tr("取消")) { dismiss() }
+                    Button(L10n.tr("取消")) { cancelAndClose() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.tr("保存")) { save() }
-                        .disabled(!isValid)
+                        .disabled(!isValid || isBlocking)
                 }
             }
             .onAppear {
@@ -94,6 +97,56 @@ struct AddConnectionView: View {
                 handleFolderImport(result)
             }
         }
+        .overlay {
+            if isBlocking {
+                ConnectionStatusDialog(
+                    kind: .connecting(
+                        title: isSaving ? L10n.tr("正在连接...") : L10n.tr("正在登录..."),
+                        message: isSaving
+                            ? L10n.tr("正在与服务器协商安全连接。")
+                            : L10n.tr("完成登录后才会保存此连接")
+                    ),
+                    onCancel: cancelAndClose,
+                    onRetry: nil
+                )
+            } else if let message = saveErrorMessage ?? oauthErrorMessage {
+                ConnectionStatusDialog(
+                    kind: .failed(message: message),
+                    onCancel: dismissConnectionError,
+                    onRetry: retryAfterError
+                )
+            }
+        }
+        .onDisappear {
+            workTask?.cancel()
+        }
+    }
+
+    private func cancelAndClose() {
+        workTask?.cancel()
+        workTask = nil
+        isSaving = false
+        isAuthenticatingOAuth = false
+        dismiss()
+    }
+
+    private func dismissConnectionError() {
+        saveErrorMessage = nil
+        oauthErrorMessage = nil
+    }
+
+    private func retryAfterError() {
+        if oauthErrorMessage != nil {
+            oauthErrorMessage = nil
+            startOAuthLogin()
+        } else {
+            saveErrorMessage = nil
+            save()
+        }
+    }
+
+    private var isBlocking: Bool {
+        isSaving || isAuthenticatingOAuth
     }
 
     // MARK: - Sections
@@ -272,14 +325,11 @@ struct AddConnectionView: View {
             }
 
             Button {
-                Task { await beginOAuthLogin() }
+                startOAuthLogin()
             } label: {
                 HStack {
                     Text(isEditing ? "重新登录 \(selectedType.displayName)" : "使用 \(selectedType.displayName) 账号登录")
                     Spacer()
-                    if isAuthenticatingOAuth {
-                        ProgressView()
-                    }
                 }
             }
             .disabled(!OAuthProviderConfiguration.isConfigured(for: selectedType) || isAuthenticatingOAuth)
@@ -609,10 +659,21 @@ struct AddConnectionView: View {
     }
 
     private func save() {
-        Task {
+        guard !isBlocking else { return }
+        isSaving = true
+        saveErrorMessage = nil
+        workTask = Task {
+            defer {
+                if !Task.isCancelled {
+                    isSaving = false
+                }
+            }
             let didConnect: Bool
             if selectedType.isLocal {
-                guard let folderURL, let folderBookmark else { return }
+                guard let folderURL, let folderBookmark else {
+                    saveErrorMessage = L10n.tr("请先选择本地文件夹")
+                    return
+                }
                 if let editingConnection {
                     didConnect = await viewModel.updateConnection(
                         editingConnection,
@@ -663,9 +724,23 @@ struct AddConnectionView: View {
                     )
                 }
             }
+            if Task.isCancelled { return }
             if didConnect {
                 dismiss()
+            } else {
+                saveErrorMessage = viewModel.errorMessage.isEmpty
+                    ? L10n.tr("服务器无响应或地址不正确。")
+                    : viewModel.errorMessage
             }
+        }
+    }
+
+    private func startOAuthLogin() {
+        guard !isBlocking else { return }
+        isAuthenticatingOAuth = true
+        oauthErrorMessage = nil
+        workTask = Task {
+            await beginOAuthLogin()
         }
     }
 
@@ -681,10 +756,133 @@ struct AddConnectionView: View {
         }
 
         isAuthenticatingOAuth = false
+        if Task.isCancelled { return }
         if success {
             dismiss()
         } else {
             oauthErrorMessage = viewModel.errorMessage.isEmpty ? L10n.tr("登录失败，请重试") : viewModel.errorMessage
+        }
+    }
+}
+
+private struct ConnectionStatusDialog: View {
+    enum Kind {
+        case connecting(title: String, message: String)
+        case failed(message: String)
+    }
+
+    let kind: Kind
+    let onCancel: () -> Void
+    let onRetry: (() -> Void)?
+
+    private let accent = Color(red: 43 / 255, green: 127 / 255, blue: 255 / 255)
+    private let subtitleColor = Color(red: 115 / 255, green: 115 / 255, blue: 115 / 255)
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.2)
+                .ignoresSafeArea()
+                .allowsHitTesting(true)
+
+            VStack(spacing: 0) {
+                mainContent
+                    .frame(maxWidth: .infinity)
+                    .padding(24)
+                    .frame(minHeight: 140)
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.1))
+                    .frame(height: 0.6)
+
+                footer
+                    .frame(height: 53.5)
+            }
+            .frame(width: 270)
+            .background(
+                Color.white.opacity(0.9),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.6)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: Color.black.opacity(0.12), radius: 16, y: 8)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityTitle)
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
+        switch kind {
+        case .connecting(let title, let message):
+            VStack(spacing: 0) {
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(accent)
+                    .frame(width: 40, height: 40)
+                    .padding(.bottom, 16)
+                Text(title)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 4)
+                Text(message)
+                    .font(.system(size: 13))
+                    .foregroundStyle(subtitleColor)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 221)
+            }
+        case .failed(let message):
+            VStack(spacing: 0) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(Color.red)
+                    .frame(width: 40, height: 40)
+                    .padding(.bottom, 16)
+                Text(L10n.tr("连接失败"))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.black)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 4)
+                Text(message.isEmpty ? L10n.tr("服务器无响应或地址不正确。") : message)
+                    .font(.system(size: 13))
+                    .foregroundStyle(subtitleColor)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 221)
+            }
+        }
+    }
+
+    private var footer: some View {
+        HStack(spacing: 0) {
+            dialogButton(L10n.tr("取消"), weight: .regular, action: onCancel)
+            if let onRetry {
+                Rectangle()
+                    .fill(Color.black.opacity(0.1))
+                    .frame(width: 0.6)
+                dialogButton(L10n.tr("重试"), weight: .semibold, action: onRetry)
+            }
+        }
+    }
+
+    private func dialogButton(_ title: String, weight: Font.Weight, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 17, weight: weight))
+                .foregroundStyle(accent)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var accessibilityTitle: String {
+        switch kind {
+        case .connecting(let title, _):
+            return title
+        case .failed:
+            return L10n.tr("连接失败")
         }
     }
 }

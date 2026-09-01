@@ -73,6 +73,7 @@ public struct ServerMediaItem: Sendable {
     public let year: Int?
     public let overview: String?
     public let rating: Double?
+    public let contentRating: String?
     public let mediaType: MediaType
     public let posterURL: URL?
     public let backdropURL: URL?
@@ -88,6 +89,9 @@ public struct ServerMediaItem: Sendable {
     public let duration: TimeInterval
     public let originalFileName: String?
     public let container: String?
+    public let videoWidth: Int?
+    public let videoHeight: Int?
+    public let dynamicRange: String?
 
     public let showTitle: String?
     public let seasonNumber: Int?
@@ -108,6 +112,7 @@ public struct ServerMediaItem: Sendable {
         year: Int? = nil,
         overview: String? = nil,
         rating: Double? = nil,
+        contentRating: String? = nil,
         mediaType: MediaType,
         posterURL: URL? = nil,
         backdropURL: URL? = nil,
@@ -123,6 +128,9 @@ public struct ServerMediaItem: Sendable {
         duration: TimeInterval = 0,
         originalFileName: String? = nil,
         container: String? = nil,
+        videoWidth: Int? = nil,
+        videoHeight: Int? = nil,
+        dynamicRange: String? = nil,
         showTitle: String? = nil,
         seasonNumber: Int? = nil,
         episodeNumber: Int? = nil,
@@ -139,6 +147,7 @@ public struct ServerMediaItem: Sendable {
         self.year = year
         self.overview = overview
         self.rating = rating
+        self.contentRating = contentRating
         self.mediaType = mediaType
         self.posterURL = posterURL
         self.backdropURL = backdropURL
@@ -154,6 +163,9 @@ public struct ServerMediaItem: Sendable {
         self.duration = duration
         self.originalFileName = originalFileName
         self.container = container
+        self.videoWidth = videoWidth
+        self.videoHeight = videoHeight
+        self.dynamicRange = dynamicRange
         self.showTitle = showTitle
         self.seasonNumber = seasonNumber
         self.episodeNumber = episodeNumber

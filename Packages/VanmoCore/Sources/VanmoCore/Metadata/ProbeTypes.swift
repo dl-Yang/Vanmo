@@ -86,6 +86,7 @@ public protocol MediaProbeProviding: AnyObject, Sendable {
 public enum MediaProbeApplicator {
     public static func shouldProbe(item: MediaItem) -> Bool {
         guard !item.isLiveStream else { return false }
+        guard item.mediaType != .tvShow, item.mediaType != .boxSet else { return false }
 
         let fingerprint = ProbeFingerprint.from(item: item).storageValue
         if item.probeStatus == ProbeStatus.pending.rawValue {
@@ -93,7 +94,8 @@ public enum MediaProbeApplicator {
         }
         if item.probeStatus == ProbeStatus.success.rawValue,
            item.probeFingerprint == fingerprint,
-           item.duration > 0 {
+           item.duration > 0,
+           (item.videoWidth ?? 0) > 0 || (item.videoHeight ?? 0) > 0 {
             return false
         }
 
@@ -101,6 +103,7 @@ public enum MediaProbeApplicator {
             || item.probeStatus == ProbeStatus.failed.rawValue
             || item.probeFingerprint != fingerprint
             || item.duration <= 0
+            || ((item.videoWidth ?? 0) <= 0 && (item.videoHeight ?? 0) <= 0)
     }
 
     public static func markPending(_ item: MediaItem) {

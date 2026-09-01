@@ -12,6 +12,8 @@ public final class MediaItem {
     public var backdropURL: URL?
     public var logoURL: URL?
     public var rating: Double?
+    /// 服务器提供的电视/电影分级原文（如 TV-MA）。无则不显示。
+    public var contentRating: String?
     public var mediaType: MediaType
     public var fileURL: URL
     public var fileSize: Int64

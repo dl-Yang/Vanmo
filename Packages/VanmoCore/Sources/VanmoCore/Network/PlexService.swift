@@ -535,6 +535,7 @@ private struct PlexMetadata: Decodable {
     let index: Int?
     let parentTitle: String?
     let guid: String?
+    let contentRating: String?
     let media: [PlexMedia]?
     let director: [PlexTag]?
     let role: [PlexTag]?
@@ -543,7 +544,7 @@ private struct PlexMetadata: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case ratingKey, key, title, originalTitle, summary, year, rating, duration
-        case thumb, art, type, parentIndex, index, parentTitle, guid
+        case thumb, art, type, parentIndex, index, parentTitle, guid, contentRating
         case media = "Media"
         case director = "Director"
         case role = "Role"
@@ -555,11 +556,15 @@ private struct PlexMetadata: Decodable {
 private struct PlexMedia: Decodable {
     let id: Int?
     let duration: Int?
+    let width: Int?
+    let height: Int?
+    let videoResolution: String?
+    let videoProfile: String?
     let container: String?
     let part: [PlexPart]?
 
     enum CodingKeys: String, CodingKey {
-        case id, duration, container
+        case id, duration, width, height, videoResolution, videoProfile, container
         case part = "Part"
     }
 }
@@ -728,6 +733,13 @@ fileprivate func mapPlexMetadataToServerItem(
     let originalFileName = primaryPart?.file.flatMap { PlexService.extractFileName(from: $0) }
     let container = primaryPart?.container.flatMap { $0.isEmpty ? nil : $0 }
     let fileSize = primaryPart?.size ?? 0
+    let primaryMedia = meta.media?.first
+    let fallbackSize = VideoResolutionLabel.dimensions(fromResolutionToken: primaryMedia?.videoResolution)
+    let videoWidth = primaryMedia?.width ?? fallbackSize?.width
+    let videoHeight = primaryMedia?.height ?? fallbackSize?.height
+    let dynamicRange: String? = MediaCapabilityTags.isDolbyVisionRange(primaryMedia?.videoProfile)
+        ? DynamicRange.dolbyVision.rawValue
+        : nil
 
     let directors = meta.director?.compactMap(\.tag).joined(separator: ", ")
     let normalizedDirector = (directors?.isEmpty ?? true) ? nil : directors
@@ -745,6 +757,7 @@ fileprivate func mapPlexMetadataToServerItem(
         year: meta.year,
         overview: meta.summary,
         rating: meta.rating,
+        contentRating: meta.contentRating,
         mediaType: mediaType,
         posterURL: posterURL,
         backdropURL: backdropURL,
@@ -758,6 +771,9 @@ fileprivate func mapPlexMetadataToServerItem(
         duration: durationSeconds,
         originalFileName: originalFileName,
         container: container,
+        videoWidth: videoWidth,
+        videoHeight: videoHeight,
+        dynamicRange: dynamicRange,
         showTitle: nil,
         seasonNumber: nil,
         episodeNumber: nil,
@@ -987,6 +1003,8 @@ public enum PlexEpisodeFetcher {
             URL(string: "\(baseURLStr)\(path)?X-Plex-Token=\(context.token)")
         }
 
+        let primaryMedia = meta.media?.first
+        let fallbackSize = VideoResolutionLabel.dimensions(fromResolutionToken: primaryMedia?.videoResolution)
         return EpisodeInfo(
             id: key,
             title: meta.title,
@@ -999,7 +1017,12 @@ public enum PlexEpisodeFetcher {
             fileSize: part.size ?? 0,
             originalFileName: part.file.flatMap(PlexService.extractFileName(from:)),
             container: part.container,
-            remotePath: partKey
+            remotePath: partKey,
+            videoWidth: primaryMedia?.width ?? fallbackSize?.width,
+            videoHeight: primaryMedia?.height ?? fallbackSize?.height,
+            dynamicRange: MediaCapabilityTags.isDolbyVisionRange(primaryMedia?.videoProfile)
+                ? DynamicRange.dolbyVision.rawValue
+                : nil
         )
     }
 }

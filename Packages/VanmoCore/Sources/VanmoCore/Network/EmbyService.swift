@@ -304,7 +304,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
             )!
             var queryItems: [URLQueryItem] = [
                 URLQueryItem(name: "Recursive", value: "true"),
-                URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,DateLastSaved,SeriesName,SeriesId,ParentIndexNumber,IndexNumber"),
+                URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,MediaStreams,OfficialRating,ProductionLocations,DateLastSaved,SeriesName,SeriesId,ParentIndexNumber,IndexNumber"),
                 URLQueryItem(name: "SortBy", value: "SortName"),
                 URLQueryItem(name: "SortOrder", value: "Ascending"),
                 URLQueryItem(name: "StartIndex", value: String(startIndex)),
@@ -394,7 +394,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
     // MARK: - Live Library API
 
     private static let liveItemFields =
-        "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,DateCreated,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
+        "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,MediaStreams,OfficialRating,ProductionLocations,DateCreated,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
 
     private static func includeItemTypes(for collectionType: EmbyCollectionType) -> String {
         switch collectionType {
@@ -939,6 +939,8 @@ fileprivate enum EmbyItemMapper {
         let originalFileName = primarySource?.path.flatMap(EmbyService.extractFileName(from:))
         let container = primarySource?.container.flatMap { $0.isEmpty ? nil : $0 }
         let fileSize = primarySource?.size ?? 0
+        let videoSize = videoDimensions(from: primarySource)
+        let dynamicRange = dolbyDynamicRange(from: primarySource)
 
         let showTitle = item.seriesName
         let seasonNumber = item.parentIndexNumber
@@ -971,6 +973,7 @@ fileprivate enum EmbyItemMapper {
             year: item.productionYear,
             overview: item.overview,
             rating: item.communityRating,
+            contentRating: item.officialRating,
             mediaType: mediaType,
             posterURL: posterURL,
             backdropURL: backdropURL,
@@ -986,6 +989,9 @@ fileprivate enum EmbyItemMapper {
             duration: durationSeconds,
             originalFileName: originalFileName,
             container: container,
+            videoWidth: videoSize.width,
+            videoHeight: videoSize.height,
+            dynamicRange: dynamicRange,
             showTitle: showTitle,
             seasonNumber: seasonNumber,
             episodeNumber: episodeNumber,
@@ -996,6 +1002,26 @@ fileprivate enum EmbyItemMapper {
             lastPlaybackPosition: lastPlaybackPosition,
             isFavoriteOnServer: item.userData?.isFavorite ?? false
         )
+    }
+
+    fileprivate static func videoDimensions(from source: EmbyMediaSource?) -> (width: Int?, height: Int?) {
+        if let width = source?.width, width > 0, let height = source?.height, height > 0 {
+            return (width, height)
+        }
+        if let video = source?.mediaStreams?.first(where: { $0.type?.caseInsensitiveCompare("Video") == .orderedSame }) {
+            return (video.width, video.height)
+        }
+        return (source?.width, source?.height)
+    }
+
+    fileprivate static func dolbyDynamicRange(from source: EmbyMediaSource?) -> String? {
+        let streams = source?.mediaStreams ?? []
+        if streams.contains(where: { stream in
+            MediaCapabilityTags.isDolbyVisionRange(stream.videoRange)
+        }) {
+            return DynamicRange.dolbyVision.rawValue
+        }
+        return nil
     }
 
     private static func embyPersonImageURL(
@@ -1213,6 +1239,7 @@ private struct EmbyMediaDetail: Decodable, Sendable {
     let overview: String?
     let productionYear: Int?
     let communityRating: Double?
+    let officialRating: String?
     let runTimeTicks: Int64?
     let genres: [String]?
     let people: [EmbyPerson]?
@@ -1238,6 +1265,7 @@ private struct EmbyMediaDetail: Decodable, Sendable {
         case overview = "Overview"
         case productionYear = "ProductionYear"
         case communityRating = "CommunityRating"
+        case officialRating = "OfficialRating"
         case runTimeTicks = "RunTimeTicks"
         case genres = "Genres"
         case people = "People"
@@ -1286,11 +1314,37 @@ private struct EmbyMediaSource: Decodable, Sendable {
     let path: String?
     let container: String?
     let size: Int64?
+    let width: Int?
+    let height: Int?
+    let mediaStreams: [EmbyMediaStream]?
 
     enum CodingKeys: String, CodingKey {
         case path = "Path"
         case container = "Container"
         case size = "Size"
+        case width = "Width"
+        case height = "Height"
+        case mediaStreams = "MediaStreams"
+    }
+}
+
+private struct EmbyMediaStream: Decodable, Sendable {
+    let type: String?
+    let width: Int?
+    let height: Int?
+    let videoRange: String?
+    let codec: String?
+    let displayTitle: String?
+    let title: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type = "Type"
+        case width = "Width"
+        case height = "Height"
+        case videoRange = "VideoRange"
+        case codec = "Codec"
+        case displayTitle = "DisplayTitle"
+        case title = "Title"
     }
 }
 
@@ -1568,7 +1622,7 @@ public enum EmbyChildItemsFetcher {
         )!
         components.queryItems = [
             URLQueryItem(name: "ParentId", value: parentId),
-            URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber"),
+            URLQueryItem(name: "Fields", value: "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,MediaStreams,OfficialRating,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber"),
             URLQueryItem(name: "SortBy", value: "SortName"),
             URLQueryItem(name: "SortOrder", value: "Ascending"),
             URLQueryItem(name: "api_key", value: context.token),
@@ -1604,7 +1658,7 @@ public enum EmbyChildItemsFetcher {
 
 public enum EmbyItemDetailFetcher {
     private static let detailItemFields =
-        "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
+        "Overview,Genres,People,ProductionYear,ProviderIds,OriginalTitle,RunTimeTicks,MediaSources,MediaStreams,OfficialRating,ProductionLocations,SeriesName,SeriesId,ParentIndexNumber,IndexNumber,UserData"
 
     public static func fetchDetail(itemId: String, connection: MediaServerConnectionSnapshot) async throws -> ServerMediaItem {
         let service = try await EmbyConnectionHelper.connect(connection)
@@ -1813,6 +1867,9 @@ public struct EpisodeInfo: Identifiable, Sendable {
     public let originalFileName: String?
     public let container: String?
     public let remotePath: String?
+    public let videoWidth: Int?
+    public let videoHeight: Int?
+    public let dynamicRange: String?
 
     public init(
         id: String,
@@ -1826,12 +1883,18 @@ public struct EpisodeInfo: Identifiable, Sendable {
         fileSize: Int64 = 0,
         originalFileName: String? = nil,
         container: String? = nil,
-        remotePath: String? = nil
+        remotePath: String? = nil,
+        videoWidth: Int? = nil,
+        videoHeight: Int? = nil,
+        dynamicRange: String? = nil
     ) {
         self.id = id; self.title = title; self.seasonNumber = seasonNumber; self.episodeNumber = episodeNumber
         self.duration = duration; self.overview = overview; self.streamURL = streamURL; self.backdropURL = backdropURL
         self.fileSize = fileSize; self.originalFileName = originalFileName; self.container = container
         self.remotePath = remotePath
+        self.videoWidth = videoWidth
+        self.videoHeight = videoHeight
+        self.dynamicRange = dynamicRange
     }
 }
 
@@ -1996,7 +2059,7 @@ public enum EmbyEpisodeFetcher {
             resolvingAgainstBaseURL: false
         )!
         var queryItems = [
-            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags,ImageTags,MediaSources"),
+            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags,ImageTags,MediaSources,MediaStreams,OfficialRating"),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
             URLQueryItem(name: "Limit", value: String(pageSize)),
             URLQueryItem(name: "api_key", value: context.token),
@@ -2060,6 +2123,7 @@ public enum EmbyEpisodeFetcher {
         }
 
         let source = item.mediaSources?.first
+        let videoSize = EmbyItemMapper.videoDimensions(from: source)
         return EpisodeInfo(
             id: item.id,
             title: item.name,
@@ -2072,7 +2136,10 @@ public enum EmbyEpisodeFetcher {
             fileSize: source?.size ?? 0,
             originalFileName: source?.path.flatMap(EmbyService.extractFileName(from:)),
             container: source?.container,
-            remotePath: item.id
+            remotePath: item.id,
+            videoWidth: videoSize.width,
+            videoHeight: videoSize.height,
+            dynamicRange: EmbyItemMapper.dolbyDynamicRange(from: source)
         )
     }
 }

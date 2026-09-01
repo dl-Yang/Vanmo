@@ -391,11 +391,23 @@ public actor MediaScanner {
         item.backdropURL = serverItem.backdropURL
         item.logoURL = serverItem.logoURL
         item.rating = serverItem.rating
+        if let contentRating = serverItem.contentRating, !contentRating.isEmpty {
+            item.contentRating = contentRating
+        }
         item.mediaType = serverItem.mediaType
         item.fileURL = serverItem.streamURL
         item.fileSize = serverItem.fileSize
         item.originalFileName = serverItem.originalFileName
         item.container = serverItem.container
+        if let width = serverItem.videoWidth, width > 0 {
+            item.videoWidth = width
+        }
+        if let height = serverItem.videoHeight, height > 0 {
+            item.videoHeight = height
+        }
+        if let dynamicRange = serverItem.dynamicRange, !dynamicRange.isEmpty {
+            item.dynamicRange = dynamicRange
+        }
         if serverItem.duration > 0 {
             item.duration = serverItem.duration
         }

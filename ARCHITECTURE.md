@@ -263,13 +263,13 @@ This window lifecycle is one of the largest platform differences between iOS and
 
 Key models:
 
-- `MediaItem`: media identity, metadata, playback state, source, remote version, probe results, audio tracks, and subtitle preferences.
+- `MediaItem`: media identity, metadata, playback state, source, remote version, probe results, audio tracks, subtitle preferences, optional server `contentRating`, and probed or server-supplied video dimensions.
+- `RemoteFile` and `ServerMediaItem`: Sendable transport models for file services and media servers. `ServerMediaItem` can carry optional `contentRating`, `videoWidth`, `videoHeight`, and `dynamicRange` from Emby, Jellyfin, or Plex.
 - `SavedConnection`: non-sensitive remote connection configuration. Passwords and OAuth tokens are stored separately.
 - `PlaybackRecord`: local playback-history snapshot.
 - `FolderBookmark`: a remote directory selected for synchronization.
 - `CloudMediaState`: the minimal progress and favorite state synchronized across devices.
 - `ScanJobRecord`: persistent scan status and progress.
-- `RemoteFile` and `ServerMediaItem`: Sendable transport models for file services and media servers.
 
 ### 6.2 Persistence and Scanning
 
