@@ -50,7 +50,7 @@ Build or run the relevant application:
 ./run_device.sh --macos      # native macOS app
 ```
 
-`./init.sh` does not compile either application by default. Use `./init.sh --full` or `./scripts/check-app-build.sh` serially for isolated Debug compile evidence. Do not start the iOS and macOS script platforms as parallel processes, and do not point Xcode at `build/app-build-evidence/SourcePackages`. Keep launch, manual journeys, real-source checks, and Release CloudKit validation separate. See [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
+`./init.sh` does not compile either application by default. Use `./init.sh --full` or `./scripts/check-app-build.sh` serially for isolated Debug compile evidence. Do not start the iOS and macOS script platforms as parallel processes, and do not point Xcode at `build/app-build-evidence/SourcePackages`. Keep launch, manual journeys, real-source checks, and real CloudKit validation (signed device or Mac plus iCloud account plus bound container) separate. See [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
 
 ## Device UI Interaction
 

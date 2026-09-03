@@ -126,9 +126,9 @@ Current evidence as of August 26, 2026:
 
 ## Debug and Release CloudKit Boundary
 
-`CLOUDKIT_SYNC_ENABLED` and cloud entitlements are Release-only for both applications. Debug builds use non-cloud entitlements and can verify local fallback behavior and static model boundaries, but they cannot prove real CloudKit transport, account, conflict, or multi-device behavior.
+`CLOUDKIT_SYNC_ENABLED` and cloud entitlements are enabled for iOS and macOS Debug and Release. Personal-team fallback entitlement files still omit iCloud. Debug can verify local fallback when ModelContainer creation throws, and a signed Debug device or Mac can exercise real CloudKit.
 
-A real CloudKit claim requires a Release-capable environment, the intended entitlements and account, a recorded user flow, and non-sensitive evidence. Do not infer it from `./init.sh`, a Debug launch, or the presence of synchronization code.
+A real CloudKit claim requires a signed physical iOS device or Mac, the Cloud entitlements, an iCloud account, the bound `iCloud.com.vanmo.app` container, a recorded user flow, and non-sensitive evidence. Do not infer it from `./init.sh`, a Simulator Debug launch, or the presence of synchronization code. A signed-device export that ends as `CKErrorDomain` code 2 with empty userInfo is not a schema failure by itself: `NSPersistentCloudKitContainer` strips nested partial errors, and a 2026-09-02 probe recorded `Quota exceeded` (`CKError` 25) for `iCloud.com.vanmo.app`.
 
 ## Golden Journeys
 
@@ -141,7 +141,7 @@ A real CloudKit claim requires a Release-capable environment, the intended entit
 4. **Platform navigation and lifecycle**
    - On iOS, verify tab navigation and full-screen player presentation. On macOS, verify sidebar routing, the independent player window, downloads window, and cleanup on close.
 5. **Optional cloud synchronization**
-   - In an authorized Release environment, verify only the intended connection, bookmark, favorite, and minimal playback state across devices; confirm credentials and the full media catalog are excluded.
+   - On a signed device or Mac with an iCloud account and the bound container, verify only the intended connection, bookmark, favorite, and minimal playback state across devices; confirm credentials and the full media catalog are excluded.
 
 Each journey must record the source type, platform, configuration, steps performed, outcome, and sanitized failure evidence.
 
@@ -156,7 +156,7 @@ Each journey must record the source type, platform, configuration, steps perform
 | Simulator `simctl` launch/terminate | The exact recorded simulator management command completed | Screenshots, selectors, XCUITest interaction, or a golden journey |
 | Simulator XCUITest command | The exact recorded action or in-process journey completed on that simulator, with retained `xcresult` artifacts | Physical-device signing, Figma fidelity, real-source flows, or product journeys 1–3 |
 | Physical-device XCUITest command | The exact recorded action and its retained artifacts completed on that signed device | Other commands, complete UI coverage, Figma fidelity, accessibility quality, or an end-to-end product journey |
-| Debug app compile check | The selected application target compiled for the recorded Debug configuration and destination | Installation, launch, XCUITest, physical-device signing, UI behavior, real-source flows, or Release CloudKit |
+| Debug app compile check | The selected application target compiled for the recorded Debug configuration and destination | Installation, launch, XCUITest, physical-device signing, UI behavior, real-source flows, or real CloudKit transport |
 | `check-app-build.sh` Debug compile | The selected target compiled in the isolated evidence DerivedData and SourcePackages | An Xcode Incremental Build, launch, or that iOS and macOS can share one DerivedData or run as two parallel processes |
 | App build | A target compiled for the recorded configuration and environment | Launch quality or completion of a user journey |
 | App launch | Startup reached the recorded state | End-to-end playback, downloads, synchronization, or recovery |

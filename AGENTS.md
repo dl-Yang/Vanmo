@@ -83,7 +83,7 @@ If the baseline is already failing, report the existing failure and avoid stacki
 - For target, dependency, source, resource, setting, or entitlement changes: edit `project.yml`, run `xcodegen generate`, and include the regenerated `Vanmo.xcodeproj/project.pbxproj`.
 - Never hand-edit `project.pbxproj`.
 - Standard commands, configuration differences, and evidence boundaries live in [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
-- `CLOUDKIT_SYNC_ENABLED` is Release-only. Debug builds cannot validate real CloudKit behavior.
+- `CLOUDKIT_SYNC_ENABLED` is defined for Debug and Release. Real CloudKit still requires a signed device or Mac, an iCloud account, and the bound `iCloud.com.vanmo.app` container. Simulator Debug is not CloudKit evidence.
 - The macOS target directly reuses only the shared views listed in `project.yml`; do not assume arbitrary files under `Vanmo/` compile for macOS.
 
 ## Verification and Evidence

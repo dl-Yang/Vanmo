@@ -18,51 +18,63 @@ pass() {
 
 echo "== P1-3 Cloud Sync / Multi-platform static checks =="
 
-# 1) CloudKit entitlements (Debug 无 iCloud；Release 使用 *-Cloud.entitlements)
+# 1) CloudKit entitlements (Debug and Release use *-Cloud.entitlements;
+# personal-team fallback files omit iCloud)
 if [[ -f Vanmo/Vanmo-Cloud.entitlements ]] && \
    rg -q 'com.apple.developer.icloud-services' Vanmo/Vanmo-Cloud.entitlements && \
    rg -q 'CloudKit' Vanmo/Vanmo-Cloud.entitlements && \
    rg -q 'iCloud.com.vanmo.app' Vanmo/Vanmo-Cloud.entitlements; then
-  pass "iOS Release entitlements include CloudKit container"
+  pass "iOS Cloud entitlements include CloudKit container"
 else
   fail "Vanmo-Cloud.entitlements missing CloudKit configuration"
 fi
 
 if ! rg -q 'com.apple.developer.icloud-services' Vanmo/Vanmo.entitlements 2>/dev/null; then
-  pass "iOS Debug entitlements omit iCloud (personal team compatible)"
+  pass "iOS personal-team fallback entitlements omit iCloud"
 else
-  fail "Vanmo.entitlements still declares iCloud — Debug signing will fail on personal teams"
+  fail "Vanmo.entitlements still declares iCloud — personal-team signing would fail"
 fi
 
 if [[ -f VanmoMac/Vanmo-Mac-Cloud.entitlements ]] && \
    rg -q 'CloudKit' VanmoMac/Vanmo-Mac-Cloud.entitlements; then
-  pass "macOS Release Cloud entitlements present"
+  pass "macOS Cloud entitlements present"
 else
   fail "VanmoMac/Vanmo-Mac-Cloud.entitlements missing or incomplete"
 fi
 
 if [[ -f VanmoMac/Vanmo-Mac.entitlements ]] && \
    ! rg -q 'CloudKit' VanmoMac/Vanmo-Mac.entitlements 2>/dev/null; then
-  pass "macOS Debug entitlements omit CloudKit"
+  pass "macOS personal-team fallback entitlements omit CloudKit"
 else
-  fail "VanmoMac/Vanmo-Mac.entitlements should not include CloudKit for Debug builds"
+  fail "VanmoMac/Vanmo-Mac.entitlements should not include CloudKit"
 fi
 
-if rg -q 'Vanmo-Cloud.entitlements' Vanmo.xcodeproj/project.pbxproj && \
+ios_cloud=$(rg -c 'CODE_SIGN_ENTITLEMENTS = "?Vanmo/Vanmo-Cloud.entitlements"?' Vanmo.xcodeproj/project.pbxproj || true)
+mac_cloud=$(rg -c 'CODE_SIGN_ENTITLEMENTS = "?VanmoMac/Vanmo-Mac-Cloud.entitlements"?' Vanmo.xcodeproj/project.pbxproj || true)
+ios_local=$(rg -c 'CODE_SIGN_ENTITLEMENTS = "?Vanmo/Vanmo.entitlements"?' Vanmo.xcodeproj/project.pbxproj || true)
+mac_local=$(rg -c 'CODE_SIGN_ENTITLEMENTS = "?VanmoMac/Vanmo-Mac.entitlements"?' Vanmo.xcodeproj/project.pbxproj || true)
+if [[ "${ios_cloud:-0}" -ge 2 && "${mac_cloud:-0}" -ge 2 && "${ios_local:-0}" -eq 0 && "${mac_local:-0}" -eq 0 ]] && \
    rg -q 'CLOUDKIT_SYNC_ENABLED' Vanmo.xcodeproj/project.pbxproj; then
-  pass "Xcode Release config uses Cloud entitlements + CLOUDKIT_SYNC_ENABLED"
+  pass "Xcode Debug and Release use Cloud entitlements + CLOUDKIT_SYNC_ENABLED"
 else
-  fail "project.pbxproj missing Release CloudKit build settings"
+  fail "project.pbxproj Debug/Release must both use Cloud entitlements (found iOS Cloud=$ios_cloud local=$ios_local, macOS Cloud=$mac_cloud local=$mac_local)"
 fi
 
 if [[ -f project.yml ]] && \
-   rg -q 'Vanmo-Cloud.entitlements' project.yml && \
+   rg -q 'Vanmo/Vanmo-Cloud.entitlements' project.yml && \
+   rg -q 'VanmoMac/Vanmo-Mac-Cloud.entitlements' project.yml && \
    rg -q 'CLOUDKIT_SYNC_ENABLED' project.yml && \
-   rg -q 'Vanmo/Vanmo.entitlements' project.yml && \
-   rg -q 'VanmoMac/Vanmo-Mac.entitlements' project.yml; then
-  pass "project.yml preserves Debug/Release CloudKit split for iOS and macOS"
+   ! rg -q 'CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo.entitlements' project.yml && \
+   ! rg -q 'CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac.entitlements' project.yml; then
+  pass "project.yml enables CloudKit for Debug and Release"
 else
-  fail "project.yml missing Debug/Release CloudKit configuration"
+  fail "project.yml missing CloudKit configuration or still points a config at non-cloud entitlements"
+fi
+
+if rg -q '\.define\("CLOUDKIT_SYNC_ENABLED"\)' Packages/VanmoCore/Package.swift; then
+  pass "VanmoCore defines CLOUDKIT_SYNC_ENABLED for all package configurations"
+else
+  fail "Packages/VanmoCore/Package.swift missing CLOUDKIT_SYNC_ENABLED"
 fi
 
 if rg -q 'CloudSyncAvailability' Packages/VanmoCore/Sources/VanmoCore/Storage/CloudSyncPreferences.swift && \
@@ -76,6 +88,7 @@ fi
 if rg -q 'cloudKitDatabase' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
    rg -q 'CloudMediaState' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
    rg -q 'CLOUDKIT_SYNC_ENABLED' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
+   rg -q 'resolvedCloudKitDatabase' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
    rg -q 'ModelContainerFactory.makeSharedContainer' Vanmo/App/VanmoApp.swift VanmoMac/App/VanmoMacApp.swift; then
   pass "CloudKit-backed SwiftData container wired with local/cloud split"
 else

@@ -1809,18 +1809,18 @@
         }
       }
     },
-    "当前构建未启用 CloudKit。iCloud 同步仅在 Release 构建（需付费开发者账号）中可用。": {
+    "当前构建未启用 CloudKit。iCloud 同步需要 Cloud entitlement、付费 Team 与已绑定的 iCloud 容器。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This build does not enable CloudKit. iCloud sync is available only in Release builds that use a paid developer account."
+            "value": "This build does not enable CloudKit. iCloud sync requires Cloud entitlements, a paid Team, and a bound iCloud container."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "当前构建未启用 CloudKit。iCloud 同步仅在 Release 构建（需付费开发者账号）中可用。"
+            "value": "当前构建未启用 CloudKit。iCloud 同步需要 Cloud entitlement、付费 Team 与已绑定的 iCloud 容器。"
           }
         }
       }
@@ -3281,166 +3281,6 @@
         }
       }
     },
-    "无法保存连接": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn’t save the connection"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法保存连接"
-          }
-        }
-      }
-    },
-    "无法连接到服务器，请检查地址和凭据": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Couldn’t connect. Check the address and credentials."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法连接到服务器，请检查地址和凭据"
-          }
-        }
-      }
-    },
-    "正在验证连接...": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verifying connection..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在验证连接..."
-          }
-        }
-      }
-    },
-    "正在确认地址和凭据，通过后才会保存": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Checking the address and credentials. It is saved only after this succeeds."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在确认地址和凭据，通过后才会保存"
-          }
-        }
-      }
-    },
-    "完成登录后才会保存此连接": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This connection is saved only after sign-in succeeds."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "完成登录后才会保存此连接"
-          }
-        }
-      }
-    },
-    "请先选择本地文件夹": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select a local folder first"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请先选择本地文件夹"
-          }
-        }
-      }
-    },
-    "正在保存连接...": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saving connection..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在保存连接..."
-          }
-        }
-      }
-    },
-    "正在登录...": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Signing in..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在登录..."
-          }
-        }
-      }
-    },
-    "正在连接...": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connecting..."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在连接..."
-          }
-        }
-      }
-    },
-    "正在与服务器协商安全连接。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Negotiating secure connection to the server."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "正在与服务器协商安全连接。"
-          }
-        }
-      }
-    },
     "正在同步数据": {
       "localizations": {
         "en": {
@@ -3558,7 +3398,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connection Failed"
+            "value": "Connection failed"
           }
         },
         "zh-Hans": {
@@ -4993,22 +4833,6 @@
         }
       }
     },
-    "重试": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Retry"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重试"
-          }
-        }
-      }
-    },
     "重新下载": {
       "localizations": {
         "en": {
@@ -5217,22 +5041,6 @@
         }
       }
     },
-    "服务器无响应或地址不正确。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The server is unresponsive or the address is incorrect."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "服务器无响应或地址不正确。"
-          }
-        }
-      }
-    },
     "端口": {
       "localizations": {
         "en": {
@@ -5341,6 +5149,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "留空则保留现有密码。"
+          }
+        }
+      }
+    },
+    "此设备还没有密码，iCloud 不同步凭据。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device doesn’t have the password yet. iCloud does not sync credentials."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此设备还没有密码，iCloud 不同步凭据。"
           }
         }
       }
@@ -5869,22 +5693,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已同步 · %d 个库"
-          }
-        }
-      }
-    },
-    "已同步 · %d 个服务器": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Synced · %d servers"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已同步 · %d 个服务器"
           }
         }
       }

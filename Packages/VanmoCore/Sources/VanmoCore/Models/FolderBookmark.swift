@@ -3,13 +3,13 @@ import SwiftData
 
 @Model
 public final class FolderBookmark {
-    public var id: UUID
-    public var title: String
-    public var connectionId: UUID
-    public var connectionName: String
-    public var path: String
-    public var addedAt: Date
-    public var updatedAt: Date
+    public var id: UUID = UUID()
+    public var title: String = ""
+    public var connectionId: UUID = UUID()
+    public var connectionName: String = ""
+    public var path: String = ""
+    public var addedAt: Date = Date()
+    public var updatedAt: Date = Date()
     public var deletedAt: Date?
     public var lastModifiedDeviceId: String?
 

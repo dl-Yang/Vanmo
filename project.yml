@@ -12,7 +12,7 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "4"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
     INFOPLIST_FILE: Vanmo/Resources/Info.plist
@@ -82,17 +82,24 @@ targets:
           - "CoreFoundation"
       configs:
         Debug:
-          CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo.entitlements
+          CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo-Cloud.entitlements
+          OTHER_SWIFT_FLAGS:
+            - "-DFFMPEG_ENABLED"
+            - "-DCLOUDKIT_SYNC_ENABLED"
         Release:
           CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo-Cloud.entitlements
           OTHER_SWIFT_FLAGS:
             - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"
     entitlements:
-      path: Vanmo/Vanmo.entitlements
+      path: Vanmo/Vanmo-Cloud.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.vanmo.app
+        com.apple.developer.icloud-services:
+          - CloudKit
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.vanmo.app
     postBuildScripts:
@@ -165,8 +172,11 @@ targets:
           - "-DFFMPEG_ENABLED"
       configs:
         Debug:
-          CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac.entitlements
+          CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac-Cloud.entitlements
           DEVELOPMENT_TEAM: L775YJ7YS4
+          OTHER_SWIFT_FLAGS:
+            - "-DFFMPEG_ENABLED"
+            - "-DCLOUDKIT_SYNC_ENABLED"
         Release:
           CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac-Cloud.entitlements
           DEVELOPMENT_TEAM: L775YJ7YS4
@@ -174,13 +184,17 @@ targets:
             - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"
     entitlements:
-      path: VanmoMac/Vanmo-Mac.entitlements
+      path: VanmoMac/Vanmo-Mac-Cloud.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.files.downloads.read-write: true
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.network.client: true
         com.apple.security.network.server: true
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.vanmo.app
+        com.apple.developer.icloud-services:
+          - CloudKit
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.vanmo.app.mac
     postBuildScripts:

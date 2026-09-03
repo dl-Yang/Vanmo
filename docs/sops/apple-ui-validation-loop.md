@@ -82,8 +82,9 @@ complete any unsupported journey steps. Matching sanitized logs must still be
 copied manually from Xcode Console or Console.app.
 
 Simulator screenshots, a successful build, Swift package tests, and code
-inspection do not replace device-only evidence. Debug also cannot prove real
-CloudKit behavior because Vanmo enables CloudKit only for Release.
+inspection do not replace device-only evidence. Simulator Debug cannot prove
+real CloudKit behavior. Real CloudKit still requires a signed device or Mac,
+an iCloud account, and the bound `iCloud.com.vanmo.app` container.
 
 ## Clean Criteria
 

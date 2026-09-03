@@ -81,6 +81,8 @@ struct ContentView: View {
 #endif
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
+            await connectionsViewModel.loadSavedConnections()
+            _ = await connectionsViewModel.activateNewlySyncedConnections()
         }
         .onChange(of: scenePhase) { _, newPhase in
             Task {
@@ -88,10 +90,14 @@ struct ContentView: View {
                     downloadManager.resume()
                     await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
                     await connectionsViewModel.loadSavedConnections()
+                    _ = await connectionsViewModel.activateNewlySyncedConnections()
                 } else if newPhase == .background {
                     await downloadManager.suspend()
                 }
             }
+        }
+        .sheet(item: $connectionsViewModel.pendingMissingCredentialConnection) { connection in
+            AddConnectionView(viewModel: connectionsViewModel, editingConnection: connection)
         }
     }
 }

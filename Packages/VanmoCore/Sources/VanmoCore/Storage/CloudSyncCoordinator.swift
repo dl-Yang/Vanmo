@@ -44,6 +44,11 @@ public final class CloudSyncCoordinator: ObservableObject {
             lastSyncAt = now
             CloudSyncPreferences.lastSyncAt = now
             statusMessage = "已同步 (\(reason))"
+            #if DEBUG
+            let connections = (try? context.fetch(FetchDescriptor<SavedConnection>())) ?? []
+            let types = connections.map(\.type.rawValue).sorted().joined(separator: ",")
+            print("[Debug][CloudKit] local save reason=\(reason) preferenceOn=\(CloudSyncPreferences.isEnabled) attachedPrivate=\(ModelContainerFactory.openedCloudStoreWithPrivateCloudKit) connections=\(connections.count) types=\(types)")
+            #endif
         } catch {
             statusMessage = "同步失败：\(error.localizedDescription)"
         }

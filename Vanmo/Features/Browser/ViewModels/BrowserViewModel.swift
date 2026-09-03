@@ -38,12 +38,15 @@ final class ConnectionsViewModel: ObservableObject {
     @Published var showAddConnection = false
     @Published var showError = false
     @Published var errorMessage = ""
+    @Published var pendingMissingCredentialConnection: SavedConnection?
     @Published private(set) var scanCoordinator = ScanCoordinator()
     @Published var scanToastMessage: String?
 
     private var connectionStatuses: [UUID: ConnectionStatus] = [:]
     private var modelContext: ModelContext?
     private var didAttemptAutoReconnect = false
+    private var selectedConnectionFallback: SavedConnection?
+    private var isActivatingSyncedConnections = false
     private var browserService: RemoteFileService?
     private var browserServiceConnectionID: UUID?
     private var epgLoadID: UUID?
@@ -126,6 +129,7 @@ final class ConnectionsViewModel: ObservableObject {
     var selectedConnection: SavedConnection? {
         guard let selectedConnectionID else { return nil }
         return savedConnections.first { $0.id == selectedConnectionID }
+            ?? selectedConnectionFallback
     }
 
     var canBookmarkFoldersInSelectedConnection: Bool {
@@ -407,6 +411,7 @@ final class ConnectionsViewModel: ObservableObject {
         CloudSyncCoordinator.shared.requestSync(reason: "connection-created", context: modelContext)
         await loadSavedConnections()
         if let saved = savedConnections.first(where: { $0.id == connection.id }) {
+            CloudSyncedConnectionActivation.markProcessed([saved.id])
             await selectConnection(saved)
             // 地址和凭据已通过；扫描失败不回退入库，也不把「无法保存」回给添加页。
             _ = await connectAndScan(saved, showErrorAlert: false)
@@ -477,8 +482,15 @@ final class ConnectionsViewModel: ObservableObject {
         resetBrowserStateAfterEditing(connection)
         connectionStatuses[connection.id] = .idle
         connectionErrorMessages.removeValue(forKey: connection.id)
-        await loadSavedConnections()
-        return true
+
+        let didConnect = await connectAndScan(connection)
+        if didConnect {
+            await loadSavedConnections()
+            if selectedConnectionID == connection.id {
+                await loadDirectory(path: currentPath)
+            }
+        }
+        return didConnect
     }
 
     /// 发起 OAuth 网盘登录：授权成功后落地连接并进入浏览；入库须用户在目录内手动「同步当前目录」。
@@ -514,6 +526,7 @@ final class ConnectionsViewModel: ObservableObject {
         guard let saved = savedConnections.first(where: { $0.id == connectionId }) else {
             return false
         }
+        CloudSyncedConnectionActivation.markProcessed([saved.id])
         await selectConnection(saved)
         return await connectAndScan(saved, showErrorAlert: true)
     }
@@ -569,6 +582,7 @@ final class ConnectionsViewModel: ObservableObject {
         modelContext?.delete(connection)
         try? modelContext?.save()
         CloudSyncCoordinator.shared.requestSync(reason: "connection-deleted", context: modelContext)
+        CloudSyncedConnectionActivation.removeProcessed(connectionId)
         connectionStatuses.removeValue(forKey: connectionId)
         connectionErrorMessages.removeValue(forKey: connectionId)
         let deletedSelectedConnection = selectedConnectionID == connectionId
@@ -757,6 +771,7 @@ final class ConnectionsViewModel: ObservableObject {
     }
 
     func selectConnection(_ connection: SavedConnection) async {
+        await ensureSavedConnectionVisible(connection)
         let isSameConnection = selectedConnectionID == connection.id
         if !isSameConnection {
             selectedConnectionID = connection.id
@@ -766,6 +781,11 @@ final class ConnectionsViewModel: ObservableObject {
             fileBrowserErrorMessage = nil
             resetIPTVState()
             await disconnectBrowserServiceIfNeeded()
+        }
+        if promptIfMissingLocalCredential(connection) {
+            fileBrowserErrorMessage = connectionErrorMessages[connection.id]
+            files = []
+            return
         }
         await loadDirectory(path: currentPath)
     }
@@ -877,12 +897,20 @@ final class ConnectionsViewModel: ObservableObject {
 
     private func reconcileSelectedConnection() {
         if savedConnections.isEmpty {
-            resetFileBrowser()
+            if selectedConnectionFallback == nil {
+                resetFileBrowser()
+            }
             return
         }
 
         if let selectedConnectionID,
            savedConnections.contains(where: { $0.id == selectedConnectionID }) {
+            selectedConnectionFallback = nil
+            return
+        }
+
+        if let selectedConnectionID,
+           selectedConnectionFallback?.id == selectedConnectionID {
             return
         }
 
@@ -891,6 +919,74 @@ final class ConnectionsViewModel: ObservableObject {
         pathStack = []
         files = []
         fileBrowserErrorMessage = nil
+    }
+
+    private func ensureSavedConnectionVisible(_ connection: SavedConnection) async {
+        if savedConnections.contains(where: { $0.id == connection.id }) {
+            selectedConnectionFallback = nil
+            return
+        }
+        await loadSavedConnections()
+        if savedConnections.contains(where: { $0.id == connection.id }) {
+            selectedConnectionFallback = nil
+            return
+        }
+        selectedConnectionFallback = connection
+    }
+
+    @discardableResult
+    func promptIfMissingLocalCredential(_ connection: SavedConnection) -> Bool {
+        guard CloudSyncedConnectionActivation.needsLocalCredential(connection) else {
+            return false
+        }
+        let message = L10n.tr("此设备还没有密码，iCloud 不同步凭据。")
+        connectionStatuses[connection.id] = .failed
+        connectionErrorMessages[connection.id] = message
+        if pendingMissingCredentialConnection == nil {
+            pendingMissingCredentialConnection = connection
+        }
+        #if DEBUG
+        print("[Debug][CloudKit] missingCredential type=\(connection.type.rawValue)")
+        #endif
+        return true
+    }
+
+    /// Connects CloudKit-imported connections that this device has not handled yet.
+    /// Returns true when a media server connected so the home live refresh can run.
+    @discardableResult
+    func activateNewlySyncedConnections() async -> Bool {
+        guard !isActivatingSyncedConnections else { return false }
+        isActivatingSyncedConnections = true
+        defer { isActivatingSyncedConnections = false }
+
+        let newcomers = CloudSyncedConnectionActivation.unprocessedConnections(from: savedConnections)
+        guard !newcomers.isEmpty else { return false }
+
+        var didConnectMediaServer = false
+        for connection in newcomers {
+            CloudSyncedConnectionActivation.markProcessed([connection.id])
+            #if DEBUG
+            print("[Debug][CloudKit] activate type=\(connection.type.rawValue) missingCredential=\(CloudSyncedConnectionActivation.needsLocalCredential(connection))")
+            #endif
+
+            if connection.type == .localFolder {
+                await restoreLocalFolderAccess()
+                continue
+            }
+
+            if promptIfMissingLocalCredential(connection) {
+                continue
+            }
+
+            let connected = await connectAndScan(connection, showErrorAlert: false)
+            if connected, connection.type.requiresManualDirectorySync {
+                _ = await syncAllBookmarks(for: connection)
+            }
+            if connected, connection.type.isMediaServer {
+                didConnectMediaServer = true
+            }
+        }
+        return didConnectMediaServer
     }
 
     private func reconcileActiveMediaServer() async {
@@ -931,6 +1027,7 @@ final class ConnectionsViewModel: ObservableObject {
 
     private func resetFileBrowser() {
         selectedConnectionID = nil
+        selectedConnectionFallback = nil
         currentPath = "/"
         pathStack = []
         files = []

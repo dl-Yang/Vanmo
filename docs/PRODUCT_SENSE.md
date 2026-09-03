@@ -31,7 +31,7 @@ This document records durable Vanmo product judgment that cannot be inferred saf
 - Automated `VanmoCore` tests establish shared-logic evidence only.
 - Static checks establish configuration and boundary evidence only.
 - An app build establishes compilation evidence, not user-flow acceptance.
-- Device, simulator, macOS runtime, real remote source, and Release CloudKit claims require their corresponding manual or environment-specific evidence.
+- Device, simulator, macOS runtime, real remote source, and real CloudKit claims require their corresponding manual or environment-specific evidence. Simulator Debug is not CloudKit evidence.
 - Product specs must label unverified acceptance paths explicitly.
 
 ## No-Go Patterns

@@ -31,7 +31,7 @@
 
 - Verification evidence matters more than confidence.
 - Tests prove only the behavior they execute; static checks prove only their encoded boundaries.
-- Builds, launches, manual journeys, real-source checks, and Release CloudKit validation are distinct evidence classes.
+- Builds, launches, manual journeys, real-source checks, and real CloudKit validation are distinct evidence classes.
 - Unrun evidence remains unverified and is labeled accordingly.
 - Known failures are recorded rather than hidden by weaker checks.
 

@@ -265,22 +265,28 @@ public enum MediaServerConnectionResolver {
 
 @Model
 public final class SavedConnection {
-    public var id: UUID
-    public var name: String
-    public var type: ConnectionType
-    public var host: String
-    public var port: Int
+    public var id: UUID = UUID()
+    public var name: String = ""
+    /// CloudKit rejects SwiftData enum/composite attributes; persist the raw value.
+    public var typeRawValue: String = ConnectionType.localFolder.rawValue
+    @Transient
+    public var type: ConnectionType {
+        get { ConnectionType(rawValue: typeRawValue) ?? .localFolder }
+        set { typeRawValue = newValue.rawValue }
+    }
+    public var host: String = ""
+    public var port: Int = 0
     public var username: String?
     public var path: String?
     /// 仅 localFolder 使用：security-scoped bookmark，跨 App 重启恢复访问权限。
     /// 跨设备 CloudKit 同步后通常无法直接复用，新设备需重新授权。
     public var bookmarkData: Data?
-    public var isFavorite: Bool
+    public var isFavorite: Bool = false
     public var lastConnectedAt: Date?
     public var lastSyncedAt: Date?
-    public var addedAt: Date
+    public var addedAt: Date = Date()
     /// 连接配置最后修改时间，用于 CloudKit 冲突合并。
-    public var updatedAt: Date
+    public var updatedAt: Date = Date()
     /// 软删除墓碑；CloudKit 同步到其他设备后再物理删除。
     public var deletedAt: Date?
     /// 最后修改设备标识，辅助调试与 LWW。
@@ -297,7 +303,7 @@ public final class SavedConnection {
     ) {
         self.id = UUID()
         self.name = name
-        self.type = type
+        self.typeRawValue = type.rawValue
         self.host = host
         self.port = port ?? type.defaultPort
         self.username = username

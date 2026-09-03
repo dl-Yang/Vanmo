@@ -21,6 +21,8 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 - [`2026-08-28-architecture-structure-guards.md`](2026-08-28-architecture-structure-guards.md) — **Completed.** Stage 2 now rejects XcodeGen drift, illegal target sources, and unconditional VanmoCore UI imports; fast baseline stays at four stages.
 - [`2026-08-31-app-language-switching.md`](2026-08-31-app-language-switching.md) — **Completed.** Chinese / English / Follow System on Appearance; 2026-09-01 iOS Simulator and macOS operator walks plus isolated `check-app-build.sh all` passed.
 - [`2026-09-01-ios-home-detail-files-ui.md`](2026-09-01-ios-home-detail-files-ui.md) — **Completed.** iOS Simulator walk passed home loading under the title, favorites 1/2/3+, default hero, TV/movie resolution tags, Files root without status, and the Figma Add Connection dialogs.
+- [`2026-09-01-ios-testflight-launch-crash.md`](2026-09-01-ios-testflight-launch-crash.md) — **Completed.** TestFlight launch crash mitigated with CloudStore defaults, no `mediaKey` unique, local-only launch, and one-time store reset. CloudKit re-attach is recorded in the 2026-09-02 iCloud plan.
+- [`2026-09-02-icloud-debug-device.md`](2026-09-02-icloud-debug-device.md) — **Completed.** Signed iOS and macOS Debug attach `iCloud.com.vanmo.app`; Dashboard and macOS missing-password connect of an iOS-synced Emby row are recorded. Passwords stay on-device Keychain.
 
 ## Archival Rules
 

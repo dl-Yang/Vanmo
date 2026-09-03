@@ -285,7 +285,7 @@ struct AddConnectionView: View {
                 .textContentType(.password)
 
             if isEditing {
-                Text(L10n.tr("留空则保留现有密码。"))
+                Text(editingPasswordHint)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -354,6 +354,13 @@ struct AddConnectionView: View {
 
     private var isEditing: Bool {
         editingConnection != nil
+    }
+
+    private var editingPasswordHint: String {
+        if let editingConnection, CloudSyncedConnectionActivation.needsLocalCredential(editingConnection) {
+            return L10n.tr("此设备还没有密码，iCloud 不同步凭据。")
+        }
+        return L10n.tr("留空则保留现有密码。")
     }
 
     private var hostPlaceholder: String {

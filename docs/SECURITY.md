@@ -6,14 +6,15 @@ This document defines Vanmo's durable rules for credentials, persisted data, URL
 
 - Connection passwords belong in `KeychainManager`; OAuth credentials belong in `OAuthCredentialStore`.
 - `SavedConnection` may store non-sensitive connection configuration but must not store passwords, access tokens, refresh tokens, cookies, or equivalent secrets.
-- Keep iOS and macOS Keychain access groups aligned with `project.yml` and their entitlements.
+- Keep iOS and macOS Keychain access groups aligned with `project.yml` and their entitlements. The groups stay platform-specific (`com.vanmo.app` vs `com.vanmo.app.mac`). A 2026-09-03 review rejected iCloud Keychain (`kSecAttrSynchronizable`) password sync; do not add it without a new security review.
+- Keep `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` on connection secrets unless that review replaces it.
 - Never place real credentials in source, documentation, fixtures, screenshots, issue text, plan evidence, or test output.
 - Credential lookup should be scoped to the connection identity and performed only when an operation needs it.
 
 ## SwiftData and Cloud Data
 
 - `LocalStore` owns local media, playback-history, and scan-job data and is never CloudKit-enabled.
-- `CloudStore` may contain saved connection configuration, folder bookmarks, and minimal media state only when Release CloudKit is enabled.
+- `CloudStore` may contain saved connection configuration, folder bookmarks, and minimal media state only when CloudKit is enabled for the build and the user iCloud sync preference is on.
 - The full media catalog and credentials must not be uploaded to CloudKit.
 - Every new model must be assigned deliberately to a store and added through `ModelContainerFactory` with tests and migration consideration.
 - SwiftData model objects and `ModelContext` must not cross unstructured concurrency boundaries unsafely.
@@ -48,7 +49,7 @@ The four required lists are complete in each file:
 
 Collected types map to current code, not speculative future collection:
 
-- User ID: the iCloud identity used by Release CloudKit
+- User ID: the iCloud identity used by CloudKit when sync is enabled
 - Device ID: `CloudSyncDevice.id` written onto `CloudMediaState.lastModifiedDeviceId`
 - Product Interaction: playback position, watched state, and favorites in `CloudMediaState`
 - Other User Content: CloudKit-synced connection configuration and folder bookmarks; media title or filename sent to the user-enabled online-subtitle providers

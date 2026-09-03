@@ -1390,7 +1390,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac-Cloud.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1399,7 +1399,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;
@@ -1443,7 +1443,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -1473,7 +1473,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -1495,7 +1495,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED";
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1507,7 +1507,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Vanmo/Vanmo.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -1541,7 +1541,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac-Cloud.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1594,7 +1594,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

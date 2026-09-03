@@ -330,7 +330,7 @@ struct MacAddConnectionView: View {
             }
 
             if isEditing {
-                Text(L10n.tr("留空则保留现有密码。"))
+                Text(editingPasswordHint)
                     .font(.system(size: 12))
                     .foregroundStyle(theme.tertiaryText)
                     .padding(.leading, 72)
@@ -656,6 +656,13 @@ struct MacAddConnectionView: View {
     // MARK: - Validation Helpers
 
     private var isEditing: Bool { editingConnection != nil }
+
+    private var editingPasswordHint: String {
+        if let editingConnection, CloudSyncedConnectionActivation.needsLocalCredential(editingConnection) {
+            return L10n.tr("此设备还没有密码，iCloud 不同步凭据。")
+        }
+        return L10n.tr("留空则保留现有密码。")
+    }
 
     private var hostPlaceholder: String {
         if selectedType.isMediaServer {

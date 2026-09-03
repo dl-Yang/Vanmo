@@ -24,7 +24,7 @@ platform applications, persistence, synchronization, or Xcode targets.
 - SwiftData `LocalStore`: `MediaItem`, `PlaybackRecord`, and `ScanJobRecord`;
   never CloudKit-enabled.
 - SwiftData `CloudStore`: `SavedConnection`, `FolderBookmark`, and
-  `CloudMediaState`; CloudKit is optional and Release-only.
+  `CloudMediaState`; CloudKit is optional when the user toggle is on.
 - Keychain/OAuth storage: credentials and tokens. They do not belong in either
   SwiftData store.
 
@@ -65,7 +65,7 @@ Stop and resolve the design before continuing if:
 
 - platform UI is being moved into `VanmoCore`
 - credentials or the full media catalog would enter `CloudStore`
-- a Debug run is being used to claim real CloudKit behavior
+- a Simulator Debug run is being used to claim real CloudKit behavior
 - a target change exists only in `project.pbxproj`
 - iOS and macOS presentation are being forced together solely to remove
   superficial duplication

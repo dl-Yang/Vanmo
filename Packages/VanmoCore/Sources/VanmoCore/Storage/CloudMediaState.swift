@@ -4,7 +4,7 @@ import SwiftData
 /// 跨设备 CloudKit 同步的播放进度与收藏状态（不包含完整 MediaItem 元数据）。
 @Model
 public final class CloudMediaState {
-    @Attribute(.unique) var mediaKey: String
+    var mediaKey: String = ""
     public var mediaItemID: UUID?
     public var sourceConnectionId: UUID?
     public var lastPlaybackPosition: TimeInterval = 0

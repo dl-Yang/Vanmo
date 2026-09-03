@@ -1,6 +1,6 @@
 # Vanmo Architecture
 
-> This document describes the repository as of September 1, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
+> This document describes the repository as of September 3, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
 > If this document conflicts with the code, treat `project.yml`, `Packages/VanmoCore/Package.swift`, and the current implementation as the sources of truth.
 
 ## 1. System Overview
@@ -38,7 +38,7 @@ flowchart TB
     CORE --> KEYCHAIN[Keychain]
     CORE --> CACHE[Disk Caches and Downloads]
     CORE --> REMOTE[SMB / WebDAV / Cloud Drives / IPTV / Media Servers]
-    CORE --> CLOUD[(Optional CloudKit in Release)]
+    CORE --> CLOUD[(Optional CloudKit on signed device)]
 ```
 
 ## 2. Repository and Module Boundaries
@@ -112,10 +112,9 @@ Boundary rules:
 
 ### 3.3 Debug and Release Differences
 
-- `CLOUDKIT_SYNC_ENABLED` is defined only for Release builds.
-- Debug configurations use entitlements without iCloud capabilities, which allows personal development-team signing.
-- Release configurations use `Vanmo-Cloud.entitlements` and `Vanmo-Mac-Cloud.entitlements`.
-- Application code must not assume CloudKit is available in Debug builds.
+- `CLOUDKIT_SYNC_ENABLED` is defined for VanmoCore and for iOS/macOS Debug and Release app configurations. Personal-team fallback files `Vanmo.entitlements` and `Vanmo-Mac.entitlements` still omit iCloud.
+- Debug and Release use `Vanmo-Cloud.entitlements` and `Vanmo-Mac-Cloud.entitlements` (`iCloud.com.vanmo.app`). Signed Debug on a physical device or Mac can exercise real CloudKit; a Simulator Debug launch cannot.
+- Real CloudKit still requires a paid Team, an iCloud account on the device, and that container bound to both `com.vanmo.app` and `com.vanmo.app.mac`.
 
 ### 3.4 Privacy Manifests
 
@@ -278,11 +277,13 @@ Key models:
 | Store | Models | CloudKit |
 |---|---|---|
 | `LocalStore` | `MediaItem`, `PlaybackRecord`, `ScanJobRecord` | Never enabled |
-| `CloudStore` | `SavedConnection`, `FolderBookmark`, `CloudMediaState` | Release only, when enabled by the user |
+| `CloudStore` | `SavedConnection`, `FolderBookmark`, `CloudMediaState` | When `CloudSyncPreferences.isEnabled` is true, launch uses `.private("iCloud.com.vanmo.app")`. A throwing create falls back to `.none`; an unreadable store is deleted once and recreated locally |
 
 The full media catalog is never uploaded to CloudKit. Only connections, folder bookmarks, and minimal media state are synchronized. Media-server progress and favorites can be excluded through flags on `MediaItem`, allowing the server to remain authoritative.
 
-The project currently has no `VersionedSchema`, `SchemaMigrationPlan`, or other explicit migration path. It relies primarily on SwiftData's lightweight evolution for additive field changes.
+CloudStore models must stay CloudKit-compatible: every persisted property is optional or has a default, relationships stay optional, CloudKit does not allow unique constraints (`CloudMediaState.mediaKey` is matched in code, not by `@Attribute(.unique)`), and enums are stored as raw strings. SwiftData persists a `Codable` enum as a composite attribute (`NSCompositeAttributeType`); CloudKit rejects that type, so `SavedConnection.type` is a computed wrapper over `typeRawValue`.
+
+The project currently has no `VersionedSchema`, `SchemaMigrationPlan`, or other explicit migration path. It relies primarily on SwiftData's lightweight evolution for additive field changes. When iCloud sync is enabled, launch attaches CloudKit to CloudStore. A CloudStore that was first created with `cloudKitDatabase: .none` cannot start mirroring in place: opening that same file with `.private` can create `com.apple.coredata.cloudkit.zone` while leaving the Private Database empty. Launch therefore snapshots CloudStore models, opens a new `CloudStore-ck3` file under `.private`, restores the snapshot (keeping `SavedConnection.id` so Keychain `conn_<id>` still matches), and deletes the previous CloudStore files only after that restore succeeds. Generation `2` replaced the composite `SavedConnection.type` with `typeRawValue`. Generation `3` recreates the CloudKit-backed file after a Development-environment reset so local mirroring metadata is not reused against a wiped zone. `LocalStore` is left in place. A TestFlight `1.0.0 (3)` crash showed `CKContainer(iCloud.com.vanmo.app)` asserting on a background thread when the container was unbound; Swift `do/catch` cannot recover that assert. If ModelContainer creation throws, the factory logs and retries the same stores with `.none`. If the on-disk LocalStore or CloudStore still cannot be opened, it deletes those two store files and retries once locally. A second local failure can still `fatalError`. Changing the sync toggle still requires an app restart; there is no hot-swap of `ModelContainer`.
 
 Scanning has two layers:
 
@@ -386,6 +387,8 @@ Metadata has two complementary paths:
 - Playback progress and favorites synchronize through `CloudMediaState`, not the complete `MediaItem`.
 
 The coordinator does not implement a transport protocol. The CloudKit-enabled SwiftData `ModelConfiguration` performs the underlying synchronization.
+
+After launch or foreground merge, iOS and macOS reload CloudStore connections and activate IDs that this device has not processed yet (`cloudSync.processedConnectionIDs`). Activation reuses the existing `connectAndScan` / Emby live refresh / bookmark-sync path. Local folders are not full-scanned. Missing Keychain passwords or OAuth tokens open the edit-connection sheet. Credentials stay out of CloudKit and do not use iCloud Keychain; the 2026-09-03 decision keeps on-device Keychain only.
 
 ### 6.9 Interface Language
 
@@ -608,8 +611,8 @@ See `docs/RELIABILITY.md` for the complete command stages and evidence boundarie
 1. **Substantial platform-layer duplication.** iOS and macOS maintain separate connection, library, search, and player ViewModels. `VanmoCore` shares infrastructure, but use-case orchestration remains platform-specific.
 2. **Large ViewModels and views.** The iOS `PlayerViewModel`, `ConnectionsViewModel`, `LibraryViewModel`, and their macOS counterparts combine state, network orchestration, mapping, and persistence. Changes require focused data-flow verification.
 3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. NFS, DLNA, and several official cloud-drive integrations require further implementation. FTP is implemented; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play, and Files-browser download. SFTP is implemented as a password-authenticated Citadel client; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play (`source=sftp`), and Files-browser download.
-4. **No explicit SwiftData migration strategy.** There is no `VersionedSchema` or `SchemaMigrationPlan`. Container creation calls `fatalError` on failure and has no recovery or fallback path.
-5. **CloudKit is Release-only.** Debug builds can verify local fallback and static boundaries, but cannot prove real CloudKit behavior.
+4. **No explicit SwiftData migration strategy.** There is no `VersionedSchema` or `SchemaMigrationPlan`. Launch can delete an unreadable LocalStore or CloudStore once; a second local failure can still `fatalError`.
+5. **CloudKit attach can still assert.** Launch uses `.private("iCloud.com.vanmo.app")` when sync is enabled. A thrown create falls back to `.none`, but an unbound-container `CKContainer` assert is not catchable. Real sync evidence still requires a signed device or Mac, an iCloud account, and the bound container. Simulator Debug is not CloudKit evidence.
 6. **iOS UI automation still lacks physical-device evidence.** The `VanmoUITests` target and unified XCUITest CLI exist, and the compile-safe Settings `.paused` label unblocks Simulator `build-for-testing`. Physical-device signing and device-side runner-argument delivery remain unverified; broader iOS/macOS player or real-source journeys still depend on later recorded evidence.
 7. **Playback implementations can drift.** iOS and macOS do not share one AVFoundation/KSPlayer adapter protocol.
 8. **Legacy FFmpeg configuration remains.** Playback currently uses FFmpeg through KSPlayer, while the repository retains an unused `FFMPEG_ENABLED` definition, an effectively empty bridging header, and a standalone FFmpeg build script.

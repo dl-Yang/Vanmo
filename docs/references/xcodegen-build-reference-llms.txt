@@ -97,13 +97,15 @@ COMMAND BOUNDARIES
   built, installed, launched, archived, or completed a user journey.
 
 CLOUDKIT CONFIGURATION BOUNDARY
-- CLOUDKIT_SYNC_ENABLED is defined only in Release for both app targets.
-- Debug uses Vanmo/Vanmo.entitlements or
-  VanmoMac/Vanmo-Mac.entitlements without the Release cloud entitlement path.
-- Release uses Vanmo/Vanmo-Cloud.entitlements or
-  VanmoMac/Vanmo-Mac-Cloud.entitlements.
-- A Debug build, ./init.sh, or the static scope check cannot prove real
-  CloudKit transport, account, conflict, or multi-device behavior.
+- CLOUDKIT_SYNC_ENABLED is defined for VanmoCore and for iOS/macOS Debug and
+  Release. Personal-team fallback files Vanmo/Vanmo.entitlements and
+  VanmoMac/Vanmo-Mac.entitlements omit iCloud.
+- Debug and Release use Vanmo/Vanmo-Cloud.entitlements or
+  VanmoMac/Vanmo-Mac-Cloud.entitlements (`iCloud.com.vanmo.app`).
+- A Simulator Debug build, ./init.sh, or the static scope check cannot prove
+  real CloudKit transport, account, conflict, or multi-device behavior.
+- Real CloudKit still requires a signed device or Mac, an iCloud account, and
+  the bound container.
 
 RELATED REPOSITORY GUIDANCE
 - project.yml

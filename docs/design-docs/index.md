@@ -5,6 +5,7 @@ This index is the discoverable map of durable Vanmo design decisions.
 ## Accepted
 
 - [`core-beliefs.md`](core-beliefs.md): product, architecture, evidence, platform, data, and agent-harness beliefs
+- [`icloud-keychain-password-sync.md`](icloud-keychain-password-sync.md): connection passwords stay on-device Keychain; iCloud Keychain sync rejected; CloudKit passwords forbidden
 - [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md): implemented system map and hard boundaries
 
 ## Proposed

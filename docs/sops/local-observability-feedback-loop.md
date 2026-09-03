@@ -60,9 +60,9 @@ In short: `query -> reason -> fix -> restart -> rerun -> verify`.
 
 For iOS device-only behavior, ask the user to reproduce on the device and
 manually copy the matching non-sensitive lines from Xcode Console or
-Console.app. A simulator trace or Debug build is not evidence for hardware,
-entitlement, background, or real Release CloudKit behavior that only exists on
-the target device/environment.
+Console.app. A simulator trace is not evidence for hardware, entitlement,
+background, or real CloudKit behavior that only exists on the target
+device/environment. Simulator Debug is not CloudKit evidence.
 
 ## Definition of Done
 

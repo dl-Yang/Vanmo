@@ -22,6 +22,7 @@ This is the entry point for durable Vanmo product and system design decisions. D
 
 - `docs/design-docs/index.md`: status and discovery index
 - `docs/design-docs/core-beliefs.md`: durable Vanmo design and agent-harness beliefs
+- `docs/design-docs/icloud-keychain-password-sync.md`: connection passwords stay on-device Keychain; iCloud Keychain sync rejected
 - `ARCHITECTURE.md`: implemented boundaries, targets, data flows, and known risks
 
 ## Maintenance Rules

@@ -32,7 +32,7 @@ let package = Package(
                 .process("Localization/Resources"),
             ],
             swiftSettings: [
-                .define("CLOUDKIT_SYNC_ENABLED", .when(configuration: .release)),
+                .define("CLOUDKIT_SYNC_ENABLED"),
             ]
         ),
         .testTarget(

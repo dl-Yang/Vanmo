@@ -35,10 +35,13 @@ final class MacConnectionsViewModel: ObservableObject {
     @Published var errorMessage = ""
     @Published private(set) var scanCoordinator = ScanCoordinator()
     @Published var scanToastMessage: String?
+    @Published var pendingMissingCredentialConnection: SavedConnection?
 
     @Published private(set) var connectionStatuses: [UUID: MacConnectionStatus] = [:]
     private var modelContext: ModelContext?
     private var didAttemptAutoReconnect = false
+    private var selectedConnectionFallback: SavedConnection?
+    private var isActivatingSyncedConnections = false
     private var browserService: RemoteFileService?
     private var browserServiceConnectionID: UUID?
     private var epgLoadID: UUID?
@@ -94,6 +97,7 @@ final class MacConnectionsViewModel: ObservableObject {
     var selectedConnection: SavedConnection? {
         guard let selectedConnectionID else { return nil }
         return savedConnections.first { $0.id == selectedConnectionID }
+            ?? selectedConnectionFallback
     }
 
     var canBookmarkFoldersInSelectedConnection: Bool {
@@ -312,6 +316,7 @@ final class MacConnectionsViewModel: ObservableObject {
         CloudSyncCoordinator.shared.markConnectionChanged(connection)
         try? modelContext?.save()
         CloudSyncCoordinator.shared.requestSync(reason: "connection-deleted", context: modelContext)
+        CloudSyncedConnectionActivation.removeProcessed(connectionId)
 
         connectionStatuses.removeValue(forKey: connectionId)
         connectionErrorMessages.removeValue(forKey: connectionId)
@@ -401,6 +406,7 @@ final class MacConnectionsViewModel: ObservableObject {
         guard let saved = savedConnections.first(where: { $0.id == connection.id }) else {
             return false
         }
+        CloudSyncedConnectionActivation.markProcessed([saved.id])
         await selectConnection(saved)
         return await connectAndScan(saved)
     }
@@ -493,6 +499,7 @@ final class MacConnectionsViewModel: ObservableObject {
         guard let saved = savedConnections.first(where: { $0.id == connectionId }) else {
             return false
         }
+        CloudSyncedConnectionActivation.markProcessed([saved.id])
         await selectConnection(saved)
         return await connectAndScan(saved)
     }
@@ -522,6 +529,7 @@ final class MacConnectionsViewModel: ObservableObject {
     }
 
     func selectConnection(_ connection: SavedConnection) async {
+        await ensureSavedConnectionVisible(connection)
         let isSameConnection = selectedConnectionID == connection.id
         if !isSameConnection {
             selectedConnectionID = connection.id
@@ -531,6 +539,11 @@ final class MacConnectionsViewModel: ObservableObject {
             fileBrowserErrorMessage = nil
             resetIPTVState()
             await disconnectBrowserServiceIfNeeded()
+        }
+        if promptIfMissingLocalCredential(connection) {
+            fileBrowserErrorMessage = connectionErrorMessages[connection.id]
+            files = []
+            return
         }
         await loadDirectory(path: currentPath)
     }
@@ -942,12 +955,20 @@ final class MacConnectionsViewModel: ObservableObject {
 
     private func reconcileSelectedConnection() {
         if savedConnections.isEmpty {
-            resetFileBrowser()
+            if selectedConnectionFallback == nil {
+                resetFileBrowser()
+            }
             return
         }
 
         if let selectedConnectionID,
            savedConnections.contains(where: { $0.id == selectedConnectionID }) {
+            selectedConnectionFallback = nil
+            return
+        }
+
+        if let selectedConnectionID,
+           selectedConnectionFallback?.id == selectedConnectionID {
             return
         }
 
@@ -956,6 +977,74 @@ final class MacConnectionsViewModel: ObservableObject {
         pathStack = []
         files = []
         fileBrowserErrorMessage = nil
+    }
+
+    private func ensureSavedConnectionVisible(_ connection: SavedConnection) async {
+        if savedConnections.contains(where: { $0.id == connection.id }) {
+            selectedConnectionFallback = nil
+            return
+        }
+        await loadSavedConnections()
+        if savedConnections.contains(where: { $0.id == connection.id }) {
+            selectedConnectionFallback = nil
+            return
+        }
+        selectedConnectionFallback = connection
+    }
+
+    @discardableResult
+    func promptIfMissingLocalCredential(_ connection: SavedConnection) -> Bool {
+        guard CloudSyncedConnectionActivation.needsLocalCredential(connection) else {
+            return false
+        }
+        let message = L10n.tr("此设备还没有密码，iCloud 不同步凭据。")
+        connectionStatuses[connection.id] = .failed
+        connectionErrorMessages[connection.id] = message
+        if pendingMissingCredentialConnection == nil {
+            pendingMissingCredentialConnection = connection
+        }
+        #if DEBUG
+        print("[Debug][CloudKit] missingCredential type=\(connection.type.rawValue)")
+        #endif
+        return true
+    }
+
+    /// Connects CloudKit-imported connections that this device has not handled yet.
+    /// Returns true when a media server connected so the home live refresh can run.
+    @discardableResult
+    func activateNewlySyncedConnections() async -> Bool {
+        guard !isActivatingSyncedConnections else { return false }
+        isActivatingSyncedConnections = true
+        defer { isActivatingSyncedConnections = false }
+
+        let newcomers = CloudSyncedConnectionActivation.unprocessedConnections(from: savedConnections)
+        guard !newcomers.isEmpty else { return false }
+
+        var didConnectMediaServer = false
+        for connection in newcomers {
+            CloudSyncedConnectionActivation.markProcessed([connection.id])
+            #if DEBUG
+            print("[Debug][CloudKit] activate type=\(connection.type.rawValue) missingCredential=\(CloudSyncedConnectionActivation.needsLocalCredential(connection))")
+            #endif
+
+            if connection.type == .localFolder {
+                await ensureLocalFolderAccess(for: connection.id)
+                continue
+            }
+
+            if promptIfMissingLocalCredential(connection) {
+                continue
+            }
+
+            let connected = await connectAndScan(connection, showErrorAlert: false)
+            if connected, connection.type.requiresManualDirectorySync {
+                _ = await syncAllBookmarks(for: connection)
+            }
+            if connected, connection.type.isMediaServer {
+                didConnectMediaServer = true
+            }
+        }
+        return didConnectMediaServer
     }
 
     private func loadEPGGuide(from service: RemoteFileService, connectionID: UUID) async {
@@ -982,6 +1071,7 @@ final class MacConnectionsViewModel: ObservableObject {
 
     private func resetFileBrowser() {
         selectedConnectionID = nil
+        selectedConnectionFallback = nil
         currentPath = "/"
         pathStack = []
         files = []

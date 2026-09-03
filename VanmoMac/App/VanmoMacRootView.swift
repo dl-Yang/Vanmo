@@ -108,6 +108,7 @@ struct VanmoMacRootView: View {
             await cloudSyncCoordinator.performSync(reason: "app-launch", context: modelContext)
             appState.notifyWatchHistoryDidChange()
             await connectionsViewModel.loadSavedConnections()
+            _ = await connectionsViewModel.activateNewlySyncedConnections()
             searchViewModel.setConnections(connectionsViewModel.savedConnections)
             await refreshLibrarySections()
 #if DEBUG
@@ -121,8 +122,12 @@ struct VanmoMacRootView: View {
                     await cloudSyncCoordinator.performSync(reason: "foreground", context: modelContext)
                     appState.notifyWatchHistoryDidChange()
                     await connectionsViewModel.loadSavedConnections()
+                    let needsLiveRefresh = await connectionsViewModel.activateNewlySyncedConnections()
                     searchViewModel.setConnections(connectionsViewModel.savedConnections)
-                    // 不再全量刷新 library：folder preview / Emby live 数据只在冷启动时加载一次。
+                    if needsLiveRefresh {
+                        await refreshLibrarySections(refreshEmbyLive: true)
+                    }
+                    // 已有连接不再全量刷新 library：folder preview / Emby live 只在冷启动或新导入媒体服务器时加载。
                 } else if newPhase == .background {
                     await downloadManager.suspend()
                 }
@@ -133,6 +138,11 @@ struct VanmoMacRootView: View {
             if !searchViewModel.searchText.isEmpty {
                 searchViewModel.search()
             }
+        }
+        .onChange(of: connectionsViewModel.pendingMissingCredentialConnection) { _, connection in
+            guard let connection else { return }
+            appState.presentEditConnection(connection)
+            connectionsViewModel.pendingMissingCredentialConnection = nil
         }
         .onChange(of: appState.pendingDownloadDetailTarget, initial: true) { _, target in
             guard let target else { return }
