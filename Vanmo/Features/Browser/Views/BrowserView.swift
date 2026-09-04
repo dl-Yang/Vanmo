@@ -78,6 +78,7 @@ struct ConnectionsView: View {
                 FilesCircleButton(asset: nil, systemName: "plus", tint: FilesDesign.accent, background: FilesDesign.addButtonBackground) {
                     viewModel.showAddConnection = true
                 }
+                .accessibilityIdentifier("files.addConnection")
             }
 
             if viewModel.savedConnections.isEmpty {
@@ -599,12 +600,7 @@ private struct ConnectionCard: View {
     var body: some View {
         HStack(spacing: 0) {
             FilesIconBox(background: FilesDesign.iconBoxGray) {
-                Image(connection.type.filesIconAsset)
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(FilesDesign.accent)
+                ConnectionProviderIcon(type: connection.type, size: 28, fallbackTint: FilesDesign.accent)
             }
 
             VStack(alignment: .leading, spacing: 0) {
@@ -837,20 +833,6 @@ private struct FilesMessageView: View {
 }
 
 // MARK: - 类型映射
-
-private extension ConnectionType {
-    /// Files 页连接图标（对齐设计稿 lucide：硬盘 / 服务器 / 文件夹）。
-    var filesIconAsset: String {
-        switch self {
-        case .localFolder:                 return "FilesFolder"
-        case .smb, .nfs:                   return "FilesHardDrive"
-        case .ftp, .sftp, .webdav, .alist, .removedOfficialCloudDrive, .baiduNetdisk, .drive115, .quarkDrive,
-             .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk, .mega,
-             .iptv, .fnos, .dlna,
-             .plex, .emby, .jellyfin:      return "FilesServer"
-        }
-    }
-}
 
 private extension RemoteFileType {
     var filesDisplayName: String {

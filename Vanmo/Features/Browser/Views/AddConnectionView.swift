@@ -162,17 +162,20 @@ struct AddConnectionView: View {
                     }
                 }
             } else {
-                Picker(L10n.tr("协议"), selection: $selectedType) {
-                    ForEach(ConnectionType.availableConnectionTypes) { type in
-                        Label {
-                            Text(type.displayName)
-                        } icon: {
-                            ConnectionProviderIcon(type: type, size: 18)
+                LabeledContent(L10n.tr("协议")) {
+                    Picker(L10n.tr("协议"), selection: $selectedType) {
+                        ForEach(ConnectionType.availableConnectionTypes) { type in
+                            Label {
+                                Text(type.displayName)
+                            } icon: {
+                                ConnectionProviderIcon(type: type, size: 18)
+                            }
+                            .tag(type)
                         }
-                        .tag(type)
                     }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
                 }
-                .pickerStyle(.menu)
                 .onChange(of: selectedType) { _, newValue in
                     useHTTPS = supportsHTTPS(for: newValue)
                         ? inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: newValue))

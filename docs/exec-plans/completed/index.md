@@ -23,6 +23,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 - [`2026-09-01-ios-home-detail-files-ui.md`](2026-09-01-ios-home-detail-files-ui.md) — **Completed.** iOS Simulator walk passed home loading under the title, favorites 1/2/3+, default hero, TV/movie resolution tags, Files root without status, and the Figma Add Connection dialogs.
 - [`2026-09-01-ios-testflight-launch-crash.md`](2026-09-01-ios-testflight-launch-crash.md) — **Completed.** TestFlight launch crash mitigated with CloudStore defaults, no `mediaKey` unique, local-only launch, and one-time store reset. CloudKit re-attach is recorded in the 2026-09-02 iCloud plan.
 - [`2026-09-02-icloud-debug-device.md`](2026-09-02-icloud-debug-device.md) — **Completed.** Signed iOS and macOS Debug attach `iCloud.com.vanmo.app`; Dashboard and macOS missing-password connect of an iOS-synced Emby row are recorded. Passwords stay on-device Keychain.
+- [`2026-09-01-ios-home-server-logos.md`](2026-09-01-ios-home-server-logos.md) — **Completed.** Home pill counts synced servers; Home, Files, and Add Connection use brand logos; operator iOS walk opened one movie and one TV-show detail with no crash.
 
 ## Archival Rules
 
