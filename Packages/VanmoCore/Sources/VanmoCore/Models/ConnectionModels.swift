@@ -287,7 +287,7 @@ public final class SavedConnection {
     public var addedAt: Date = Date()
     /// 连接配置最后修改时间，用于 CloudKit 冲突合并。
     public var updatedAt: Date = Date()
-    /// 软删除墓碑；CloudKit 同步到其他设备后再物理删除。
+    /// Legacy global hide. New deletes write `ConnectionTombstone` instead of this field.
     public var deletedAt: Date?
     /// 最后修改设备标识，辅助调试与 LWW。
     public var lastModifiedDeviceId: String?

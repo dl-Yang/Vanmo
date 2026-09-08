@@ -25,10 +25,13 @@ public enum CloudSyncedConnectionActivation {
 
     public static func unprocessedConnections(
         from connections: [SavedConnection],
+        hiddenIDs: Set<UUID> = [],
         defaults: UserDefaults = .standard
     ) -> [SavedConnection] {
         let processed = processedIDs(defaults: defaults)
-        return connections.filter { $0.deletedAt == nil && !processed.contains($0.id) }
+        return connections.filter {
+            $0.deletedAt == nil && !hiddenIDs.contains($0.id) && !processed.contains($0.id)
+        }
     }
 
     /// True when this device cannot authenticate the synced connection yet.
@@ -39,6 +42,43 @@ public enum CloudSyncedConnectionActivation {
             return (try? OAuthCredentialStore.load(connectionId: connection.id)) == nil
         }
         let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
-        return password?.isEmpty != false
+        return isMissingLocalPassword(password)
+    }
+
+    /// Missing Keychain item needs a prompt. Empty or non-empty strings are confirmed.
+    public static func isMissingLocalPassword(_ stored: String?) -> Bool {
+        stored == nil
+    }
+
+    /// `nil` means leave the existing Keychain item unchanged.
+    public static func resolvedPasswordToStore(
+        incoming: String?,
+        existing: String?,
+        replaceExisting: Bool
+    ) -> String? {
+        if let incoming, !incoming.isEmpty { return incoming }
+        if replaceExisting || existing == nil { return "" }
+        return nil
+    }
+
+    /// Writes `conn_<id>` for password-auth types. An empty string means this device
+    /// already confirmed that no password is required (public Emby, etc.).
+    /// `replaceExisting` is true for first save; false for edit-so-blank-keeps-current.
+    public static func persistLocalPassword(
+        _ password: String?,
+        for connection: SavedConnection,
+        replaceExisting: Bool
+    ) throws {
+        guard connection.type.requiresAuth, !connection.type.supportsOAuthLogin else { return }
+        let key = "conn_\(connection.id)"
+        let existing = try KeychainManager.shared.loadString(for: key)
+        guard let value = resolvedPasswordToStore(
+            incoming: password,
+            existing: existing,
+            replaceExisting: replaceExisting
+        ) else {
+            return
+        }
+        try KeychainManager.shared.save(value, for: key)
     }
 }

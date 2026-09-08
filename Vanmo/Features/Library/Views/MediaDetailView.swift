@@ -553,23 +553,47 @@ struct MediaDetailView: View {
         isUpdatingFavorite = true
         defer { isUpdatingFavorite = false }
 
+        let snapshot = try? mediaServerConnectionSnapshot()
+        let writeMediaServer = shouldWriteMediaServerFavorite(snapshot)
+
         do {
-            try await EmbyFavoriteUpdater.setFavorite(
-                item,
-                isFavorite: isFavorite,
-                connection: try? mediaServerConnectionSnapshot()
-            )
-            item.isFavorite = isFavorite
-            try updateStoredFavoriteState(isFavorite)
+            if writeMediaServer {
+                try await EmbyFavoriteUpdater.setFavorite(
+                    item,
+                    isFavorite: isFavorite,
+                    connection: snapshot
+                )
+            }
+            let persisted = try persistFavoriteState(isFavorite)
+            if persisted.isFavoriteCloudSynced {
+                CloudSyncCoordinator.shared.markMediaFavoriteChanged(persisted, in: modelContext)
+            }
             try modelContext.save()
-            NotificationCenter.default.post(name: .mediaFavoriteDidChange, object: item)
+            if persisted.isFavoriteCloudSynced {
+                CloudSyncCoordinator.shared.requestSync(reason: "favorite", context: modelContext)
+            }
+            NotificationCenter.default.post(name: .mediaFavoriteDidChange, object: persisted)
         } catch {
             favoriteErrorMessage = error.localizedDescription
         }
     }
 
-    private func updateStoredFavoriteState(_ isFavorite: Bool) throws {
-        guard let serverId = item.serverId else { return }
+    private func shouldWriteMediaServerFavorite(_ snapshot: MediaServerConnectionSnapshot?) -> Bool {
+        if snapshot != nil { return true }
+        if item.isFavoriteCloudSynced { return false }
+        return item.serverId != nil
+    }
+
+    @discardableResult
+    private func persistFavoriteState(_ isFavorite: Bool) throws -> MediaItem {
+        item.isFavorite = isFavorite
+
+        guard let serverId = item.serverId else {
+            if item.modelContext == nil, isFavorite {
+                modelContext.insert(item)
+            }
+            return item
+        }
 
         let sourceConnectionId = item.sourceConnectionId
         let descriptor = FetchDescriptor<MediaItem>(
@@ -580,7 +604,12 @@ struct MediaDetailView: View {
         )
         if let storedItem = try modelContext.fetch(descriptor).first {
             storedItem.isFavorite = isFavorite
+            return storedItem
         }
+        if isFavorite, item.modelContext == nil {
+            modelContext.insert(item)
+        }
+        return item
     }
 
     private func playEpisode(_ episode: EpisodeInfo) {

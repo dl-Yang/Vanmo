@@ -24,7 +24,7 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 
 ### In progress
 
-None.
+- None.
 
 ### Implemented, ready to run
 

@@ -206,6 +206,7 @@ final class ModelContainerFactoryTests: XCTestCase {
             SavedConnection.self,
             FolderBookmark.self,
             CloudMediaState.self,
+            ConnectionTombstone.self,
         ]) else {
             XCTFail("CloudStore managed object model was not created")
             return

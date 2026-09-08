@@ -66,4 +66,57 @@ final class CloudSyncedConnectionActivationTests: XCTestCase {
         let emby = SavedConnection(name: "Reno", type: .emby, host: "emby.local")
         XCTAssertTrue(CloudSyncedConnectionActivation.needsLocalCredential(emby))
     }
+
+    func testMissingKeychainItemNeedsCredentialButEmptyStringDoesNot() {
+        XCTAssertTrue(CloudSyncedConnectionActivation.isMissingLocalPassword(nil))
+        XCTAssertFalse(CloudSyncedConnectionActivation.isMissingLocalPassword(""))
+        XCTAssertFalse(CloudSyncedConnectionActivation.isMissingLocalPassword("secret"))
+    }
+
+    func testFirstSavePersistsEmptyPasswordWhenFormIsBlank() {
+        XCTAssertEqual(
+            CloudSyncedConnectionActivation.resolvedPasswordToStore(
+                incoming: nil,
+                existing: nil,
+                replaceExisting: true
+            ),
+            ""
+        )
+        XCTAssertEqual(
+            CloudSyncedConnectionActivation.resolvedPasswordToStore(
+                incoming: "",
+                existing: nil,
+                replaceExisting: true
+            ),
+            ""
+        )
+    }
+
+    func testEditKeepsExistingPasswordWhenFormIsBlank() {
+        XCTAssertNil(
+            CloudSyncedConnectionActivation.resolvedPasswordToStore(
+                incoming: nil,
+                existing: "secret",
+                replaceExisting: false
+            )
+        )
+        XCTAssertEqual(
+            CloudSyncedConnectionActivation.resolvedPasswordToStore(
+                incoming: nil,
+                existing: nil,
+                replaceExisting: false
+            ),
+            ""
+        )
+    }
+
+    func testReusedSaveKeepsExistingPasswordWhenFormIsBlank() {
+        XCTAssertNil(
+            CloudSyncedConnectionActivation.resolvedPasswordToStore(
+                incoming: "",
+                existing: "secret",
+                replaceExisting: false
+            )
+        )
+    }
 }

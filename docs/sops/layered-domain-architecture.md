@@ -23,8 +23,9 @@ platform applications, persistence, synchronization, or Xcode targets.
   keyboard and pointer behavior, desktop player adapters, and window cleanup.
 - SwiftData `LocalStore`: `MediaItem`, `PlaybackRecord`, and `ScanJobRecord`;
   never CloudKit-enabled.
-- SwiftData `CloudStore`: `SavedConnection`, `FolderBookmark`, and
-  `CloudMediaState`; CloudKit is optional when the user toggle is on.
+- SwiftData `CloudStore`: `SavedConnection`, `FolderBookmark`,
+  `CloudMediaState`, and `ConnectionTombstone`; CloudKit is optional when the
+  user toggle is on.
 - Keychain/OAuth storage: credentials and tokens. They do not belong in either
   SwiftData store.
 

@@ -268,6 +268,7 @@ Key models:
 - `PlaybackRecord`: local playback-history snapshot.
 - `FolderBookmark`: a remote directory selected for synchronization.
 - `CloudMediaState`: the minimal progress and favorite state synchronized across devices.
+- `ConnectionTombstone`: a per-device CloudStore hide marker for a `SavedConnection`. Other devices ignore tombstones that are not theirs.
 - `ScanJobRecord`: persistent scan status and progress.
 
 ### 6.2 Persistence and Scanning
@@ -277,7 +278,7 @@ Key models:
 | Store | Models | CloudKit |
 |---|---|---|
 | `LocalStore` | `MediaItem`, `PlaybackRecord`, `ScanJobRecord` | Never enabled |
-| `CloudStore` | `SavedConnection`, `FolderBookmark`, `CloudMediaState` | When `CloudSyncPreferences.isEnabled` is true, launch uses `.private("iCloud.com.vanmo.app")`. A throwing create falls back to `.none`; an unreadable store is deleted once and recreated locally |
+| `CloudStore` | `SavedConnection`, `FolderBookmark`, `CloudMediaState`, `ConnectionTombstone` | When `CloudSyncPreferences.isEnabled` is true, launch uses `.private("iCloud.com.vanmo.app")`. A throwing create falls back to `.none`; an unreadable store is deleted once and recreated locally |
 
 The full media catalog is never uploaded to CloudKit. Only connections, folder bookmarks, and minimal media state are synchronized. Media-server progress and favorites can be excluded through flags on `MediaItem`, allowing the server to remain authoritative.
 
@@ -382,13 +383,15 @@ Metadata has two complementary paths:
 
 - It responds to app launch, foreground transitions, and write-path triggers.
 - It debounces frequent writes by 500 milliseconds.
-- It uses `CloudSyncConflictResolver` to merge conflicts that SwiftData and CloudKit have delivered locally.
-- Connections and bookmarks use modification timestamps, device identifiers, and soft-delete tombstones.
-- Playback progress and favorites synchronize through `CloudMediaState`, not the complete `MediaItem`.
+- Overlapping `performSync` calls coalesce into one in-flight run plus one pending follow-up.
+- It uses `CloudSyncConflictResolver` to merge conflicts that SwiftData and CloudKit have delivered locally. File-based progress keeps the later `lastPlayedAt` (and the farther position when those timestamps are within two seconds). File-based favorites keep the later `favoriteUpdatedAt`. Watched stays true once set. Duplicate host-based `SavedConnection` rows with the same identity (`type + host + port + username`, with port `0` treated as the type default and SMB `guest` treated as empty) collapse to the earlier `addedAt` (then UUID) winner: local media, bookmarks, and `CloudMediaState` keys remap, then the extra CloudStore row is deleted so CloudKit does not keep two records. Duplicate `CloudMediaState` rows with the same `mediaKey` and duplicate live folder bookmarks with the same `connectionId + path` collapse to one winner. Emby / Jellyfin / Plex items do not take CloudKit progress or favorites; the media server stays authoritative.
+- Connections and bookmarks use modification timestamps and device identifiers. Deleting a connection writes a per-device `ConnectionTombstone` and clears that device's LocalStore `MediaItem` / `PlaybackRecord` rows. The CloudStore `SavedConnection` row stays so other devices keep the connection. The legacy global `deletedAt` field still hides a row everywhere if it is already set; new deletes do not write it.
+- Playback progress and favorites synchronize through `CloudMediaState`, not the complete `MediaItem`. The CloudKit `mediaKey` is `connectionId + normalized server path`, not `fileURL.absoluteString`, so a catalog placeholder (`vanmo://playback/smb/...`) and a live `smb://` stream URL for the same file share one row. Live SMB URLs must not carry credentials into CloudKit.
+- Home continue-watching rows whose `sourceConnectionId` is not a connection visible on this device are hidden.
 
 The coordinator does not implement a transport protocol. The CloudKit-enabled SwiftData `ModelConfiguration` performs the underlying synchronization.
 
-After launch or foreground merge, iOS and macOS reload CloudStore connections and activate IDs that this device has not processed yet (`cloudSync.processedConnectionIDs`). Activation reuses the existing `connectAndScan` / Emby live refresh / bookmark-sync path. Local folders are not full-scanned. Missing Keychain passwords or OAuth tokens open the edit-connection sheet. Credentials stay out of CloudKit and do not use iCloud Keychain; the 2026-09-03 decision keeps on-device Keychain only.
+After launch or foreground merge, iOS and macOS reload CloudStore connections visible on this device and activate IDs that this device has not processed yet (`cloudSync.processedConnectionIDs`). Activation reuses the existing `connectAndScan` / Emby live refresh / bookmark-sync path. Local folders are not full-scanned. A newly imported connection that still lacks a Keychain item or OAuth token is marked failed and does not auto-present the editor; selecting that connection does. An empty Keychain password is a confirmed no-password save and does not re-prompt. Saving a host-based connection (`type + host + port + username`) reuses the matching live or locally tombstoned CloudStore row instead of inserting a second one. A CloudKit-imported duplicate of a visible identity is collapsed onto that winner and deleted from CloudStore; it is not scanned as a second connection. Local folders and OAuth drives are not merged. Credentials stay out of CloudKit and do not use iCloud Keychain; the 2026-09-03 decision keeps on-device Keychain only.
 
 ### 6.9 Interface Language
 

@@ -148,10 +148,14 @@ final class ConnectionsViewModel: ObservableObject {
         guard let context = modelContext else { return }
         do {
             let descriptor = FetchDescriptor<SavedConnection>(
-                predicate: #Predicate { $0.deletedAt == nil },
                 sortBy: [SortDescriptor(\.lastConnectedAt, order: .reverse)]
             )
-            savedConnections = try context.fetch(descriptor)
+            let hiddenIDs = ConnectionVisibility.hiddenConnectionIDs(in: context)
+            let visible = ConnectionVisibility.visibleConnections(
+                from: try context.fetch(descriptor),
+                hiddenIDs: hiddenIDs
+            )
+            savedConnections = ConnectionIdentity.hideDuplicates(visible, in: context)
             await reconcileActiveMediaServer()
             reconcileSelectedConnection()
         } catch {
@@ -379,7 +383,7 @@ final class ConnectionsViewModel: ObservableObject {
         path: String?,
         bookmarkData: Data? = nil
     ) async -> Bool {
-        let connection = SavedConnection(
+        let candidate = SavedConnection(
             name: name,
             type: type,
             host: host,
@@ -390,7 +394,7 @@ final class ConnectionsViewModel: ObservableObject {
         )
 
         do {
-            try await verifyConnectionAccess(connection, password: password)
+            try await verifyConnectionAccess(candidate, password: password)
         } catch is CancellationError {
             return false
         } catch {
@@ -399,20 +403,42 @@ final class ConnectionsViewModel: ObservableObject {
         }
 
         if Task.isCancelled { return false }
+        guard let context = modelContext else { return false }
 
-        modelContext?.insert(connection)
+        let resolved = ConnectionIdentity.resolveForSave(
+            name: name,
+            type: type,
+            host: host,
+            port: port,
+            username: username,
+            path: path,
+            bookmarkData: bookmarkData,
+            in: context
+        )
+        let connection = resolved.connection
 
-        if let password, !password.isEmpty {
-            try? KeychainManager.shared.save(password, for: "conn_\(connection.id)")
+        do {
+            try CloudSyncedConnectionActivation.persistLocalPassword(
+                password,
+                for: connection,
+                replaceExisting: !resolved.reused
+            )
+            CloudSyncCoordinator.shared.markConnectionChanged(connection)
+            try context.save()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
         }
 
-        try? modelContext?.save()
-        CloudSyncCoordinator.shared.markConnectionChanged(connection)
-        CloudSyncCoordinator.shared.requestSync(reason: "connection-created", context: modelContext)
+        CloudSyncCoordinator.shared.requestSync(
+            reason: resolved.reused ? "connection-updated" : "connection-created",
+            context: context
+        )
         await loadSavedConnections()
         if let saved = savedConnections.first(where: { $0.id == connection.id }) {
             CloudSyncedConnectionActivation.markProcessed([saved.id])
-            await selectConnection(saved)
+            await selectConnection(saved, promptForMissingCredential: false)
             // 地址和凭据已通过；扫描失败不回退入库，也不把「无法保存」回给添加页。
             _ = await connectAndScan(saved, showErrorAlert: false)
         }
@@ -450,14 +476,16 @@ final class ConnectionsViewModel: ObservableObject {
     ) async -> Bool {
         guard let context = modelContext else { return false }
 
-        if let password, !password.isEmpty {
-            do {
-                try KeychainManager.shared.save(password, for: "conn_\(connection.id)")
-            } catch {
-                errorMessage = "保存密码失败: \(error.localizedDescription)"
-                showError = true
-                return false
-            }
+        do {
+            try CloudSyncedConnectionActivation.persistLocalPassword(
+                password,
+                for: connection,
+                replaceExisting: false
+            )
+        } catch {
+            errorMessage = "保存密码失败: \(error.localizedDescription)"
+            showError = true
+            return false
         }
 
         connection.name = name
@@ -527,7 +555,7 @@ final class ConnectionsViewModel: ObservableObject {
             return false
         }
         CloudSyncedConnectionActivation.markProcessed([saved.id])
-        await selectConnection(saved)
+        await selectConnection(saved, promptForMissingCredential: false)
         return await connectAndScan(saved, showErrorAlert: true)
     }
 
@@ -551,7 +579,6 @@ final class ConnectionsViewModel: ObservableObject {
 
     func deleteConnection(_ connection: SavedConnection) {
         let connectionId = connection.id
-        let isMediaServerConnection = connection.type.isMediaServer
 
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
         if connection.type.supportsOAuthLogin {
@@ -577,14 +604,16 @@ final class ConnectionsViewModel: ObservableObject {
             }
         }
 
-        deleteMediaItems(for: connectionId)
-        deleteFolderBookmarks(for: connectionId)
-        modelContext?.delete(connection)
-        try? modelContext?.save()
+        if let context = modelContext {
+            ConnectionVisibility.upsertTombstone(for: connectionId, in: context)
+            ConnectionLocalCleanup.deleteLocalMedia(for: connectionId, in: context)
+            try? context.save()
+        }
         CloudSyncCoordinator.shared.requestSync(reason: "connection-deleted", context: modelContext)
         CloudSyncedConnectionActivation.removeProcessed(connectionId)
         connectionStatuses.removeValue(forKey: connectionId)
         connectionErrorMessages.removeValue(forKey: connectionId)
+        savedConnections.removeAll { $0.id == connectionId }
         let deletedSelectedConnection = selectedConnectionID == connectionId
         if deletedSelectedConnection {
             resetFileBrowser()
@@ -595,9 +624,7 @@ final class ConnectionsViewModel: ObservableObject {
             if deletedSelectedConnection {
                 await loadSelectedConnectionRootIfNeeded()
             }
-            if isMediaServerConnection {
-                librarySyncCompletionID += 1
-            }
+            librarySyncCompletionID += 1
         }
     }
 
@@ -640,24 +667,6 @@ final class ConnectionsViewModel: ObservableObject {
             }
         } catch {
             VanmoLogger.library.error("[Connections] Update folder bookmark names failed: \(error.localizedDescription)")
-        }
-    }
-
-    private func deleteMediaItems(for connectionId: UUID) {
-        guard let context = modelContext else { return }
-
-        do {
-            let descriptor = FetchDescriptor<MediaItem>(
-                predicate: #Predicate<MediaItem> { item in
-                    item.sourceConnectionId == connectionId
-                }
-            )
-            let items = try context.fetch(descriptor)
-            for item in items {
-                context.delete(item)
-            }
-        } catch {
-            VanmoLogger.library.error("[Connections] Delete cached media failed: \(error.localizedDescription)")
         }
     }
 
@@ -752,25 +761,7 @@ final class ConnectionsViewModel: ObservableObject {
         return last.isEmpty ? file.path : last
     }
 
-    private func deleteFolderBookmarks(for connectionId: UUID) {
-        guard let context = modelContext else { return }
-        let targetConnectionId = connectionId
-        let descriptor = FetchDescriptor<FolderBookmark>(
-            predicate: #Predicate<FolderBookmark> { bookmark in
-                bookmark.connectionId == targetConnectionId
-            }
-        )
-        do {
-            let bookmarks = try context.fetch(descriptor)
-            for bookmark in bookmarks {
-                context.delete(bookmark)
-            }
-        } catch {
-            VanmoLogger.library.error("[Connections] Delete folder bookmarks failed: \(error.localizedDescription)")
-        }
-    }
-
-    func selectConnection(_ connection: SavedConnection) async {
+    func selectConnection(_ connection: SavedConnection, promptForMissingCredential: Bool = true) async {
         await ensureSavedConnectionVisible(connection)
         let isSameConnection = selectedConnectionID == connection.id
         if !isSameConnection {
@@ -782,7 +773,7 @@ final class ConnectionsViewModel: ObservableObject {
             resetIPTVState()
             await disconnectBrowserServiceIfNeeded()
         }
-        if promptIfMissingLocalCredential(connection) {
+        if promptForMissingCredential, promptIfMissingLocalCredential(connection) {
             fileBrowserErrorMessage = connectionErrorMessages[connection.id]
             files = []
             return
@@ -935,18 +926,18 @@ final class ConnectionsViewModel: ObservableObject {
     }
 
     @discardableResult
-    func promptIfMissingLocalCredential(_ connection: SavedConnection) -> Bool {
+    func promptIfMissingLocalCredential(_ connection: SavedConnection, presentEditor: Bool = true) -> Bool {
         guard CloudSyncedConnectionActivation.needsLocalCredential(connection) else {
             return false
         }
         let message = L10n.tr("此设备还没有密码，iCloud 不同步凭据。")
         connectionStatuses[connection.id] = .failed
         connectionErrorMessages[connection.id] = message
-        if pendingMissingCredentialConnection == nil {
+        if presentEditor, pendingMissingCredentialConnection == nil {
             pendingMissingCredentialConnection = connection
         }
         #if DEBUG
-        print("[Debug][CloudKit] missingCredential type=\(connection.type.rawValue)")
+        print("[Debug][CloudKit] missingCredential type=\(connection.type.rawValue) presentEditor=\(presentEditor)")
         #endif
         return true
     }
@@ -959,11 +950,30 @@ final class ConnectionsViewModel: ObservableObject {
         isActivatingSyncedConnections = true
         defer { isActivatingSyncedConnections = false }
 
-        let newcomers = CloudSyncedConnectionActivation.unprocessedConnections(from: savedConnections)
+        let hiddenIDs = modelContext.map { ConnectionVisibility.hiddenConnectionIDs(in: $0) } ?? []
+        let newcomers = CloudSyncedConnectionActivation.unprocessedConnections(
+            from: savedConnections,
+            hiddenIDs: hiddenIDs
+        )
         guard !newcomers.isEmpty else { return false }
 
         var didConnectMediaServer = false
+        if let context = modelContext {
+            let removedIDs = ConnectionIdentity.collapseDuplicates(in: context)
+            if !removedIDs.isEmpty {
+                try? context.save()
+                savedConnections.removeAll { removedIDs.contains($0.id) }
+            }
+        }
+
         for connection in newcomers {
+            if !savedConnections.contains(where: { $0.id == connection.id }) {
+                #if DEBUG
+                print("[Debug][CloudKit] skipDuplicate type=\(connection.type.rawValue)")
+                #endif
+                continue
+            }
+
             CloudSyncedConnectionActivation.markProcessed([connection.id])
             #if DEBUG
             print("[Debug][CloudKit] activate type=\(connection.type.rawValue) missingCredential=\(CloudSyncedConnectionActivation.needsLocalCredential(connection))")
@@ -974,7 +984,7 @@ final class ConnectionsViewModel: ObservableObject {
                 continue
             }
 
-            if promptIfMissingLocalCredential(connection) {
+            if promptIfMissingLocalCredential(connection, presentEditor: false) {
                 continue
             }
 

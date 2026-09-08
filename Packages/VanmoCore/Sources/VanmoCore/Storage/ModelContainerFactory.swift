@@ -19,6 +19,7 @@ public enum ModelContainerFactory {
         SavedConnection.self,
         FolderBookmark.self,
         CloudMediaState.self,
+        ConnectionTombstone.self,
     ])
 
     public static let schema = Schema([
@@ -27,12 +28,13 @@ public enum ModelContainerFactory {
         PlaybackRecord.self,
         FolderBookmark.self,
         CloudMediaState.self,
+        ConnectionTombstone.self,
         ScanJobRecord.self,
     ])
 
     /// 共享 SwiftData 容器：
     /// - 本地库：MediaItem / PlaybackRecord / ScanJobRecord，永不启用 CloudKit
-    /// - 云库：SavedConnection / FolderBookmark / CloudMediaState
+    /// - 云库：SavedConnection / FolderBookmark / CloudMediaState / ConnectionTombstone
     ///
     /// 用户打开 iCloud 同步时 CloudStore 使用 `.private(iCloud.com.vanmo.app)`。
     /// 创建抛错时回退 `.none`，必要时删除损坏的 store 后再建本地容器。
@@ -69,7 +71,7 @@ public enum ModelContainerFactory {
             }
             if adoptionPrepared {
                 #if DEBUG
-                print("[Debug][CloudKit] reset CloudStore to adopt private CloudKit connections=\(snapshot.connections.count) bookmarks=\(snapshot.bookmarks.count) mediaStates=\(snapshot.mediaStates.count)")
+                print("[Debug][CloudKit] reset CloudStore to adopt private CloudKit connections=\(snapshot.connections.count) bookmarks=\(snapshot.bookmarks.count) mediaStates=\(snapshot.mediaStates.count) tombstones=\(snapshot.tombstones.count)")
                 #endif
             } else {
                 VanmoLogger.storage.error("CloudStore snapshot failed; keeping existing CloudStore")
@@ -348,7 +350,8 @@ public enum ModelContainerFactory {
             snapshot = CloudStoreSnapshot(
                 connections: try context.fetch(FetchDescriptor<SavedConnection>()).map(SavedConnectionDraft.init),
                 bookmarks: try context.fetch(FetchDescriptor<FolderBookmark>()).map(FolderBookmarkDraft.init),
-                mediaStates: try context.fetch(FetchDescriptor<CloudMediaState>()).map(CloudMediaStateDraft.init)
+                mediaStates: try context.fetch(FetchDescriptor<CloudMediaState>()).map(CloudMediaStateDraft.init),
+                tombstones: try context.fetch(FetchDescriptor<ConnectionTombstone>()).map(ConnectionTombstoneDraft.init)
             )
         }
         var overlaid = snapshot
@@ -363,7 +366,8 @@ public enum ModelContainerFactory {
         let types = connections.map(\.type.rawValue).sorted().joined(separator: ",")
         let bookmarks = (try? context.fetch(FetchDescriptor<FolderBookmark>()))?.count ?? 0
         let states = (try? context.fetch(FetchDescriptor<CloudMediaState>()))?.count ?? 0
-        print("[Debug][CloudKit] cloudCounts connections=\(connections.count) types=\(types) bookmarks=\(bookmarks) mediaStates=\(states)")
+        let tombstones = (try? context.fetch(FetchDescriptor<ConnectionTombstone>()))?.count ?? 0
+        print("[Debug][CloudKit] cloudCounts connections=\(connections.count) types=\(types) bookmarks=\(bookmarks) mediaStates=\(states) tombstones=\(tombstones)")
     }
     #endif
 
@@ -393,6 +397,9 @@ public enum ModelContainerFactory {
         }
         for draft in snapshot.mediaStates {
             context.insert(CloudMediaState(draft: draft))
+        }
+        for draft in snapshot.tombstones {
+            context.insert(ConnectionTombstone(draft: draft))
         }
         do {
             try context.save()

@@ -272,9 +272,10 @@ struct CloudStoreSnapshot {
     var connections: [SavedConnectionDraft] = []
     var bookmarks: [FolderBookmarkDraft] = []
     var mediaStates: [CloudMediaStateDraft] = []
+    var tombstones: [ConnectionTombstoneDraft] = []
 
     var isEmpty: Bool {
-        connections.isEmpty && bookmarks.isEmpty && mediaStates.isEmpty
+        connections.isEmpty && bookmarks.isEmpty && mediaStates.isEmpty && tombstones.isEmpty
     }
 }
 
@@ -368,6 +369,20 @@ struct CloudMediaStateDraft {
     var deletedAt: Date?
 }
 
+struct ConnectionTombstoneDraft {
+    init(_ tombstone: ConnectionTombstone) {
+        id = tombstone.id
+        connectionId = tombstone.connectionId
+        deviceId = tombstone.deviceId
+        deletedAt = tombstone.deletedAt
+    }
+
+    var id: UUID
+    var connectionId: UUID
+    var deviceId: String
+    var deletedAt: Date
+}
+
 extension SavedConnection {
     convenience init(draft: SavedConnectionDraft) {
         self.init(
@@ -421,6 +436,14 @@ extension CloudMediaState {
         favoriteUpdatedAt = draft.favoriteUpdatedAt
         syncUpdatedAt = draft.syncUpdatedAt
         lastModifiedDeviceId = draft.lastModifiedDeviceId
+        deletedAt = draft.deletedAt
+    }
+}
+
+extension ConnectionTombstone {
+    convenience init(draft: ConnectionTombstoneDraft) {
+        self.init(connectionId: draft.connectionId, deviceId: draft.deviceId)
+        id = draft.id
         deletedAt = draft.deletedAt
     }
 }

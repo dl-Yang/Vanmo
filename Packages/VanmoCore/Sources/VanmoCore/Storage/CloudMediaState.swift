@@ -26,18 +26,64 @@ public final class CloudMediaState {
 }
 
 public enum CloudMediaStateStore {
+    /// Stable CloudKit identity: connection + server path.
+    /// Never use a live `smb://user:pass@host/...` string; iOS stores
+    /// `vanmo://playback/smb/...` while an older Mac row may still hold the SMB URL.
     public static func mediaKey(for item: MediaItem) -> String {
-        item.fileURL.absoluteString
+        groupingKey(
+            connectionId: item.sourceConnectionId,
+            serverPath: item.serverId,
+            fileURL: item.fileURL
+        )
+    }
+
+    public static func groupingKey(for state: CloudMediaState) -> String {
+        if state.mediaKey.hasPrefix("conn:")
+            || state.mediaKey.hasPrefix("path:")
+            || state.mediaKey.hasPrefix("url:") {
+            return state.mediaKey
+        }
+        if let url = URL(string: state.mediaKey) {
+            return groupingKey(
+                connectionId: state.sourceConnectionId,
+                serverPath: nil,
+                fileURL: url
+            )
+        }
+        return state.mediaKey
+    }
+
+    public static func groupingKey(
+        connectionId: UUID?,
+        serverPath: String?,
+        fileURL: URL
+    ) -> String {
+        let path = normalizedServerPath(serverPath: serverPath, fileURL: fileURL)
+        if let connectionId, !path.isEmpty {
+            return "conn:\(connectionId.uuidString.lowercased())|\(path)"
+        }
+        if !path.isEmpty {
+            return "path:\(path)"
+        }
+        return "url:\(credentialFreeURLIdentity(fileURL))"
+    }
+
+    public static func normalizedServerPath(serverPath: String?, fileURL: URL) -> String {
+        if let serverPath {
+            let normalized = normalizePath(serverPath)
+            if !normalized.isEmpty { return normalized }
+        }
+        return pathFromPlaybackOrRemoteURL(fileURL)
     }
 
     @MainActor
     public static func fetchOrCreate(for item: MediaItem, in context: ModelContext) -> CloudMediaState {
         let key = mediaKey(for: item)
-        let descriptor = FetchDescriptor<CloudMediaState>(
-            predicate: #Predicate { $0.mediaKey == key && $0.deletedAt == nil }
-        )
-        if let existing = try? context.fetch(descriptor).first {
+        if let existing = fetchExact(key, in: context) {
             return existing
+        }
+        if let migrated = migrateLegacyRow(for: item, canonicalKey: key, in: context) {
+            return migrated
         }
         let state = CloudMediaState(
             mediaKey: key,
@@ -71,6 +117,7 @@ public enum CloudMediaStateStore {
         state.sourceConnectionId = item.sourceConnectionId
         state.isFavorite = item.isFavorite
         let now = Date()
+        item.favoriteUpdatedAt = now
         state.favoriteUpdatedAt = now
         state.syncUpdatedAt = now
         state.lastModifiedDeviceId = CloudSyncDevice.id
@@ -92,7 +139,7 @@ public enum CloudMediaStateStore {
         }
 
         for state in states {
-            let item = itemsByKey[state.mediaKey] ?? state.mediaItemID.flatMap { itemsByID[$0] }
+            let item = itemsByKey[groupingKey(for: state)] ?? state.mediaItemID.flatMap { itemsByID[$0] }
             guard let item, item.isProgressCloudSynced || item.isFavoriteCloudSynced else { continue }
 
             if item.isProgressCloudSynced {
@@ -118,5 +165,76 @@ public enum CloudMediaStateStore {
                 )
             }
         }
+    }
+
+    @MainActor
+    private static func fetchExact(_ key: String, in context: ModelContext) -> CloudMediaState? {
+        let descriptor = FetchDescriptor<CloudMediaState>(
+            predicate: #Predicate { $0.mediaKey == key && $0.deletedAt == nil }
+        )
+        return try? context.fetch(descriptor).first
+    }
+
+    @MainActor
+    private static func migrateLegacyRow(
+        for item: MediaItem,
+        canonicalKey: String,
+        in context: ModelContext
+    ) -> CloudMediaState? {
+        let rawURL = item.fileURL.absoluteString
+        if rawURL != canonicalKey, let existing = fetchExact(rawURL, in: context) {
+            existing.mediaKey = canonicalKey
+            existing.sourceConnectionId = item.sourceConnectionId ?? existing.sourceConnectionId
+            return existing
+        }
+        guard let connectionId = item.sourceConnectionId else { return nil }
+        let path = normalizedServerPath(serverPath: item.serverId, fileURL: item.fileURL)
+        guard !path.isEmpty else { return nil }
+        let candidates = (try? context.fetch(FetchDescriptor<CloudMediaState>())) ?? []
+        if let match = candidates.first(where: { state in
+            state.deletedAt == nil
+                && state.sourceConnectionId == connectionId
+                && groupingKey(for: state) == canonicalKey
+        }) {
+            match.mediaKey = canonicalKey
+            return match
+        }
+        return nil
+    }
+
+    static func pathFromPlaybackOrRemoteURL(_ url: URL) -> String {
+        if url.scheme?.lowercased() == "vanmo", url.host?.lowercased() == "playback" {
+            var parts = url.path.split(separator: "/").map(String.init)
+            if let first = parts.first, ConnectionType(rawValue: first) != nil {
+                parts.removeFirst()
+            }
+            return normalizePath(parts.joined(separator: "/"))
+        }
+        return normalizePath(url.path)
+    }
+
+    static func normalizePath(_ raw: String) -> String {
+        var path = (raw.removingPercentEncoding ?? raw)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if path.isEmpty { return "" }
+        if !path.hasPrefix("/") {
+            path = "/\(path)"
+        }
+        while path.contains("//") {
+            path = path.replacingOccurrences(of: "//", with: "/")
+        }
+        if path.count > 1, path.hasSuffix("/") {
+            path.removeLast()
+        }
+        return path.lowercased()
+    }
+
+    static func credentialFreeURLIdentity(_ url: URL) -> String {
+        var parts = URLComponents()
+        parts.scheme = url.scheme?.lowercased()
+        parts.host = url.host?.lowercased()
+        parts.port = url.port
+        parts.path = normalizePath(url.path)
+        return parts.string ?? normalizePath(url.path)
     }
 }

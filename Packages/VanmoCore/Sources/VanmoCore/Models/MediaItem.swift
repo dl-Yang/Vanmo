@@ -24,6 +24,8 @@ public final class MediaItem {
     public var lastPlaybackPosition: TimeInterval
     public var isWatched: Bool
     public var isFavorite: Bool
+    /// Last local or cloud favorite toggle. Used for CloudKit last-write merge.
+    public var favoriteUpdatedAt: Date?
     public var addedAt: Date
 
     public var tmdbID: Int?

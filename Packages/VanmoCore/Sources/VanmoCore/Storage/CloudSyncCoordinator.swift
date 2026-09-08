@@ -10,6 +10,9 @@ public final class CloudSyncCoordinator: ObservableObject {
     @Published public private(set) var statusMessage: String?
 
     private var debounceTask: Task<Void, Never>?
+    private var isPerformingSync = false
+    private var pendingSyncReason: String?
+    private var pendingSyncContext: ModelContext?
 
     private init() {
         lastSyncAt = CloudSyncPreferences.lastSyncAt
@@ -36,7 +39,27 @@ public final class CloudSyncCoordinator: ObservableObject {
 
     public func performSync(reason: String, context: ModelContext?) async {
         guard isEnabled, let context else { return }
+        if isPerformingSync {
+            pendingSyncReason = reason
+            pendingSyncContext = context
+            return
+        }
 
+        isPerformingSync = true
+        var currentReason = reason
+        var currentContext = context
+        while true {
+            await runSync(reason: currentReason, context: currentContext)
+            guard let pendingReason = pendingSyncReason else { break }
+            pendingSyncReason = nil
+            currentReason = pendingReason
+            currentContext = pendingSyncContext ?? currentContext
+            pendingSyncContext = nil
+        }
+        isPerformingSync = false
+    }
+
+    private func runSync(reason: String, context: ModelContext) async {
         do {
             try CloudSyncConflictResolver.mergePendingConflicts(in: context)
             try context.save()

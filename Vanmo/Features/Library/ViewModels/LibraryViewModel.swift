@@ -768,21 +768,19 @@ final class LibraryViewModel: ObservableObject {
     ) async throws -> InitialSnapshot {
         let container = context.container
         let limit = highlightSectionLimit
-        let mediaServerConnectionIds = Set(connections.filter { $0.type.isMediaServer }.map(\.id))
+        let visibleConnectionIds = Set(connections.map(\.id))
         let hiddenConnectionIds = Set(serverConnectionErrors.keys)
 
         return try await Task.detached(priority: .userInitiated) {
             let bgCtx = ModelContext(container)
             func isVisibleHighlight(_ item: MediaItem) -> Bool {
-                if let sourceConnectionId = item.sourceConnectionId,
-                   hiddenConnectionIds.contains(sourceConnectionId) {
-                    return false
-                }
-                guard let sourceConnectionId = item.sourceConnectionId,
-                      mediaServerConnectionIds.contains(sourceConnectionId) else {
+                guard let sourceConnectionId = item.sourceConnectionId else {
                     return true
                 }
-                return true
+                if hiddenConnectionIds.contains(sourceConnectionId) {
+                    return false
+                }
+                return visibleConnectionIds.contains(sourceConnectionId)
             }
 
             // 继续观看：lastPlayedAt 非空即视为可恢复播放，不再额外按 mediaType 过滤，

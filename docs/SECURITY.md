@@ -15,7 +15,7 @@ This document defines Vanmo's durable rules for credentials, persisted data, URL
 
 - `LocalStore` owns local media, playback-history, and scan-job data and is never CloudKit-enabled.
 - `CloudStore` may contain saved connection configuration, folder bookmarks, and minimal media state only when CloudKit is enabled for the build and the user iCloud sync preference is on.
-- The full media catalog and credentials must not be uploaded to CloudKit.
+- The full media catalog and credentials must not be uploaded to CloudKit. `CloudMediaState.mediaKey` is `connectionId + path`, not a live `smb://user:pass@...` stream URL.
 - Every new model must be assigned deliberately to a store and added through `ModelContainerFactory` with tests and migration consideration.
 - SwiftData model objects and `ModelContext` must not cross unstructured concurrency boundaries unsafely.
 

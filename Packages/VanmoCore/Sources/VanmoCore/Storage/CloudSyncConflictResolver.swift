@@ -25,8 +25,10 @@ public enum CloudSyncConflictResolver {
 
     public static func mergeFavorite(into item: MediaItem, isFavorite: Bool, updatedAt: Date) {
         guard item.isFavoriteCloudSynced else { return }
-        _ = updatedAt
+        let existing = item.favoriteUpdatedAt ?? .distantPast
+        guard updatedAt >= existing else { return }
         item.isFavorite = isFavorite
+        item.favoriteUpdatedAt = updatedAt
     }
 
     public static func mergeWatched(into item: MediaItem, isWatched: Bool, updatedAt: Date) {
@@ -69,8 +71,65 @@ public enum CloudSyncConflictResolver {
 
     @MainActor
     public static func mergePendingConflicts(in context: ModelContext) throws {
+        _ = ConnectionIdentity.collapseDuplicates(in: context)
+        try dedupeCloudMediaStates(in: context)
         try dedupeFolderBookmarks(in: context)
         try CloudMediaStateStore.applyCloudStates(in: context)
+    }
+
+    @MainActor
+    static func dedupeCloudMediaStates(in context: ModelContext) throws {
+        let states = try context.fetch(
+            FetchDescriptor<CloudMediaState>(
+                predicate: #Predicate { $0.deletedAt == nil }
+            )
+        )
+        var groups: [String: [CloudMediaState]] = [:]
+        for state in states {
+            groups[CloudMediaStateStore.groupingKey(for: state), default: []].append(state)
+        }
+        for (canonicalKey, group) in groups {
+            let ranked = group.sorted { lhs, rhs in
+                let lhsSync = lhs.syncUpdatedAt ?? .distantPast
+                let rhsSync = rhs.syncUpdatedAt ?? .distantPast
+                if lhsSync != rhsSync { return lhsSync > rhsSync }
+                return lhs.persistentModelID.hashValue > rhs.persistentModelID.hashValue
+            }
+            guard let winner = ranked.first else { continue }
+            winner.mediaKey = canonicalKey
+            guard group.count > 1 else { continue }
+            for loser in ranked.dropFirst() {
+                mergeCloudMediaState(winner, with: loser)
+                context.delete(loser)
+            }
+        }
+    }
+
+    static func mergeCloudMediaState(_ winner: CloudMediaState, with loser: CloudMediaState) {
+        let winnerPlayed = winner.lastPlayedAt ?? .distantPast
+        let loserPlayed = loser.lastPlayedAt ?? .distantPast
+        if loserPlayed > winnerPlayed
+            || (abs(loserPlayed.timeIntervalSince(winnerPlayed)) <= progressTieBreakInterval
+                && loser.lastPlaybackPosition > winner.lastPlaybackPosition) {
+            winner.lastPlaybackPosition = loser.lastPlaybackPosition
+            winner.lastPlayedAt = loser.lastPlayedAt
+            winner.progressUpdatedAt = loser.progressUpdatedAt
+        }
+        if loser.isWatched {
+            winner.isWatched = true
+        }
+        let winnerFavoriteAt = winner.favoriteUpdatedAt ?? .distantPast
+        let loserFavoriteAt = loser.favoriteUpdatedAt ?? .distantPast
+        if loserFavoriteAt >= winnerFavoriteAt {
+            winner.isFavorite = loser.isFavorite
+            winner.favoriteUpdatedAt = loser.favoriteUpdatedAt
+        }
+        let winnerSync = winner.syncUpdatedAt ?? .distantPast
+        let loserSync = loser.syncUpdatedAt ?? .distantPast
+        if loserSync > winnerSync {
+            winner.syncUpdatedAt = loser.syncUpdatedAt
+            winner.lastModifiedDeviceId = loser.lastModifiedDeviceId
+        }
     }
 
     @MainActor

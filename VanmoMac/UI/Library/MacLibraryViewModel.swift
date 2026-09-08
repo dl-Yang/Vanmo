@@ -900,12 +900,15 @@ final class MacLibraryViewModel: ObservableObject {
 
         return try await Task.detached(priority: .userInitiated) {
             let bgCtx = ModelContext(container)
+            let visibleConnectionIds = ConnectionVisibility.visibleConnectionIDs(in: bgCtx)
             func isVisibleHighlight(_ item: MediaItem) -> Bool {
-                if let sourceConnectionId = item.sourceConnectionId,
-                   hiddenConnectionIds.contains(sourceConnectionId) {
+                guard let sourceConnectionId = item.sourceConnectionId else {
+                    return true
+                }
+                if hiddenConnectionIds.contains(sourceConnectionId) {
                     return false
                 }
-                return true
+                return visibleConnectionIds.contains(sourceConnectionId)
             }
 
             let playedDescriptor = FetchDescriptor<MediaItem>(

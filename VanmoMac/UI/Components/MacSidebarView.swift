@@ -158,10 +158,8 @@ struct MacSidebarView: View {
     @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @Environment(\.macTheme) private var theme
     @Environment(\.openSettings) private var openSettings
-    @Query(
-        filter: #Predicate<SavedConnection> { $0.deletedAt == nil },
-        sort: \SavedConnection.name
-    ) private var connections: [SavedConnection]
+    @Query(sort: \SavedConnection.name) private var connections: [SavedConnection]
+    @Query private var tombstones: [ConnectionTombstone]
 
     @State private var dragStartWidth: CGFloat?
     @State private var liveSidebarWidth: CGFloat?
@@ -169,6 +167,15 @@ struct MacSidebarView: View {
 
     private var displayedSidebarWidth: CGFloat {
         liveSidebarWidth ?? appState.sidebarWidth
+    }
+
+    private var visibleConnections: [SavedConnection] {
+        let hiddenIDs = Set(
+            tombstones.compactMap { tombstone in
+                tombstone.deviceId == CloudSyncDevice.id ? tombstone.connectionId : nil
+            }
+        )
+        return ConnectionVisibility.visibleConnections(from: connections, hiddenIDs: hiddenIDs)
     }
 
     var body: some View {
@@ -219,7 +226,7 @@ struct MacSidebarView: View {
                     .padding(.top, 24)
                     .padding(.bottom, 8)
 
-                    ForEach(connections) { connection in
+                    ForEach(visibleConnections) { connection in
                         MacConnectionSidebarRow(
                             connectionsViewModel: connectionsViewModel,
                             connection: connection,

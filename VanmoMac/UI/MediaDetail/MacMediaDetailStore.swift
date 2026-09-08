@@ -494,11 +494,13 @@ final class MacMediaDetailStore: ObservableObject {
         let targetFavorite = !isFavorite
 
         do {
-            if item.serverId != nil {
+            let snapshot = try? mediaServerConnectionSnapshot(for: item, in: modelContext)
+            let writeMediaServer = snapshot != nil || (!item.isFavoriteCloudSynced && item.serverId != nil)
+            if writeMediaServer {
                 try await EmbyFavoriteUpdater.setFavorite(
                     item,
                     isFavorite: targetFavorite,
-                    connection: try? mediaServerConnectionSnapshot(for: item, in: modelContext)
+                    connection: snapshot
                 )
             }
             try persistFavoriteState(

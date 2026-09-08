@@ -326,7 +326,7 @@ public final class DownloadManager: ObservableObject {
             predicate: #Predicate { $0.id == connectionId }
         )
         guard let connection = try modelContext.fetch(descriptor).first,
-              connection.deletedAt == nil else {
+              ConnectionVisibility.isVisible(connection, in: modelContext) else {
             throw DownloadError.missingConnection
         }
         guard DownloadEligibility.isSupported(connectionType: connection.type) else {

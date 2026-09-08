@@ -87,6 +87,7 @@ fi
 # 2) SwiftData CloudKit container wiring (VanmoCore + 双端 App 入口)
 if rg -q 'cloudKitDatabase' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
    rg -q 'CloudMediaState' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
+   rg -q 'ConnectionTombstone' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
    rg -q 'CLOUDKIT_SYNC_ENABLED' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
    rg -q 'resolvedCloudKitDatabase' Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift && \
    rg -q 'ModelContainerFactory.makeSharedContainer' Vanmo/App/VanmoApp.swift VanmoMac/App/VanmoMacApp.swift; then
