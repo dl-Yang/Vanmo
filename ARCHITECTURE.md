@@ -1,6 +1,6 @@
 # Vanmo Architecture
 
-> This document describes the repository as of September 3, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
+> This document describes the repository as of September 10, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
 > If this document conflicts with the code, treat `project.yml`, `Packages/VanmoCore/Package.swift`, and the current implementation as the sources of truth.
 
 ## 1. System Overview
@@ -291,7 +291,9 @@ Scanning has two layers:
 - `ScanCoordinator` is a `@MainActor ObservableObject` responsible for task lifecycle, UI progress, pause/resume/cancel operations, and `ScanJobRecord`.
 - `MediaScanner` is an actor responsible for concurrent directory traversal, incremental comparison, batched saves, pruning missing items, NFO parsing, and collecting media-probe candidates.
 
-Scan results are sent to `MediaProbeQueue`, which fills technical metadata such as codec, dimensions, and dynamic range. Most file-based connections require the user to choose a directory before synchronization. Media servers and IPTV follow service-specific flows.
+Scan results are sent to `MediaProbeQueue`, which fills technical metadata such as codec, dimensions, and dynamic range. `VideoThumbnailQueue` then fills missing `posterURL` values with a local JPEG under Application Support. App-target `KSPlayerVideoThumbnailExtractor` opens one `KSMEPlayer` at a time (`maxConcurrent = 1`), waits for the first decoded keyframe, and copies it with `thumbnailImageAtCurrentTime()`. JPEG covers are stored at the source frame size with quality `1.0` (`maxPixelSize = 0` means no scale). When `StreamingRequestHeaders` supplies a provider (Google Drive Bearer), the queue registers `PrefetchProxy` and extracts from the localhost URL; a failed register skips the raw HTTPS open. Baidu Netdisk is an official download link, not a seekable original stream: covers use `filemetas thumb=1` (`thumbs.url3/url2/url1/icon`) and skip KSPlayer keyframe extraction; play opens the ephemeral `dlink` with `User-Agent: pan.baidu.com` and does not Range-probe it through `PrefetchProxy`. The public open platform has no own-file M3U8 streaming method; share-link `method=streaming` is out of scope. `smb` / `ftp` / `sftp` thumbnail opens, media probes, and iOS `KSPlayerEngine` playback all share `LibavformatOpenGate` for the lifetime of that FFmpeg protocol context; concurrent `avformat_open_input` on `smb://` aborts in libsmbclient `talloc`. KSPlayer `shutdown()` returns before `avformat_close_input` finishes, so `LibavformatOpenGate.exclusive` and iOS playback `releaseAfterProtocolCloseDrain()` wait a short close drain before the next open. Presenting the player pauses the cover queue; dismissing it resumes. macOS playback stays on the localhost prefetch proxy and does not take this gate. Those JPEG files stay on-device in LocalStore and are not CloudKit-synced.
+
+File-based connections (`requiresManualDirectorySync`) still use manual deep directory sync. On this device, the first connect with no local `MediaItem` rows also runs a shallow root scan (`ScanScope.shallowRoot`, `maxDepth = 1`, `pruneMissing = false`) of the browser root plus immediate subfolders. A later connect that already has local rows does not scan again; if any of those rows still lack `posterURL`, only cover extraction is resumed. An empty shallow result keeps the connection off the Home scanned-library rows. Scan identity uses a normalized `serverId` path key (`ScanItemPathKey`) so slash spelling differences do not insert a second row. Same-folder episode clusters are decided by `EpisodeClusterPlanner` and grouped for display by `ScannedShowGrouping` using `connectionId + parent directory + show title`. Media servers and IPTV follow service-specific flows.
 
 ### 6.3 Remote Connection Abstraction
 
@@ -314,7 +316,7 @@ File-based services implement `RemoteFileService`, which defines:
 
 `RemoteServiceFactory` currently maps connection types as follows:
 
-- Concrete service classes: Local Folder, SMB, FTP, SFTP, WebDAV/AList/fnOS, Baidu Netdisk, Google Drive, OneDrive, Box, pCloud, Yandex.Disk, IPTV, Emby, Jellyfin, and Plex.
+- Concrete service classes: Local Folder, SMB, FTP, SFTP, WebDAV/AList/fnOS, Baidu Netdisk, Google Drive, OneDrive, Box, pCloud, Yandex.Disk, IPTV, Emby, Jellyfin, and Plex. Baidu listing uses official `categorylist` (`category=1`, `recursion=0`, `show_dir=1`, `start`/`cursor`) so scan and Files only see videos and folders in the current directory; `method=list` `page+limit` is not used.
 - Explicitly unsupported placeholders: the removed Aliyun Drive type, 115, Quark Drive, and MEGA.
 - FTP is a real RFC 959 client (`PASV`/`EPSV`, `MLSD`/`LIST`, `REST`/`RETR`) with prefetch `source=ftp`. SFTP is a password-authenticated Citadel client (SSH + SFTP subsystem) with prefetch `source=sftp`. First-version host-key policy accepts any server key. SSH public-key and known-hosts UI are not implemented.
 - NFS, DLNA, and other types without dedicated implementations fall back to a generic HTTP placeholder.
@@ -344,7 +346,7 @@ Scanning persists catalog URLs in the `vanmo://playback/...` form instead of sto
 - It listens on a random `127.0.0.1` port.
 - Each item receives a token and a `PrefetchSession`.
 - `RemoteFetcher`, `RangeCache`, and temporary files handle remote Range requests and caching.
-- Header providers inject dynamic credentials such as Google Drive bearer tokens and the Baidu Netdisk User-Agent.
+- Header providers come from `StreamingRequestHeaders` and inject dynamic credentials such as Google Drive bearer tokens and the Baidu Netdisk User-Agent. Play and Google/Baidu cover extraction share that helper. iOS play falls back to `KSOptions.appendHeader` only when prefetch registration fails; it does not open those sources without headers.
 - `smb://`, `ftp://`, and `sftp://` registrations use protocol-specific byte sources. KSPlayer loads the localhost proxy for FTP and SFTP on both platforms.
 
 ### 6.5 Downloads
@@ -365,7 +367,7 @@ The queue is suspended and resumed with application lifecycle changes.
 
 Metadata has two complementary paths:
 
-- Catalog identification uses `FileNameParser`, `DirectorySemanticsParser`, `NFOMetadataParser`, `MediaIdentificationPipeline`, and `MediaItemFactory`.
+- Catalog identification uses `FileNameParser`, `DirectorySemanticsParser`, `NFOMetadataParser`, `MediaIdentificationPipeline`, `EpisodeClusterPlanner`, and `MediaItemFactory`.
 - Detail refresh uses `MetadataRefreshCoordinator` to load metadata, episodes, and cast from Emby, Jellyfin, or Plex before persisting a `MetadataCacheRecord`.
 
 `MetadataCache` is an actor that serializes disk-cache operations. The UI first renders basic `MediaItem` fields and then merges cached or network-enriched data.
@@ -385,7 +387,7 @@ Metadata has two complementary paths:
 - It debounces frequent writes by 500 milliseconds.
 - Overlapping `performSync` calls coalesce into one in-flight run plus one pending follow-up.
 - It uses `CloudSyncConflictResolver` to merge conflicts that SwiftData and CloudKit have delivered locally. File-based progress keeps the later `lastPlayedAt` (and the farther position when those timestamps are within two seconds). File-based favorites keep the later `favoriteUpdatedAt`. Watched stays true once set. Duplicate host-based `SavedConnection` rows with the same identity (`type + host + port + username`, with port `0` treated as the type default and SMB `guest` treated as empty) collapse to the earlier `addedAt` (then UUID) winner: local media, bookmarks, and `CloudMediaState` keys remap, then the extra CloudStore row is deleted so CloudKit does not keep two records. Duplicate `CloudMediaState` rows with the same `mediaKey` and duplicate live folder bookmarks with the same `connectionId + path` collapse to one winner. Emby / Jellyfin / Plex items do not take CloudKit progress or favorites; the media server stays authoritative.
-- Connections and bookmarks use modification timestamps and device identifiers. Deleting a connection writes a per-device `ConnectionTombstone` and clears that device's LocalStore `MediaItem` / `PlaybackRecord` rows. The CloudStore `SavedConnection` row stays so other devices keep the connection. The legacy global `deletedAt` field still hides a row everywhere if it is already set; new deletes do not write it.
+- Connections and bookmarks use modification timestamps and device identifiers. Deleting a connection cancels an in-flight scan, drops in-memory `MediaItem` UI references, then writes a per-device `ConnectionTombstone` and clears that device's LocalStore `MediaItem` / `PlaybackRecord` rows. The CloudStore `SavedConnection` row stays so other devices keep the connection. The legacy global `deletedAt` field still hides a row everywhere if it is already set; new deletes do not write it.
 - Playback progress and favorites synchronize through `CloudMediaState`, not the complete `MediaItem`. The CloudKit `mediaKey` is `connectionId + normalized server path`, not `fileURL.absoluteString`, so a catalog placeholder (`vanmo://playback/smb/...`) and a live `smb://` stream URL for the same file share one row. Live SMB URLs must not carry credentials into CloudKit.
 - Home continue-watching rows whose `sourceConnectionId` is not a connection visible on this device are hidden.
 
@@ -424,7 +426,7 @@ Appearance settings on both apps expose the three options and remind the user th
 `PlayerEngine` unifies playback state, time, duration, buffering, subtitles, track selection, and controls:
 
 - `AVPlayerEngine` wraps AVPlayer, native media selection, system buffering state, and text subtitles.
-- `KSPlayerEngine` handles FFmpeg demuxing and decoding, software-decode fallback after hardware-decode failure, rich-text/image subtitles, chapters, and Picture in Picture adaptation.
+- `KSPlayerEngine` handles FFmpeg demuxing and decoding, software-decode fallback after hardware-decode failure, rich-text/image subtitles, chapters, and Picture in Picture adaptation. Direct `smb` / `ftp` / `sftp` loads hold `LibavformatOpenGate` from `prepareToPlay` until shutdown plus a short close drain so probe and cover extraction cannot open a second libsmbclient context.
 
 `PlayerViewModel` subscribes to engine Combine publishers and manages:
 

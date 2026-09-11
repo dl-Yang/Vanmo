@@ -2,6 +2,8 @@ import Foundation
 
 public enum ScanScope: Sendable, Equatable {
     case connectionRoot
+    /// Root plus immediate subfolders only. Must not prune deeper existing items.
+    case shallowRoot
     case directory(path: String)
     case bookmarks(paths: [String])
 
@@ -9,14 +11,14 @@ public enum ScanScope: Sendable, Equatable {
         switch self {
         case .connectionRoot:
             return false
-        case .directory, .bookmarks:
+        case .shallowRoot, .directory, .bookmarks:
             return true
         }
     }
 
     public var rootPaths: [String] {
         switch self {
-        case .connectionRoot:
+        case .connectionRoot, .shallowRoot:
             return []
         case .directory(let path):
             return [path]
@@ -31,6 +33,8 @@ public extension RemoteScanOptions {
         switch scope {
         case .connectionRoot:
             return forConnectionRoot(forceFullScan: forceFullScan, connectionType: connectionType)
+        case .shallowRoot:
+            return forInitialShallowRoot(connectionType: connectionType)
         case .directory, .bookmarks:
             return forPartialDirectory(forceFullScan: forceFullScan, connectionType: connectionType)
         }

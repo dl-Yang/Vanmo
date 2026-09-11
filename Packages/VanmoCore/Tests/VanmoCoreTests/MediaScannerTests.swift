@@ -22,6 +22,24 @@ final class FileNameParserTests: XCTestCase {
         let parsed = FileNameParser.parse("庆余年.第01集.1080p.mp4")
         XCTAssertTrue(parsed.isTV)
         XCTAssertEqual(parsed.episode, 1)
+        XCTAssertEqual(parsed.title, "庆余年")
+        XCTAssertEqual(parsed.patternKind, .chineseEpisode)
+    }
+
+    func testParsesAdjacentChineseShowAndEpisode() {
+        let parsed = FileNameParser.parse("咒术回战第01集.mp4")
+        XCTAssertTrue(parsed.isTV)
+        XCTAssertEqual(parsed.title, "咒术回战")
+        XCTAssertEqual(parsed.episode, 1)
+        XCTAssertEqual(parsed.patternKind, .chineseEpisode)
+    }
+
+    func testParsesChineseEpisodeHua() {
+        let parsed = FileNameParser.parse("咒术回战第03话.mkv")
+        XCTAssertTrue(parsed.isTV)
+        XCTAssertEqual(parsed.title, "咒术回战")
+        XCTAssertEqual(parsed.episode, 3)
+        XCTAssertEqual(parsed.patternKind, .chineseEpisode)
     }
 
     func testParsesAnimeBracketEpisode() {
@@ -229,6 +247,42 @@ final class MediaScannerTests: XCTestCase {
         )
         XCTAssertEqual(second.insertedItems.count, 0)
         XCTAssertEqual(second.unchangedCount, 1)
+    }
+
+    func testIncrementalScanTreatsNormalizedPathsAsSameItem() async throws {
+        let connectionId = UUID()
+        let modified = Date(timeIntervalSince1970: 1_700_000_000)
+        let scanner = MediaScanner(modelContainer: container)
+        let first = try await scanner.scanRemoteDirectory(
+            service: MockRemoteFileService(filesByDirectory: [
+                "/": [
+                    mockVideo(path: "/movie.mkv", name: "Movie.2020.mkv", size: 500, modified: modified)
+                ]
+            ]),
+            path: "/",
+            connectionId: connectionId,
+            in: context,
+            options: .forConnectionRoot(forceFullScan: false)
+        )
+        XCTAssertEqual(first.insertedItems.count, 1)
+
+        let second = try await scanner.scanRemoteDirectory(
+            service: MockRemoteFileService(filesByDirectory: [
+                "/": [
+                    mockVideo(path: "movie.mkv", name: "Movie.2020.mkv", size: 500, modified: modified)
+                ]
+            ]),
+            path: "/",
+            connectionId: connectionId,
+            in: context,
+            options: .forConnectionRoot(forceFullScan: false)
+        )
+        XCTAssertEqual(second.insertedItems.count, 0)
+        XCTAssertEqual(second.unchangedCount, 1)
+
+        let items = try context.fetch(FetchDescriptor<MediaItem>())
+            .filter { $0.sourceConnectionId == connectionId }
+        XCTAssertEqual(items.count, 1)
     }
 
     func testFullScanPrunesMissingItems() async throws {

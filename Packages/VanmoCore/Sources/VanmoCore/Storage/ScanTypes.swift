@@ -211,4 +211,16 @@ public struct RemoteScanOptions: Sendable {
             maxConcurrentDirectories: connectionType?.serviceCapabilities.maxConcurrentDirectoryReads ?? 2
         )
     }
+
+    /// First-connect scan of the outermost path: root files plus one folder level.
+    /// Never prune — a later manual deep scan must keep those items.
+    public static func forInitialShallowRoot(connectionType: ConnectionType? = nil) -> RemoteScanOptions {
+        RemoteScanOptions(
+            maxDepth: 1,
+            forceFullScan: false,
+            pruneMissing: false,
+            isPartialScan: true,
+            maxConcurrentDirectories: connectionType?.serviceCapabilities.maxConcurrentDirectoryReads ?? 2
+        )
+    }
 }

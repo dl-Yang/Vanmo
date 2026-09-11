@@ -154,6 +154,8 @@
 		EB215A56D1547DDFADF6C4C4 /* iptv.png in Resources */ = {isa = PBXBuildFile; fileRef = 6D6524ADADB8CC750BE7000A /* iptv.png */; };
 		EB758A74342A89D52B40C26B /* loadingSpinner.json in Resources */ = {isa = PBXBuildFile; fileRef = 1FFCF33F1D900A4B2797C123 /* loadingSpinner.json */; };
 		EBE3CFC47BAB98876DCD20FA /* ConnectionProviderIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7553292EBCA6B2F858ABC102 /* ConnectionProviderIcon.swift */; };
+		EC1C047F64854D6079D1CA53 /* KSPlayerVideoThumbnailExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86E5C58E34AA9D39FABA7633 /* KSPlayerVideoThumbnailExtractor.swift */; };
+		EC44402BEDE44C8320C3DD94 /* KSPlayerVideoThumbnailExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA77F177C2594A21A8372CB /* KSPlayerVideoThumbnailExtractor.swift */; };
 		EEE94A8BC9E412841A4FA59F /* SubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B7332CE86F10F0D7D0A3A4 /* SubtitleOverlayView.swift */; };
 		EF67AFEA69D6D34EF1AC1A4E /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B3D0B1F917828F998055F1 /* LibraryView.swift */; };
 		F031D0424EB370CEC07AA037 /* MacScannedLibraryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */; };
@@ -254,11 +256,13 @@
 		7B45846B6B09E717C245CFD9 /* MacScanSyncBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScanSyncBanner.swift; sourceTree = "<group>"; };
 		7BAFA7DEA8E1C7B77F951404 /* ftp.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ftp.png; sourceTree = "<group>"; };
 		7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChipsRow.swift; sourceTree = "<group>"; };
+		7FA77F177C2594A21A8372CB /* KSPlayerVideoThumbnailExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerVideoThumbnailExtractor.swift; sourceTree = "<group>"; };
 		8331488DDF8E08E73F3667EF /* Vanmo-Cloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Cloud.entitlements"; sourceTree = "<group>"; };
 		83FDFF1091EE82F447D35C39 /* MacKSPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacKSPlayerView.swift; sourceTree = "<group>"; };
 		8636415210B4191F85B68B7E /* MacRemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRemoteImage.swift; sourceTree = "<group>"; };
 		86786584DACF6F5FC223B219 /* KSPlayerMediaProbeProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerMediaProbeProvider.swift; sourceTree = "<group>"; };
 		86D3F3AD3CCD5F63E8C40925 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		86E5C58E34AA9D39FABA7633 /* KSPlayerVideoThumbnailExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerVideoThumbnailExtractor.swift; sourceTree = "<group>"; };
 		8975545DA300E57FD1C133D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		898928A3506370EB7FCD0FF8 /* PlatformCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformCompatibility.swift; sourceTree = "<group>"; };
 		8A20D39765496E942D610EFB /* MacSettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsViewModel.swift; sourceTree = "<group>"; };
@@ -563,6 +567,7 @@
 			isa = PBXGroup;
 			children = (
 				736B4DD3127AB97D0DC63402 /* KSPlayerMediaProbeProvider.swift */,
+				7FA77F177C2594A21A8372CB /* KSPlayerVideoThumbnailExtractor.swift */,
 			);
 			path = Metadata;
 			sourceTree = "<group>";
@@ -667,6 +672,7 @@
 			isa = PBXGroup;
 			children = (
 				86786584DACF6F5FC223B219 /* KSPlayerMediaProbeProvider.swift */,
+				86E5C58E34AA9D39FABA7633 /* KSPlayerVideoThumbnailExtractor.swift */,
 			);
 			path = Metadata;
 			sourceTree = "<group>";
@@ -1208,6 +1214,7 @@
 				C1830AAC09C0E61B711D11F8 /* Color+Mac.swift in Sources */,
 				03B0F2B61C7AE2F1ADA9FCCF /* Int64+FileSize.swift in Sources */,
 				FD10B87504DB9EC3579C70A4 /* KSPlayerMediaProbeProvider.swift in Sources */,
+				EC44402BEDE44C8320C3DD94 /* KSPlayerVideoThumbnailExtractor.swift in Sources */,
 				4B88C61B8F139EB885CDFAB8 /* LoadingIndicatorView.swift in Sources */,
 				49740FB0D4E2989DAAEDA7C3 /* MacAVPlayerView.swift in Sources */,
 				482D6C1831D360002E8F3554 /* MacAddConnectionView.swift in Sources */,
@@ -1300,6 +1307,7 @@
 				DB26E3C4BEC970BA23430A51 /* Int64+FileSize.swift in Sources */,
 				E27647CBF81A4FD67C50E33E /* KSPlayerEngine.swift in Sources */,
 				D442E93B0F496CD0726CDA47 /* KSPlayerMediaProbeProvider.swift in Sources */,
+				EC1C047F64854D6079D1CA53 /* KSPlayerVideoThumbnailExtractor.swift in Sources */,
 				8DB4CC7410DB6E78F9D74BD1 /* LibraryFilters.swift in Sources */,
 				EF67AFEA69D6D34EF1AC1A4E /* LibraryView.swift in Sources */,
 				FF84C30ADC33D47677635F7B /* LibraryViewModel.swift in Sources */,

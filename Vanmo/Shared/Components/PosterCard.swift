@@ -35,6 +35,7 @@ struct PosterCard: View {
             titleOverlay
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
         .shadow(
             color: showShadow ? .black.opacity(0.25) : .clear,
             radius: showShadow ? 8 : 0,
@@ -59,6 +60,8 @@ struct PosterCard: View {
                         .resizable()
                         .scaledToFill()
                 }
+                .clipped()
+                .contentShape(Rectangle())
                 .overlay(alignment: .topTrailing) {
                     if let rating, rating > 0 {
                         RatingBadge(rating)
@@ -84,6 +87,7 @@ struct PosterCard: View {
         .frame(maxWidth: .infinity)
         .aspectRatio(2 / 3, contentMode: .fit)
         .clipped()
+        .contentShape(Rectangle())
     }
 
     private var placeholderView: some View {

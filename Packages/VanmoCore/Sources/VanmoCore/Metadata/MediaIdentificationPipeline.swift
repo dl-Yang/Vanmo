@@ -159,6 +159,23 @@ public enum MediaIdentificationPipeline {
     }
 }
 
+public extension MediaIdentificationResult {
+    func clusteredEpisode(showTitle: String, episode: Int, season: Int?) -> MediaIdentificationResult {
+        MediaIdentificationResult(
+            title: LocalizedFormat.episodeLabel(episode),
+            showTitle: showTitle,
+            episodeTitle: episodeTitle,
+            year: year,
+            season: season ?? self.season,
+            episode: episode,
+            mediaType: .tvEpisode,
+            overview: overview,
+            tmdbID: tmdbID,
+            confidence: max(confidence, 0.75)
+        )
+    }
+}
+
 public struct DirectorySemantics: Sendable, Equatable {
     public enum Kind: Sendable {
         case movieRoot

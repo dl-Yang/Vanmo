@@ -34,6 +34,31 @@ final class SearchViewModel: ObservableObject {
         self.modelContext = context
     }
 
+    func removeResults(forConnectionId connectionId: UUID) {
+        searchTask?.cancel()
+        searchTask = nil
+        searchGeneration = UUID()
+        isSearching = false
+
+        connectionSnapshots.removeAll { $0.id == connectionId }
+        let nextSections = sections.compactMap { section -> SearchResultSection? in
+            let items = section.items.filter { item in
+                guard !item.item.isDeleted else { return false }
+                return item.item.sourceConnectionId != connectionId
+            }
+            guard !items.isEmpty else { return nil }
+            return SearchResultSection(
+                id: section.id,
+                title: section.title,
+                subtitle: section.subtitle,
+                items: items
+            )
+        }
+        sections = nextSections
+        results = nextSections.flatMap { section in section.items.map(\.item) }
+        searchedSourceCount = nextSections.count
+    }
+
     func setConnections(_ connections: [SavedConnection]) {
         connectionSnapshots = connections.map { connection in
             let password = connection.type == .localFolder ? nil : try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")

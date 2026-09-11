@@ -54,6 +54,28 @@ public enum ScanLibraryQueries {
     }
 
     @MainActor
+    public static func itemsMissingPosters(connectionId: UUID, in context: ModelContext) -> [MediaItem] {
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { item in
+                item.sourceConnectionId == connectionId
+            }
+        )
+        let items = (try? context.fetch(descriptor)) ?? []
+        return items.filter { $0.posterURL == nil }
+    }
+
+    @MainActor
+    public static func hasMediaItems(connectionId: UUID, in context: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { item in
+                item.sourceConnectionId == connectionId
+            }
+        )
+        descriptor.fetchLimit = 1
+        return ((try? context.fetch(descriptor)) ?? []).isEmpty == false
+    }
+
+    @MainActor
     public static func stats(
         for connectionId: UUID,
         in context: ModelContext,

@@ -13,7 +13,7 @@ struct MacMediaListRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.displayTitle)
+                Text(item.title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(2)

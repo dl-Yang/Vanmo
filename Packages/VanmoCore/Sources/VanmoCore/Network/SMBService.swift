@@ -198,6 +198,28 @@ public final class SMBService: RemoteFileService {
         return Int64(stat.size)
     }
 
+    public func writePrefix(at path: String, to localURL: URL, maxBytes: Int) async throws {
+        let cap = max(64 * 1024, maxBytes)
+        if FileManager.default.fileExists(atPath: localURL.path) {
+            try FileManager.default.removeItem(at: localURL)
+        }
+        FileManager.default.createFile(atPath: localURL.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: localURL)
+        defer { try? handle.close() }
+
+        var offset: UInt64 = 0
+        let max = UInt64(cap)
+        while offset < max {
+            let chunk = UInt32(min(UInt64(256 * 1024), max - offset))
+            let data = try await readRange(at: path, offset: offset, length: chunk)
+            if data.isEmpty { break }
+            try handle.write(contentsOf: data)
+            offset += UInt64(data.count)
+            if data.count < Int(chunk) { break }
+        }
+        guard offset > 0 else { throw NetworkError.transferFailed("empty prefix") }
+    }
+
     public func readRange(at path: String, offset: UInt64, length: UInt32) async throws -> Data {
         guard isConnected, let client else { throw NetworkError.notConnected }
         let (shareName, subpath) = SMBConnectionEndpoint.splitSharePath(path)

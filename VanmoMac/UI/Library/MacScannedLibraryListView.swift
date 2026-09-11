@@ -12,7 +12,7 @@ struct MacScannedLibraryListView: View {
     let collectionType: EmbyCollectionType
 
     @State private var movies: [MediaItem] = []
-    @State private var shows: [MacScannedShowSummary] = []
+    @State private var shows: [ScannedShowSummary] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var mediaPurgeHandlerId: UUID?
@@ -55,6 +55,7 @@ struct MacScannedLibraryListView: View {
         .background(theme.appBackground)
         .task(id: "\(connection.id)-\(collectionType.rawValue)") {
             loadItems()
+            await refreshPostersWhileMissing()
         }
         .onAppear {
             guard mediaPurgeHandlerId == nil else { return }
@@ -76,7 +77,7 @@ struct MacScannedLibraryListView: View {
         }
     }
 
-    private func sortedShows(_ input: [MacScannedShowSummary]) -> [MacScannedShowSummary] {
+    private func sortedShows(_ input: [ScannedShowSummary]) -> [ScannedShowSummary] {
         switch libraryViewModel.sortOption {
         case .title:
             return input.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -115,7 +116,7 @@ struct MacScannedLibraryListView: View {
         LazyVGrid(columns: columns, spacing: MacDesignTokens.Layout.posterSpacing) {
             switch collectionType {
             case .movies:
-                ForEach(aliveMovies) { item in
+                ForEach(aliveMovies, id: \.id) { item in
                     MacPosterCard(
                         title: item.displayTitle,
                         subtitle: movieSubtitle(item),
@@ -126,13 +127,17 @@ struct MacScannedLibraryListView: View {
                     .macMediaItemContextMenu(for: item)
                 }
             case .tvshows:
-                ForEach(shows) { show in
+                ForEach(shows, id: \.id) { show in
                     MacPosterCard(
                         title: show.title,
                         subtitle: "\(show.episodeCount) 集",
                         posterURL: show.posterURL
                     ) {
-                        appState.openScannedShowDetail(connection: connection, showTitle: show.title)
+                        appState.openScannedShowDetail(
+                            connection: connection,
+                            showTitle: show.title,
+                            parentDirectory: show.parentDirectory
+                        )
                     }
                 }
             case .playlists:
@@ -148,9 +153,13 @@ struct MacScannedLibraryListView: View {
             MacLibraryPosterList(items: aliveMovies, onSelect: { appState.openDetail($0) })
         case .tvshows:
             LazyVStack(spacing: 0) {
-                ForEach(shows) { show in
+                ForEach(shows, id: \.id) { show in
                     Button {
-                        appState.openScannedShowDetail(connection: connection, showTitle: show.title)
+                        appState.openScannedShowDetail(
+                            connection: connection,
+                            showTitle: show.title,
+                            parentDirectory: show.parentDirectory
+                        )
                     } label: {
                         HStack(spacing: 12) {
                             MacRemoteImage(url: show.posterURL)
@@ -186,6 +195,34 @@ struct MacScannedLibraryListView: View {
         return item.mediaType.displayName
     }
 
+    private func refreshPostersWhileMissing() async {
+        while !Task.isCancelled {
+            let missingMoviePosters = movies.contains { $0.posterURL == nil }
+            let missingShowPosters = shows.contains { $0.posterURL == nil }
+            guard missingMoviePosters || missingShowPosters else { return }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            reloadItemsQuietly()
+        }
+    }
+
+    private func reloadItemsQuietly() {
+        do {
+            let descriptor = FetchDescriptor<MediaItem>(
+                sortBy: [SortDescriptor(\.addedAt, order: .reverse)]
+            )
+            let items = try modelContext.fetch(descriptor)
+                .filter { $0.sourceConnectionId == connection.id }
+
+            movies = MacLibrarySorting.sorted(
+                items.filter { $0.mediaType == .movie },
+                by: libraryViewModel.sortOption
+            )
+            shows = sortedShows(ScannedShowGrouping.summaries(from: items))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func loadItems() {
         isLoading = true
         errorMessage = nil
@@ -201,52 +238,11 @@ struct MacScannedLibraryListView: View {
                 items.filter { $0.mediaType == .movie },
                 by: libraryViewModel.sortOption
             )
-            shows = sortedShows(makeShowSummaries(from: items))
+            shows = sortedShows(ScannedShowGrouping.summaries(from: items))
         } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
     }
-
-    private func makeShowSummaries(from items: [MediaItem]) -> [MacScannedShowSummary] {
-        let episodeItems = items.filter { $0.mediaType == .tvEpisode || $0.mediaType == .tvShow }
-        let grouped = Dictionary(grouping: episodeItems) { normalizedShowTitle(for: $0) }
-
-        return grouped.compactMap { title, episodes in
-            guard let representative = episodes.sorted(by: episodeSortPredicate).first else { return nil }
-            return MacScannedShowSummary(
-                title: title,
-                episodeCount: episodes.count,
-                posterURL: representative.posterURL,
-                rating: representative.rating
-            )
-        }
-        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-    }
-
-    private func normalizedShowTitle(for item: MediaItem) -> String {
-        let rawTitle = item.showTitle ?? item.title
-        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? item.displayTitle : trimmed
-    }
-
-    private func episodeSortPredicate(_ lhs: MediaItem, _ rhs: MediaItem) -> Bool {
-        let lhsSeason = lhs.seasonNumber ?? Int.max
-        let rhsSeason = rhs.seasonNumber ?? Int.max
-        if lhsSeason != rhsSeason { return lhsSeason < rhsSeason }
-        let lhsEpisode = lhs.episodeNumber ?? Int.max
-        let rhsEpisode = rhs.episodeNumber ?? Int.max
-        if lhsEpisode != rhsEpisode { return lhsEpisode < rhsEpisode }
-        return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-    }
-}
-
-struct MacScannedShowSummary: Identifiable {
-    let title: String
-    let episodeCount: Int
-    let posterURL: URL?
-    let rating: Double?
-
-    var id: String { title }
 }

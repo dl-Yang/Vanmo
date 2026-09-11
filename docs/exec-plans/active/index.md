@@ -18,13 +18,13 @@ These rules apply to every plan listed below. A validation-only plan does not au
 
 Out of default scope for this set: downloads, library scan persistence, playback-progress sync, CloudKit, physical-device XCUITest, and Figma changes.
 
-Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local folder, Google Drive, Baidu Netdisk. Advance one plan at a time. AList connect, list, play, and Files-browser download are recorded under `docs/exec-plans/completed/`. FTP real-source connect, list, play, and download are recorded under `docs/exec-plans/completed/`. SFTP password connect, list, prefetch play, and Files-browser download are recorded under `docs/exec-plans/completed/`. The FTP placeholder expected-failure record remains under `docs/exec-plans/completed/`.
+Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local folder, Google Drive. Advance one plan at a time. AList connect, list, play, and Files-browser download are recorded under `docs/exec-plans/completed/`. FTP real-source connect, list, play, and download are recorded under `docs/exec-plans/completed/`. SFTP password connect, list, prefetch play, and Files-browser download are recorded under `docs/exec-plans/completed/`. Baidu Netdisk implicit OAuth, list, and `dlink` play are recorded under `docs/exec-plans/completed/`. The FTP placeholder expected-failure record remains under `docs/exec-plans/completed/`.
 
 ## Current Plans
 
 ### In progress
 
-- None.
+- [`2026-09-08-library-scan-thumbnail.md`](2026-09-08-library-scan-thumbnail.md) — **In progress.** First-connect shallow scan, filename identification, same-folder episode clustering, serial KSPlayer keyframe covers, Baidu official thumbs plus dual-platform `dlink` play; Google Drive covers remain
 
 ### Implemented, ready to run
 
@@ -33,7 +33,6 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 - [`2026-08-28-iptv-connection-validation.md`](2026-08-28-iptv-connection-validation.md) — **Not started.** M3U/M3U8 channel list and live play
 - [`2026-08-28-local-folder-connection-validation.md`](2026-08-28-local-folder-connection-validation.md) — **Not started.** Security-scoped folder bookmark, list, and play
 - [`2026-08-28-google-drive-connection-validation.md`](2026-08-28-google-drive-connection-validation.md) — **Not started.** Configured OAuth login, browse, and Bearer play
-- [`2026-08-28-baidu-netdisk-connection-validation.md`](2026-08-28-baidu-netdisk-connection-validation.md) — **Not started.** Implicit OAuth login, browse, and ephemeral dlink play
 
 ### Implemented, blocked on OAuth credentials
 

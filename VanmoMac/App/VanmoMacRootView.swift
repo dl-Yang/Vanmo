@@ -358,9 +358,13 @@ struct VanmoMacRootView: View {
             if let container = appState.routeContainerItem {
                 MacEmbyFolderBrowseView(container: container)
             }
-        case let .libraryScannedShowDetail(_, showTitle):
+        case let .libraryScannedShowDetail(_, showTitle, parentDirectory):
             if let connection = appState.routeConnection {
-                MacScannedShowDetailView(connection: connection, showTitle: showTitle)
+                MacScannedShowDetailView(
+                    connection: connection,
+                    showTitle: showTitle,
+                    parentDirectory: parentDirectory
+                )
             }
         default:
             EmptyView()
@@ -411,30 +415,52 @@ struct VanmoMacRootView: View {
         let env = ProcessInfo.processInfo.environment
         guard let name = env["VANMO_DEBUG_OPEN_CONNECTION"]?.trimmingCharacters(in: .whitespacesAndNewlines),
               !name.isEmpty else { return }
-        guard let connection = connectionsViewModel.savedConnections.first(where: {
-            $0.name.caseInsensitiveCompare(name) == .orderedSame
-        }) else {
-            print("[Debug][FTP] accept missing connection name=\(name)")
-            return
-        }
-        appState.enterConnectionBrowser(connection)
-        await connectionsViewModel.selectConnection(connection)
-        var video = connectionsViewModel.files.first(where: \.isVideo)
-        if video == nil, let folder = connectionsViewModel.files.first(where: \.isDirectory) {
-            await connectionsViewModel.openDirectory(folder)
-            video = connectionsViewModel.files.first(where: \.isVideo)
-        }
         let actions = Set(
             (env["VANMO_DEBUG_ACCEPT_ACTIONS"] ?? "")
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         )
-        print("[Debug][FTP] accept listed=\(connectionsViewModel.files.count) hasVideo=\(video != nil) actions=\(actions.sorted().joined(separator: ","))")
-        guard let video else { return }
-        if actions.contains("play") {
+        guard let connection = connectionsViewModel.savedConnections.first(where: {
+            $0.name.caseInsensitiveCompare(name) == .orderedSame
+        }) ?? connectionsViewModel.savedConnections.first(where: {
+            $0.type.displayName.caseInsensitiveCompare(name) == .orderedSame
+        }) else {
+            VanmoLogger.library.info("[Debug][LibraryScan] accept missing connection name=\(name, privacy: .public)")
+            return
+        }
+        appState.enterConnectionBrowser(connection)
+        VanmoLogger.library.info("[Debug][LibraryScan] accept start type=\(connection.type.rawValue, privacy: .public) actions=\(actions.sorted().joined(separator: ","), privacy: .public)")
+        if actions.contains("reauth") {
+            let ok = await connectionsViewModel.reauthenticateOAuthConnection(connection)
+            VanmoLogger.library.info("[Debug][LibraryScan] accept reauth ok=\(ok) error=\(connectionsViewModel.errorMessage, privacy: .public)")
+            if !ok { return }
+        } else if actions.contains("connect") {
+            _ = await connectionsViewModel.connectAndScan(connection, showErrorAlert: false)
+            VanmoLogger.library.info("[Debug][LibraryScan] accept connect done control=\(String(describing: connectionsViewModel.scanCoordinator.controlState), privacy: .public)")
+        }
+        await connectionsViewModel.selectConnection(connection, promptForMissingCredential: false)
+        var video = connectionsViewModel.files.first(where: \.isVideo)
+        if video == nil, let folder = connectionsViewModel.files.first(where: \.isDirectory) {
+            await connectionsViewModel.openDirectory(folder)
+            video = connectionsViewModel.files.first(where: \.isVideo)
+        }
+        VanmoLogger.library.info("[Debug][LibraryScan] accept listed=\(connectionsViewModel.files.count) hasVideo=\(video != nil)")
+        if actions.contains("cancel") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                connectionsViewModel.cancelScan()
+                LibraryScanDebugLog.scan("accept cancel requested")
+            }
+            _ = await connectionsViewModel.scanCurrentDirectory()
+            LibraryScanDebugLog.scan("accept cancel finished control=\(String(describing: connectionsViewModel.scanCoordinator.controlState))")
+        } else if actions.contains("scan") {
+            _ = await connectionsViewModel.scanCurrentDirectory()
+            LibraryScanDebugLog.scan("accept scan done control=\(String(describing: connectionsViewModel.scanCoordinator.controlState))")
+        }
+        if actions.contains("play"), let video {
             await connectionsViewModel.play(video, via: appState)
         }
-        if actions.contains("download") {
+        if actions.contains("download"), let video {
             do {
                 let request = try DownloadRequestFactory.make(
                     from: video,
@@ -446,6 +472,16 @@ struct VanmoMacRootView: View {
             } catch {
                 print("[Debug][FTP] accept download failed \(error.localizedDescription)")
             }
+        }
+        if actions.contains("delete") {
+            MacConnectionDeletion.delete(
+                connection,
+                appState: appState,
+                libraryViewModel: libraryViewModel,
+                connectionsViewModel: connectionsViewModel,
+                searchViewModel: searchViewModel
+            )
+            LibraryScanDebugLog.scan("accept delete requested")
         }
     }
 #endif

@@ -11,6 +11,7 @@ struct LibraryView: View {
     @StateObject private var viewModel = LibraryViewModel()
 
     @State private var syncToastMessage: String?
+    @State private var selectedMediaItemID: UUID?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -36,6 +37,9 @@ struct LibraryView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(item: $selectedMediaItemID) { itemID in
+            libraryNavigationDestination(for: itemID)
+        }
         .task {
             viewModel.setModelContext(modelContext)
             await connectionsViewModel.loadSavedConnections()
@@ -61,6 +65,10 @@ struct LibraryView: View {
                 // 兜底：若 LibraryView 此前未挂载而错过收藏通知，切回本 tab 时补一次轻量刷新。
                 await viewModel.refreshFavoritesAfterChange(connections: connectionsViewModel.savedConnections)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .connectionLocalMediaWillDelete)) { notification in
+            guard let connectionId = notification.object as? UUID else { return }
+            viewModel.removeItems(forConnectionId: connectionId)
         }
     }
 
@@ -542,20 +550,15 @@ struct LibraryView: View {
             folderPreviewSkeletonRow
         } else if !previewItems.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(previewItems) { item in
-                        NavigationLink {
-                            previewDestination(item: item, folder: folder, connection: connection)
-                        } label: {
-                            LibraryPosterCard(
-                                title: item.displayTitle,
-                                subtitle: folderPreviewSubtitle(item),
-                                posterURL: item.posterURL,
-                                progress: item.playbackProgress > 0 ? item.playbackProgress : nil,
-                                width: posterWidth
-                            )
+                HStack(spacing: 12) {
+                    ForEach(previewItems, id: \.id) { item in
+                        LibraryHomePreviewButton(
+                            item: item,
+                            subtitle: folderPreviewSubtitle(item),
+                            width: posterWidth
+                        ) { itemID in
+                            selectedMediaItemID = itemID
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -566,13 +569,53 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
+    private func libraryNavigationDestination(for itemID: UUID) -> some View {
+        if let resolved = resolvePreviewNavigation(id: itemID) {
+            previewDestination(item: resolved.item, folder: resolved.folder, connection: resolved.connection)
+        } else if let item = fetchMediaItem(id: itemID) {
+            LibraryItemDestination(item: item)
+        } else {
+            EmptyStateView(
+                icon: "exclamationmark.triangle",
+                title: L10n.tr("无法加载内容"),
+                message: L10n.tr("找不到该条目")
+            )
+        }
+    }
+
+    private func resolvePreviewNavigation(
+        id: UUID
+    ) -> (item: MediaItem, folder: CollectionFolder, connection: SavedConnection)? {
+        for connection in connectionsViewModel.savedConnections {
+            let folders = usesServerCollectionAPI(connection)
+                ? viewModel.homeVisibleFolders(for: connection.id)
+                : viewModel.homeVisibleScannedFolders(for: connection.id)
+            for folder in folders {
+                if let item = viewModel.previewItems(for: folder).first(where: { $0.id == id }) {
+                    return (item, folder, connection)
+                }
+            }
+        }
+        return nil
+    }
+
+    private func fetchMediaItem(id: UUID) -> MediaItem? {
+        let descriptor = FetchDescriptor<MediaItem>()
+        return (try? modelContext.fetch(descriptor))?.first(where: { $0.id == id })
+    }
+
+    @ViewBuilder
     private func previewDestination(
         item: MediaItem,
         folder: CollectionFolder,
         connection: SavedConnection
     ) -> some View {
         if !usesServerCollectionAPI(connection), folder.collectionType == .tvshows {
-            ScannedShowDetailView(connection: connection, showTitle: item.showTitle ?? item.title)
+            ScannedShowDetailView(
+                connection: connection,
+                showTitle: item.showTitle ?? item.title,
+                parentDirectory: ScannedShowGrouping.parentDirectory(for: item)
+            )
         } else {
             LibraryItemDestination(item: item)
         }
@@ -1133,6 +1176,30 @@ private struct FolderBookmarkCard: View {
     }
 }
 
+private struct LibraryHomePreviewButton: View {
+    let item: MediaItem
+    let subtitle: String?
+    let width: CGFloat
+    let onSelect: (UUID) -> Void
+
+    var body: some View {
+        Button {
+            onSelect(item.id)
+        } label: {
+            LibraryPosterCard(
+                title: item.displayTitle,
+                subtitle: subtitle,
+                posterURL: item.posterURL,
+                progress: item.playbackProgress > 0 ? item.playbackProgress : nil,
+                width: width
+            )
+        }
+        .buttonStyle(.plain)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .id(item.id)
+    }
+}
+
 // MARK: - Library Poster Card
 
 /// 对应设计稿电影区海报卡：海报图 + 底部渐隐 + 蓝色进度条，下方标题/副标题。
@@ -1164,6 +1231,7 @@ private struct LibraryPosterCard: View {
                     .scaledToFill()
                     .frame(width: width, height: imageHeight)
                     .clipped()
+                    .contentShape(Rectangle())
 
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.72)],
@@ -1209,6 +1277,7 @@ private struct LibraryPosterCard: View {
         }
         .background(HomeDesign.posterBase)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 

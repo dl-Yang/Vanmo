@@ -1,5 +1,12 @@
 import Foundation
 
+public enum EpisodePatternKind: String, Sendable, Hashable {
+    case seasonAndEpisode
+    case chineseEpisode
+    case episodeCode
+    case bracketNumber
+}
+
 public struct ParsedFileName {
     public let title: String
     public let year: Int?
@@ -8,6 +15,7 @@ public struct ParsedFileName {
     public let episodeTitle: String?
     public let isTV: Bool
     public let confidence: Double
+    public let patternKind: EpisodePatternKind?
 
     public var searchQuery: String {
         title.replacingOccurrences(of: ".", with: " ")
@@ -22,7 +30,8 @@ public struct ParsedFileName {
         episode: Int?,
         episodeTitle: String? = nil,
         isTV: Bool,
-        confidence: Double = 0.5
+        confidence: Double = 0.5,
+        patternKind: EpisodePatternKind? = nil
     ) {
         self.title = title
         self.year = year
@@ -31,20 +40,27 @@ public struct ParsedFileName {
         self.episodeTitle = episodeTitle
         self.isTV = isTV
         self.confidence = confidence
+        self.patternKind = patternKind
     }
 }
 
 public enum FileNameParser {
-    private static let tvPatterns: [(pattern: String, seasonGroup: Int, episodeGroup: Int, confidence: Double)] = [
-        (#"[Ss](\d{1,2})[Ee](\d{1,3})(?:[Ee](\d{1,3}))?"#, 1, 2, 0.9),
-        (#"(\d{1,2})[xX](\d{1,3})"#, 1, 2, 0.85),
-        (#"[Ss]eason[\s._-]*(\d{1,2}).*[Ee]pisode[\s._-]*(\d{1,3})"#, 1, 2, 0.85),
-        (#"\[(\d{1,2})[xX](\d{1,3})\]"#, 1, 2, 0.8),
-        (#"\b[Ee][Pp](\d{1,3})\b"#, 0, 1, 0.75),
-        (#"\b[Ee](\d{1,3})\b"#, 0, 1, 0.65),
-        (#"第[\s]*(\d{1,2})[\s]*季[\s._-]*第[\s]*(\d{1,3})[\s]*集"#, 1, 2, 0.85),
-        (#"第[\s]*(\d{1,3})[\s]*集"#, 0, 1, 0.7),
-        (#"\[(\d{1,3})\]"#, 0, 1, 0.6),
+    private static let tvPatterns: [(
+        pattern: String,
+        seasonGroup: Int,
+        episodeGroup: Int,
+        confidence: Double,
+        kind: EpisodePatternKind
+    )] = [
+        (#"[Ss](\d{1,2})[Ee](\d{1,3})(?:[Ee](\d{1,3}))?"#, 1, 2, 0.9, .seasonAndEpisode),
+        (#"(\d{1,2})[xX](\d{1,3})"#, 1, 2, 0.85, .seasonAndEpisode),
+        (#"[Ss]eason[\s._-]*(\d{1,2}).*[Ee]pisode[\s._-]*(\d{1,3})"#, 1, 2, 0.85, .seasonAndEpisode),
+        (#"\[(\d{1,2})[xX](\d{1,3})\]"#, 1, 2, 0.8, .seasonAndEpisode),
+        (#"\b[Ee][Pp](\d{1,3})\b"#, 0, 1, 0.75, .episodeCode),
+        (#"\b[Ee](\d{1,3})\b"#, 0, 1, 0.65, .episodeCode),
+        (#"第[\s]*(\d{1,2})[\s]*季[\s._-]*第[\s]*(\d{1,3})[\s]*[集话]"#, 1, 2, 0.85, .seasonAndEpisode),
+        (#"第[\s]*(\d{1,3})[\s]*[集话]"#, 0, 1, 0.7, .chineseEpisode),
+        (#"\[(\d{1,3})\]"#, 0, 1, 0.6, .bracketNumber),
     ]
 
     private static let yearPattern = #"\b((?:19|20)\d{2})\b"#
@@ -89,7 +105,8 @@ public enum FileNameParser {
                     episode: episode,
                     episodeTitle: episodeTitle,
                     isTV: true,
-                    confidence: tvPattern.confidence
+                    confidence: tvPattern.confidence,
+                    patternKind: tvPattern.kind
                 )
             }
         }

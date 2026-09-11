@@ -80,6 +80,31 @@ final class LibraryViewModel: ObservableObject {
         return sortedByNewestFirst(items)
     }
 
+    /// Drop in-memory MediaItem references before `modelContext.delete`, matching macOS.
+    func removeItems(forConnectionId connectionId: UUID) {
+        recentlyPlayed.removeAll { item in
+            guard !item.isDeleted else { return true }
+            return item.sourceConnectionId == connectionId
+        }
+        favorites.removeAll { item in
+            guard !item.isDeleted else { return true }
+            return item.sourceConnectionId == connectionId
+        }
+
+        let keyPrefix = "\(connectionId.uuidString)::"
+        folderPreviews = folderPreviews.filter { !$0.key.hasPrefix(keyPrefix) }
+        folderTotalCounts = folderTotalCounts.filter { !$0.key.hasPrefix(keyPrefix) }
+        scannedFolderPreviews = scannedFolderPreviews.filter { !$0.key.hasPrefix(keyPrefix) }
+        scannedFolderTotalCounts = scannedFolderTotalCounts.filter { !$0.key.hasPrefix(keyPrefix) }
+
+        serverCollectionFolders[connectionId] = nil
+        embyConnectionsById[connectionId] = nil
+        scannedLibraryFolders[connectionId] = nil
+        scannedConnectionsById[connectionId] = nil
+        serverConnectionErrors[connectionId] = nil
+        folderBookmarks.removeAll { $0.connectionId == connectionId }
+    }
+
     /// 首页展示的媒体库：仅保留电影 / 电视剧类型，并隐藏确定为空的媒体库。
     /// 其它类型（如播放列表）仍保留在 `serverCollectionFolders` 中，只是不在首页渲染。
     func homeVisibleFolders(for connectionId: UUID) -> [CollectionFolder] {
@@ -612,7 +637,12 @@ final class LibraryViewModel: ObservableObject {
 
         for connection in scannedConnections {
             let items = allItems.filter { $0.sourceConnectionId == connection.id }
-            guard !items.isEmpty else { continue }
+            guard !items.isEmpty else {
+                LibraryScanDebugLog.scan(
+                    "home hide conn=\(LibraryScanDebugLog.shortID(connection.id)) type=\(connection.type.rawValue) reason=noItems"
+                )
+                continue
+            }
 
             var folders: [CollectionFolder] = []
             let movieItems = items.filter { $0.mediaType == .movie }
@@ -629,7 +659,7 @@ final class LibraryViewModel: ObservableObject {
                 totalCountsByFolder[key] = movieItems.count
             }
 
-            let showItems = makeShowPreviewItems(from: items)
+            let showItems = ScannedShowGrouping.previewItems(from: items)
             if !showItems.isEmpty {
                 let folder = makeScannedFolder(
                     id: scannedFolderId(connectionId: connection.id, collectionType: .tvshows),
@@ -652,6 +682,9 @@ final class LibraryViewModel: ObservableObject {
         scannedConnectionsById = connectionsById
         scannedFolderPreviews = previewsByFolder
         scannedFolderTotalCounts = totalCountsByFolder
+        LibraryScanDebugLog.scan(
+            "home platform=ios visibleConnections=\(foldersByConnection.count) movieRows=\(foldersByConnection.values.flatMap { $0 }.filter { $0.collectionType == .movies }.count) showRows=\(foldersByConnection.values.flatMap { $0 }.filter { $0.collectionType == .tvshows }.count)"
+        )
     }
 
     private func loadFolderBookmarks(
@@ -690,61 +723,12 @@ final class LibraryViewModel: ObservableObject {
         "scanned-\(connectionId.uuidString)-\(collectionType.rawValue)"
     }
 
-    private func makeShowPreviewItems(from items: [MediaItem]) -> [MediaItem] {
-        let episodeItems = items.filter { $0.mediaType == .tvEpisode || $0.mediaType == .tvShow }
-        let grouped = Dictionary(grouping: episodeItems) { item in
-            normalizedShowTitle(for: item)
-        }
-
-        return sortedByNewestFirst(grouped.compactMap { showTitle, episodes in
-            guard let representative = episodes.sorted(by: episodeSortPredicate).first else { return nil }
-            let latestAddedAt = episodes.map(\.addedAt).max() ?? representative.addedAt
-            let item = MediaItem(
-                title: showTitle,
-                fileURL: representative.fileURL,
-                mediaType: .tvShow,
-                fileSize: representative.fileSize,
-                duration: representative.duration
-            )
-            item.posterURL = representative.posterURL
-            item.backdropURL = representative.backdropURL
-            item.year = representative.year
-            item.rating = representative.rating
-            item.showTitle = showTitle
-            item.sourceConnectionId = representative.sourceConnectionId
-            item.addedAt = latestAddedAt
-            return item
-        })
-    }
-
     private func sortedByNewestFirst(_ items: [MediaItem]) -> [MediaItem] {
         items.sorted { $0.addedAt > $1.addedAt }
     }
 
     private func newestPreviewSlice(from items: [MediaItem]) -> [MediaItem] {
         Array(sortedByNewestFirst(items).prefix(folderPreviewPageSize))
-    }
-
-    private func normalizedShowTitle(for item: MediaItem) -> String {
-        let rawTitle = item.showTitle ?? item.title
-        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? item.displayTitle : trimmed
-    }
-
-    private func episodeSortPredicate(_ lhs: MediaItem, _ rhs: MediaItem) -> Bool {
-        let lhsSeason = lhs.seasonNumber ?? Int.max
-        let rhsSeason = rhs.seasonNumber ?? Int.max
-        if lhsSeason != rhsSeason {
-            return lhsSeason < rhsSeason
-        }
-
-        let lhsEpisode = lhs.episodeNumber ?? Int.max
-        let rhsEpisode = rhs.episodeNumber ?? Int.max
-        if lhsEpisode != rhsEpisode {
-            return lhsEpisode < rhsEpisode
-        }
-
-        return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
     }
 
     private func reloadHighlights(
@@ -914,4 +898,5 @@ enum LibrarySortOption: String, CaseIterable, Sendable {
 
 extension Notification.Name {
     static let mediaFavoriteDidChange = Notification.Name("mediaFavoriteDidChange")
+    static let connectionLocalMediaWillDelete = Notification.Name("connectionLocalMediaWillDelete")
 }

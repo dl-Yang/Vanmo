@@ -356,8 +356,7 @@ final class VanmoDeviceInteractionTests: XCTestCase {
                     "width": frame.size.width,
                     "height": frame.size.height
                 ],
-                "enabled": element.isEnabled,
-                "hittable": element.isHittable
+                "enabled": element.isEnabled
             ]
         }
         return try JSONSerialization.data(

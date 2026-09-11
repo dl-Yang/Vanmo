@@ -63,6 +63,10 @@ struct ContentView: View {
             // 持久化到 AppState，避免 LibraryView 未挂载时通知丢失。
             appState.notifyFavoriteDidChange()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .connectionLocalMediaWillDelete)) { notification in
+            guard let connectionId = notification.object as? UUID else { return }
+            appState.purgeMediaState(for: connectionId)
+        }
         .task {
 #if DEBUG
             if ProcessInfo.processInfo.environment["VANMO_DEBUG_TAB"] == "files" {

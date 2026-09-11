@@ -228,10 +228,7 @@ struct MacLibraryHomeView: View {
         connection: SavedConnection
     ) {
         guard let item = libraryViewModel.previewItems(for: folder).first(where: {
-            if let serverId = model.serverId {
-                return $0.serverId == serverId
-            }
-            return $0.title == model.title && $0.posterURL?.path == model.posterPath
+            $0.id == model.id
         }) else {
             return
         }
@@ -244,7 +241,11 @@ struct MacLibraryHomeView: View {
         connection: SavedConnection
     ) {
         if !usesServerCollectionAPI(connection), folder.collectionType == .tvshows {
-            appState.openScannedShowDetail(connection: connection, showTitle: item.showTitle ?? item.title)
+            appState.openScannedShowDetail(
+                connection: connection,
+                showTitle: item.showTitle ?? item.title,
+                parentDirectory: ScannedShowGrouping.parentDirectory(for: item)
+            )
         } else {
             switch item.mediaType {
             case .folder, .collectionFolder, .season, .boxSet:
@@ -286,20 +287,18 @@ struct MacLibraryHomeView: View {
 }
 
 private struct MacHomePreviewCardModel: Equatable, Identifiable {
-    let id: String
-    let serverId: String?
+    let id: UUID
     let title: String
     let subtitle: String
     let posterURL: URL?
     let posterPath: String
 
     init(item: MediaItem, subtitle: String) {
-        serverId = item.serverId
+        id = item.id
         title = item.displayTitle
         self.subtitle = subtitle
         posterURL = item.posterURL
         posterPath = item.posterURL?.path ?? ""
-        id = item.serverId ?? "\(item.title)|\(posterPath)"
     }
 }
 

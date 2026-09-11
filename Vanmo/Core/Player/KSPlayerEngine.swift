@@ -36,6 +36,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     // MARK: - KSPlayer
 
     private var player: KSMEPlayer?
+    private let libavformatGateLock = NSLock()
+    private var holdsLibavformatGate = false
     private var timeUpdateTimer: Timer?
     private var shouldResumeAfterBuffering = false
     private var lastPlayableTime: CFAbsoluteTime = 0
@@ -99,13 +101,23 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     deinit {
         stopTimeUpdateTimer()
         player?.shutdown()
+        if consumeLibavformatGateHold() {
+            Task {
+                await LibavformatOpenGate.shared.releaseAfterProtocolCloseDrain()
+            }
+        }
     }
 
     // MARK: - PlayerEngine Protocol
 
     func load(url: URL, startPosition: CMTime? = nil) async throws {
+        try await load(url: url, startPosition: startPosition, headers: [:])
+    }
+
+    func load(url: URL, startPosition: CMTime?, headers: [String: String]) async throws {
         VanmoLogger.player.info("[KSEngine] load() called, url: \(url.safePlaybackLogDescription)")
-        await MainActor.run { stop() }
+        await MainActor.run { stopPlaybackResources() }
+        await releaseLibavformatGateIfHeld()
         stateSubject.send(.loading)
 
         let hardwareDecode = PlaybackPreferences.hardwareDecodingEnabled
@@ -113,7 +125,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             try await loadPlayer(
                 url: url,
                 startPosition: startPosition,
-                hardwareDecode: hardwareDecode
+                hardwareDecode: hardwareDecode,
+                headers: headers
             )
         } catch {
             guard hardwareDecode else { throw error }
@@ -123,16 +136,23 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
                 player = nil
             }
             readyContinuation = nil
+            await releaseLibavformatGateIfHeld()
             stateSubject.send(.loading)
             try await loadPlayer(
                 url: url,
                 startPosition: startPosition,
-                hardwareDecode: false
+                hardwareDecode: false,
+                headers: headers
             )
         }
     }
 
-    private func loadPlayer(url: URL, startPosition: CMTime?, hardwareDecode: Bool) async throws {
+    private func loadPlayer(
+        url: URL,
+        startPosition: CMTime?,
+        hardwareDecode: Bool,
+        headers: [String: String]
+    ) async throws {
         let options = KSOptions()
         if let startPosition, startPosition.seconds > 0 {
             options.startPlayTime = startPosition.seconds
@@ -149,27 +169,41 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         options.hardwareDecode = hardwareDecode
         VanmoLogger.player.info("[KSEngine] hardwareDecode: \(hardwareDecode)")
 
+        if !headers.isEmpty {
+            options.appendHeader(headers)
+        }
+
         Self.configureAudioOptions(options)
 
-        let mePlayer = await MainActor.run {
-            let p = KSMEPlayer(url: url, options: options)
-            p.delegate = self
-            self.player = p
-            p.prepareToPlay()
-            return p
+        if LibavformatOpenGate.needsExclusiveOpen(url) {
+            await LibavformatOpenGate.shared.acquire()
+            markLibavformatGateHeld()
         }
 
-        try await waitForReady()
+        do {
+            let mePlayer = await MainActor.run {
+                let p = KSMEPlayer(url: url, options: options)
+                p.delegate = self
+                self.player = p
+                p.prepareToPlay()
+                return p
+            }
 
-        let dur = mePlayer.duration
-        if dur > 0 {
-            durationSubject.send(CMTime(seconds: dur, preferredTimescale: 600))
+            try await waitForReady()
+
+            let dur = mePlayer.duration
+            if dur > 0 {
+                durationSubject.send(CMTime(seconds: dur, preferredTimescale: 600))
+            }
+            VanmoLogger.player.info("[KSEngine] duration: \(dur)s")
+
+            await MainActor.run { startTimeUpdateTimer() }
+            stateSubject.send(.paused)
+            VanmoLogger.player.info("[KSEngine] load complete: \(url.lastPathComponent)")
+        } catch {
+            await releaseLibavformatGateIfHeld()
+            throw error
         }
-        VanmoLogger.player.info("[KSEngine] duration: \(dur)s")
-
-        await MainActor.run { startTimeUpdateTimer() }
-        stateSubject.send(.paused)
-        VanmoLogger.player.info("[KSEngine] load complete: \(url.lastPathComponent)")
     }
 
     func play() {
@@ -206,6 +240,15 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
 
     func stop() {
         VanmoLogger.player.info("[KSEngine] stop()")
+        stopPlaybackResources()
+        if consumeLibavformatGateHold() {
+            Task {
+                await LibavformatOpenGate.shared.releaseAfterProtocolCloseDrain()
+            }
+        }
+    }
+
+    private func stopPlaybackResources() {
         stopTimeUpdateTimer()
         player?.shutdown()
         player = nil
@@ -218,6 +261,25 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         durationSubject.send(.zero)
         bufferProgressSubject.send(0)
         subtitleContentSubject.send(nil)
+    }
+
+    private func markLibavformatGateHeld() {
+        libavformatGateLock.lock()
+        holdsLibavformatGate = true
+        libavformatGateLock.unlock()
+    }
+
+    private func consumeLibavformatGateHold() -> Bool {
+        libavformatGateLock.lock()
+        defer { libavformatGateLock.unlock() }
+        guard holdsLibavformatGate else { return false }
+        holdsLibavformatGate = false
+        return true
+    }
+
+    private func releaseLibavformatGateIfHeld() async {
+        guard consumeLibavformatGateHold() else { return }
+        await LibavformatOpenGate.shared.releaseAfterProtocolCloseDrain()
     }
 
     // MARK: - Track Selection

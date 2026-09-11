@@ -35,6 +35,10 @@ struct SearchView: View {
             await connectionsViewModel.loadSavedConnections()
             viewModel.setConnections(connectionsViewModel.savedConnections)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .connectionLocalMediaWillDelete)) { notification in
+            guard let connectionId = notification.object as? UUID else { return }
+            viewModel.removeResults(forConnectionId: connectionId)
+        }
     }
 
     // MARK: - Empty State

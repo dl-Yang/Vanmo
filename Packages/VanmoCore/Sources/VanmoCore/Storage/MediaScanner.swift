@@ -224,16 +224,26 @@ public actor MediaScanner {
 
             let nfoByFileName = await loadNFOMap(from: files, service: service, directoryPath: current)
 
-            for file in files {
-                if file.isDirectory {
-                    let maxDepth = await state.maxDepth
-                    if depth < maxDepth {
-                        await state.enqueueDirectory(file.path, depth: depth + 1)
-                    }
-                    continue
+            for file in files where file.isDirectory {
+                let maxDepth = await state.maxDepth
+                if depth < maxDepth {
+                    await state.enqueueDirectory(file.path, depth: depth + 1)
                 }
+            }
 
-                guard file.isVideo else { continue }
+            let videoFiles = files.filter { !$0.isDirectory && $0.isVideo }
+            let identifications = refineIdentifications(
+                for: videoFiles,
+                directoryPath: current,
+                nfoByFileName: nfoByFileName
+            )
+            let clusteredCount = identifications.values.filter { $0.mediaType == .tvEpisode && $0.showTitle != nil }.count
+            let movieCount = identifications.values.filter { $0.mediaType == .movie }.count
+            LibraryScanDebugLog.scan(
+                "dir=\(LibraryScanDebugLog.leaf(current)) depth=\(depth) videos=\(videoFiles.count) movies=\(movieCount) episodes=\(clusteredCount)"
+            )
+
+            for file in videoFiles {
                 await state.markVideoDiscovered()
 
                 let activeConnectionId = await state.connectionId
@@ -241,6 +251,7 @@ public actor MediaScanner {
                 await state.markSeen(key: key)
 
                 let storageURL = PlaybackURLResolver.storageURL(for: file, service: service)
+                let identification = identifications[file.name]
 
                 if let existingItem = await state.existingItem(for: key) {
                     if existingItem.sourceConnectionId == nil, let activeConnectionId {
@@ -269,6 +280,7 @@ public actor MediaScanner {
                             connectionId: activeConnectionId,
                             directoryPath: current,
                             nfoByFileName: nfoByFileName,
+                            identification: identification,
                             to: existingItem
                         )
                     }
@@ -282,7 +294,8 @@ public actor MediaScanner {
                     streamURL: storageURL,
                     connectionId: activeConnectionId,
                     directoryPath: current,
-                    nfoByFileName: nfoByFileName
+                    nfoByFileName: nfoByFileName,
+                    identification: identification
                 ) else {
                     continue
                 }
@@ -292,6 +305,31 @@ public actor MediaScanner {
                 await flushBatchIfNeeded(context: context, pendingInBatch: await state.pendingBatchCount(), force: false, batchSize: await state.batchSize, reset: { await state.resetPendingBatch() })
             }
         }
+    }
+
+    private func refineIdentifications(
+        for videoFiles: [RemoteFile],
+        directoryPath: String,
+        nfoByFileName: [String: ParsedNFOMetadata]
+    ) -> [String: MediaIdentificationResult] {
+        var parsedByName: [String: ParsedFileName] = [:]
+        var identifications: [String: MediaIdentificationResult] = [:]
+
+        for file in videoFiles {
+            parsedByName[file.name] = FileNameParser.parse(file.name)
+            if let identification = MediaIdentificationPipeline.identify(
+                fileName: file.name,
+                directoryPath: directoryPath,
+                nfoByFileName: nfoByFileName
+            ) {
+                identifications[file.name] = identification
+            }
+        }
+
+        return EpisodeClusterPlanner.refine(
+            identifications: identifications,
+            parsedNames: parsedByName
+        )
     }
 
     private func flushBatchIfNeeded(
@@ -467,10 +505,7 @@ public actor MediaScanner {
     }
 
     private nonisolated func serverItemKey(serverId: String, connectionId: UUID?) -> String {
-        if let connectionId {
-            return "\(connectionId.uuidString)::\(serverId)"
-        }
-        return serverId
+        ScanItemPathKey.make(serverId: serverId, connectionId: connectionId)
     }
 }
 

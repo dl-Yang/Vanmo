@@ -8,6 +8,7 @@ struct ScannedShowDetailView: View {
 
     let connection: SavedConnection
     let showTitle: String
+    let parentDirectory: String
 
     @State private var episodes: [MediaItem] = []
     @State private var isLoading = true
@@ -59,7 +60,7 @@ struct ScannedShowDetailView: View {
     }
 
     private var taskID: String {
-        "\(connection.id.uuidString)-\(showTitle)"
+        "\(connection.id.uuidString)-\(parentDirectory)-\(showTitle)"
     }
 
     private var header: some View {
@@ -101,13 +102,12 @@ struct ScannedShowDetailView: View {
                     SortDescriptor(\.title),
                 ]
             )
-            episodes = try modelContext.fetch(descriptor)
-                .filter { item in
-                    item.sourceConnectionId == connection.id &&
-                    (item.mediaType == .tvEpisode || item.mediaType == .tvShow) &&
-                    normalizedShowTitle(for: item) == showTitle
-                }
-                .sorted(by: episodeSortPredicate)
+            episodes = ScannedShowGrouping.episodes(
+                from: try modelContext.fetch(descriptor),
+                connectionId: connection.id,
+                showTitle: showTitle,
+                parentDirectory: parentDirectory
+            )
             hasLoadedOnce = true
         } catch {
             errorMessage = error.localizedDescription
@@ -116,27 +116,6 @@ struct ScannedShowDetailView: View {
         isLoading = false
     }
 
-    private func normalizedShowTitle(for item: MediaItem) -> String {
-        let rawTitle = item.showTitle ?? item.title
-        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? item.displayTitle : trimmed
-    }
-
-    private func episodeSortPredicate(_ lhs: MediaItem, _ rhs: MediaItem) -> Bool {
-        let lhsSeason = lhs.seasonNumber ?? Int.max
-        let rhsSeason = rhs.seasonNumber ?? Int.max
-        if lhsSeason != rhsSeason {
-            return lhsSeason < rhsSeason
-        }
-
-        let lhsEpisode = lhs.episodeNumber ?? Int.max
-        let rhsEpisode = rhs.episodeNumber ?? Int.max
-        if lhsEpisode != rhsEpisode {
-            return lhsEpisode < rhsEpisode
-        }
-
-        return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-    }
 }
 
 private struct ScannedShowLoadingView: View {
@@ -182,7 +161,8 @@ private struct ScannedShowLoadingView: View {
                 host: "192.168.1.2",
                 port: 445
             ),
-            showTitle: "示例剧集"
+            showTitle: "示例剧集",
+            parentDirectory: "/TV/示例剧集"
         )
     }
     .environmentObject(AppState())

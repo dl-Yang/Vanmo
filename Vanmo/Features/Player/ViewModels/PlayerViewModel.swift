@@ -208,16 +208,34 @@ final class PlayerViewModel: ObservableObject {
 
         let originalURL = await resolveCloudDriveStreamURLIfNeeded(item.fileURL)
         let playbackURL = await resolveDiscPlaybackURLIfNeeded(originalURL)
+        let headerProvider = cloudDriveStreamingHeaderProvider()
         let loadURL: URL
+        var loadHeaders: [String: String] = [:]
         if playbackURL.isFileURL || Self.shouldBypassPrefetch(for: playbackURL) {
             loadURL = playbackURL
+        } else if usesOfficialDownloadLink(), let headerProvider {
+            let headers = await headerProvider()
+            guard !headers.isEmpty else {
+                throw PlayerError.networkError("无法为该网盘注入播放鉴权头")
+            }
+            loadURL = playbackURL
+            loadHeaders = headers
+            VanmoLogger.player.info("[PlayerVM] official download link, skip prefetch")
         } else if let registration = await PrefetchProxy.shared.register(
             originalURL: playbackURL,
-            headerProvider: cloudDriveStreamingHeaderProvider()
+            headerProvider: headerProvider
         ) {
             loadURL = registration.url
             prefetchToken = registration.token
             VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
+        } else if let headerProvider {
+            let headers = await headerProvider()
+            guard !headers.isEmpty else {
+                throw PlayerError.networkError("无法为该网盘注入播放鉴权头")
+            }
+            loadURL = playbackURL
+            loadHeaders = headers
+            VanmoLogger.player.info("[PlayerVM] prefetch unavailable, loading remote URL with streaming headers")
         } else {
             loadURL = playbackURL
             VanmoLogger.player.info("[PlayerVM] prefetch unavailable, loading remote URL directly")
@@ -227,7 +245,7 @@ final class PlayerViewModel: ObservableObject {
             ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
             : nil
         VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
-        try await engine.load(url: loadURL, startPosition: startPosition)
+        try await loadEngine(url: loadURL, startPosition: startPosition, headers: loadHeaders)
         VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
         audioTracks = await engine.availableAudioTracks()
         let embeddedSubtitleTracks = await engine.availableSubtitleTracks()
@@ -300,6 +318,28 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    private func loadEngine(url: URL, startPosition: CMTime?, headers: [String: String]) async throws {
+        if headers.isEmpty {
+            try await engine.load(url: url, startPosition: startPosition)
+            return
+        }
+        guard let ksEngine = engine as? KSPlayerEngine else {
+            throw PlayerError.networkError("无法建立带鉴权的播放代理")
+        }
+        try await ksEngine.load(url: url, startPosition: startPosition, headers: headers)
+    }
+
+    private func usesOfficialDownloadLink() -> Bool {
+        guard let modelContext, let connectionId = item.sourceConnectionId else { return false }
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        guard let connection = try? modelContext.fetch(descriptor).first else {
+            return false
+        }
+        return connection.type.usesOfficialDownloadLink
+    }
+
     /// 若当前条目来自需要自定义请求头的 OAuth 网盘，返回 header provider 交给 PrefetchProxy：
     /// - Google Drive：动态 Bearer token
     /// - 百度网盘：固定 User-Agent（dlink 下载/播放要求）
@@ -308,27 +348,10 @@ final class PlayerViewModel: ObservableObject {
         let descriptor = FetchDescriptor<SavedConnection>(
             predicate: #Predicate { $0.id == connectionId }
         )
-        guard let connection = try? modelContext.fetch(descriptor).first,
-              connection.type.requiresStreamingHeaderProvider else {
+        guard let connection = try? modelContext.fetch(descriptor).first else {
             return nil
         }
-
-        switch connection.type {
-        case .googleDrive:
-            let type = connection.type
-            return {
-                guard let token = try? await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId) else {
-                    return [:]
-                }
-                return ["Authorization": "Bearer \(token)"]
-            }
-        case .baiduNetdisk:
-            return {
-                ["User-Agent": BaiduNetdiskService.requiredUserAgent]
-            }
-        default:
-            return nil
-        }
+        return StreamingRequestHeaders.provider(for: connection.type, connectionId: connectionId)
     }
 
     // MARK: - Playback Control

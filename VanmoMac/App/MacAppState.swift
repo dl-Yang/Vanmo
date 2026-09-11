@@ -85,7 +85,7 @@ enum MacContentRoute: Equatable {
     case libraryCollectionFolder(connectionId: UUID, folderId: String)
     case libraryScannedLibrary(connectionId: UUID, collectionTypeRaw: String)
     case libraryEmbyFolderBrowse
-    case libraryScannedShowDetail(connectionId: UUID, showTitle: String)
+    case libraryScannedShowDetail(connectionId: UUID, showTitle: String, parentDirectory: String)
     case connectionBrowser(activeConnectionId: UUID)
     case search
 }
@@ -299,9 +299,17 @@ final class MacAppState: ObservableObject {
         closeDetail()
     }
 
-    func openScannedShowDetail(connection: SavedConnection, showTitle: String) {
+    func openScannedShowDetail(
+        connection: SavedConnection,
+        showTitle: String,
+        parentDirectory: String
+    ) {
         routeConnection = connection
-        contentRoute = .libraryScannedShowDetail(connectionId: connection.id, showTitle: showTitle)
+        contentRoute = .libraryScannedShowDetail(
+            connectionId: connection.id,
+            showTitle: showTitle,
+            parentDirectory: parentDirectory
+        )
         closeDetail()
     }
 
@@ -388,7 +396,7 @@ final class MacAppState: ObservableObject {
             switch contentRoute {
             case let .libraryCollectionFolder(id, _),
                  let .libraryScannedLibrary(id, _),
-                 let .libraryScannedShowDetail(id, _):
+                 let .libraryScannedShowDetail(id, _, _):
                 return id == connectionId
             case .libraryEmbyFolderBrowse:
                 if let container = routeContainerItem,
@@ -436,6 +444,13 @@ final class MacAppState: ObservableObject {
             closePlayer()
         }
 
+        Task {
+            await VideoThumbnailQueue.shared.pause()
+            self.presentPlayer(item, from: position)
+        }
+    }
+
+    private func presentPlayer(_ item: MediaItem, from position: TimeInterval) {
         playerItem = item
         playerStartPosition = position
         isPlayerPresented = true
@@ -477,6 +492,9 @@ final class MacAppState: ObservableObject {
         playerItem = nil
         playerStartPosition = 0
         unregisterActivePlayer()
+        Task {
+            await VideoThumbnailQueue.shared.resume()
+        }
         // 播放进度在关闭前已落库，通知首页与 History 页面刷新观看记录。
         notifyWatchHistoryDidChange()
     }

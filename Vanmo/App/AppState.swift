@@ -33,16 +33,28 @@ final class AppState: ObservableObject {
     }
 
     func play(_ item: MediaItem) {
-        currentPlayingItem = item
-        isPlayerPresented = true
+        Task {
+            await VideoThumbnailQueue.shared.pause()
+            currentPlayingItem = item
+            isPlayerPresented = true
 #if DEBUG
-        print("[Debug][Player] present mediaType=\(item.mediaType.rawValue) isFile=\(item.fileURL.isFileURL) ext=\(item.fileURL.pathExtension.lowercased())")
+            print("[Debug][Player] present mediaType=\(item.mediaType.rawValue) isFile=\(item.fileURL.isFileURL) ext=\(item.fileURL.pathExtension.lowercased())")
 #endif
+        }
     }
 
     func stopPlayback() {
         isPlayerPresented = false
         currentPlayingItem = nil
+        Task {
+            await VideoThumbnailQueue.shared.resume()
+        }
+    }
+
+    func purgeMediaState(for connectionId: UUID) {
+        if let currentPlayingItem, currentPlayingItem.sourceConnectionId == connectionId {
+            stopPlayback()
+        }
     }
 }
 

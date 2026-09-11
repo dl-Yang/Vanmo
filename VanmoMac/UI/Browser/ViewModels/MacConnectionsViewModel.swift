@@ -60,6 +60,15 @@ final class MacConnectionsViewModel: ObservableObject {
             await MediaProbeQueue.shared.setURLResolver { item in
                 try await Self.resolveProbeURL(for: item, context: context)
             }
+            await VideoThumbnailQueue.shared.setURLResolver { item in
+                try await Self.resolveProbeURL(for: item, context: context)
+            }
+            await VideoThumbnailQueue.shared.setHeaderResolver { connectionId in
+                await Self.streamingHeaderProvider(connectionId: connectionId, context: context)
+            }
+            await VideoThumbnailQueue.shared.setOfficialPosterResolver { connectionId, path in
+                await Self.officialPoster(connectionId: connectionId, path: path, context: context)
+            }
         }
     }
 
@@ -84,6 +93,41 @@ final class MacConnectionsViewModel: ObservableObject {
         try await service.connect(config: ConnectionConfig(from: connection, password: password))
         defer { Task { await service.disconnect() } }
         return try await PlaybackURLResolver.resolvePlaybackURL(item: item, service: service)
+    }
+
+    private static func streamingHeaderProvider(
+        connectionId: UUID,
+        context: ModelContext
+    ) async -> (() async -> [String: String])? {
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        let connection: SavedConnection? = await MainActor.run {
+            try? context.fetch(descriptor).first
+        }
+        guard let connection else { return nil }
+        return StreamingRequestHeaders.provider(for: connection.type, connectionId: connectionId)
+    }
+
+    private static func officialPoster(
+        connectionId: UUID,
+        path: String,
+        context: ModelContext
+    ) async -> ThumbnailOfficialPoster {
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        let connection: SavedConnection? = await MainActor.run {
+            try? context.fetch(descriptor).first
+        }
+        guard let connection else { return .useKeyframe }
+        let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+        return await OfficialPosterSource.resolve(
+            type: connection.type,
+            connectionId: connection.id,
+            path: path,
+            password: password
+        )
     }
 
     func connectionStatus(for connection: SavedConnection) -> MacConnectionStatus {
@@ -294,6 +338,7 @@ final class MacConnectionsViewModel: ObservableObject {
 
     func deleteConnection(_ connection: SavedConnection) {
         let connectionId = connection.id
+        scanCoordinator.cancel()
 
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
         if connection.type.supportsOAuthLogin {
@@ -500,6 +545,8 @@ final class MacConnectionsViewModel: ObservableObject {
 
         connectionStatuses[connection.id] = .idle
         connectionErrorMessages.removeValue(forKey: connection.id)
+        errorMessage = ""
+        showError = false
         return await connectAndScan(connection)
     }
 
@@ -635,6 +682,41 @@ final class MacConnectionsViewModel: ObservableObject {
             scanPath: currentPath,
             isPartialScan: true
         )
+    }
+
+    func thumbnailURL(for file: RemoteFile) async -> URL? {
+        guard file.isVideo, let connection = selectedConnection else { return nil }
+        let cacheKey = VideoThumbnailCacheKey.make(
+            connectionId: connection.id,
+            path: file.path,
+            fileSize: file.size,
+            modifiedAt: file.modifiedDate
+        )
+        if let cached = await VideoThumbnailQueue.shared.cachedURL(for: cacheKey) {
+            LibraryScanDebugLog.thumbnail("files cacheHit file=\(LibraryScanDebugLog.leaf(file.path)) platform=mac")
+            return cached
+        }
+        let sourceURL: URL
+        if connection.type.usesOfficialDownloadLink {
+            sourceURL = connection.type.catalogPlaybackURL(serverPath: file.path)
+        } else if let streamURL = try? await streamURL(for: file) {
+            sourceURL = streamURL
+        } else {
+            LibraryScanDebugLog.thumbnail("files streamFail file=\(LibraryScanDebugLog.leaf(file.path)) platform=mac")
+            return nil
+        }
+        let request = VideoThumbnailRequest(
+            connectionId: connection.id,
+            path: file.path,
+            fileSize: file.size,
+            modifiedAt: file.modifiedDate,
+            sourceURL: sourceURL
+        )
+        let url = await VideoThumbnailQueue.shared.thumbnail(for: request)
+        LibraryScanDebugLog.thumbnail(
+            "files result file=\(LibraryScanDebugLog.leaf(file.path)) ok=\(url != nil) platform=mac"
+        )
+        return url
     }
 
     func streamURL(for file: RemoteFile) async throws -> URL {
@@ -787,15 +869,29 @@ final class MacConnectionsViewModel: ObservableObject {
             connection.lastConnectedAt = Date()
             try? modelContext?.save()
 
-            let requiresDirectorySelection = connection.type.requiresManualDirectorySync
-            let shouldScanRemoteFiles = !requiresDirectorySelection || scanPath != nil
-
             guard let context = modelContext else {
                 isLoading = false
                 librarySyncMessage = nil
                 librarySyncCompletionID += 1
                 return true
             }
+
+            let hasLocalMediaItems = ScanLibraryQueries.hasMediaItems(
+                connectionId: connection.id,
+                in: context
+            )
+            let missingPosterCount = ScanLibraryQueries.itemsMissingPosters(
+                connectionId: connection.id,
+                in: context
+            ).count
+            let shouldScanRemoteFiles = LibraryScanTrigger.shouldScanRemoteFiles(
+                type: connection.type,
+                scanPath: scanPath,
+                hasLocalMediaItems: hasLocalMediaItems
+            )
+            LibraryScanDebugLog.scan(
+                "decide platform=mac type=\(connection.type.rawValue) conn=\(LibraryScanDebugLog.shortID(connection.id)) hasLocal=\(hasLocalMediaItems) missingPosters=\(missingPosterCount) scanPath=\(scanPath == nil ? "nil" : "set") partial=\(isPartialScan) shouldScan=\(shouldScanRemoteFiles)"
+            )
 
             let scanner = MediaScanner(modelContainer: context.container)
             var shouldRefreshLibrary = true
@@ -810,6 +906,11 @@ final class MacConnectionsViewModel: ObservableObject {
                 loadingMessage = "已连接 \(connection.name)"
                 librarySyncMessage = nil
                 shouldRefreshLibrary = false
+                enqueueMissingPostersIfNeeded(
+                    connection: connection,
+                    context: context,
+                    platform: "mac"
+                )
             }
 
             if let mediaServer = service as? MediaServerService,
@@ -827,8 +928,13 @@ final class MacConnectionsViewModel: ObservableObject {
                 connection.lastSyncedAt = syncStart
                 try? modelContext?.save()
             } else if connection.type != .emby && connection.type != .jellyfin, shouldScanRemoteFiles {
-                let resolvedScanPath = scanPath ?? connection.path ?? "/"
-                let scope: ScanScope = isPartialScan ? .directory(path: resolvedScanPath) : .connectionRoot
+                let scope = LibraryScanTrigger.fileScanScope(
+                    type: connection.type,
+                    scanPath: scanPath,
+                    isPartialScan: isPartialScan,
+                    hasLocalMediaItems: hasLocalMediaItems
+                ) ?? .shallowRoot
+                LibraryScanDebugLog.scan("scope=\(scope.debugName) platform=mac")
                 isLoading = false
 
                 let scanResult = await performCoordinatorScan(
@@ -1252,6 +1358,39 @@ final class MacConnectionsViewModel: ObservableObject {
         }
     }
 
+    private func enqueueMissingPostersIfNeeded(
+        connection: SavedConnection,
+        context: ModelContext,
+        platform: String
+    ) {
+        guard connection.type.requiresManualDirectorySync else {
+            LibraryScanDebugLog.scan("skipScan reason=connectOnly missing=0 platform=\(platform)")
+            return
+        }
+
+        let missing = ScanLibraryQueries.itemsMissingPosters(
+            connectionId: connection.id,
+            in: context
+        )
+        guard LibraryScanTrigger.shouldResumeCovers(
+            hasLocalMediaItems: true,
+            hasMissingPosters: !missing.isEmpty
+        ) else {
+            LibraryScanDebugLog.scan("skipScan reason=connectOnly missing=\(missing.count) platform=\(platform)")
+            return
+        }
+
+        LibraryScanDebugLog.scan(
+            "skipScan reason=resumeCovers missing=\(missing.count) platform=\(platform)"
+        )
+        Task {
+            await VideoThumbnailQueue.shared.enqueue(items: missing, in: context)
+            await MainActor.run {
+                self.librarySyncCompletionID += 1
+            }
+        }
+    }
+
     private func performCoordinatorScan(
         connection: SavedConnection,
         service: RemoteFileService,
@@ -1321,8 +1460,10 @@ enum MacConnectionDeletion {
 
         Task { @MainActor in
             // 让 SwiftUI 先卸掉仍持有 MediaItem 的子路由/详情/播放器视图，再 hard-delete。
+            await VideoThumbnailQueue.shared.cancelPending()
             await Task.yield()
             connectionsViewModel.deleteConnection(connection)
+            await VideoThumbnailQueue.shared.resume()
             let remainingConnections = connectionsViewModel.savedConnections.filter {
                 $0.id != connectionId
             }

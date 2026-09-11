@@ -6,9 +6,10 @@ public enum MediaItemFactory {
         streamURL: URL,
         connectionId: UUID?,
         directoryPath: String,
-        nfoByFileName: [String: ParsedNFOMetadata] = [:]
+        nfoByFileName: [String: ParsedNFOMetadata] = [:],
+        identification: MediaIdentificationResult? = nil
     ) -> MediaItem? {
-        guard let identification = MediaIdentificationPipeline.identify(
+        guard let identification = identification ?? MediaIdentificationPipeline.identify(
             fileName: file.name,
             directoryPath: directoryPath,
             nfoByFileName: nfoByFileName
@@ -66,6 +67,7 @@ public enum MediaItemFactory {
         connectionId: UUID?,
         directoryPath: String,
         nfoByFileName: [String: ParsedNFOMetadata],
+        identification: MediaIdentificationResult? = nil,
         to item: MediaItem
     ) {
         item.fileURL = streamURL
@@ -80,7 +82,7 @@ public enum MediaItemFactory {
 
         MediaProbeApplicator.invalidateIfNeeded(existing: item, file: file)
 
-        if let identification = MediaIdentificationPipeline.identify(
+        if let identification = identification ?? MediaIdentificationPipeline.identify(
             fileName: file.name,
             directoryPath: directoryPath,
             nfoByFileName: nfoByFileName

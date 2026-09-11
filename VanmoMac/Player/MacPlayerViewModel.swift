@@ -422,6 +422,10 @@ final class MacPlayerViewModel: ObservableObject {
 
         if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
             loadURL = originalURL
+        } else if usesOfficialDownloadLink() {
+            try await requireOfficialDownloadHeaders(headerProvider)
+            loadURL = originalURL
+            VanmoLogger.player.info("[MacPlayerVM] official download link, skip prefetch")
         } else if let registration = await PrefetchProxy.shared.register(
             originalURL: originalURL,
             headerProvider: headerProvider
@@ -486,6 +490,10 @@ final class MacPlayerViewModel: ObservableObject {
 
         if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
             loadURL = originalURL
+        } else if usesOfficialDownloadLink() {
+            try await requireOfficialDownloadHeaders(headerProvider)
+            loadURL = originalURL
+            VanmoLogger.player.info("[MacPlayerVM] KS official download link, skip prefetch")
         } else if let registration = await PrefetchProxy.shared.register(
             originalURL: originalURL,
             headerProvider: headerProvider
@@ -503,6 +511,8 @@ final class MacPlayerViewModel: ObservableObject {
         let headers: [String: String]
         if usesPrefetch || loadURL.isFileURL {
             headers = [:]
+        } else if usesOfficialDownloadLink() {
+            headers = try await requireOfficialDownloadHeaders(headerProvider)
         } else {
             headers = await headerProvider?() ?? [:]
         }
@@ -1524,32 +1534,36 @@ final class MacPlayerViewModel: ObservableObject {
         }
     }
 
+    private func requireOfficialDownloadHeaders(
+        _ headerProvider: (() async -> [String: String])?
+    ) async throws -> [String: String] {
+        let headers = await headerProvider?() ?? [:]
+        guard !headers.isEmpty else {
+            throw MacPlayerPlaybackError.fileNotAccessible("无法为该网盘注入播放鉴权头")
+        }
+        return headers
+    }
+
+    private func usesOfficialDownloadLink() -> Bool {
+        guard let modelContext, let connectionId = item.sourceConnectionId else { return false }
+        let descriptor = FetchDescriptor<SavedConnection>(
+            predicate: #Predicate { $0.id == connectionId }
+        )
+        guard let connection = try? modelContext.fetch(descriptor).first else {
+            return false
+        }
+        return connection.type.usesOfficialDownloadLink
+    }
+
     private func cloudDriveStreamingHeaderProvider() -> (() async -> [String: String])? {
         guard let modelContext, let connectionId = item.sourceConnectionId else { return nil }
         let descriptor = FetchDescriptor<SavedConnection>(
             predicate: #Predicate { $0.id == connectionId }
         )
-        guard let connection = try? modelContext.fetch(descriptor).first,
-              connection.type.requiresStreamingHeaderProvider else {
+        guard let connection = try? modelContext.fetch(descriptor).first else {
             return nil
         }
-
-        switch connection.type {
-        case .googleDrive:
-            let type = connection.type
-            return {
-                guard let token = try? await OAuthCoordinator.shared.validAccessToken(for: type, connectionId: connectionId) else {
-                    return [:]
-                }
-                return ["Authorization": "Bearer \(token)"]
-            }
-        case .baiduNetdisk:
-            return {
-                ["User-Agent": BaiduNetdiskService.requiredUserAgent]
-            }
-        default:
-            return nil
-        }
+        return StreamingRequestHeaders.provider(for: connection.type, connectionId: connectionId)
     }
 }
 

@@ -167,8 +167,8 @@ public enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendabl
         return trimmed.hasPrefix("/") ? trimmed : "/\(trimmed)"
     }
 
-    /// connect 后仅建立连接与浏览；须用户选定目录后手动触发递归同步入库（Infuse Favorite 模型）。
-    /// 媒体服务器（Plex/Emby/Jellyfin）与 IPTV/DLNA 仍保留原有 connect 同步行为。
+    /// connect 后以浏览为主；本机该连接尚无 MediaItem 时自动浅扫最外层（根 + 直接子目录）。
+    /// 更深目录仍须用户选定后手动递归同步。媒体服务器与 IPTV/DLNA 仍走原有 connect 同步。
     public var requiresManualDirectorySync: Bool {
         switch self {
         case .emby, .jellyfin, .plex, .iptv, .dlna:
@@ -193,6 +193,12 @@ public enum ConnectionType: String, Codable, CaseIterable, Identifiable, Sendabl
         default:
             return false
         }
+    }
+
+    /// 开放平台只提供整文件下载直链（百度 `dlink`），不是可 Range 探测的原片流。
+    /// 封面走官方 `filemetas thumb=1`；播放跳过 Prefetch 体积探测，由引擎带鉴权头跟随 302。
+    public var usesOfficialDownloadLink: Bool {
+        self == .baiduNetdisk
     }
 
     /// 扫描/入库时不应持久化含 access_token 的直链（如百度 dlink），改用占位 URL，播放前再解析。

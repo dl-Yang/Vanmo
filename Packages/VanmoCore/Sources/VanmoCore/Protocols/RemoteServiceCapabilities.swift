@@ -71,8 +71,8 @@ public extension ConnectionType {
                 listing: .paginated,
                 playbackPersistence: .catalogPlaceholder,
                 supportsRangeReads: true,
-                maxConcurrentDirectoryReads: 2,
-                requestsPerSecond: 2
+                maxConcurrentDirectoryReads: 1,
+                requestsPerSecond: 1
             )
         case .webdav, .alist, .fnos:
             return RemoteServiceCapabilities(

@@ -14,6 +14,8 @@ struct ScannedLibraryListView: View {
     @State private var isLoading = true
     @State private var hasLoadedOnce = false
     @State private var errorMessage: String?
+    @State private var selectedMovieID: UUID?
+    @State private var selectedShowKey: ScannedShowGroupKey?
 
     private let gridColumns = [
         GridItem(.adaptive(minimum: 112, maximum: 160), spacing: 14)
@@ -50,8 +52,19 @@ struct ScannedLibraryListView: View {
         .background(Color.vanmoBackground)
         .navigationTitle(collectionType.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $selectedMovieID) { itemID in
+            movieDestination(for: itemID)
+        }
+        .navigationDestination(item: $selectedShowKey) { key in
+            ScannedShowDetailView(
+                connection: connection,
+                showTitle: key.showTitle,
+                parentDirectory: key.parentDirectory
+            )
+        }
         .task(id: taskID) {
             loadItems()
+            await refreshPostersWhileMissing()
         }
     }
 
@@ -111,40 +124,18 @@ struct ScannedLibraryListView: View {
         LazyVGrid(columns: gridColumns, spacing: 18) {
             switch collectionType {
             case .movies:
-                ForEach(movies) { item in
-                    NavigationLink {
-                        LibraryItemDestination(item: item)
-                    } label: {
-                        PosterCard(
-                            title: item.displayTitle,
-                            posterURL: item.posterURL,
-                            subtitle: movieSubtitle(item),
-                            rating: item.rating,
-                            progress: item.playbackProgress > 0 ? item.playbackProgress : nil
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button {
-                            appState.play(item)
-                        } label: {
-                            Label(L10n.tr("播放"), systemImage: "play.fill")
-                        }
+                ForEach(movies, id: \.id) { item in
+                    ScannedMovieNavButton(item: item) { itemID in
+                        selectedMovieID = itemID
+                    } onPlay: { movie in
+                        appState.play(movie)
                     }
                 }
             case .tvshows:
-                ForEach(shows) { show in
-                    NavigationLink {
-                        ScannedShowDetailView(connection: connection, showTitle: show.title)
-                    } label: {
-                        PosterCard(
-                            title: show.title,
-                            posterURL: show.posterURL,
-                            subtitle: "\(show.episodeCount) 集",
-                            rating: show.rating
-                        )
+                ForEach(shows, id: \.id) { show in
+                    ScannedShowNavButton(show: show) { key in
+                        selectedShowKey = key
                     }
-                    .buttonStyle(.plain)
                 }
             case .playlists:
                 EmptyView()
@@ -153,17 +144,32 @@ struct ScannedLibraryListView: View {
         .padding(.horizontal)
     }
 
-    private func movieSubtitle(_ item: MediaItem) -> String? {
-        if let year = item.year {
-            return "\(item.mediaType.displayName) · \(year)"
+    @ViewBuilder
+    private func movieDestination(for itemID: UUID) -> some View {
+        if let item = resolvedMovie(for: itemID) {
+            LibraryItemDestination(item: item)
+        } else {
+            EmptyStateView(
+                icon: "exclamationmark.triangle",
+                title: L10n.tr("无法加载内容"),
+                message: L10n.tr("找不到该条目")
+            )
         }
-        return item.mediaType.displayName
+    }
+
+    private func resolvedMovie(for itemID: UUID) -> MediaItem? {
+        movies.first(where: { $0.id == itemID }) ?? fetchMediaItem(id: itemID)
+    }
+
+    private func fetchMediaItem(id: UUID) -> MediaItem? {
+        let descriptor = FetchDescriptor<MediaItem>()
+        return (try? modelContext.fetch(descriptor))?.first(where: { $0.id == id })
     }
 
     private func loadItems() {
-        guard !hasLoadedOnce else { return }
-
-        isLoading = true
+        if !hasLoadedOnce {
+            isLoading = true
+        }
         errorMessage = nil
 
         do {
@@ -174,7 +180,7 @@ struct ScannedLibraryListView: View {
                 .filter { $0.sourceConnectionId == connection.id }
 
             movies = items.filter { $0.mediaType == .movie }
-            shows = makeShowSummaries(from: items)
+            shows = ScannedShowGrouping.summaries(from: items)
             hasLoadedOnce = true
         } catch {
             errorMessage = error.localizedDescription
@@ -183,54 +189,16 @@ struct ScannedLibraryListView: View {
         isLoading = false
     }
 
-    private func makeShowSummaries(from items: [MediaItem]) -> [ScannedShowSummary] {
-        let episodeItems = items.filter { $0.mediaType == .tvEpisode || $0.mediaType == .tvShow }
-        let grouped = Dictionary(grouping: episodeItems) { item in
-            normalizedShowTitle(for: item)
+    private func refreshPostersWhileMissing() async {
+        while !Task.isCancelled {
+            let missingMoviePosters = movies.contains { $0.posterURL == nil }
+            let missingShowPosters = shows.contains { $0.posterURL == nil }
+            guard missingMoviePosters || missingShowPosters else { return }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            loadItems()
         }
-
-        return grouped.compactMap { title, episodes in
-            guard let representative = episodes.sorted(by: episodeSortPredicate).first else { return nil }
-            return ScannedShowSummary(
-                title: title,
-                episodeCount: episodes.count,
-                posterURL: representative.posterURL,
-                rating: representative.rating
-            )
-        }
-        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private func normalizedShowTitle(for item: MediaItem) -> String {
-        let rawTitle = item.showTitle ?? item.title
-        let trimmed = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? item.displayTitle : trimmed
-    }
-
-    private func episodeSortPredicate(_ lhs: MediaItem, _ rhs: MediaItem) -> Bool {
-        let lhsSeason = lhs.seasonNumber ?? Int.max
-        let rhsSeason = rhs.seasonNumber ?? Int.max
-        if lhsSeason != rhsSeason {
-            return lhsSeason < rhsSeason
-        }
-
-        let lhsEpisode = lhs.episodeNumber ?? Int.max
-        let rhsEpisode = rhs.episodeNumber ?? Int.max
-        if lhsEpisode != rhsEpisode {
-            return lhsEpisode < rhsEpisode
-        }
-
-        return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-    }
-}
-
-private struct ScannedShowSummary: Identifiable {
-    let title: String
-    let episodeCount: Int
-    let posterURL: URL?
-    let rating: Double?
-
-    var id: String { title }
 }
 
 private struct ScannedLibraryLoadingView: View {
@@ -291,6 +259,64 @@ private struct ScannedLibraryPosterPlaceholder: View {
             .background(.ultraThinMaterial)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private struct ScannedMovieNavButton: View {
+    let item: MediaItem
+    let onSelect: (UUID) -> Void
+    let onPlay: (MediaItem) -> Void
+
+    var body: some View {
+        Button {
+            onSelect(item.id)
+        } label: {
+            PosterCard(
+                title: item.displayTitle,
+                posterURL: item.posterURL,
+                subtitle: movieSubtitle(item),
+                rating: item.rating,
+                progress: item.playbackProgress > 0 ? item.playbackProgress : nil
+            )
+        }
+        .buttonStyle(.plain)
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .contextMenu {
+            Button {
+                onPlay(item)
+            } label: {
+                Label(L10n.tr("播放"), systemImage: "play.fill")
+            }
+        }
+        .id(item.id)
+    }
+
+    private func movieSubtitle(_ item: MediaItem) -> String? {
+        if let year = item.year {
+            return "\(item.mediaType.displayName) · \(year)"
+        }
+        return item.mediaType.displayName
+    }
+}
+
+private struct ScannedShowNavButton: View {
+    let show: ScannedShowSummary
+    let onSelect: (ScannedShowGroupKey) -> Void
+
+    var body: some View {
+        Button {
+            onSelect(show.groupKey)
+        } label: {
+            PosterCard(
+                title: show.title,
+                posterURL: show.posterURL,
+                subtitle: "\(show.episodeCount) 集",
+                rating: show.rating
+            )
+        }
+        .buttonStyle(.plain)
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .id(show.id)
     }
 }
 

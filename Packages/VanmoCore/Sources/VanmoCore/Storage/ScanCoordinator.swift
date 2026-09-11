@@ -1,6 +1,6 @@
+import Combine
 import Foundation
 import SwiftData
-import VanmoCore
 
 @MainActor
 public final class ScanCoordinator: ObservableObject {
@@ -55,7 +55,11 @@ public final class ScanCoordinator: ObservableObject {
         activeService = service
 
         let options = RemoteScanOptions.forScope(scope, forceFullScan: forceFullScan, connectionType: connection.type)
-        let rootPath = scope.rootPaths.first ?? connection.path ?? "/"
+        let fallbackRoot = connection.browserRootPath
+        let rootPath = scope.rootPaths.first ?? fallbackRoot
+        LibraryScanDebugLog.scan(
+            "start type=\(connection.type.rawValue) conn=\(LibraryScanDebugLog.shortID(connection.id)) scope=\(scope.debugName) maxDepth=\(options.maxDepth) prune=\(options.pruneMissing) root=\(LibraryScanDebugLog.leaf(rootPath))"
+        )
         let job = ScanJobRecord(
             connectionId: connection.id,
             connectionName: connection.name,
@@ -68,7 +72,7 @@ public final class ScanCoordinator: ObservableObject {
 
         scanTask = Task {
             let scanner = MediaScanner(modelContainer: modelContainer)
-            let paths = scope.rootPaths.isEmpty ? [connection.path ?? "/"] : scope.rootPaths
+            let paths = scope.rootPaths.isEmpty ? [fallbackRoot] : scope.rootPaths
             var aggregate = ScanResult(
                 status: .completed,
                 insertedItems: [],
@@ -110,6 +114,16 @@ public final class ScanCoordinator: ObservableObject {
                 if !aggregate.probeCandidates.isEmpty {
                     job.phase = .probing
                     await MediaProbeQueue.shared.enqueue(items: aggregate.probeCandidates, in: context)
+                }
+
+                let thumbnailItems = uniqueItems(aggregate.insertedItems + aggregate.probeCandidates)
+                LibraryScanDebugLog.scan(
+                    "done status=\(aggregate.status.rawValue) inserted=\(aggregate.insertedItems.count) updated=\(aggregate.updatedCount) unchanged=\(aggregate.unchangedCount) movies=\(aggregate.stats.movieCount) episodes=\(aggregate.stats.tvEpisodeCount) thumbs=\(thumbnailItems.count)"
+                )
+                if !thumbnailItems.isEmpty {
+                    Task {
+                        await VideoThumbnailQueue.shared.enqueue(items: thumbnailItems, in: context)
+                    }
                 }
 
                 await finish(with: aggregate, onFinished: onFinished)
@@ -195,6 +209,11 @@ public final class ScanCoordinator: ObservableObject {
     private func resumeIfPaused() {
         pauseContinuation?.resume()
         pauseContinuation = nil
+    }
+
+    private func uniqueItems(_ items: [MediaItem]) -> [MediaItem] {
+        var seen: Set<UUID> = []
+        return items.filter { seen.insert($0.id).inserted }
     }
 
     private func update(job: ScanJobRecord, with progress: ScanProgress) {

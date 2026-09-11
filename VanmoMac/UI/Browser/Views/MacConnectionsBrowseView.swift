@@ -229,7 +229,9 @@ struct MacConnectionsBrowseView: View {
         Button {
             Task { await handleFileTap(file) }
         } label: {
-            MacConnectionFileRow(file: file)
+            MacConnectionFileRow(file: file) { file in
+                await connectionsViewModel.thumbnailURL(for: file)
+            }
         }
         .buttonStyle(MacConnectionFileRowButtonStyle(theme: theme))
         .contextMenu {
@@ -473,14 +475,14 @@ private struct MacConnectionFileRow: View {
     @Environment(\.macTheme) private var theme
 
     let file: RemoteFile
+    var thumbnailProvider: ((RemoteFile) async -> URL?)?
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: iconName)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(file.isDirectory ? MacDesignTokens.accentBlue : theme.secondaryText)
+            fileIcon
                 .frame(width: 36, height: 36)
                 .background(iconBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipped()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)
@@ -511,6 +513,25 @@ private struct MacConnectionFileRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
+    @ViewBuilder
+    private var fileIcon: some View {
+        if file.isDirectory {
+            systemGlyph(iconName)
+        } else if file.isVideo, thumbnailProvider != nil {
+            MacFileVideoThumbnailIcon(file: file, load: thumbnailProvider) {
+                systemGlyph("film")
+            }
+        } else {
+            systemGlyph(iconName)
+        }
+    }
+
+    private func systemGlyph(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 18, weight: .medium))
+            .foregroundStyle(file.isDirectory ? MacDesignTokens.accentBlue : theme.secondaryText)
+    }
+
     private var iconName: String {
         if file.isDirectory {
             return "folder.fill"
@@ -533,6 +554,36 @@ private struct MacConnectionFileRow: View {
             return MacBrowseFormatters.fileSize(file.size)
         }
         return file.type.macBrowseDisplayName
+    }
+}
+
+private struct MacFileVideoThumbnailIcon<Fallback: View>: View {
+    let file: RemoteFile
+    let load: ((RemoteFile) async -> URL?)?
+    @ViewBuilder let fallback: () -> Fallback
+
+    @State private var thumbnailURL: URL?
+
+    var body: some View {
+        Group {
+            if let thumbnailURL {
+                AsyncImage(url: thumbnailURL) { phase in
+                    if case .success(let image) = phase {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        fallback()
+                    }
+                }
+            } else {
+                fallback()
+            }
+        }
+        .task(id: file.path) {
+            guard let load else { return }
+            thumbnailURL = await load(file)
+        }
     }
 }
 

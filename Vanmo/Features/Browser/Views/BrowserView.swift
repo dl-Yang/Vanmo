@@ -211,7 +211,9 @@ struct ConnectionsView: View {
         Button {
             Task { await handleFileTap(file) }
         } label: {
-            FileCard(file: file)
+            FileCard(file: file) { file in
+                await viewModel.thumbnailURL(for: file)
+            }
         }
         .buttonStyle(FilesRowButtonStyle())
         .contextMenu {
@@ -337,12 +339,31 @@ struct ConnectionsView: View {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         )
         print("[Debug][FTP] accept listed=\(viewModel.files.count) hasVideo=\(video != nil) actions=\(actions.sorted().joined(separator: ","))")
-        guard let video else { return }
-        if actions.contains("play") {
+        if actions.contains("connect") {
+            _ = await viewModel.connectAndScan(connection, showErrorAlert: false)
+            print("[Debug][LibraryScan] accept connect done control=\(String(describing: viewModel.scanCoordinator.controlState))")
+        }
+        if actions.contains("cancel") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                viewModel.cancelScan()
+                print("[Debug][LibraryScan] accept cancel requested")
+            }
+            _ = await viewModel.scanCurrentDirectory()
+            print("[Debug][LibraryScan] accept cancel finished control=\(String(describing: viewModel.scanCoordinator.controlState))")
+        } else if actions.contains("scan") {
+            _ = await viewModel.scanCurrentDirectory()
+            print("[Debug][LibraryScan] accept scan done control=\(String(describing: viewModel.scanCoordinator.controlState))")
+        }
+        if actions.contains("play"), let video {
             await play(video)
         }
-        if actions.contains("download") {
+        if actions.contains("download"), let video {
             await download(video, connection: connection)
+        }
+        if actions.contains("delete") {
+            viewModel.deleteConnection(connection)
+            print("[Debug][LibraryScan] accept delete requested")
         }
     }
 #endif
@@ -632,16 +653,20 @@ private struct ConnectionCard: View {
 
 private struct FileCard: View {
     let file: RemoteFile
+    var thumbnailProvider: ((RemoteFile) async -> URL?)?
 
     var body: some View {
         HStack(spacing: 0) {
             FilesIconBox(background: file.isDirectory ? FilesDesign.folderBoxBackground : FilesDesign.iconBoxGray) {
-                Image(file.isDirectory ? "FilesFolder" : "FilesFileVideo")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(file.isDirectory ? FilesDesign.accent : FilesDesign.secondaryIcon)
+                if file.isDirectory {
+                    fileGlyph(name: "FilesFolder", color: FilesDesign.accent)
+                } else if file.isVideo, thumbnailProvider != nil {
+                    FileVideoThumbnailIcon(file: file, load: thumbnailProvider, fallback: {
+                        fileGlyph(name: "FilesFileVideo", color: FilesDesign.secondaryIcon)
+                    })
+                } else {
+                    fileGlyph(name: "FilesFileVideo", color: FilesDesign.secondaryIcon)
+                }
             }
 
             VStack(alignment: .leading, spacing: 0) {
@@ -679,9 +704,50 @@ private struct FileCard: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(FilesDesign.subtitle)
         } else {
-            Text(file.type.filesDisplayName)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(FilesDesign.subtitle)
+                Text(file.type.filesDisplayName)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(FilesDesign.subtitle)
+        }
+    }
+
+    private func fileGlyph(name: String, color: Color) -> some View {
+        Image(name)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: 24, height: 24)
+            .foregroundStyle(color)
+    }
+}
+
+private struct FileVideoThumbnailIcon<Fallback: View>: View {
+    let file: RemoteFile
+    let load: ((RemoteFile) async -> URL?)?
+    @ViewBuilder let fallback: () -> Fallback
+
+    @State private var thumbnailURL: URL?
+
+    var body: some View {
+        Group {
+            if let thumbnailURL {
+                AsyncImage(url: thumbnailURL) { phase in
+                    if case .success(let image) = phase {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        fallback()
+                    }
+                }
+            } else {
+                fallback()
+            }
+        }
+        .frame(width: 24, height: 24)
+        .clipped()
+        .task(id: file.path) {
+            guard let load else { return }
+            thumbnailURL = await load(file)
         }
     }
 }

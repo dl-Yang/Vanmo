@@ -4,6 +4,15 @@ import VanmoCore
 
 final class KSPlayerMediaProbeProvider: MediaProbeProviding, @unchecked Sendable {
     func probe(url: URL, timeout: TimeInterval) async throws -> MediaProbeResult {
+        if LibavformatOpenGate.needsExclusiveOpen(url) {
+            return try await LibavformatOpenGate.shared.exclusive {
+                try await self.probeOnce(url: url, timeout: timeout)
+            }
+        }
+        return try await probeOnce(url: url, timeout: timeout)
+    }
+
+    private func probeOnce(url: URL, timeout: TimeInterval) async throws -> MediaProbeResult {
         try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 do {
@@ -196,6 +205,7 @@ enum MediaProbeBootstrap {
     static func configure() {
         Task {
             await MediaProbeQueue.shared.setProvider(KSPlayerMediaProbeProvider())
+            await VideoThumbnailQueue.shared.setExtractor(KSPlayerVideoThumbnailExtractor())
         }
     }
 }
