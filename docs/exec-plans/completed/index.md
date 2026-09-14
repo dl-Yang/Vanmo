@@ -27,6 +27,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 - [`2026-09-04-icloud-connection-tombstone.md`](2026-09-04-icloud-connection-tombstone.md) — **Completed.** Per-device tombstone delete, empty-password Keychain, and same-server identity reuse passed a signed two-device walk.
 - [`2026-09-07-icloud-conflict-merge.md`](2026-09-07-icloud-conflict-merge.md) — **Completed.** Signed two-device walk passed file-based progress, favorite, and bookmark sync. Dashboard shows one `CD_SavedConnection` for the same SMB connection.
 - [`2026-09-01-ios-home-server-logos.md`](2026-09-01-ios-home-server-logos.md) — **Completed.** Home pill counts synced servers; Home, Files, and Add Connection use brand logos; operator iOS walk opened one movie and one TV-show detail with no crash.
+- [`2026-09-08-library-scan-thumbnail.md`](2026-09-08-library-scan-thumbnail.md) — **Completed.** First-connect shallow scan, filename clustering, serial KSPlayer keyframe covers, Baidu official thumbs, and dual-platform Google Drive prefetch keyframes (`extractOK` on iOS Simulator and Vanmo-macOS).
 
 ## Archival Rules
 

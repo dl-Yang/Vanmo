@@ -22,10 +22,6 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 
 ## Current Plans
 
-### In progress
-
-- [`2026-09-08-library-scan-thumbnail.md`](2026-09-08-library-scan-thumbnail.md) — **In progress.** First-connect shallow scan, filename identification, same-folder episode clustering, serial KSPlayer keyframe covers, Baidu official thumbs plus dual-platform `dlink` play; Google Drive covers remain
-
 ### Implemented, ready to run
 
 - [`2026-08-28-plex-connection-validation.md`](2026-08-28-plex-connection-validation.md) — **Not started.** plex.tv sign-in, PMS listing, and play

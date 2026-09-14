@@ -1,6 +1,7 @@
 # Library Shallow Scan, Identification, and First-Frame Covers
 
-**Status:** In progress
+**Status:** Completed
+**Completed:** 2026-09-14
 **Plan type:** Feature / library
 **Related product spec:** [`../../product-specs/library-scan.md`](../../product-specs/library-scan.md)
 **Related reliability authority:** [`../../RELIABILITY.md`](../../RELIABILITY.md)
@@ -56,10 +57,12 @@ On a file-based connection, the first local connect scans the outermost path (ro
 - **2026-09-10:** Device Baidu walk confirmed `categorylist+start` paging (no `repeatFirst` loop). A shallow pass finished `scanToast=同步完成，4 项待确认`. A following full tree walk then hit HTTP 400 `errno 31034 hit frequency limit` on later directories; those `listFail` rows were the “21 problems” toast, not probe failures. Listing now retries 31034 with backoff and Baidu scan rate is 1 worker / 1 rps. Operator confirmed the scan no longer sticks on frequency-limit failures. Temporary `[Debug][BaiduScan]` session probes were removed. Frequency-limit detection trusts JSON `errno` when present; a body that merely contains the digits `31034` is not treated as 31034.
 - **2026-09-11:** iOS Simulator Baidu closeout on iPhone 17 Pro recorded reconnect `skipScan reason=resumeCovers`, official `baiduThumbs hasThumb=true` plus `skipKeyframe` (no prefetch/KSPlayer 20s cover path), Files `cacheHit` for an already-stored JPEG, and one `dlink` play (`official download link, skip prefetch`, KSPlayer `readyToPlay` duration 2002s, `state=playing`). A root “同步当前目录” walk used `scope=directory maxDepth=8` at ~1 dir/s with the Files list still interactive and a cancelable banner (220 directories / 4999 videos mid-walk); cancel produced `done status=cancelled`. Deleting while Home still held `MediaItem` rows first hit SwiftData `mediaType` fault; iOS now matches macOS (cancel scan, drop UI refs, then LocalStore cleanup). After delete, Files showed no sources and Home was empty. Package tests 202. Serial iOS Simulator (`20260911-101329-50240`) then macOS (`20260911-101434-50853`) Debug compiles passed before the walk. Signed VanmoMac CloudKit exported and imported; seven Baidu `SavedConnection` rows stayed `home hide reason=noItems` with no local catalog and no auto-scan. Google Drive is unchanged.
 - **2026-09-11:** Vanmo-macOS Debug re-authenticated one imported Baidu connection (`accept reauth ok=true`), listed 19 Files entries, inserted 4 local catalog rows, and played through `MacKSPlayerEngine` with `KS official download link, skip prefetch` and `load complete`. The Baidu connection-validation plan moved to `docs/exec-plans/completed/`.
+- **2026-09-13:** iPhone 17 Pro Simulator Google Drive first connect recorded `decide platform=ios type=googleDrive … hasLocal=false shouldScan=true`, `scope=shallowRoot`, and `done status=completed inserted=1 thumbs=1`. Cover extraction used Bearer prefetch: `extractStart … via=prefetch`, `extractEngine engine=ksplayer-me elapsedMs=5614`, `extractOK`, and `posterSaved`. Home showed the Google Drive Movies row with that keyframe. A later reconnect recorded `skipScan reason=connectOnly missing=0`. Package tests `swift test --package-path Packages/VanmoCore` passed 202 tests before the walk. Sanitized unified-log lines only; no tokens or `alt=media` URLs.
+- **2026-09-14:** Vanmo-macOS already had a local Google Drive catalog (Home one-movie library plus keyframe). Reconnect recorded `skipScan reason=connectOnly`, then a missing-poster reconnect recorded `skipScan reason=resumeCovers missing=1`, `extractStart … via=prefetch`, `extractEngine engine=ksplayer-me elapsedMs=5691`, `extractOK`, and `posterSaved`. Prefetch unregister after extract logged a cancelled body stream; the JPEG was saved. Google Drive play remains on the separate connection-validation plan.
 
 ## Next step
 
-Google Drive still expects prefetch keyframes.
+None. Other cover surfaces stay deferred debt. Google Drive login/list/play evidence stays on [`2026-08-28-google-drive-connection-validation.md`](../active/2026-08-28-google-drive-connection-validation.md).
 
 ## Open Decisions
 
