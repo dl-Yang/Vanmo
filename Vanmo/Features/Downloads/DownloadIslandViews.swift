@@ -229,20 +229,23 @@ struct DownloadIslandPoster: View {
 struct DownloadIslandProgressRing: View {
     let progress: Double
     let percent: Int
+    var size: CGFloat = 23
+    var lineWidth: CGFloat = 2
+    var percentSize: CGFloat = 5.8
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.12), lineWidth: 2)
+                .stroke(Color.white.opacity(0.12), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: min(max(progress, 0.02), 1))
-                .stroke(DownloadIslandPalette.ring, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(DownloadIslandPalette.ring, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Text("\(percent)")
-                .font(.system(size: 5.8, weight: .semibold))
+                .font(.system(size: percentSize, weight: .semibold))
                 .foregroundStyle(DownloadIslandPalette.ringText)
         }
-        .frame(width: 23, height: 23)
+        .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 }

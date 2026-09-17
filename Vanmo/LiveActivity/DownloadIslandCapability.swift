@@ -15,7 +15,36 @@ enum DownloadIslandCapability {
     }
 
     static var canUseLiveActivity: Bool {
-        hasDynamicIsland && ActivityAuthorizationInfo().areActivitiesEnabled
+        (hasDynamicIsland || hasNotchStatusBar) && ActivityAuthorizationInfo().areActivitiesEnabled
+    }
+
+    /// Notch iPhone without a Dynamic Island (X through 14 non-Pro). Cached once detected.
+    static var hasNotchStatusBar: Bool {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return false }
+        if hasDynamicIsland { return false }
+        if let cachedHasNotchStatusBar {
+            return cachedHasNotchStatusBar
+        }
+        let inset = maxKeyWindowSafeAreaInset
+        let statusBar = resolvedStatusBarHeight
+        let detected = (inset >= 44 && inset < 59) || (statusBar >= 44 && statusBar < 59)
+        if detected {
+            cachedHasNotchStatusBar = true
+        }
+        return detected
+    }
+
+    /// In-app status-bar capsule on notch phones, sized like the system location pill (`tem/1.PNG`).
+    static let notchCapsuleWidth: CGFloat = 64
+    static let notchCapsuleHeight: CGFloat = 28
+    static let notchCapsuleLeading: CGFloat = 16
+    static let notchCapsuleLineWidth: CGFloat = 2.4
+    static let fallbackNotchStatusBarHeight: CGFloat = 47
+
+    static var notchStatusBarHeight: CGFloat {
+        let height = resolvedStatusBarHeight
+        if height >= 44 { return height }
+        return fallbackNotchStatusBarHeight
     }
 
     /// Measured from an iPhone 17 Pro simulator screenshot at 3× (402×874 points).
@@ -63,6 +92,16 @@ enum DownloadIslandCapability {
         return CGSize(width: width, height: 36)
     }
 
+    static func notchLandingFrame(in screen: CGRect) -> CGRect {
+        let y = screen.minY + max((notchStatusBarHeight - notchCapsuleHeight) / 2, 0)
+        return CGRect(
+            x: screen.minX + notchCapsuleLeading,
+            y: y,
+            width: notchCapsuleWidth,
+            height: notchCapsuleHeight
+        )
+    }
+
     static func fallbackBarFrame(in screen: CGRect, safeAreaTop: CGFloat) -> CGRect {
         let horizontal: CGFloat = 16
         let topGap: CGFloat = 6
@@ -95,6 +134,15 @@ enum DownloadIslandCapability {
     }
 
     private static var cachedHasDynamicIsland: Bool?
+    private static var cachedHasNotchStatusBar: Bool?
+
+    private static var resolvedStatusBarHeight: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let height = scenes.compactMap(\.statusBarManager?.statusBarFrame.height).first, height > 0 {
+            return height
+        }
+        return 0
+    }
 
     private static var maxKeyWindowSafeAreaInset: CGFloat {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }

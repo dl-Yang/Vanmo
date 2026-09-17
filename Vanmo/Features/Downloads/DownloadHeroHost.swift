@@ -19,7 +19,17 @@ final class DownloadIslandHandoff: ObservableObject {
 
     func becomeActive() {
         isParked = false
-        hidesStatusBar = true
+        applyStatusBarPolicy()
+    }
+
+    /// Island and notch phones hide the system status bar so in-app download chrome is not covered.
+    func applyStatusBarPolicy() {
+        if isParked {
+            hidesStatusBar = false
+            return
+        }
+        hidesStatusBar = DownloadIslandCapability.hasDynamicIsland
+            || DownloadIslandCapability.hasNotchStatusBar
     }
 }
 
@@ -88,6 +98,8 @@ struct DownloadHeroHost: View {
             )
         } else {
             DownloadHeroCapsule(title: hero.title, posterURL: hero.posterURL)
+                .frame(width: hero.capsuleSize.width, height: hero.capsuleSize.height)
+                .clipShape(Capsule())
                 .scaleEffect(hero.capsuleScale)
         }
     }
@@ -115,6 +127,9 @@ struct DownloadHeroHost: View {
     private static func destinationFrame(in screen: CGRect, safeTop: CGFloat) -> CGRect {
         if DownloadIslandCapability.hasDynamicIsland {
             return DownloadIslandCapability.islandFrame(in: screen, safeAreaTop: safeTop)
+        }
+        if DownloadIslandCapability.hasNotchStatusBar {
+            return DownloadIslandCapability.notchLandingFrame(in: screen)
         }
         return DownloadIslandCapability.fallbackBarFrame(in: screen, safeAreaTop: safeTop)
     }

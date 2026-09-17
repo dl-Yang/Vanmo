@@ -25,7 +25,7 @@ final class DownloadLiveActivityBridge: ObservableObject {
     private var endGeneration = 0
 
     var shouldShowFallbackBar: Bool {
-        !DownloadIslandCapability.hasDynamicIsland
+        !DownloadIslandCapability.hasDynamicIsland && !DownloadIslandCapability.hasNotchStatusBar
     }
 
     func sync(tasks: [DownloadTaskSnapshot]) {
@@ -36,10 +36,12 @@ final class DownloadLiveActivityBridge: ObservableObject {
         )
 
         let enabled = ActivityAuthorizationInfo().areActivitiesEnabled
-        if !DownloadIslandCapability.hasDynamicIsland || !enabled {
+        let usesSystemActivity = DownloadIslandCapability.hasDynamicIsland
+            || DownloadIslandCapability.hasNotchStatusBar
+        if !enabled || !usesSystemActivity {
             previousID = presentation.task?.id
 #if DEBUG
-            print("[Debug][Downloads] live activity skipped island=\(DownloadIslandCapability.hasDynamicIsland) enabled=\(enabled)")
+            print("[Debug][Downloads] live activity skipped island=\(DownloadIslandCapability.hasDynamicIsland) notch=\(DownloadIslandCapability.hasNotchStatusBar) enabled=\(enabled)")
 #endif
             if !enabled {
                 startFailed = false

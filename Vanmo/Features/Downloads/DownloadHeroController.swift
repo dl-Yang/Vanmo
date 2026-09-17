@@ -35,11 +35,13 @@ final class DownloadHeroController: ObservableObject {
         revealsDestinationChrome = false
         landedAt = nil
         isFlying = true
+        DownloadIslandHandoff.shared.applyStatusBarPolicy()
 
         guard !reduceMotion, sourceFrame.width > 1 else {
             revealsDestinationChrome = true
             isFlying = false
             landedAt = Date()
+            DownloadIslandHandoff.shared.applyStatusBarPolicy()
             return
         }
 
@@ -63,10 +65,18 @@ final class DownloadHeroController: ObservableObject {
             guard !Task.isCancelled else { return }
             await self.animate(.spring(response: 0.50, dampingFraction: 0.78), duration: 0.56) {
                 self.capsuleCenter = CGPoint(x: dest.midX, y: dest.midY)
+                if DownloadIslandCapability.hasNotchStatusBar {
+                    self.capsuleSize = CGSize(
+                        width: dest.width > 1 ? dest.width : DownloadIslandCapability.notchCapsuleWidth,
+                        height: dest.height > 1 ? dest.height : DownloadIslandCapability.notchCapsuleHeight
+                    )
+                }
             }
             guard !Task.isCancelled else { return }
             if DownloadIslandCapability.hasDynamicIsland {
                 await self.playIslandMorph(island: dest)
+            } else if DownloadIslandCapability.hasNotchStatusBar {
+                await self.playNotchLanding()
             } else {
                 await self.playFallbackLanding()
             }
@@ -91,6 +101,15 @@ final class DownloadHeroController: ObservableObject {
             self.capsuleSize = compact
             self.capsuleCenter = DownloadIslandCapability.topAlignedCenter(for: compact, in: island)
             self.morphProgress = 1
+        }
+        guard !Task.isCancelled else { return }
+        finishFlight(revealChrome: true)
+    }
+
+    private func playNotchLanding() async {
+        revealsDestinationChrome = true
+        await animate(.easeOut(duration: 0.18), duration: 0.18) {
+            self.capsuleOpacity = 0
         }
         guard !Task.isCancelled else { return }
         finishFlight(revealChrome: true)
@@ -137,6 +156,7 @@ final class DownloadHeroController: ObservableObject {
         capsuleOpacity = 0
         morphProgress = 0
         destinationScale = 1
+        DownloadIslandHandoff.shared.applyStatusBarPolicy()
     }
 
     private var resolvedDestination: CGRect {

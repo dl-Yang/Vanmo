@@ -147,6 +147,7 @@
 		C8508F0E3622A5D1309715CA /* jellyfin.png in Resources */ = {isa = PBXBuildFile; fileRef = 9C6C9DB7C33B25EE254DD601 /* jellyfin.png */; };
 		C8D53FF63F5EE1E87FD0AF8E /* MacScanSyncBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B45846B6B09E717C245CFD9 /* MacScanSyncBanner.swift */; };
 		CB6685A01E4B0E6B419481F1 /* baiduNetdisk.png in Resources */ = {isa = PBXBuildFile; fileRef = B09C32D3BB0EC025D1769F53 /* baiduNetdisk.png */; };
+		CEE663CAED98260E8D5DF085 /* DownloadNotchStatusBarHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 562559506E4D0EB0EC3253DC /* DownloadNotchStatusBarHost.swift */; };
 		D442E93B0F496CD0726CDA47 /* KSPlayerMediaProbeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86786584DACF6F5FC223B219 /* KSPlayerMediaProbeProvider.swift */; };
 		D59F902EE7228DE91DADB286 /* mega.png in Resources */ = {isa = PBXBuildFile; fileRef = C64BB62C8F69AE1F342C8CE4 /* mega.png */; };
 		D930CAE97EB033B3F87D6E2A /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D672C6AFDA04BC432035478A /* InfoPlist.xcstrings */; };
@@ -258,6 +259,7 @@
 		525103842B302272BB888AAD /* MacMediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaDetailView.swift; sourceTree = "<group>"; };
 		529EDB8110AF477715A8A72C /* Vanmo-Mac-Cloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac-Cloud.entitlements"; sourceTree = "<group>"; };
 		52AB4C935BD3532632AE099A /* MacConnectionTypeGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacConnectionTypeGroups.swift; sourceTree = "<group>"; };
+		562559506E4D0EB0EC3253DC /* DownloadNotchStatusBarHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadNotchStatusBarHost.swift; sourceTree = "<group>"; };
 		58B4B29A68276E4D731CAB87 /* plex.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = plex.png; sourceTree = "<group>"; };
 		58FD915D4042EB1C1A80D05C /* Info-Mac.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-Mac.plist"; sourceTree = "<group>"; };
 		5A64BCC4A5AF212206C6EB3A /* MacPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerView.swift; sourceTree = "<group>"; };
@@ -1043,6 +1045,7 @@
 				775AF80877A93227EBB62496 /* DownloadHeroController.swift */,
 				1E95D7653A8A44C0A75F0517 /* DownloadHeroHost.swift */,
 				D89AB4EE2089414828703B64 /* DownloadIslandViews.swift */,
+				562559506E4D0EB0EC3253DC /* DownloadNotchStatusBarHost.swift */,
 			);
 			path = Downloads;
 			sourceTree = "<group>";
@@ -1367,6 +1370,7 @@
 				0B0AEF68D90DEA3C7446F33F /* DownloadLiveActivityBridge.swift in Sources */,
 				368E2796F56AC4A64B535705 /* DownloadLiveActivityIntents.swift in Sources */,
 				ABEBB8DFF54C2614AD4936A4 /* DownloadManagementView.swift in Sources */,
+				CEE663CAED98260E8D5DF085 /* DownloadNotchStatusBarHost.swift in Sources */,
 				629533D36025C33335AD711A /* EmbyFolderBrowseView.swift in Sources */,
 				21156474DADE809BFC7E4AF3 /* EmptyStateView.swift in Sources */,
 				737076767678A1A15FEB0257 /* FavoritesListView.swift in Sources */,

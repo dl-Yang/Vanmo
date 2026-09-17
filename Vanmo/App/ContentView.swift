@@ -66,6 +66,9 @@ struct ContentView: View {
         .overlay(alignment: .top) {
             DownloadFallbackBarHost()
         }
+        .overlay(alignment: .topLeading) {
+            DownloadNotchStatusBarHost()
+        }
         .overlay(alignment: .top) {
             DownloadIslandRingHost()
         }
@@ -89,6 +92,7 @@ struct ContentView: View {
             appState.purgeMediaState(for: connectionId)
         }
         .onAppear {
+            DownloadIslandHandoff.shared.applyStatusBarPolicy()
 #if DEBUG
             IslandDebugDarwin.shared.openDownloadsHandler = { appState.openDownloads() }
 #endif

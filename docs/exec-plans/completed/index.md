@@ -31,6 +31,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 - [`2026-09-11-download-hero-animation.md`](2026-09-11-download-hero-animation.md) — **Completed.** Detail enqueue flies a poster capsule to the iOS Dynamic Island or SE fallback bar and the Vanmo-macOS sidebar download icon; Downloads domain QUALITY_SCORE is A.
 - [`2026-09-14-download-island-polish.md`](2026-09-14-download-island-polish.md) — **Completed.** Foreground Compact/Expanded fake island, foreground ActivityKit request that does not steal hits, scene absorb into the hardware island, lock-screen `vanmo://downloads`, completion alert, and no-island fallback bar. QUALITY_SCORE unchanged.
 - [`2026-09-17-ios-visual-verification.md`](2026-09-17-ios-visual-verification.md) — **Completed.** Retired the iOS UI-test target and CLI. Physical-device UI evidence is screenshots plus a recording; Simulator walks are agent-operated. Fast baseline is three stages.
+- [`2026-09-17-notch-download-status-bar.md`](2026-09-17-notch-download-status-bar.md) — **Completed.** Notch iPhone hides the status bar, flies a shrinking hero to the leading slot, then shows a solid-blue in-app capsule; `tem/cmp.mp4` on iPhone 13 mini passed flight, landed capsule, lock-screen Live Activity, and pause sync. QUALITY_SCORE unchanged.
 
 ## Archival Rules
 
