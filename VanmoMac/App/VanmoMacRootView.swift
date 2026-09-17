@@ -55,6 +55,9 @@ struct VanmoMacRootView: View {
                 .padding(.top, 2)
                 .ignoresSafeArea(edges: .top)
 
+            MacDownloadHeroOverlay()
+                .allowsHitTesting(false)
+
             if let message = connectionsViewModel.librarySyncMessage {
                 syncStatusOverlay(message: message)
             }
@@ -67,6 +70,14 @@ struct VanmoMacRootView: View {
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .zIndex(2)
+            }
+        }
+        .onPreferenceChange(MacDownloadHeroFrameKey.self) { frames in
+            if let source = frames["source"] {
+                MacDownloadHeroController.shared.sourceFrame = source
+            }
+            if let destination = frames["destination"] {
+                MacDownloadHeroController.shared.destinationFrame = destination
             }
         }
         .macTheme(activeTheme)
@@ -113,6 +124,15 @@ struct VanmoMacRootView: View {
             await refreshLibrarySections()
 #if DEBUG
             await runDebugSourceAcceptanceIfNeeded()
+            if let kind = DownloadHeroWalkFixtures.requestedKind {
+                do {
+                    let item = try DownloadHeroWalkFixtures.seedItem(kind: kind, in: modelContext)
+                    appState.openDetail(item)
+                    print("[Debug][Downloads] hero walk presented kind=\(kind.rawValue) title=\(item.title)")
+                } catch {
+                    print("[Debug][Downloads] hero walk seed failed")
+                }
+            }
 #endif
         }
         .onChange(of: scenePhase) { _, newPhase in

@@ -22,6 +22,7 @@ struct VanmoMacApp: App {
     @StateObject private var connectionsViewModel = MacConnectionsViewModel()
     @StateObject private var searchViewModel = MacSearchViewModel()
     @StateObject private var downloadManager = DownloadManager.shared
+    @StateObject private var downloadHero = MacDownloadHeroController.shared
 
     var sharedModelContainer: ModelContainer = ModelContainerFactory.makeSharedContainer()
 
@@ -34,6 +35,7 @@ struct VanmoMacApp: App {
                 .environmentObject(connectionsViewModel)
                 .environmentObject(searchViewModel)
                 .environmentObject(downloadManager)
+                .environmentObject(downloadHero)
                 .frame(minWidth: 960, minHeight: 640)
         }
         .windowStyle(.hiddenTitleBar)

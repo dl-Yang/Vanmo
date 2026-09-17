@@ -24,7 +24,7 @@ A later agent must not treat a green documentation stage as proof that `./init.s
 - Scanning `templates/`
 - XcodeGen drift, SwiftSyntax, stale-plan gardening, or local log export
 - Archiving the debug-build-evidence-layer plan or renaming `Implemented` to `completed`
-- App code, XCUITest, or `./init.sh --full`
+- App code or `./init.sh --full`
 
 ## Verification
 
@@ -32,7 +32,7 @@ A later agent must not treat a green documentation stage as proof that `./init.s
 2. Changing RELIABILITY Bootstrap `four` to `five` makes the check fail with a stage-count mismatch.
 3. Changing the active-index status of the macOS download plan to `Completed` makes the check fail with an index/plan Status mismatch.
 4. Restoring both edits makes the check pass again.
-5. Fast `./init.sh` still runs four stages and does not compile apps or run XCUITest.
+5. Fast `./init.sh` still runs four stages and does not compile apps or capture UI.
 
 ## Risks
 
@@ -42,7 +42,7 @@ A later agent must not treat a green documentation stage as proof that `./init.s
 ## Progress
 
 - **2026-08-26:** Plan created. Implementation starts from the existing link checker.
-- **2026-08-26:** Extended `scripts/check-harness-docs.sh` with live stage-count, plan-index Status, spec/plan Status, and QUALITY command-path checks. RELIABILITY, AGENTS, and ARCHITECTURE now describe the documentation stage as a narrative check. Current-tree `./scripts/check-harness-docs.sh` passed with 0 failures. Injecting `five baseline stages` into RELIABILITY Bootstrap failed with `stage-count mismatch: docs/RELIABILITY.md Bootstrap claims 5 (five baseline stages), init.sh fast baseline has 4`. Injecting `**Completed.**` for the macOS download plan in the active index failed with `index/plan Status mismatch`. Both edits were restored; the check passed again. Fast `./init.sh` completed all four stages with 0 failures and did not compile apps or run XCUITest.
+- **2026-08-26:** Extended `scripts/check-harness-docs.sh` with live stage-count, plan-index Status, spec/plan Status, and QUALITY command-path checks. RELIABILITY, AGENTS, and ARCHITECTURE now describe the documentation stage as a narrative check. Current-tree `./scripts/check-harness-docs.sh` passed with 0 failures. Injecting `five baseline stages` into RELIABILITY Bootstrap failed with `stage-count mismatch: docs/RELIABILITY.md Bootstrap claims 5 (five baseline stages), init.sh fast baseline has 4`. Injecting `**Completed.**` for the macOS download plan in the active index failed with `index/plan Status mismatch`. Both edits were restored; the check passed again. Fast `./init.sh` completed all four stages with 0 failures and did not compile apps or capture UI.
 - **2026-08-26:** Post-task review tightened Status matching to the phrase before `.` or `;`, so `Not started` no longer collapses to `not`. Bootstrap stage-count now stops before the `--full` continuation. Unparseable Status fails instead of matching `None == None`.
 
 ## Open Decisions

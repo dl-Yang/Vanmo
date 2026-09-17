@@ -5,9 +5,9 @@ import VanmoCore
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
-    @EnvironmentObject private var downloadManager: DownloadManager
     @State private var isChoosingDirectory = false
     @State private var directoryError: String?
+    @State private var downloadDirectoryPath = DownloadManager.shared.destination.rootPath
 
     var body: some View {
         Form {
@@ -24,6 +24,9 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)
         .background(Color.vanmoBackground)
         .navigationTitle(L10n.tr("设置"))
+        .onAppear {
+            downloadDirectoryPath = DownloadManager.shared.destination.rootPath
+        }
         .task {
             await viewModel.calculateCacheSize()
             await viewModel.calculateMetadataCacheSize()
@@ -66,7 +69,8 @@ struct SettingsView: View {
         ) { result in
             do {
                 guard let url = try result.get().first else { return }
-                try downloadManager.setCustomDirectory(url)
+                try DownloadManager.shared.setCustomDirectory(url)
+                downloadDirectoryPath = DownloadManager.shared.destination.rootPath
             } catch {
                 directoryError = error.localizedDescription
             }
@@ -297,12 +301,13 @@ struct SettingsView: View {
                 Label(L10n.tr("下载管理"), systemImage: "arrow.down.circle")
             }
 
-            LabeledContent(L10n.tr("下载目录"), value: downloadManager.destination.rootPath)
+            LabeledContent(L10n.tr("下载目录"), value: downloadDirectoryPath)
             Button(L10n.tr("选择下载文件夹")) {
                 isChoosingDirectory = true
             }
             Button(L10n.tr("恢复默认下载位置")) {
-                downloadManager.useDefaultDirectory()
+                DownloadManager.shared.useDefaultDirectory()
+                downloadDirectoryPath = DownloadManager.shared.destination.rootPath
             }
 
             HStack {

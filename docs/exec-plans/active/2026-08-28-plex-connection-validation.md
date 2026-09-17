@@ -20,7 +20,7 @@ Record that a real Plex Media Server can be added, authenticated through plex.tv
 - Implementation changes
 - Downloads, library-scan persistence, or playback-progress reporting
 - Plex two-factor recovery, remote relay, or shared-server invites
-- Physical-device XCUITest or automated credential entry
+- Automated credential entry
 
 ## Prerequisites
 

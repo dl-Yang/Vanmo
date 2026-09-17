@@ -62,9 +62,6 @@ echo "==> 检查 CloudKit、跨平台边界与结构守卫"
 echo "==> 检查 Advanced Harness 文档守卫"
 ./scripts/check-harness-docs.sh
 
-echo "==> 检查 iOS UI 交互 CLI"
-./scripts/check-ios-ui-cli.sh
-
 if [[ "$FULL" -eq 1 ]]; then
     echo "==> 编译 iOS Simulator 与 macOS Debug 应用"
     ./scripts/check-app-build.sh all

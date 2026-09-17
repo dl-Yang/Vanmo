@@ -209,6 +209,22 @@
         }
       }
     },
+    "下载进度": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download progress"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载进度"
+          }
+        }
+      }
+    },
     "外观": {
       "localizations": {
         "en": {
@@ -4861,6 +4877,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待中 · 即将开始"
+          }
+        }
+      }
+    },
+    "下载完成": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download complete"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载完成"
           }
         }
       }

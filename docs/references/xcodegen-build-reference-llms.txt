@@ -1,5 +1,5 @@
 VANMO XCODEGEN AND BUILD REFERENCE FOR LLMS
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-17
 
 CONFIGURATION AUTHORITY
 - project.yml is the source of truth for application targets, package
@@ -14,19 +14,16 @@ CONFIGURATION AUTHORITY
 - Include the regenerated Vanmo.xcodeproj/project.pbxproj with the project.yml
   change and inspect the generated diff.
 
-IOS UI TEST TARGET
-- VanmoUITests is a bundle.ui-testing target with a dependency on Vanmo and
-  TEST_TARGET_NAME set to Vanmo.
-- The Vanmo scheme includes VanmoUITests in its test action.
-- scripts/ios-ui.sh sets TEST_RUNNER_VANMO_UI_* environment variables. Xcode's
-  test runner is expected to remove the TEST_RUNNER_ prefix when exposing them
-  to VanmoDeviceInteractionTests.swift, which reads VANMO_UI_* variables.
-  Simulator delivery was verified by the 2026-08-26 tab-navigation journey;
-  physical-device delivery remains unverified until a signed device run is
-  recorded.
+IOS VISUAL VERIFICATION
+- The repository has no UI-test target and no automated UI driver.
+- Physical-device UI evidence is screenshots plus a screen recording after
+  ./run_device.sh installs and launches Vanmo.
+- Simulator UI evidence is agent-operated: ./run_device.sh --simulator, then
+  xcrun simctl io booted screenshot or recordVideo.
+- simctl launch or terminate alone does not prove a user journey.
 
 STANDARD COMMANDS
-- Resolve VanmoCore dependencies and run the four-stage baseline:
+- Resolve VanmoCore dependencies and run the three-stage baseline:
   ./init.sh
 - Run the fast baseline, then Debug compile evidence for both apps:
   ./init.sh --full
@@ -35,13 +32,6 @@ STANDARD COMMANDS
   ./scripts/check-app-build.sh macos
 - Check XcodeGen drift, target source whitelist, and VanmoCore UI imports:
   ./scripts/check-architecture-guards.sh
-- Check the iOS UI target, generated project, Bash CLI, and Swift test source:
-  ./scripts/check-ios-ui-cli.sh
-- Run a bounded Simulator XCUITest interaction or journey:
-  ./scripts/ios-ui.sh simulator tree --output /tmp/vanmo-tree.json
-  ./scripts/ios-ui.sh simulator journey --name tab-navigation
-- Run the same XCUITest commands on a signed physical device:
-  ./scripts/ios-ui.sh device screenshot --output /tmp/vanmo.png
 - Build, install, and launch the default iOS device target:
   ./run_device.sh
 - Build, install, and launch an iOS Simulator target:
@@ -59,10 +49,10 @@ STANDARD COMMANDS
 
 COMMAND BOUNDARIES
 - ./init.sh does not build or launch either app by default. After dependency
-  resolution, its four baseline stages are VanmoCore tests,
+  resolution, its three baseline stages are VanmoCore tests,
   ./scripts/check-cloud-sync-multiplatform-scope.sh
-  (including architecture structure guards),
-  ./scripts/check-harness-docs.sh, and ./scripts/check-ios-ui-cli.sh.
+  (including architecture structure guards), and
+  ./scripts/check-harness-docs.sh.
 - ./init.sh --full runs that fast baseline first, then
   ./scripts/check-app-build.sh all. The focused commands are
   ./scripts/check-app-build.sh ios-simulator and
@@ -80,15 +70,6 @@ COMMAND BOUNDARIES
 - The Harness documentation check requires Python 3 and fails when required
   governance files, routing links, or repository-local Markdown targets are
   missing.
-- scripts/ios-ui.sh uses XCUITest for device and Simulator screenshot, tree,
-  tap, type, swipe, wait, assert, and journey commands. simctl is limited to
-  simulator boot plus launch/terminate and does not validate UI.
-- XCUITest runs retain result bundles, logs, and exported attachments under
-  build/ui-cli/runs/. Simulator XCUITest uses build/DerivedData-UITests-sim.
-  A physical-device development team may be supplied through
-  VANMO_DEVELOPMENT_TEAM or --team.
-- The iOS UI CLI static check does not prove app compilation, signing, device
-  execution, TEST_RUNNER argument delivery, or attachment export.
 - run_device.sh defaults to Debug and selects the Vanmo or Vanmo-macOS scheme
   according to the requested platform.
 - build_ipa.sh archives the Vanmo scheme with Release configuration and exports

@@ -64,7 +64,8 @@ public enum DownloadRequestFactory {
         show: MediaItem,
         connectionType: ConnectionType?
     ) throws -> DownloadRequest {
-        guard let connectionId = show.sourceConnectionId else {
+        let hasLocalFile = episode.streamURL.isFileURL
+        guard show.sourceConnectionId != nil || hasLocalFile else {
             throw DownloadError.missingConnection
         }
         if let connectionType, !DownloadEligibility.isSupported(connectionType: connectionType) {
@@ -84,13 +85,14 @@ public enum DownloadRequestFactory {
             container: episode.container
         )
         return DownloadRequest(
-            sourceConnectionId: connectionId,
+            sourceConnectionId: show.sourceConnectionId,
             postUrl: episode.backdropURL ?? show.posterURL ?? show.backdropURL,
             sourceMediaItemID: show.id,
             sourceServerID: episode.id,
             seriesServerID: show.serverId ?? show.seriesId,
             connectionType: connectionType,
             remotePath: episode.remotePath ?? episode.id,
+            sourceFileURL: hasLocalFile ? episode.streamURL : nil,
             fileName: fileName,
             displayTitle: displayTitle,
             mediaType: .tvEpisode,

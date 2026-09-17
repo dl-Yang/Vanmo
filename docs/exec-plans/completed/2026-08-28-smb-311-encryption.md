@@ -25,7 +25,7 @@ Connect, browse, and play against an SMB server that requires SMB 3.1.1 AES-GCM 
 - Multi-channel, persistent handles, or directory leasing
 - Changing the File Sharing connect/play record from 2026-08-27
 - Replacing KSPlayer or libsmbclient
-- Physical-device XCUITest or automated credential entry
+- Automated credential entry
 - Figma or connection-form visual changes
 
 ## Verification

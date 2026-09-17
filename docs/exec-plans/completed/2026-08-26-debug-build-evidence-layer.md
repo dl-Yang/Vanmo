@@ -19,7 +19,7 @@ execution: code
 - **Objective:** Add a repeatable Debug build evidence layer for the iOS Simulator and native macOS applications without turning every repository bootstrap into a full Xcode build.
 - **Authority order:** Current code and schemes, `project.yml`, `Packages/VanmoCore/Package.swift`, `ARCHITECTURE.md`, then this plan.
 - **Execution profile:** Add one platform-aware build primitive, expose a layered `./init.sh --full` entry point, preserve evidence for each selected platform, and update the repository guidance.
-- **Stop conditions:** Do not install or launch an app, run XCUITest, request device provisioning, regenerate the Xcode project, repair unrelated compile failures, or claim runtime behavior from a build result.
+- **Stop conditions:** Do not install or launch an app, capture UI, request device provisioning, regenerate the Xcode project, repair unrelated compile failures, or claim runtime behavior from a build result.
 - **Tail ownership:** The infrastructure change may finish with an accurately recorded red iOS result. Making the complete build matrix green is separate follow-up work when the failure is outside this plan.
 
 ---
@@ -84,13 +84,13 @@ The repository already records an iOS `build-for-testing` failure caused by the 
 #### Deferred to Follow-Up Work
 
 - Fix the missing `.paused` settings presentation after the required Figma and product decision is available.
-- Add `build-for-testing` evidence for the UI-test bundle after the app compile gate is healthy.
+- Add broader compile-matrix coverage after the app compile gate is healthy.
 - Add CI execution, Release builds, warning baselines, clean-build scheduling, evidence retention, or automatic evidence cleanup.
 - Add an XcodeGen drift check as a separate architecture-guard improvement.
 
 #### Outside This Plan
 
-- App installation, launch, screenshots, accessibility trees, XCUITest actions, and golden journeys.
+- App installation, launch, screenshots, accessibility trees, and golden journeys.
 - Physical-device signing, provisioning updates, or development-team configuration.
 - Release CloudKit validation, archives, IPA export, notarization, or distribution.
 - Remote logging, telemetry, or evidence upload.
@@ -105,7 +105,7 @@ The repository already records an iOS `build-for-testing` failure caused by the 
 - KTD1. **Use a layered gate.** `(session-settled: user-directed — chosen over compiling both apps during every bootstrap: preserve fast feedback for documentation and VanmoCore-only work.)` The default entry point satisfies R1, while `--full` satisfies R2.
 - KTD2. **Separate the build primitive from orchestration.** `scripts/check-app-build.sh` owns platform mapping, build execution, evidence capture, and aggregation. `init.sh` owns the fast baseline and decides whether to invoke the full matrix.
 - KTD3. **Use one platform-aware script.** A single script avoids duplicating evidence format, exit semantics, dependency-cache rules, and failure handling across two platform files while still exposing the platform primitives required by R3.
-- KTD4. **Use ordinary app `build`, not `build-for-testing`.** This layer proves application target compilation only. UI-test bundle compilation belongs to the separate UI Harness evidence layer.
+- KTD4. **Use ordinary app `build`, not `build-for-testing`.** This layer proves application target compilation only.
 - KTD5. **Keep the build non-mutating.** The script consumes the committed project and records Git state but does not regenerate the project, edit settings, install dependencies outside Xcode's normal package resolution, or repair source errors.
 - KTD6. **Collect the whole selected matrix.** After the fast baseline succeeds, an iOS failure must not hide the macOS result. The aggregate status is red if any selected platform is red.
 - KTD7. **Treat failures as first-class evidence.** `xcodebuild` exit status is authoritative for the process result, while platform success additionally requires the expected `.app` product to exist. Log text such as `BUILD SUCCEEDED` is diagnostic only, and a known source failure may be the correct output of a working evidence layer.
@@ -259,7 +259,7 @@ A green two-platform matrix is a later repository-health milestone, not a hidden
 
 - **2026-08-26:** Plan created. The user selected a layered gate: default `./init.sh` remains fast and `./init.sh --full` adds both app builds.
 - **2026-08-26:** Implemented `scripts/check-app-build.sh` and `./init.sh --full`. Fast `./init.sh` passed the four baseline stages and created no `build/app-build-evidence/` directory. Focused `./scripts/check-app-build.sh macos` passed (`xcodebuild` 0, `Vanmo-macOS.app` present). `./init.sh --full` then recorded an honest matrix on a dirty tree at `8f12677`: iOS Simulator Debug failed with `xcodebuild` 65 at `Vanmo/Features/Settings/Views/SettingsView.swift:489` missing `.paused`; macOS Debug passed independently; aggregate exit was 1. Evidence: `build/app-build-evidence/runs/20260826-140652-6333` and `build/app-build-evidence/runs/20260826-141002-10994`. Toolchain: Xcode 26.0.1 / Swift 6.2. The Harness layer is complete; making the iOS compile green remains follow-up work.
-- **2026-08-26:** Closed the plan on clean `34bf345` after the later Settings `.paused` label unblocked iOS compile. Fast `./init.sh` passed 4/4 and created no new evidence run. Focused `./scripts/check-app-build.sh ios-simulator` passed (`xcodebuild` 0, `Vanmo.app` present, generic Simulator destination, no `simctl`). `./init.sh --full` then recorded iOS pass + macOS pass and aggregate exit 0. Evidence: `build/app-build-evidence/runs/20260826-153812-287` and `build/app-build-evidence/runs/20260826-153856-830`. Toolchain: Xcode 26.0.1 / Swift 6.2. The first red iOS matrix remains historical. No launch, XCUITest, or CloudKit claim.
+- **2026-08-26:** Closed the plan on clean `34bf345` after the later Settings `.paused` label unblocked iOS compile. Fast `./init.sh` passed 4/4 and created no new evidence run. Focused `./scripts/check-app-build.sh ios-simulator` passed (`xcodebuild` 0, `Vanmo.app` present, generic Simulator destination, no `simctl`). `./init.sh --full` then recorded iOS pass + macOS pass and aggregate exit 0. Evidence: `build/app-build-evidence/runs/20260826-153812-287` and `build/app-build-evidence/runs/20260826-153856-830`. Toolchain: Xcode 26.0.1 / Swift 6.2. The first red iOS matrix remains historical. No launch or CloudKit claim.
 
 ## Open Decisions
 

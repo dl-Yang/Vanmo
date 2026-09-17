@@ -1,6 +1,6 @@
 # Vanmo Architecture
 
-> This document describes the repository as of September 10, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
+> This document describes the repository as of September 16, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
 > If this document conflicts with the code, treat `project.yml`, `Packages/VanmoCore/Package.swift`, and the current implementation as the sources of truth.
 
 ## 1. System Overview
@@ -62,7 +62,6 @@ Vanmo/
 ├── Packages/VanmoCore/          # Cross-platform domain and infrastructure package
 │   ├── Sources/VanmoCore/
 │   └── Tests/VanmoCoreTests/
-├── VanmoUITests/                # One-command iOS device XCUITest interaction target
 ├── scripts/                     # Build and static architecture checks
 ├── docs/                        # Durable product, design, plan, quality, and operating knowledge
 ├── project.yml                  # XcodeGen source of truth
@@ -94,7 +93,7 @@ Boundary rules:
 | Target / Product | Platform | Minimum Version | Entry Point |
 |---|---|---:|---|
 | `Vanmo` | iOS | 17.0 | `Vanmo/App/VanmoApp.swift` |
-| `VanmoUITests` | iOS UI testing | 17.0 | `VanmoUITests/VanmoDeviceInteractionTests.swift` |
+| `VanmoDownloadWidget` | iOS app extension | 17.0 | `VanmoDownloadWidget/VanmoDownloadWidget.swift` |
 | `Vanmo-macOS` | macOS | 14.0 | `VanmoMac/App/VanmoMacApp.swift` |
 | `VanmoCore` | iOS / macOS | 17.0 / 14.0 | `Packages/VanmoCore/Package.swift` |
 
@@ -104,7 +103,7 @@ Boundary rules:
 
 - Both apps depend on `VanmoCore`, Kingfisher, KSPlayer, and Lottie.
 - The iOS target also declares direct dependencies on SWXMLHash and SMBClient.
-- `VanmoUITests` is an iOS UI-testing bundle that depends on the `Vanmo` application target, uses `TEST_TARGET_NAME = Vanmo`, and participates in the `Vanmo` scheme test action.
+- `VanmoDownloadWidget` is an iOS WidgetKit extension embedded in `Vanmo`. It renders the download Live Activity only. Shared `DownloadLiveActivityAttributes` and `DownloadLiveActivityIntents` are compiled into both targets; the widget does not import `VanmoCore`. Expanded pause / resume / cancel reach `DownloadManager` through an app-registered relay. Lock-screen taps use `vanmo://downloads`.
 - `VanmoCore` itself depends on SWXMLHash and SMBClient.
 - System frameworks include SwiftUI, SwiftData, AVFoundation, Network, and Security. iOS also uses UIKit; macOS uses AppKit.
 - `FFMPEG_ENABLED` is still defined for both app targets, but no current Swift source consumes the condition and the Xcode project does not link static libraries from `Vanmo/Frameworks/FFmpeg/`.
@@ -139,6 +138,7 @@ The app creates and injects:
 - `ConnectionsViewModel`
 - `CloudSyncCoordinator.shared`
 - `DownloadManager.shared`
+- `DownloadHeroController.shared`
 - The SwiftData container returned by `ModelContainerFactory.makeSharedContainer()`
 
 There is no dependency-injection framework. SwiftUI environment objects, local `@StateObject` instances, and a small number of shared singletons provide dependency ownership.
@@ -203,6 +203,7 @@ When the app enters the foreground, it resumes downloads, performs synchronizati
 - `MacSearchViewModel`
 - `CloudSyncCoordinator.shared`
 - `DownloadManager.shared`
+- `MacDownloadHeroController.shared`
 - The shared SwiftData container
 
 The app declares:
@@ -363,6 +364,8 @@ Scanning persists catalog URLs in the `vanmo://playback/...` form instead of sto
 
 The queue is suspended and resumed with application lifecycle changes.
 
+iOS maps `DownloadManager.tasks` through `DownloadActivityPresentation`. The `Vanmo` `App` scene, `ContentView`, Settings, and media detail do not subscribe to per-tick progress or hero frames, so TabView and the player do not remount when a download starts. Only the island overlay, fallback bar, and the detail download button observe `DownloadManager`. While the app is active on a Dynamic Island device, ActivityKit is requested alongside the in-app overlay. A 2026-09-17 operator walk confirmed the system island does not steal Compact/Expanded hits, and requesting in the foreground lets the scene absorb into the hardware island on background. The foreground overlay uses an explicit `hidden | flying | compact | expanded` mode. Compact matches LibraryHome `569:38` (262×41 artwork, title, status, trailing ring). Compact paused matches `572:14` (ring hidden, pause icon resumes). Expanded matches `570:259` (poster, title, status • percent, bar, bytes, pause pill). Compact and Expanded share one pure-black blob. Compact→Expanded uses a system-island spring; Expanded→Compact is critically damped so the blob cannot shrink below the hardware island. The flying capsule grows from the island top, not its center, so the Compact handoff does not jump. Compact tap expands; a press outside Expanded collapses. Compact has no pause button; Expanded pause/resume and the Compact pause-icon resume call the same `DownloadManager` APIs as Live Activity intents and read `task.status` only. Appear runs only on `hidden → compact`. Pause/resume never changes mode. Detail enqueue flies a material capsule to the hardware island, aligns, then morphs once to Compact; `restoreAndResume` and Reduce Motion skip the flight and show Compact whenever a presentable task exists. iOS hides the system status bar while the app is active. Those phones never show the status-bar fallback bar. `UIApplication.willResignActive` hides the in-app overlay immediately (no dismiss spring), unhides the status bar, and requests ActivityKit on the same callback so the home snapshot cannot keep the fake island and the system can absorb the scene into the hardware island. Returning to the foreground keeps the activity and restores Compact with `playAppear`. Expanded content sits below the hardware island. `.background` retries the request after `DownloadManager.suspend`. ActivityKit compact stays leading/trailing replicas of `569:38` because it cannot draw a free-floating 262pt capsule; Expanded and lock screen follow `570:259`. The widget can pause or resume the displayed task. Devices without a Dynamic Island show an in-app fallback bar after the capsule lands. macOS uses the same presentation rules only for title text on the flying capsule; progress remains in the downloads window.
+
 ### 6.6 Metadata
 
 Metadata has two complementary paths:
@@ -515,17 +518,14 @@ sequenceDiagram
 4. The Store or ViewModel merges metadata, seasons, episodes, and collections.
 5. Generation and cancellation checks prevent stale requests from overwriting the current detail.
 
-### 8.4 iOS Device Interaction CLI
+### 8.4 iOS Visual Verification
 
-`scripts/ios-ui.sh` uses one XCUITest entry for both destinations:
+iOS UI evidence is visual. The repository has no UI-test target and no automated UI driver.
 
-1. `device` and `simulator` screenshot, tree, tap, type, swipe, wait, assert, and `journey` commands invoke `VanmoDeviceInteractionTests/testExecuteCommand` through the `Vanmo` scheme.
-2. The script sets `TEST_RUNNER_VANMO_UI_*` environment variables. Xcode's test runner is expected to expose them to the XCUITest process with the `TEST_RUNNER_` prefix removed, where the test reads `VANMO_UI_*`. Simulator delivery is part of the tab-navigation golden-journey evidence; physical-device delivery remains unverified until a signed device run is recorded.
-3. Each XCUITest run launches Vanmo. Independent tap and assert commands therefore cannot preserve navigation across processes. `journey --name tab-navigation` performs library assert, Settings tap, and settings-screen assert in one process, then attaches a screenshot and tree.
-4. XCUITest screenshots, trees, failure diagnostics, logs, and result bundles are retained under `build/ui-cli/runs/`; requested screenshot or tree output is copied from the exported `xcresult` attachments. Simulator XCUITest uses `build/DerivedData-UITests-sim`; device runs keep `build/DerivedData-UITests`.
-5. `simulator launch|terminate` still use `simctl` only to boot or manage the Simulator app process. `simctl` does not capture screenshots or validate UI.
-
-This CLI is a bounded interaction and evidence interface, not a replacement for Figma comparison, accessibility review, or product journeys that need a real media source. Device commands require a connected and trusted device plus valid signing; the development team may be supplied through `VANMO_DEVELOPMENT_TEAM` or `--team`. Simulator XCUITest does not require a development team.
+1. Physical-device journeys use `./run_device.sh` to install and launch Vanmo. The operator captures screenshots and a screen recording of the exact walk, plus sanitized Console lines when behavior is stateful.
+2. Simulator journeys are agent-operated. The agent launches Vanmo with `./run_device.sh --simulator`, interacts with the Simulator, and captures screenshots or recordings through `simctl io`.
+3. A screenshot or recording proves only the frames that were captured. It does not replace Figma comparison, accessibility review, or a real-source product journey.
+4. Device-only behavior still requires a connected, trusted, signed device. Simulator frames do not prove physical-device hardware, signing, background execution, or Dynamic Island behavior.
 
 ## 9. State, Concurrency, and Events
 
@@ -557,7 +557,7 @@ New cross-module events should first have an explicit state owner. Global notifi
 
 ## 10. Tests and Verification
 
-The repository has `VanmoCore` package tests and an iOS `VanmoUITests` UI-testing target. The UI target exposes one dynamic command test; it is not a broad automated app regression suite.
+The repository has `VanmoCore` package tests. iOS UI is verified visually: physical-device screenshots and recordings, plus agent-operated Simulator walks. There is no UI-test target.
 
 ```bash
 swift test --package-path Packages/VanmoCore
@@ -572,9 +572,9 @@ The tests cover:
 - Remote-service capability declarations.
 - Schema and foundational enum mappings.
 
-As of August 26, 2026, all four `./init.sh` baseline stages complete with no failures: 36 `VanmoCore` tests, the CloudKit/multiplatform static check (including XcodeGen drift, target source whitelist, and VanmoCore UI-import guards), the Advanced Harness documentation and live narrative-consistency check, and `./scripts/check-ios-ui-cli.sh`. The documentation stage checks required files, repository-local links, init stage count, plan-index Status, spec/plan Status, and QUALITY current-baseline command paths. The iOS UI CLI stage statically checks the target declarations in `project.yml` and the generated project, validates the Bash CLI, and type-checks the XCUITest source.
+As of September 17, 2026, all three `./init.sh` baseline stages complete with no failures: the `VanmoCore` suite, the CloudKit/multiplatform static check (including XcodeGen drift, target source whitelist, and VanmoCore UI-import guards), and the Advanced Harness documentation and live narrative-consistency check. The documentation stage checks required files, repository-local links, init stage count, plan-index Status, spec/plan Status, and QUALITY current-baseline command paths.
 
-Focused iOS Simulator Debug compile passed after the Settings `.paused` label was added. Simulator XCUITest on iPhone 17 Pro then recorded tree, default-screen assert, and `journey --name tab-navigation`, including `TEST_RUNNER_VANMO_UI_*` delivery and `xcresult` attachment export. No physical-device XCUITest has run, so signing remains unverified.
+Focused iOS Simulator Debug compile remains a separate evidence command. iOS physical-device UI evidence is a screenshot and screen-recording walk. Simulator UI evidence is an agent-operated `./run_device.sh --simulator` walk with `simctl` captures.
 
 Other verification entry points:
 
@@ -591,9 +591,6 @@ Other verification entry points:
 
 # Check XcodeGen drift, target source whitelist, and VanmoCore UI imports
 ./scripts/check-architecture-guards.sh
-
-# Check the iOS UI target and CLI statically without running XCUITest
-./scripts/check-ios-ui-cli.sh
 
 # Compile one application target without launching it.
 # Run the two platforms serially; they share SourcePackages and stay off Xcode's cache.
@@ -618,7 +615,7 @@ See `docs/RELIABILITY.md` for the complete command stages and evidence boundarie
 3. **Placeholder protocol support.** UI-visible connection types are not all production-ready. NFS, DLNA, and several official cloud-drive integrations require further implementation. FTP is implemented; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play, and Files-browser download. SFTP is implemented as a password-authenticated Citadel client; 2026-08-31 iOS Simulator and VanmoMac runs recorded login, listing, KSPlayer prefetch play (`source=sftp`), and Files-browser download.
 4. **No explicit SwiftData migration strategy.** There is no `VersionedSchema` or `SchemaMigrationPlan`. Launch can delete an unreadable LocalStore or CloudStore once; a second local failure can still `fatalError`.
 5. **CloudKit attach can still assert.** Launch uses `.private("iCloud.com.vanmo.app")` when sync is enabled. A thrown create falls back to `.none`, but an unbound-container `CKContainer` assert is not catchable. Real sync evidence still requires a signed device or Mac, an iCloud account, and the bound container. Simulator Debug is not CloudKit evidence.
-6. **iOS UI automation still lacks physical-device evidence.** The `VanmoUITests` target and unified XCUITest CLI exist, and the compile-safe Settings `.paused` label unblocks Simulator `build-for-testing`. Physical-device signing and device-side runner-argument delivery remain unverified; broader iOS/macOS player or real-source journeys still depend on later recorded evidence.
+6. **iOS UI evidence is visual, not automated.** Physical-device walks require screenshots and a screen recording. Simulator walks are agent-operated. Broader iOS/macOS player or real-source journeys still depend on later recorded visual evidence.
 7. **Playback implementations can drift.** iOS and macOS do not share one AVFoundation/KSPlayer adapter protocol.
 8. **Legacy FFmpeg configuration remains.** Playback currently uses FFmpeg through KSPlayer, while the repository retains an unused `FFMPEG_ENABLED` definition, an effectively empty bridging header, and a standalone FFmpeg build script.
 9. **Documentation routing can drift.** All Harness state belongs under `docs/` and must remain consistent with current code, `project.yml`, package manifests, and this architecture document.

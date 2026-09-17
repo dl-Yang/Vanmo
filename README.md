@@ -14,9 +14,7 @@ The applications use SwiftUI, SwiftData, Swift Concurrency, Combine, AVFoundatio
 Vanmo/                       # iOS application UI and platform behavior
 VanmoMac/                    # macOS application UI, AppKit integration, and windows
 Packages/VanmoCore/          # Shared models and infrastructure
-VanmoUITests/                # iOS device interaction XCUITest target
 scripts/                     # Build and static verification helpers
-scripts/ios-ui.sh            # iOS XCUITest CLI for device and Simulator; simctl manages Simulator lifecycle
 docs/                        # Durable product, design, plan, quality, and operating knowledge
 project.yml                  # XcodeGen source of truth
 Vanmo.xcodeproj/             # Generated and committed Xcode project
@@ -52,25 +50,21 @@ Build or run the relevant application:
 
 `./init.sh` does not compile either application by default. Use `./init.sh --full` or `./scripts/check-app-build.sh` serially for isolated Debug compile evidence. Do not start the iOS and macOS script platforms as parallel processes, and do not point Xcode at `build/app-build-evidence/SourcePackages`. Keep launch, manual journeys, real-source checks, and real CloudKit validation (signed device or Mac plus iCloud account plus bound container) separate. See [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
 
-## Device UI Interaction
+## iOS Visual Verification
 
-Use the repository CLI for bounded iOS interaction and evidence capture:
+iOS UI evidence is visual. The repository has no UI-test target.
 
 ```bash
-# Simulator XCUITest: screenshot, tree, interaction, and the tab-navigation journey
-./scripts/ios-ui.sh simulator tree --output /tmp/vanmo-tree.json
-./scripts/ios-ui.sh simulator assert --identifier screen.library --state exists
-./scripts/ios-ui.sh simulator journey --name tab-navigation
+# Physical device: install and launch, then capture screenshots and a recording
+./run_device.sh
 
-# Physical device: the same XCUITest commands, plus signing
-./scripts/ios-ui.sh device screenshot --device "My iPhone" --output /tmp/vanmo.png
-./scripts/ios-ui.sh device tap --identifier tab.settings --timeout 5
-
-# Simulator management only
-./scripts/ios-ui.sh simulator launch --device "iPhone 17 Pro"
+# Simulator: the agent launches and operates the app
+./run_device.sh --simulator
+xcrun simctl io booted screenshot /tmp/vanmo-simulator.png
+xcrun simctl io booted recordVideo /tmp/vanmo-simulator.mp4
 ```
 
-Device and Simulator screenshot, tree, tap, type, swipe, wait, assert, and journey commands use XCUITest. Replace selector placeholders with identifiers or exact labels from the current tree output. Physical-device commands require a connected, trusted device and valid signing; supply the Apple development team with `VANMO_DEVELOPMENT_TEAM` or `--team TEAM`. Each XCUITest run retains its result bundle, logs, and exported attachments under `build/ui-cli/runs/`. `simulator launch|terminate` still use `simctl` only to manage the Simulator and do not validate UI.
+Physical-device journeys require a connected, trusted device and valid signing. After launch, capture screenshots and a screen recording of the exact walk. Simulator journeys are agent-operated; `simctl` launch or terminate alone does not prove a user journey. See [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
 
 ## Architecture and Capability Status
 

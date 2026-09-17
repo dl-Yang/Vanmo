@@ -55,6 +55,31 @@ final class MacMediaDetailStore: ObservableObject {
 
     // MARK: - Loading
 
+#if DEBUG
+    func installDebugHeroWalkEpisodesIfNeeded(for item: MediaItem) {
+        guard DownloadHeroWalkFixtures.requestedKind == .series, item.mediaType == .tvShow else { return }
+        guard let episodes = try? DownloadHeroWalkFixtures.seriesEpisodes() else { return }
+        if content == nil {
+            content = MacMediaDetailContent(
+                enrichedOverview: item.overview,
+                enrichedGenres: [],
+                logoURL: nil,
+                backdropURL: nil,
+                castMembers: [],
+                seasons: [SeasonInfo(seasonNumber: 1)],
+                collections: []
+            )
+        } else {
+            content?.seasons = [SeasonInfo(seasonNumber: 1)]
+        }
+        selectedSeason = 1
+        seasonEpisodes = episodes
+        hasMoreEpisodes = false
+        isLoadingEpisodes = false
+        isLoadingMoreEpisodes = false
+    }
+#endif
+
     func load(item: MediaItem, modelContext: ModelContext, autoDownloadMetadata: Bool) async {
         // Home 预览项是临时对象，isFavorite 常不准；打开详情时从 SwiftData 对齐。
         syncFavoriteState(for: item, in: modelContext)

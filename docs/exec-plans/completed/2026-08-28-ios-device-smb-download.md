@@ -27,7 +27,7 @@ This is a factual acceptance record. It does not authorize download-engine chang
 - SMB connect/browse/play (already recorded on simulator and Mac)
 - Using leftover Emby or simulator tasks as the recorded run
 - `xcodegen` regeneration
-- XCUITest or remote logging
+- Remote logging
 - Figma or unrelated player work
 
 If the flow exposes a defect, stop at a reproducible, sanitized record. A separately scoped fix plan is required before implementation.
@@ -90,7 +90,7 @@ The operator paused, then resumed in the same session, then terminated while the
 
 ## Outcome
 
-Physical-device iOS SMB enqueue, same-session resume, terminate while downloading, `.part` restore, and completion are recorded. This record does not prove a paused-across-kill path, macOS SMB download, XCUITest, or an expansion of the macOS HTTP recovery matrix.
+Physical-device iOS SMB enqueue, same-session resume, terminate while downloading, `.part` restore, and completion are recorded. This record does not prove a paused-across-kill path, macOS SMB download, or an expansion of the macOS HTTP recovery matrix.
 
 ## Open Decisions
 

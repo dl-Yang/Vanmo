@@ -44,6 +44,20 @@ struct MacMediaDetailView: View {
                 modelContext: modelContext,
                 autoDownloadMetadata: metadataAutoDownload
             )
+#if DEBUG
+            store.installDebugHeroWalkEpisodesIfNeeded(for: item)
+            if DownloadHeroWalkFixtures.shouldAutoEnqueue {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                if item.mediaType == .tvShow {
+                    selectedDownloadEpisodes = Dictionary(
+                        uniqueKeysWithValues: store.seasonEpisodes.map { ($0.id, $0) }
+                    )
+                    enqueueSelectedEpisodes()
+                } else {
+                    beginDownload()
+                }
+            }
+#endif
         }
         .onAppear {
             guard mediaPurgeHandlerId == nil else { return }
@@ -349,6 +363,8 @@ struct MacMediaDetailView: View {
         }
         .disabled(isDownloadButtonDisabled)
         .help(item.mediaType == .tvShow ? L10n.tr("选择剧集下载") : L10n.tr("下载"))
+        .macDownloadHeroFrame("source")
+        .accessibilityIdentifier("download.detail.button")
     }
 
     @ViewBuilder
@@ -844,6 +860,10 @@ struct MacMediaDetailView: View {
                         connectionType: try sourceConnectionType()
                     )
                     try await downloadManager.enqueue(request)
+                    MacDownloadHeroController.request(
+                        title: DownloadActivityPresentation.title(for: request),
+                        posterURL: request.postUrl ?? item.posterURL
+                    )
 #if DEBUG
                     print("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue) connection=\(request.connectionType?.rawValue ?? "none")")
 #endif
@@ -880,6 +900,12 @@ struct MacMediaDetailView: View {
                     )
                 }
                 try await downloadManager.enqueue(requests)
+                if let first = requests.first {
+                    MacDownloadHeroController.request(
+                        title: DownloadActivityPresentation.title(for: first),
+                        posterURL: first.postUrl ?? item.posterURL
+                    )
+                }
 #if DEBUG
                 print("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count) connection=\(connectionType?.rawValue ?? "none")")
 #endif

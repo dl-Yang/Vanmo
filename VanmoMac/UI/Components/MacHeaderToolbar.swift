@@ -58,6 +58,7 @@ struct MacLibraryViewControls: View {
 
 struct MacSidebarToggleButton: View {
     @EnvironmentObject private var appState: MacAppState
+    @EnvironmentObject private var downloadHero: MacDownloadHeroController
     @Environment(\.macTheme) private var theme
     @Environment(\.openWindow) private var openWindow
 
@@ -98,9 +99,12 @@ struct MacSidebarToggleButton: View {
                     .font(.system(size: 14, weight: .medium))
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
+                    .scaleEffect(downloadHero.destinationScale)
             }
             .buttonStyle(.plain)
             .help(L10n.tr("查看下载列表"))
+            .macDownloadHeroFrame("destination")
+            .accessibilityIdentifier("download.sidebar.icon")
         }
     }
 }

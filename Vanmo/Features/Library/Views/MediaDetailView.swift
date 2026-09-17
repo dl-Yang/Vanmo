@@ -5,7 +5,6 @@ import VanmoCore
 
 struct MediaDetailView: View {
     @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var downloadManager: DownloadManager
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -96,12 +95,26 @@ struct MediaDetailView: View {
                 modelContext: modelContext,
                 autoDownloadMetadata: metadataAutoDownload
             )
+#if DEBUG
+            store.installDebugHeroWalkEpisodesIfNeeded(for: item)
+#endif
             if !userDidInteractWithPanel, panelState == .collapsed {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                     panelState = .expanded
                 }
             }
+#if DEBUG
+            if DownloadHeroWalkFixtures.shouldAutoEnqueue, item.mediaType == .tvShow {
+                await enqueueDebugHeroWalkIfNeeded()
+            }
+#endif
         }
+#if DEBUG
+        .task(id: "\(item.id)-hero-auto-movie") {
+            guard DownloadHeroWalkFixtures.shouldAutoEnqueue, item.mediaType != .tvShow else { return }
+            await enqueueDebugHeroWalkIfNeeded()
+        }
+#endif
         .alert(L10n.tr("收藏失败"), isPresented: favoriteErrorBinding) {
             Button(L10n.tr("确定")) {}
         } message: {
@@ -485,9 +498,9 @@ struct MediaDetailView: View {
             accentBlue: accentBlue,
             isRefreshing: store.isRefreshingMetadata,
             supportsMetadataRefresh: store.supportsMetadataRefresh(for: item, in: modelContext),
-            downloadTaskID: displayedDownloadTask?.id,
+            isTVShow: item.mediaType == .tvShow,
+            isRelatedDownload: isRelatedDownloadRequest,
             isEnqueueingDownload: isEnqueueingDownload,
-            isDownloadDisabled: isDownloadButtonDisabled,
             play: play,
             download: handleDownloadButtonTap,
             refresh: { Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) } }
@@ -633,16 +646,20 @@ struct MediaDetailView: View {
 
     private func handleDownloadButtonTap() {
         guard !isEnqueueingDownload else { return }
-        if item.mediaType != .tvShow, let task = displayedDownloadTask {
+        if item.mediaType != .tvShow,
+           let task = mediaDetailDisplayedTask(
+               in: DownloadManager.shared.tasks,
+               matching: isRelatedDownloadRequest
+           ) {
             switch task.status {
             case .queued, .downloading:
-                Task { await downloadManager.pause(task.id) }
+                Task { await DownloadManager.shared.pause(task.id) }
                 return
             case .paused:
-                Task { await downloadManager.resume(task.id) }
+                Task { await DownloadManager.shared.resume(task.id) }
                 return
             case .failed:
-                Task { await downloadManager.retry(task.id) }
+                Task { await DownloadManager.shared.retry(task.id) }
                 return
             case .completed:
                 return
@@ -650,6 +667,23 @@ struct MediaDetailView: View {
         }
         beginDownload()
     }
+
+#if DEBUG
+    private func enqueueDebugHeroWalkIfNeeded() async {
+        for _ in 0..<24 where DownloadHeroController.shared.sourceFrame.width <= 1 {
+            try? await Task.sleep(nanoseconds: 16_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 280_000_000)
+        if item.mediaType == .tvShow {
+            selectedDownloadEpisodes = Dictionary(
+                uniqueKeysWithValues: store.seasonEpisodes.map { ($0.id, $0) }
+            )
+            enqueueSelectedEpisodes()
+        } else {
+            beginDownload()
+        }
+    }
+#endif
 
     private func beginDownload() {
         guard !isEnqueueingDownload else { return }
@@ -667,7 +701,11 @@ struct MediaDetailView: View {
                         from: item,
                         connectionType: try sourceConnectionType()
                     )
-                    try await downloadManager.enqueue(request)
+                    try await DownloadManager.shared.enqueue(request)
+                    DownloadHeroController.request(
+                        title: DownloadActivityPresentation.title(for: request),
+                        posterURL: request.postUrl ?? item.posterURL
+                    )
 #if DEBUG
                     print("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue) connection=\(request.connectionType?.rawValue ?? "none")")
 #endif
@@ -707,7 +745,13 @@ struct MediaDetailView: View {
                         connectionType: connectionType
                     )
                 }
-                try await downloadManager.enqueue(requests)
+                try await DownloadManager.shared.enqueue(requests)
+                if let first = requests.first {
+                    DownloadHeroController.request(
+                        title: DownloadActivityPresentation.title(for: first),
+                        posterURL: first.postUrl ?? item.posterURL
+                    )
+                }
 #if DEBUG
                 print("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count) connection=\(connectionType?.rawValue ?? "none")")
 #endif
@@ -721,33 +765,6 @@ struct MediaDetailView: View {
                 downloadErrorMessage = error.localizedDescription
             }
         }
-    }
-
-    private var displayedDownloadTask: DownloadTaskSnapshot? {
-        let related = downloadManager.tasks.filter { isRelatedDownloadRequest($0.request) }
-        if let downloading = related.first(where: { $0.status == .downloading }) {
-            return downloading
-        }
-        if let queued = related
-            .filter({ $0.status == .queued })
-            .min(by: { $0.createdAt < $1.createdAt }) {
-            return queued
-        }
-        if let paused = related
-            .filter({ $0.status == .paused })
-            .min(by: { $0.createdAt < $1.createdAt }) {
-            return paused
-        }
-        guard !related.isEmpty, related.allSatisfy({ $0.status == .completed }) else {
-            return nil
-        }
-        return related.max(by: { $0.updatedAt < $1.updatedAt })
-    }
-
-    private var isDownloadButtonDisabled: Bool {
-        guard !isEnqueueingDownload else { return true }
-        guard item.mediaType != .tvShow, let task = displayedDownloadTask else { return false }
-        return task.status == .completed
     }
 
     private func isRelatedDownloadRequest(_ request: DownloadRequest) -> Bool {
@@ -984,6 +1001,33 @@ final class MediaDetailStore: ObservableObject {
         selectedSeason = season
         await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
     }
+
+#if DEBUG
+    func installDebugHeroWalkEpisodesIfNeeded(for item: MediaItem) {
+        guard DownloadHeroWalkFixtures.requestedKind == .series, item.mediaType == .tvShow else { return }
+        guard let episodes = try? DownloadHeroWalkFixtures.seriesEpisodes() else { return }
+        if content == nil {
+            content = MediaDetailContent(
+                rating: nil,
+                contentRating: nil,
+                logoURL: nil,
+                overview: item.overview,
+                genres: [],
+                director: nil,
+                castMembers: [],
+                seasons: [SeasonInfo(seasonNumber: 1)],
+                collections: []
+            )
+        } else {
+            content?.seasons = [SeasonInfo(seasonNumber: 1)]
+        }
+        selectedSeason = 1
+        seasonEpisodes = episodes
+        hasMoreEpisodes = false
+        isLoadingEpisodes = false
+        isLoadingMoreEpisodes = false
+    }
+#endif
 
     func loadMoreEpisodes(item: MediaItem, modelContext: ModelContext) async {
         guard hasMoreEpisodes, !isLoadingMoreEpisodes, !isLoadingEpisodes else { return }
@@ -1604,16 +1648,51 @@ private struct MediaDetailRatingRow: View {
     }
 }
 
+private func mediaDetailDisplayedTask(
+    in tasks: [DownloadTaskSnapshot],
+    matching isRelated: (DownloadRequest) -> Bool
+) -> DownloadTaskSnapshot? {
+    let related = tasks.filter { isRelated($0.request) }
+    if let downloading = related.first(where: { $0.status == .downloading }) {
+        return downloading
+    }
+    if let queued = related
+        .filter({ $0.status == .queued })
+        .min(by: { $0.createdAt < $1.createdAt }) {
+        return queued
+    }
+    if let paused = related
+        .filter({ $0.status == .paused })
+        .min(by: { $0.createdAt < $1.createdAt }) {
+        return paused
+    }
+    guard !related.isEmpty, related.allSatisfy({ $0.status == .completed }) else {
+        return nil
+    }
+    return related.max(by: { $0.updatedAt < $1.updatedAt })
+}
+
 private struct MediaDetailPanelActions: View {
+    @EnvironmentObject private var downloadManager: DownloadManager
     let accentBlue: Color
     let isRefreshing: Bool
     let supportsMetadataRefresh: Bool
-    let downloadTaskID: UUID?
+    let isTVShow: Bool
+    let isRelatedDownload: (DownloadRequest) -> Bool
     let isEnqueueingDownload: Bool
-    let isDownloadDisabled: Bool
     let play: () -> Void
     let download: () -> Void
     let refresh: () -> Void
+
+    private var displayedDownloadTask: DownloadTaskSnapshot? {
+        mediaDetailDisplayedTask(in: downloadManager.tasks, matching: isRelatedDownload)
+    }
+
+    private var isDownloadDisabled: Bool {
+        guard !isEnqueueingDownload else { return true }
+        guard !isTVShow, let task = displayedDownloadTask else { return false }
+        return task.status == .completed
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -1635,13 +1714,15 @@ private struct MediaDetailPanelActions: View {
 
             Button(action: download) {
                 MediaDetailDownloadButtonContent(
-                    taskID: downloadTaskID,
+                    taskID: displayedDownloadTask?.id,
                     isEnqueueing: isEnqueueingDownload,
                     accentBlue: accentBlue
                 )
             }
             .buttonStyle(.plain)
             .disabled(isDownloadDisabled)
+            .downloadHeroFrame("source")
+            .accessibilityIdentifier("download.detail.button")
 
             if supportsMetadataRefresh {
                 Button(action: refresh) {
@@ -1847,6 +1928,7 @@ private struct EpisodeDownloadPicker: View {
                     Button(allCurrentSeasonSelected ? L10n.tr("取消全选本季") : L10n.tr("全选本季")) {
                         toggleCurrentSeason()
                     }
+                    .accessibilityIdentifier("download.picker.selectAll")
                 }
 
                 Section(L10n.tr("选择剧集")) {
@@ -1886,6 +1968,7 @@ private struct EpisodeDownloadPicker: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
                         .disabled(selectedEpisodes.isEmpty || isLoading)
+                        .accessibilityIdentifier("download.picker.confirm")
                 }
             }
         }
@@ -2270,6 +2353,7 @@ private struct MediaDetailEpisodesSection: View {
         ))
     }
     .environmentObject(AppState())
+    .environmentObject(DownloadManager.shared)
     .preferredColorScheme(.dark)
 }
 

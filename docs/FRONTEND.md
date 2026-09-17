@@ -52,24 +52,24 @@ Features with richer state machines, such as downloads and playback, may add dom
 - Support Dynamic Type without clipping essential labels or controls.
 - Provide meaningful accessibility labels, values, hints, and traits for icon-only controls, progress, toggles, and custom rows.
 - Keep touch targets appropriate on iOS and pointer/keyboard focus behavior appropriate on macOS.
-- Preserve visible focus, logical reading order, sufficient contrast, and Reduce Motion behavior for non-essential animation.
+- Preserve visible focus, logical reading order, sufficient contrast, and Reduce Motion behavior for non-essential animation. The detail-page download hero is non-essential motion: Reduce Motion skips the flight and immediately shows Compact, the fallback bar, or the macOS download icon. Island appear (`hidden → compact` only, critically damped), Compact→Expanded morph (one pure-black blob, system-island spring), Expanded→Compact collapse (critically damped so the blob cannot dip below the hardware island), completion, delete, and background/foreground handoff are also non-essential: Reduce Motion shows or hides the correct mode immediately. Delete and completion collapse the blob toward the hardware island with a critically damped spring so the island cannot overshoot and bounce. The hero capsule lands top-aligned to the hardware island, then grows to Compact without a settle bounce. ActivityKit is requested in the foreground alongside the in-app overlay. A 2026-09-17 operator walk confirmed Compact/Expanded hits still reach the fake island, and requesting in the foreground lets the scene absorb into the hardware island while the system Live Activity remains. Backgrounding a presentable download hides the in-app overlay immediately on resign-active and unhides the status bar. Returning keeps the activity and restores Compact with `playAppear` (Reduce Motion shows Compact immediately). Expanded content sits below the hardware island. Expanded dismisses on a press outside the blob, not a click. In-app Compact/Expanded follow LibraryHome `569:38`, `572:14`, and `570:259` with a pure-black shell. The iOS app hides the system status bar.
 - Do not encode status by color alone.
 - Use concise, actionable error and retry copy.
 - On macOS, verify expected keyboard shortcuts, window activation, and single-window behavior where specified.
 
-## Automation Selectors
+## Accessibility Identifiers
 
-- Give critical iOS controls stable, semantic accessibility identifiers when they are part of a repeatable interaction or golden journey. Prefer identifiers for automation because visible labels can change with copy or localization.
-- Use an exact accessibility label only as a fallback when no stable identifier exists. Labels must remain meaningful to users and assistive technologies; do not distort user-facing accessibility text solely to make automation convenient.
+- Give critical iOS controls stable, semantic accessibility identifiers when they are part of a repeatable interaction or golden journey. Prefer identifiers because visible labels can change with copy or localization.
+- Use an exact accessibility label only as a fallback when no stable identifier exists. Labels must remain meaningful to users and assistive technologies; do not distort user-facing accessibility text solely for capture convenience.
 - Keep identifiers unique within the active screen and tied to the control's purpose rather than its position or visual implementation.
-- Inspect available identifiers and labels with `./scripts/ios-ui.sh simulator tree` or `./scripts/ios-ui.sh device tree`, then use `--identifier` preferentially or `--label` for the exact-label fallback.
-- `./scripts/ios-ui.sh device ...` and `./scripts/ios-ui.sh simulator ...` use XCUITest for screenshot, tree, tap, type, swipe, wait, assert, and `journey --name tab-navigation`. `simulator launch|terminate` still use `simctl` only for Simulator management and cannot validate selectors.
 
 ## Verification Expectations
 
 ### iOS
 
 - Build or run with `./run_device.sh` or `./run_device.sh --simulator` as required by the behavior.
+- Physical-device UI evidence is screenshots plus a screen recording of the journey. Do not use a UI-test bundle or automated UI driver.
+- Simulator UI evidence is an agent-operated walk: launch with `./run_device.sh --simulator`, interact in the Simulator, and capture `simctl` screenshots or recordings.
 - Verify compact and relevant regular-width layouts, navigation stacks, full-screen player presentation, lifecycle transitions, and accessibility behavior.
 - Device-only behavior must be verified on a device; collect diagnostics from local console logs.
 

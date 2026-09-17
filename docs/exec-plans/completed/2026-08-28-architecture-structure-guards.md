@@ -14,7 +14,7 @@ Strengthen the existing CloudKit/multiplatform static stage so a later agent can
 - Invoke it from `scripts/check-cloud-sync-multiplatform-scope.sh`. Keep the fast `./init.sh` baseline at four stages.
 - Reject hand-edited `project.pbxproj` drift, illegal target sources/dependency direction, and unconditional `VanmoCore` UI imports.
 - Replace the `rg` UI-import scan and the hardcoded `PlatformCompatibility` pbxproj UUID check.
-- Document the new focused command without claiming compile, launch, or XCUITest evidence.
+- Document the new focused command without claiming compile, launch, or UI-journey evidence.
 
 ## Out of Scope
 
@@ -30,7 +30,7 @@ Strengthen the existing CloudKit/multiplatform static stage so a later agent can
 2. Current-tree `./scripts/check-architecture-guards.sh` and `./scripts/check-cloud-sync-multiplatform-scope.sh` exit 0.
 3. Injected pbxproj comment, extra macOS `Vanmo/` source, and unconditional `import SwiftUI` in `VanmoCore` each fail, then restore.
 4. `./scripts/check-harness-docs.sh` still exits 0 with four stages.
-5. Fast `./init.sh` still runs four stages and reaches the new guards; it does not compile apps or run XCUITest.
+5. Fast `./init.sh` still runs four stages and reaches the new guards; it does not compile apps or capture UI.
 
 ## Risks
 
@@ -41,7 +41,7 @@ Strengthen the existing CloudKit/multiplatform static stage so a later agent can
 ## Progress
 
 - **2026-08-28:** Plan created. Implementation starts from the existing stage-2 static check.
-- **2026-08-28:** Added `scripts/check-architecture-guards.sh` (XcodeGen 2.44.1). Current-tree guards and `./scripts/check-cloud-sync-multiplatform-scope.sh` exited 0. Injecting a `project.pbxproj` comment failed with pbxproj drift; adding `Vanmo/App/ContentView.swift` to `Vanmo-macOS` sources failed the whitelist; adding unconditional `import SwiftUI` to `NetworkError.swift` failed the import scan. All three injections were restored and the guards passed again. `./scripts/check-harness-docs.sh` passed with four stages. Fast `./init.sh` completed all four stages, reached the architecture guards, and did not compile apps or run XCUITest.
+- **2026-08-28:** Added `scripts/check-architecture-guards.sh` (XcodeGen 2.44.1). Current-tree guards and `./scripts/check-cloud-sync-multiplatform-scope.sh` exited 0. Injecting a `project.pbxproj` comment failed with pbxproj drift; adding `Vanmo/App/ContentView.swift` to `Vanmo-macOS` sources failed the whitelist; adding unconditional `import SwiftUI` to `NetworkError.swift` failed the import scan. All three injections were restored and the guards passed again. `./scripts/check-harness-docs.sh` passed with four stages. Fast `./init.sh` completed all four stages, reached the architecture guards, and did not compile apps or capture UI.
 - **2026-08-28:** Post-task review made pbxproj failures print the normalized diff and kept the script Summary after a Python failure. Re-ran `bash -n` and the guards; a restored pbxproj-comment injection now shows only `/* architecture-guard injection */` in the normalized diff.
 
 ## Open Decisions

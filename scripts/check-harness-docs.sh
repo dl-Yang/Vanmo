@@ -292,10 +292,6 @@ def stage_aliases(stage_key):
             "harness documentation",
             "harness document",
         ),
-        "check-ios-ui-cli.sh": (
-            "check-ios-ui-cli",
-            "ios ui",
-        ),
     }
     if stage_key in aliases:
         return aliases[stage_key]

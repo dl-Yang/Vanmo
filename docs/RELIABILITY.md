@@ -15,16 +15,15 @@ This document defines how Vanmo proves that the repository and user journeys are
 ./init.sh
 ```
 
-This resolves shared-package dependencies and then runs four baseline stages:
+This resolves shared-package dependencies and then runs three baseline stages:
 
-1. the 36-test `VanmoCore` suite
+1. the `VanmoCore` suite
 2. the CloudKit/multiplatform static scope check, including XcodeGen drift, target source whitelist, and VanmoCore UI-import guards
 3. the Advanced Harness document, repository-local Markdown-link, and live narrative-consistency check
-4. the iOS UI interaction CLI static check
 
-The third stage checks required files, repository-local Markdown links, the fast-baseline stage count, active/completed plan-index Status, product-spec/plan Status, and QUALITY current-baseline command paths. It does not build or launch either app. The fourth stage validates target declarations, generated-project presence, Bash syntax/usage, and Swift type-checking; it does not run XCUITest.
+The third stage checks required files, repository-local Markdown links, the fast-baseline stage count, active/completed plan-index Status, product-spec/plan Status, and QUALITY current-baseline command paths. It does not build or launch either app.
 
-After the four stages succeed, `./init.sh --full` adds Debug compile evidence for the iOS Simulator and macOS applications:
+After the three stages succeed, `./init.sh --full` adds Debug compile evidence for the iOS Simulator and macOS applications:
 
 ```bash
 ./init.sh --full
@@ -59,10 +58,9 @@ swift test --package-path Packages/VanmoCore
 ./scripts/check-cloud-sync-multiplatform-scope.sh
 ./scripts/check-architecture-guards.sh
 ./scripts/check-harness-docs.sh
-./scripts/check-ios-ui-cli.sh
 ./scripts/check-app-build.sh ios-simulator
 ./scripts/check-app-build.sh macos
-./scripts/ios-ui.sh simulator journey --name tab-navigation
+./run_device.sh --simulator
 swift test --package-path Packages/VanmoCore --filter DownloadTests
 ```
 
@@ -78,43 +76,32 @@ Use the smallest relevant check during iteration, then run the required broader 
 
 The default path targets an iOS device. Use `--simulator` for iOS Simulator and `--macos` for the native macOS app. Record the platform, configuration, and whether the command built, installed, launched, or only compiled.
 
-### iOS UI Interaction CLI
+### iOS Visual Verification
 
-Use `scripts/ios-ui.sh` for one bounded iOS action at a time:
+iOS UI evidence is visual. The repository has no UI-test target and no automated UI driver.
 
 ```bash
-# Simulator: XCUITest backend
-./scripts/ios-ui.sh simulator screenshot --output /tmp/vanmo-simulator.png
-./scripts/ios-ui.sh simulator tree --output /tmp/vanmo-tree.json
-./scripts/ios-ui.sh simulator tap --identifier tab.settings --timeout 5
-./scripts/ios-ui.sh simulator assert --identifier screen.library --state exists
-./scripts/ios-ui.sh simulator journey --name tab-navigation
+# Physical device: install and launch, then capture screenshots and a recording
+./run_device.sh
 
-# Physical device: the same XCUITest backend
-./scripts/ios-ui.sh device screenshot --output /tmp/vanmo.png
-./scripts/ios-ui.sh device tree --output /tmp/vanmo-tree.json
-./scripts/ios-ui.sh device tap --identifier tab.settings --timeout 5
-./scripts/ios-ui.sh device type --label "exact-label-from-tree" --text "example"
-./scripts/ios-ui.sh device swipe --direction up
-./scripts/ios-ui.sh device assert --identifier screen.library --state exists
-
-# Simulator management only
-./scripts/ios-ui.sh simulator launch --device "iPhone 17 Pro"
-./scripts/ios-ui.sh simulator terminate --device "iPhone 17 Pro"
+# Simulator: the agent launches and operates the app
+./run_device.sh --simulator
+xcrun simctl io booted screenshot /tmp/vanmo-simulator.png
+xcrun simctl io booted recordVideo /tmp/vanmo-simulator.mp4
 ```
 
-Device and Simulator screenshot, tree, tap, type, swipe, wait, assert, and journey commands run `VanmoDeviceInteractionTests/testExecuteCommand` through the `Vanmo` scheme. Each command except `journey` launches the app once, so tap and assert cannot preserve navigation across processes. `journey --name tab-navigation` asserts `screen.library`, taps Settings, and asserts `screen.settings` in one process. Replace remaining selector placeholders with identifiers or exact labels from the current tree output. The script sets `TEST_RUNNER_VANMO_UI_*`; Xcode's test runner is expected to expose those values to the test process as `VANMO_UI_*`. Each XCUITest run retains `result.xcresult`, the `xcodebuild` log, attachment-export diagnostics, and exported attachments under `build/ui-cli/runs/`. Simulator XCUITest uses `build/DerivedData-UITests-sim` and does not require a development team.
+Physical-device journeys require a connected and trusted iOS device plus valid signing. After `./run_device.sh` installs and launches Vanmo, the operator captures screenshots and a screen recording of the exact walk. Matching sanitized logs still come from Xcode Console or Console.app. Simulator frames do not replace device-only evidence.
 
-Physical-device prerequisites are a connected and trusted iOS device, a usable Xcode destination, and valid signing. Select a device with `--device`; provide the development team with `VANMO_DEVELOPMENT_TEAM` or `--team TEAM`. Keep typed values and exported trees/screenshots free of secrets before sharing them.
+Simulator journeys are agent-operated. The agent boots and launches Vanmo with `./run_device.sh --simulator`, interacts with the Simulator, and captures screenshots or recordings through `simctl io`. `simctl` launch or terminate alone does not prove a user journey.
 
-`simulator launch|terminate` still use `simctl` only to manage the Simulator. They do not capture screenshots or validate UI.
+Keep screenshots, recordings, and console excerpts free of secrets before sharing them. Retain visual evidence with the governing plan or review notes.
 
-Current evidence as of August 26, 2026:
+Current evidence as of September 17, 2026:
 
-- XcodeGen generation, target discovery, Bash validation, Swift type-checking, and the full `./scripts/check-ios-ui-cli.sh` static check passed.
-- Focused `./scripts/check-app-build.sh ios-simulator` passed after the Settings `.paused` label was added. Evidence: `build/app-build-evidence/runs/20260826-145050-52563/ios-simulator`.
-- Simulator XCUITest on iPhone 17 Pro recorded `tree` (`screen.library`, `tab.library`, `tab.settings` present), `assert --identifier screen.library --state exists`, and `journey --name tab-navigation` (`tab.settings` tap, `screen.settings` assert). Journey artifacts: `build/ui-cli/runs/20260826-145830-63647`.
-- `TEST_RUNNER_VANMO_UI_*` delivery succeeded on the Simulator. No physical-device XCUITest has run, so device signing remains unverified.
+- The fast `./init.sh` baseline is three stages: `VanmoCore` tests, the CloudKit/multiplatform static check, and the Harness documentation check.
+- Focused `./scripts/check-app-build.sh ios-simulator` remains the iOS Debug compile evidence command.
+- iOS physical-device UI evidence is a screenshot and screen-recording walk.
+- iOS Simulator UI evidence is an agent-operated walk with `simctl` captures.
 
 ### Debug
 
@@ -152,11 +139,10 @@ Each journey must record the source type, platform, configuration, steps perform
 | `VanmoCore` tests | Shared model and infrastructure behavior covered by those tests | App UI, player rendering, platform lifecycle, or real remote services |
 | Static scope check | Declared CloudKit and cross-platform boundaries satisfy the check | Runtime CloudKit synchronization or successful app compilation |
 | Architecture structure guards | `project.yml` target sources and dependency direction stay inside the whitelist, committed `pbxproj`/schemes match a non-mutating XcodeGen generate after format normalization, and `VanmoCore` has no unconditional UIKit/AppKit/SwiftUI imports | App compilation, launch, or that a local Xcode `DEVELOPMENT_TEAM` rewrite is absent |
-| iOS UI CLI static check | The declared UI-test target, generated-project reference, Bash interface, and test source satisfy the checker | App compilation, signing, test-runner argument delivery, device interaction, or attachment export |
-| Simulator `simctl` launch/terminate | The exact recorded simulator management command completed | Screenshots, selectors, XCUITest interaction, or a golden journey |
-| Simulator XCUITest command | The exact recorded action or in-process journey completed on that simulator, with retained `xcresult` artifacts | Physical-device signing, Figma fidelity, real-source flows, or product journeys 1–3 |
-| Physical-device XCUITest command | The exact recorded action and its retained artifacts completed on that signed device | Other commands, complete UI coverage, Figma fidelity, accessibility quality, or an end-to-end product journey |
-| Debug app compile check | The selected application target compiled for the recorded Debug configuration and destination | Installation, launch, XCUITest, physical-device signing, UI behavior, real-source flows, or real CloudKit transport |
+| Simulator `simctl` launch/terminate | The exact recorded simulator management command completed | Screenshots, recordings, or a golden journey |
+| Agent-operated Simulator walk | The agent launched Vanmo and captured the recorded Simulator screenshots or recording | Physical-device hardware, signing, Figma fidelity, real-source flows, or product journeys 1–3 |
+| Physical-device screenshot and recording | The exact recorded walk completed on that signed device, with retained frames | Other walks, complete UI coverage, Figma fidelity, accessibility quality, or an unfilmed step |
+| Debug app compile check | The selected application target compiled for the recorded Debug configuration and destination | Installation, launch, UI behavior, physical-device signing, real-source flows, or real CloudKit transport |
 | `check-app-build.sh` Debug compile | The selected target compiled in the isolated evidence DerivedData and SourcePackages | An Xcode Incremental Build, launch, or that iOS and macOS can share one DerivedData or run as two parallel processes |
 | App build | A target compiled for the recorded configuration and environment | Launch quality or completion of a user journey |
 | App launch | Startup reached the recorded state | End-to-end playback, downloads, synchronization, or recovery |

@@ -70,6 +70,12 @@ struct LibraryView: View {
             guard let connectionId = notification.object as? UUID else { return }
             viewModel.removeItems(forConnectionId: connectionId)
         }
+#if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: DownloadHeroWalkFixtures.openDetailNotification)) { notification in
+            guard let itemID = notification.object as? UUID else { return }
+            selectedMediaItemID = itemID
+        }
+#endif
     }
 
     // MARK: - Backdrop

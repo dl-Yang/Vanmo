@@ -25,7 +25,7 @@ This is a factual acceptance record. It does not authorize download-engine chang
 - The downloads-spec Related Plan or macOS HTTP `Current acceptance status`
 - iOS device work
 - `xcodegen` regeneration
-- XCUITest or remote logging
+- Remote logging
 - Figma or unrelated player work
 
 If the flow exposes a defect, stop at a reproducible, sanitized record. A separately scoped fix plan is required before implementation.

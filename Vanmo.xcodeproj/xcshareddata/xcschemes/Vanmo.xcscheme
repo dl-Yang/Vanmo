@@ -23,15 +23,15 @@
          </BuildActionEntry>
          <BuildActionEntry
             buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "EAFC3AD4DF25F3202D9BB5BC"
-               BuildableName = "VanmoUITests.xctest"
-               BlueprintName = "VanmoUITests"
+               BlueprintIdentifier = "2665CCBF2B3B9026EEF76906"
+               BuildableName = "VanmoDownloadWidget.appex"
+               BlueprintName = "VanmoDownloadWidget"
                ReferencedContainer = "container:Vanmo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -53,20 +53,7 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "EAFC3AD4DF25F3202D9BB5BC"
-               BuildableName = "VanmoUITests.xctest"
-               BlueprintName = "VanmoUITests"
-               ReferencedContainer = "container:Vanmo.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

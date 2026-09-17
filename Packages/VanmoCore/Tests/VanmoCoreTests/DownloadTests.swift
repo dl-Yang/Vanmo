@@ -120,6 +120,43 @@ final class DownloadTests: XCTestCase {
         XCTAssertEqual(request.sourceServerID, episode.id)
         XCTAssertEqual(request.seriesServerID, show.serverId)
         XCTAssertEqual(request.postUrl, show.posterURL)
+        XCTAssertNil(request.sourceFileURL)
+    }
+
+    @MainActor
+    func testLocalFileEpisodeDoesNotNeedConnection() throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hero-walk-local.mp4")
+        try Data(repeating: 0x01, count: 64).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let show = MediaItem(
+            title: "Local Show",
+            fileURL: fileURL.deletingLastPathComponent(),
+            mediaType: .tvShow
+        )
+        let episode = EpisodeInfo(
+            id: "local-e1",
+            title: "One",
+            seasonNumber: 1,
+            episodeNumber: 1,
+            duration: 60,
+            overview: nil,
+            streamURL: fileURL,
+            backdropURL: nil,
+            originalFileName: fileURL.lastPathComponent
+        )
+
+        let request = try DownloadRequestFactory.make(
+            from: episode,
+            show: show,
+            connectionType: nil
+        )
+
+        XCTAssertEqual(request.sourceFileURL?.standardizedFileURL, fileURL.standardizedFileURL)
+        XCTAssertNil(request.sourceConnectionId)
+        XCTAssertEqual(request.seasonNumber, 1)
+        XCTAssertEqual(request.episodeNumber, 1)
     }
 
     @MainActor

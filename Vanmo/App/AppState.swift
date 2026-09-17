@@ -24,6 +24,12 @@ final class AppState: ObservableObject {
         favoriteChangeCount += 1
     }
 
+    func openDownloads() {
+        selectedTab = .settings
+        settingsPath = NavigationPath()
+        settingsPath.append(SettingsRoute.downloads)
+    }
+
     func requestDownloadDetail(for request: DownloadRequest) {
         pendingDownloadDetailRequest = request
     }

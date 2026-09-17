@@ -24,7 +24,7 @@ This is a factual acceptance record. It does not authorize download-engine chang
 
 - Changing the VanmoCore download engine or adding protocols
 - SMB recovery
-- Physical-device signing or XCUITest
+- Physical-device signing
 - The macOS recovery matrix or downloads-spec Related Plan
 - Using leftover completed or paused tasks as the recorded run
 - `xcodegen` regeneration

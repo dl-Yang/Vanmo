@@ -84,7 +84,7 @@ struct PlayerView: View {
                 scalePickerPanel
             }
         }
-        .statusBarHidden(!viewModel.controlsVisible)
+        .statusBarHidden(true)
         .onAppear {
             AppOrientation.lockForPlayer()
         }

@@ -94,15 +94,15 @@ Choose verification proportional to the change:
 - CloudKit, target-boundary, or cross-platform scope: run `./scripts/check-cloud-sync-multiplatform-scope.sh`.
 - XcodeGen drift, target source whitelist, or `VanmoCore` UI-import direction: run `./scripts/check-architecture-guards.sh`. The CloudKit/multiplatform static stage invokes this guard.
 - Harness documentation, plan-index Status, and live narrative consistency: run `./scripts/check-harness-docs.sh`.
-- iOS UI target and interaction-CLI structure: run `./scripts/check-ios-ui-cli.sh`.
 - App Debug compile evidence: run `./scripts/check-app-build.sh ios-simulator` or `./scripts/check-app-build.sh macos` serially, or `./init.sh --full` after the fast baseline. Never start both script platforms as parallel processes, and do not point Xcode at `build/app-build-evidence/SourcePackages`. An Xcode Incremental Build does not replace this script. Details are in [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
 - iOS app behavior: build/run with `./run_device.sh` or `--simulator`.
-- iOS UI interaction and evidence capture: use `./scripts/ios-ui.sh device ...` or `./scripts/ios-ui.sh simulator ...` for XCUITest screenshot, tree, tap, type, swipe, wait, assert, and `journey --name tab-navigation`. `simulator launch|terminate` still use `simctl` only for simulator management.
+- iOS physical-device UI evidence: capture screenshots and a screen recording of the journey. Do not use a UI-test bundle or automated UI driver.
+- iOS Simulator UI evidence: the agent launches and operates the simulator with `./run_device.sh --simulator`, then captures `simctl` screenshots or recordings.
 - macOS app behavior: build/run with `./run_device.sh --macos`.
 - Project configuration: regenerate with XcodeGen before building.
-- UI and device-only behavior: perform the relevant manual flow and record what was actually verified.
+- UI and device-only behavior: perform the relevant flow and record what was actually verified.
 
-The Xcode project has an iOS UI-test target, but its static checker does not prove a successful app build, signed device execution, or user journey. A package test, static check, build, launch, XCUITest command, and manual journey prove different things; never present one as evidence for another. Follow [`docs/RELIABILITY.md`](docs/RELIABILITY.md) for the complete evidence boundary.
+A package test, static check, build, launch, screenshot, recording, and operator walk prove different things; never present one as evidence for another. Follow [`docs/RELIABILITY.md`](docs/RELIABILITY.md) for the complete evidence boundary.
 
 Before handing off substantial work:
 

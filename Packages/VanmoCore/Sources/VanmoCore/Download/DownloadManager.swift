@@ -372,6 +372,14 @@ public final class DownloadManager: ObservableObject {
             offset += Int64(data.count)
             update(taskID) { $0.receivedBytes = offset }
             try await persist()
+#if DEBUG
+            if let bps = DownloadHeroWalkFixtures.copyBytesPerSecond {
+                let delay = Double(data.count) / Double(bps)
+                if delay > 0 {
+                    try await Task.sleep(for: .seconds(delay))
+                }
+            }
+#endif
         }
         try destination.synchronize()
     }

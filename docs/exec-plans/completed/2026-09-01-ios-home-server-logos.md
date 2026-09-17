@@ -40,7 +40,7 @@ Home sync pill counts successfully shown servers, not movie/TV libraries. Home s
 - **2026-09-01:** Implementation added. `xcodegen generate` registered `ConnectionProviderIcon.swift` in the iOS target only.
 - **2026-09-01:** `./scripts/check-architecture-guards.sh` passed. `./scripts/check-harness-docs.sh` passed after indexing this plan.
 - **2026-09-01:** `./run_device.sh --simulator` Debug build and launch succeeded on iPhone 17 Pro (`0811807F-3DD6-4DF5-B5B3-C734ABC76F1F`).
-- **2026-09-01:** Home evidence on one Emby connection named Reno with 16 movie/TV libraries: pill `已同步 · 1 个服务器` (not `16 个库`); header shows `MacConnEmby` and subtitle `16 个媒体库`. XCUITest accessibility dump and a simctl screenshot both recorded this.
+- **2026-09-01:** Home evidence on one Emby connection named Reno with 16 movie/TV libraries: pill `已同步 · 1 个服务器` (not `16 个库`); header shows `MacConnEmby` and subtitle `16 个媒体库`. An accessibility dump and a simctl screenshot both recorded this.
 - **2026-09-01:** Files root still used generic server-rack card icons, as then specified.
 - **2026-09-03:** Files `ConnectionCard` now uses `ConnectionProviderIcon`. Add Connection keeps a visible selected-type logo in the closed picker row. `./run_device.sh --simulator` Debug build and launch succeeded on iPhone 17 Pro (`0811807F-3DD6-4DF5-B5B3-C734ABC76F1F`).
 - **2026-09-03:** Simulator screenshots: Home Reno is a failed local-folder connection and shows `MacConnLocalFolder`; Files lists Reno / SFTP / MacFtp / YinguAList, each stored as 本地文件夹, each with `MacConnLocalFolder`; Add Connection selected type showed `MacConnEmby`, `MacConnSFTP`, and `MacConnAList` for Emby / SFTP / AList.

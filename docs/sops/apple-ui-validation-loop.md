@@ -15,25 +15,23 @@ Chrome/DOM validation with Figma and Apple-platform runtime evidence.
 - the correct platform-specific Figma frame or component
 - a reproducible user journey and observable success criteria
 - the matching runtime: iOS Simulator, iOS device, or native macOS
-- a way to capture screenshots, accessibility state, and local console output
+- a way to capture screenshots, screen recordings, and local console output
 
 If the required screen or state does not exist in Figma, design it there before
 implementation. Do not use the iOS frame as the macOS authority or vice versa.
 
-## iOS CLI Backends
+## iOS Evidence Backends
 
-- Device and Simulator screenshot, tree, tap, type, swipe, wait, assert, and
-  `journey` commands use XCUITest through `./scripts/ios-ui.sh device ...` or
-  `./scripts/ios-ui.sh simulator ...`. Each command except `journey` performs
-  one action after a fresh launch.
-- `journey --name tab-navigation` keeps library assert, Settings tap, and
-  settings-screen assert in one XCUITest process because independent commands
-  relaunch the app.
-- `simulator launch|terminate` still use `simctl` only to manage the
-  Simulator. They do not capture screenshots or validate selectors.
-- Every XCUITest command retains its result bundle, logs, attachment export
-  diagnostics, and exported attachments under `build/ui-cli/runs/`.
-  Copy only sanitized requested outputs into review evidence.
+- Physical-device UI evidence is screenshots plus a screen recording of the
+  exact walk. Launch with `./run_device.sh`, then capture the frames. Do not
+  use a UI-test bundle or automated UI driver.
+- Simulator UI evidence is agent-operated. Launch with
+  `./run_device.sh --simulator`, interact in the Simulator, and capture
+  screenshots or recordings with `xcrun simctl io booted screenshot` or
+  `xcrun simctl io booted recordVideo`.
+- `simctl` launch or terminate alone does not prove a user journey.
+- Keep screenshots, recordings, and console excerpts free of secrets before
+  sharing them.
 
 ## Validation Loop
 
@@ -41,12 +39,11 @@ implementation. Do not use the iOS frame as the macOS authority or vice versa.
    initial state, and success criteria.
 2. Capture **BEFORE** evidence:
    - the relevant Figma frame
-   - a runtime screenshot; on iOS use `./scripts/ios-ui.sh simulator screenshot`
-     or `./scripts/ios-ui.sh device screenshot`
+   - a runtime screenshot; on iOS use a device screenshot or
+     `xcrun simctl io booted screenshot`
    - the visible state and navigation/window context
    - accessibility labels, values, traits, focus/reading order, and text-scale
-     observations relevant to the change; capture a tree with
-     `./scripts/ios-ui.sh simulator tree` or `./scripts/ios-ui.sh device tree`
+     observations relevant to the change
    - matching local console output when behavior is stateful or failing
 3. Exercise exactly one journey. Cover the relevant empty, loading, success,
    error, and retry/recovery state rather than inferring them from code.
@@ -66,7 +63,8 @@ implementation. Do not use the iOS frame as the macOS authority or vice versa.
 
 7. Rerun the **same journey** from the same initial conditions.
 8. Capture **AFTER** evidence with the same screenshot framing and inspection
-   criteria, using the same `ios-ui.sh` backend when it was used for BEFORE.
+   criteria. On a physical device, take a matching screenshot and screen
+   recording. On Simulator, the agent recaptures the same `simctl` frames.
    Confirm that the intended change is visible, accessibility remains usable,
    and unexpected console errors are absent or understood.
 9. Repeat until the defined journey is clean. Record only the platforms,
@@ -76,8 +74,7 @@ implementation. Do not use the iOS frame as the macOS authority or vice versa.
 
 Behavior that depends on a physical iOS device, hardware, signing,
 security-scoped access, background execution, or a Release entitlement requires
-recorded physical-device evidence. Use `./scripts/ios-ui.sh device ...` for the
-bounded actions it supports, retain the run artifacts, and ask the user to
+recorded physical-device screenshots and a screen recording. Ask the user to
 complete any unsupported journey steps. Matching sanitized logs must still be
 copied manually from Xcode Console or Console.app.
 

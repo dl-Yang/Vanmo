@@ -25,7 +25,7 @@ Make a readable SMB server connectable from both Vanmo iOS and VanmoMac, and hid
 - SMB download resume or library scan changes
 - A new Domain form field
 - Replacing `SMBClient` or adding SMB 1.0 / SMB 3.1.1 encryption
-- Physical-device XCUITest or automated credential entry
+- Automated credential entry
 - Figma or connection-form visual changes
 
 ## Verification
@@ -88,6 +88,6 @@ None.
 ## Follow-ups
 
 - SMB download resume remains unverified.
-- Physical-device XCUITest was not part of this plan.
+- Physical-device screenshot and recording coverage was not part of this plan.
 - Servers that require SMB 3.1.1 encryption are tracked in the later 2026-08-28 encryption plan.
 - macOS seek was not separately logged after the prefetch-proxy change.

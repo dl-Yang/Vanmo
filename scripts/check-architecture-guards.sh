@@ -50,7 +50,7 @@ mkdir -p "$MIRROR"
 ln -s "$ROOT/project.yml" "$MIRROR/project.yml"
 ln -s "$ROOT/Vanmo" "$MIRROR/Vanmo"
 ln -s "$ROOT/VanmoMac" "$MIRROR/VanmoMac"
-ln -s "$ROOT/VanmoUITests" "$MIRROR/VanmoUITests"
+ln -s "$ROOT/VanmoDownloadWidget" "$MIRROR/VanmoDownloadWidget"
 ln -s "$ROOT/Packages" "$MIRROR/Packages"
 
 if ! xcodegen generate --spec "$MIRROR/project.yml" --project "$MIRROR" --project-root "$MIRROR" --quiet; then
@@ -99,7 +99,13 @@ MACOS_SHARED_SOURCES = (
 SOURCE_ALLOWLIST = {
     "Vanmo": {"roots": ("Vanmo",), "files": ()},
     "Vanmo-macOS": {"roots": ("VanmoMac",), "files": MACOS_SHARED_SOURCES},
-    "VanmoUITests": {"roots": ("VanmoUITests",), "files": ()},
+    "VanmoDownloadWidget": {
+        "roots": ("VanmoDownloadWidget",),
+        "files": (
+            "Vanmo/LiveActivity/DownloadLiveActivityAttributes.swift",
+            "Vanmo/LiveActivity/DownloadLiveActivityIntents.swift",
+        ),
+    },
 }
 
 APP_TARGETS = ("Vanmo", "Vanmo-macOS")

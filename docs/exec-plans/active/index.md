@@ -16,7 +16,7 @@ These rules apply to every plan listed below. A validation-only plan does not au
 6. Copy sanitized Console lines. Do not record passwords, tokens, complete authenticated URLs, or private media titles.
 7. iOS evidence does not prove macOS. Both platforms must pass before a plan can move to `../completed/`.
 
-Out of default scope for this set: downloads, library scan persistence, playback-progress sync, CloudKit, physical-device XCUITest, and Figma changes.
+Out of default scope for this set: downloads, library scan persistence, playback-progress sync, CloudKit, and Figma changes.
 
 Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local folder, Google Drive. Advance one plan at a time. AList connect, list, play, and Files-browser download are recorded under `docs/exec-plans/completed/`. FTP real-source connect, list, play, and download are recorded under `docs/exec-plans/completed/`. SFTP password connect, list, prefetch play, and Files-browser download are recorded under `docs/exec-plans/completed/`. Baidu Netdisk implicit OAuth, list, and `dlink` play are recorded under `docs/exec-plans/completed/`. The FTP placeholder expected-failure record remains under `docs/exec-plans/completed/`.
 
