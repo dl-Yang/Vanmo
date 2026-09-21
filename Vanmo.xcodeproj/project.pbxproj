@@ -94,6 +94,7 @@
 		7E03C279AF25FF1638DB5A5F /* MacDesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */; };
 		7E44F25F6AA133AD56D0B3F2 /* VanmoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3DDD5DF152FAA28B5CB74C83 /* VanmoCore */; };
 		7FDE68FC8A739610ECD802FB /* MacLibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11D51DD94570F0CAC7F040D9 /* MacLibraryViewModel.swift */; };
+		8179A052C4C0E87E0C1AA090 /* LandscapePlayerPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71CBCEAA0A281676B3FAF17A /* LandscapePlayerPresenter.swift */; };
 		82345C9CA31F050453C59FB0 /* PlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46008C0FE585AFB0989543DB /* PlayerEngine.swift */; };
 		82A6214ECC9D160B2CE13F35 /* OAuthPresentationContextProvider+AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBDDB46BD212A7DB301BC1BC /* OAuthPresentationContextProvider+AppKit.swift */; };
 		836FC57CC4B95F0D6B562F48 /* MacMediaCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C440DE29C5B79DC7AC5825B /* MacMediaCards.swift */; };
@@ -237,7 +238,7 @@
 		2808E3F2654CF170151A05FD /* box.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = box.png; sourceTree = "<group>"; };
 		2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDesignTokens.swift; sourceTree = "<group>"; };
 		2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaTitleLogoView.swift; sourceTree = "<group>"; };
-		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F0583048E7F8AAC51FA8D37 /* MacScannedShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedShowDetailView.swift; sourceTree = "<group>"; };
 		38C765C23D38D32911EEDECB /* ScanSyncBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSyncBanner.swift; sourceTree = "<group>"; };
 		39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedLibraryListView.swift; sourceTree = "<group>"; };
@@ -276,6 +277,7 @@
 		6D6524ADADB8CC750BE7000A /* iptv.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = iptv.png; sourceTree = "<group>"; };
 		6EC988F514EC1CDBAADD33DB /* MacLibraryEmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibraryEmptyStateView.swift; sourceTree = "<group>"; };
 		71988436A2BE54CD8F1B9240 /* Vanmo-Mac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac.entitlements"; sourceTree = "<group>"; };
+		71CBCEAA0A281676B3FAF17A /* LandscapePlayerPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandscapePlayerPresenter.swift; sourceTree = "<group>"; };
 		72AD8C87B76D5E9531E0DC0C /* MacLibrarySort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibrarySort.swift; sourceTree = "<group>"; };
 		730DA18B0B85AE160E3B54BE /* MacCollectionFolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCollectionFolderListView.swift; sourceTree = "<group>"; };
 		736B4DD3127AB97D0DC63402 /* KSPlayerMediaProbeProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerMediaProbeProvider.swift; sourceTree = "<group>"; };
@@ -1005,6 +1007,7 @@
 		EC8B41BAFB7C4D38FAA2F3A0 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				71CBCEAA0A281676B3FAF17A /* LandscapePlayerPresenter.swift */,
 				FE32895B73644B009BEC9758 /* PlayerProgressBar.swift */,
 				162372EE7823659FFCD1E918 /* PlayerView.swift */,
 				CB50A9840B362764031D0025 /* TrackSelectorView.swift */,
@@ -1152,6 +1155,7 @@
 						ProvisioningStyle = Automatic;
 					};
 					0F6607F78A5C0B637140BEB4 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					2665CCBF2B3B9026EEF76906 = {
@@ -1382,6 +1386,7 @@
 				E27647CBF81A4FD67C50E33E /* KSPlayerEngine.swift in Sources */,
 				D442E93B0F496CD0726CDA47 /* KSPlayerMediaProbeProvider.swift in Sources */,
 				EC1C047F64854D6079D1CA53 /* KSPlayerVideoThumbnailExtractor.swift in Sources */,
+				8179A052C4C0E87E0C1AA090 /* LandscapePlayerPresenter.swift in Sources */,
 				8DB4CC7410DB6E78F9D74BD1 /* LibraryFilters.swift in Sources */,
 				EF67AFEA69D6D34EF1AC1A4E /* LibraryView.swift in Sources */,
 				FF84C30ADC33D47677635F7B /* LibraryViewModel.swift in Sources */,
@@ -1529,7 +1534,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",
@@ -1563,7 +1567,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",

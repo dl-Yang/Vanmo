@@ -8,6 +8,7 @@ import VanmoCore
 @main
 struct VanmoApp: App {
     init() {
+        ColorTheme.migrateStoredValue()
         AppLanguage.lockForCurrentProcess()
         OAuthCoordinator.shared.presentationContextProvider = UIKitOAuthPresentationContextProvider.shared
         PrefetchTemporaryStore.cleanupOrphans()
@@ -54,43 +55,13 @@ struct VanmoApp: App {
 }
 
 final class VanmoAppDelegate: NSObject, UIApplicationDelegate {
-    static var orientationLock: UIInterfaceOrientationMask = .allButUpsideDown
+    static var orientationLock: UIInterfaceOrientationMask = .portrait
 
     func application(
         _ application: UIApplication,
         supportedInterfaceOrientationsFor window: UIWindow?
     ) -> UIInterfaceOrientationMask {
-        Self.orientationLock
-    }
-}
-
-enum AppOrientation {
-    @MainActor
-    static func lockForPlayer() {
-        VanmoAppDelegate.orientationLock = .landscape
-        requestGeometryUpdate(.landscape)
-    }
-
-    @MainActor
-    static func restoreDefault() {
-        VanmoAppDelegate.orientationLock = .allButUpsideDown
-        requestGeometryUpdate(.allButUpsideDown)
-    }
-
-    @MainActor
-    private static func requestGeometryUpdate(_ orientations: UIInterfaceOrientationMask) {
-        guard let windowScene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first(where: { $0.activationState == .foregroundActive }) else {
-            return
-        }
-
-        windowScene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-        windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations)) { error in
-            #if DEBUG
-            VanmoLogger.player.debug("[Debug][Player] Orientation update failed: \(error.localizedDescription)")
-            #endif
-        }
+        UIDevice.current.userInterfaceIdiom == .pad ? .all : Self.orientationLock
     }
 }
 #endif

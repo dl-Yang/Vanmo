@@ -7,8 +7,12 @@ public actor MetadataCache {
     private let metadataDirectoryName = "MetadataCache"
     private let indexFileName = "index.json"
     private let imagesDirectoryName = "images"
+    private let imageDownloadConcurrency = 4
 
     private var index = MetadataCacheIndex()
+    private var activeImageCachingKeys: Set<String> = []
+    private var pendingImageRecords: [String: MetadataCacheRecord] = [:]
+    private var pendingEpisodes: [String: [String: CachedEpisodeInfo]] = [:]
 
     public func load(for key: MetadataCacheKey) -> MetadataCacheRecord? {
         loadIndexIfNeeded()
@@ -17,6 +21,83 @@ public actor MetadataCache {
 
     public func rootDirectoryURL() throws -> URL {
         try metadataRootURL(createDirectoryIfNeeded: false)
+    }
+
+    public func store(_ record: MetadataCacheRecord) throws -> MetadataCacheRecord {
+        loadIndexIfNeeded()
+        var stored = record
+        if let existing = index.records[record.key.cacheKey] {
+            stored = mergeExistingCache(existing, into: stored)
+        }
+        if let pending = pendingEpisodes.removeValue(forKey: record.key.cacheKey) {
+            stored.episodes = mergeEpisodes(
+                stored.episodes,
+                with: Array(pending.values)
+            )
+        }
+        stored.fetchedAt = Date()
+        index.records[record.key.cacheKey] = stored
+        try persistIndex()
+        return stored
+    }
+
+    public func cacheEpisodes(
+        _ episodes: [EpisodeInfo],
+        for key: MetadataCacheKey
+    ) throws {
+        loadIndexIfNeeded()
+        guard !episodes.isEmpty else { return }
+
+        var cachedEpisodes: [CachedEpisodeInfo] = []
+        for episode in episodes {
+            cachedEpisodes.append(CachedEpisodeInfo(
+                id: episode.id,
+                title: episode.title,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                duration: episode.duration,
+                overview: episode.overview,
+                streamURL: episode.streamURL,
+                backdropLocalPath: nil,
+                backdropRemoteURL: episode.backdropURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath
+            ))
+        }
+
+        guard var record = index.records[key.cacheKey] else {
+            var pending = pendingEpisodes[key.cacheKey] ?? [:]
+            for episode in cachedEpisodes {
+                pending[episode.id] = episode
+            }
+            pendingEpisodes[key.cacheKey] = pending
+            return
+        }
+        record.episodes = mergeEpisodes(record.episodes, with: cachedEpisodes)
+        index.records[key.cacheKey] = record
+        try persistIndex()
+        scheduleImageCaching(for: record)
+    }
+
+    public func scheduleImageCaching(for record: MetadataCacheRecord) {
+        let cacheKey = record.key.cacheKey
+        guard activeImageCachingKeys.insert(cacheKey).inserted else {
+            pendingImageRecords[cacheKey] = record
+            return
+        }
+
+        Task {
+            do {
+                _ = try await save(record)
+            } catch {
+                VanmoLogger.metadata.error(
+                    "[MetadataCache] artwork caching failed: \(error.localizedDescription)"
+                )
+            }
+            finishImageCaching(for: cacheKey)
+        }
     }
 
     public func save(_ record: MetadataCacheRecord) async throws -> MetadataCacheRecord {
@@ -59,35 +140,44 @@ public actor MetadataCache {
 
             let sanitizedKey = sanitizePathComponent(record.key.cacheKey)
             let imagesDir = imagesDirectoryName
-            updated.castMembers = try await withThrowingTaskGroup(of: CachedCastMember.self) { group in
-                for member in record.castMembers {
-                    group.addTask {
-                        guard let remote = member.profileRemoteURL else { return member }
-                        let fileName = "\(Self.sanitizePathComponent(member.id)).jpg"
-                        let relative = "\(imagesDir)/\(sanitizedKey)/cast/\(fileName)"
-                        let destination = root.appendingPathComponent(relative)
-                        do {
-                            try await self.downloadImage(from: remote, to: destination)
-                            return CachedCastMember(
-                                id: member.id,
-                                name: member.name,
-                                role: member.role,
-                                profileLocalPath: relative,
-                                profileRemoteURL: member.profileRemoteURL
-                            )
-                        } catch {
-                            VanmoLogger.metadata.error("[MetadataCache] cast profile download failed: \(error.localizedDescription)")
-                            return member
+            var cachedMembers: [CachedCastMember] = []
+            for start in stride(from: 0, to: record.castMembers.count, by: imageDownloadConcurrency) {
+                let end = min(start + imageDownloadConcurrency, record.castMembers.count)
+                let batch = Array(record.castMembers[start..<end])
+                let results = try await withThrowingTaskGroup(of: CachedCastMember.self) { group in
+                    for member in batch {
+                        group.addTask {
+                            guard let remote = member.profileRemoteURL else { return member }
+                            let fileName = "\(Self.sanitizePathComponent(member.id)).jpg"
+                            let relative = "\(imagesDir)/\(sanitizedKey)/cast/\(fileName)"
+                            let destination = root.appendingPathComponent(relative)
+                            do {
+                                try await self.downloadImage(from: remote, to: destination)
+                                return CachedCastMember(
+                                    id: member.id,
+                                    name: member.name,
+                                    role: member.role,
+                                    profileLocalPath: relative,
+                                    profileRemoteURL: member.profileRemoteURL
+                                )
+                            } catch {
+                                VanmoLogger.metadata.error(
+                                    "[MetadataCache] cast profile download failed: \(error.localizedDescription)"
+                                )
+                                return member
+                            }
                         }
                     }
-                }
 
-                var results: [CachedCastMember] = []
-                for try await member in group {
-                    results.append(member)
+                    var batchResults: [CachedCastMember] = []
+                    for try await member in group {
+                        batchResults.append(member)
+                    }
+                    return batchResults
                 }
-                return results
+                cachedMembers.append(contentsOf: results)
             }
+            updated.castMembers = cachedMembers
         }
 
         if !record.episodes.isEmpty {
@@ -96,51 +186,61 @@ public actor MetadataCache {
 
             let sanitizedKey = sanitizePathComponent(record.key.cacheKey)
             let imagesDir = imagesDirectoryName
-            updated.episodes = try await withThrowingTaskGroup(of: CachedEpisodeInfo.self) { group in
-                for episode in record.episodes {
-                    group.addTask {
-                        guard let remote = episode.backdropRemoteURL else { return episode }
-                        let fileName = "\(Self.sanitizePathComponent(episode.id)).jpg"
-                        let relative = "\(imagesDir)/\(sanitizedKey)/episodes/\(fileName)"
-                        let destination = root.appendingPathComponent(relative)
-                        do {
-                            try await self.downloadImage(from: remote, to: destination)
-                            return CachedEpisodeInfo(
-                                id: episode.id,
-                                title: episode.title,
-                                seasonNumber: episode.seasonNumber,
-                                episodeNumber: episode.episodeNumber,
-                                duration: episode.duration,
-                                overview: episode.overview,
-                                streamURL: episode.streamURL,
-                                backdropLocalPath: relative,
-                                backdropRemoteURL: episode.backdropRemoteURL,
-                                fileSize: episode.fileSize,
-                                originalFileName: episode.originalFileName,
-                                container: episode.container,
-                                remotePath: episode.remotePath
-                            )
-                        } catch {
-                            VanmoLogger.metadata.error("[MetadataCache] episode backdrop download failed: \(error.localizedDescription)")
-                            return episode
+            var cachedEpisodes: [CachedEpisodeInfo] = []
+            for start in stride(from: 0, to: record.episodes.count, by: imageDownloadConcurrency) {
+                let end = min(start + imageDownloadConcurrency, record.episodes.count)
+                let batch = Array(record.episodes[start..<end])
+                let results = try await withThrowingTaskGroup(of: CachedEpisodeInfo.self) { group in
+                    for episode in batch {
+                        group.addTask {
+                            guard let remote = episode.backdropRemoteURL else { return episode }
+                            let fileName = "\(Self.sanitizePathComponent(episode.id)).jpg"
+                            let relative = "\(imagesDir)/\(sanitizedKey)/episodes/\(fileName)"
+                            let destination = root.appendingPathComponent(relative)
+                            do {
+                                try await self.downloadImage(from: remote, to: destination)
+                                return CachedEpisodeInfo(
+                                    id: episode.id,
+                                    title: episode.title,
+                                    seasonNumber: episode.seasonNumber,
+                                    episodeNumber: episode.episodeNumber,
+                                    duration: episode.duration,
+                                    overview: episode.overview,
+                                    streamURL: episode.streamURL,
+                                    backdropLocalPath: relative,
+                                    backdropRemoteURL: episode.backdropRemoteURL,
+                                    fileSize: episode.fileSize,
+                                    originalFileName: episode.originalFileName,
+                                    container: episode.container,
+                                    remotePath: episode.remotePath
+                                )
+                            } catch {
+                                VanmoLogger.metadata.error(
+                                    "[MetadataCache] episode backdrop download failed: \(error.localizedDescription)"
+                                )
+                                return episode
+                            }
                         }
                     }
-                }
 
-                var results: [CachedEpisodeInfo] = []
-                for try await episode in group {
-                    results.append(episode)
+                    var batchResults: [CachedEpisodeInfo] = []
+                    for try await episode in group {
+                        batchResults.append(episode)
+                    }
+                    return batchResults
                 }
-                return results.sorted {
-                    ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber)
-                }
+                cachedEpisodes.append(contentsOf: results)
+            }
+            updated.episodes = cachedEpisodes.sorted {
+                ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber)
             }
         }
 
         updated.fetchedAt = Date()
-        index.records[record.key.cacheKey] = updated
+        let merged = mergeArtwork(from: updated, into: index.records[record.key.cacheKey])
+        index.records[record.key.cacheKey] = merged
         try persistIndex()
-        return updated
+        return merged
     }
 
     public func deleteAll() throws {
@@ -149,6 +249,8 @@ public actor MetadataCache {
             try FileManager.default.removeItem(at: root)
         }
         index = MetadataCacheIndex()
+        pendingEpisodes.removeAll()
+        pendingImageRecords.removeAll()
     }
 
     public func diskSize() throws -> Int64 {
@@ -247,6 +349,128 @@ public actor MetadataCache {
 
     private func sanitizePathComponent(_ value: String) -> String {
         Self.sanitizePathComponent(value)
+    }
+
+    private func finishImageCaching(for cacheKey: String) {
+        activeImageCachingKeys.remove(cacheKey)
+        guard let pending = pendingImageRecords.removeValue(forKey: cacheKey) else { return }
+        scheduleImageCaching(for: pending)
+    }
+
+    private func mergeArtwork(
+        from hydrated: MetadataCacheRecord,
+        into current: MetadataCacheRecord?
+    ) -> MetadataCacheRecord {
+        guard var current else { return hydrated }
+        current.logoLocalPath = hydrated.logoLocalPath ?? current.logoLocalPath
+        current.backdropLocalPath = hydrated.backdropLocalPath ?? current.backdropLocalPath
+
+        let hydratedCast = Dictionary(
+            hydrated.castMembers.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        current.castMembers = current.castMembers.map { member in
+            guard let cached = hydratedCast[member.id], cached.profileLocalPath != nil else {
+                return member
+            }
+            return CachedCastMember(
+                id: member.id,
+                name: member.name,
+                role: member.role,
+                profileLocalPath: cached.profileLocalPath,
+                profileRemoteURL: member.profileRemoteURL
+            )
+        }
+
+        let hydratedEpisodes = Dictionary(
+            hydrated.episodes.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        current.episodes = current.episodes.map { episode in
+            guard let cached = hydratedEpisodes[episode.id], cached.backdropLocalPath != nil else {
+                return episode
+            }
+            return CachedEpisodeInfo(
+                id: episode.id,
+                title: episode.title,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                duration: episode.duration,
+                overview: episode.overview,
+                streamURL: episode.streamURL,
+                backdropLocalPath: cached.backdropLocalPath,
+                backdropRemoteURL: episode.backdropRemoteURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath
+            )
+        }
+        return current
+    }
+
+    private func mergeExistingCache(
+        _ existing: MetadataCacheRecord,
+        into refreshed: MetadataCacheRecord
+    ) -> MetadataCacheRecord {
+        var merged = refreshed
+        if existing.logoRemoteURL == refreshed.logoRemoteURL {
+            merged.logoLocalPath = existing.logoLocalPath
+        }
+        if existing.backdropRemoteURL == refreshed.backdropRemoteURL {
+            merged.backdropLocalPath = existing.backdropLocalPath
+        }
+
+        let existingCast = Dictionary(
+            existing.castMembers.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        merged.castMembers = refreshed.castMembers.map { member in
+            guard let cached = existingCast[member.id],
+                  cached.profileRemoteURL == member.profileRemoteURL else {
+                return member
+            }
+            return CachedCastMember(
+                id: member.id,
+                name: member.name,
+                role: member.role,
+                profileLocalPath: cached.profileLocalPath,
+                profileRemoteURL: member.profileRemoteURL
+            )
+        }
+        merged.episodes = mergeEpisodes(existing.episodes, with: refreshed.episodes)
+        return merged
+    }
+
+    private func mergeEpisodes(
+        _ existing: [CachedEpisodeInfo],
+        with incoming: [CachedEpisodeInfo]
+    ) -> [CachedEpisodeInfo] {
+        var byID = Dictionary(
+            existing.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        for episode in incoming {
+            let previous = byID[episode.id]
+            byID[episode.id] = CachedEpisodeInfo(
+                id: episode.id,
+                title: episode.title,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                duration: episode.duration,
+                overview: episode.overview,
+                streamURL: episode.streamURL,
+                backdropLocalPath: episode.backdropLocalPath ?? previous?.backdropLocalPath,
+                backdropRemoteURL: episode.backdropRemoteURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath
+            )
+        }
+        return byID.values.sorted {
+            ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber)
+        }
     }
 
     private static func sanitizePathComponent(_ value: String) -> String {

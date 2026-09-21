@@ -38,7 +38,7 @@ A 2026-09-17 iOS Simulator operator re-walk confirmed the post-flight Compact ap
 
 The iOS downloads screen is reached from Settings → 下载管理, by tapping the notch status-bar capsule, or by tapping the fallback bar. It follows iOS Figma Download Light `456:4` and Dark `456:254`: a large title, pause-all or resume-all, select mode, a task summary, and five row states with a 16:9 poster, status copy, and a circular action. Directory selection stays in Settings storage.
 
-Selecting a row opens the existing media detail. The completed-row play control starts the local file. The media-detail download button shows related-task progress and blocks duplicate enqueue while a movie or episode is queued, downloading, or paused.
+Selecting a row opens the existing media detail. Selecting an episode row opens its series detail with the series Primary poster; the episode backdrop remains the download-row thumbnail and must not be promoted to the detail poster. The completed-row play control starts the local file. The media-detail download button shows related-task progress and blocks duplicate enqueue while a movie or episode is queued, downloading, or paused.
 
 The implemented iOS success flow has the following evidence recorded on 2026-08-27 and 2026-08-28:
 

@@ -16,12 +16,16 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     private let durationSubject = CurrentValueSubject<CMTime, Never>(.zero)
     private let bufferProgressSubject = CurrentValueSubject<Double, Never>(0)
     private let subtitleContentSubject = CurrentValueSubject<SubtitleContent?, Never>(nil)
+    private let pictureInPictureActiveSubject = CurrentValueSubject<Bool, Never>(false)
 
     var statePublisher: AnyPublisher<PlaybackState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentTimePublisher: AnyPublisher<CMTime, Never> { currentTimeSubject.eraseToAnyPublisher() }
     var durationPublisher: AnyPublisher<CMTime, Never> { durationSubject.eraseToAnyPublisher() }
     var bufferProgressPublisher: AnyPublisher<Double, Never> { bufferProgressSubject.eraseToAnyPublisher() }
     var subtitleContentPublisher: AnyPublisher<SubtitleContent?, Never> { subtitleContentSubject.eraseToAnyPublisher() }
+    var pictureInPictureActivePublisher: AnyPublisher<Bool, Never> {
+        pictureInPictureActiveSubject.eraseToAnyPublisher()
+    }
 
     var state: PlaybackState { stateSubject.value }
     var currentTime: CMTime { currentTimeSubject.value }
@@ -46,6 +50,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     private var externalRichSubtitleDelay: TimeInterval = 0
     private var subtitleLogCounter: Int = 0
     private var cachedSubtitleParts: [SubtitlePart] = []
+    private weak var configuredPictureInPictureController: AVPictureInPictureController?
+    private var retainedActivePictureInPictureControllers: [AVPictureInPictureController] = []
 
     // MARK: - Video View
 
@@ -62,7 +68,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     @MainActor
     var isPictureInPictureActive: Bool {
         if #available(iOS 15.0, tvOS 15.0, *) {
-            return player?.pipController?.isPictureInPictureActive == true
+            return pictureInPictureActiveSubject.value
+                || player?.pipController?.isPictureInPictureActive == true
         }
         return false
     }
@@ -92,10 +99,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     override init() {
         super.init()
         setupAudioSession()
-        // 使用 AVSampleBufferAudioRenderer + AVSampleBufferRenderSynchronizer 进行 A/V 同步，
-        // 避免 AudioEnginePlayer 在 5.1→stereo downmix 路径下手工推算 audio clock 出现速率漂移（实测 ~1.37×），
-        // 该漂移会让视频被定义为持续落后并被反复丢帧。
-        KSOptions.audioPlayerType = AudioRendererPlayer.self
     }
 
     deinit {
@@ -185,6 +188,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
                 let p = KSMEPlayer(url: url, options: options)
                 p.delegate = self
                 self.player = p
+                self.refreshPictureInPictureController(for: p)
                 p.prepareToPlay()
                 return p
             }
@@ -250,6 +254,17 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
 
     private func stopPlaybackResources() {
         stopTimeUpdateTimer()
+        if #available(iOS 15.0, tvOS 15.0, *) {
+            let controllers = retainedActivePictureInPictureControllers
+                + [configuredPictureInPictureController].compactMap { $0 }
+            for controller in controllers {
+                controller.delegate = nil
+                controller.stopPictureInPicture()
+            }
+        }
+        configuredPictureInPictureController = nil
+        retainedActivePictureInPictureControllers.removeAll()
+        pictureInPictureActiveSubject.send(false)
         player?.shutdown()
         player = nil
         selectedSubtitleSearchable = nil
@@ -434,14 +449,60 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     @MainActor
     func togglePictureInPicture() -> Bool {
         guard isPictureInPictureSupported else { return false }
+        refreshPictureInPictureController()
         guard let controller = player?.pipController else { return false }
         if controller.isPictureInPictureActive {
+#if DEBUG
+            print("[Debug][PiP] action=stop engine=ksplayer")
+#endif
             controller.stopPictureInPicture()
             return true
         }
         guard controller.isPictureInPicturePossible else { return false }
+#if DEBUG
+        print("[Debug][PiP] action=start engine=ksplayer")
+#endif
         controller.startPictureInPicture()
         return true
+    }
+
+    private func refreshPictureInPictureController(for player: KSMEPlayer? = nil) {
+        guard let player = player ?? self.player else { return }
+        if #available(iOS 15.0, tvOS 15.0, *), let controller = player.pipController {
+            guard configuredPictureInPictureController !== controller else { return }
+            if let previous = configuredPictureInPictureController {
+                if previous.isPictureInPictureActive {
+                    if !retainedActivePictureInPictureControllers.contains(where: { $0 === previous }) {
+                        retainedActivePictureInPictureControllers.append(previous)
+                    }
+                } else {
+                    previous.delegate = nil
+                }
+            }
+            configuredPictureInPictureController = controller
+            controller.delegate = self
+            controller.canStartPictureInPictureAutomaticallyFromInline = true
+            pictureInPictureActiveSubject.send(
+                controller.isPictureInPictureActive
+                    || retainedActivePictureInPictureControllers.contains {
+                        $0.isPictureInPictureActive
+                    }
+            )
+#if DEBUG
+            print(
+                "[Debug][PiP] configured engine=ksplayer possible=\(controller.isPictureInPicturePossible) "
+                    + "automatic=\(controller.canStartPictureInPictureAutomaticallyFromInline)"
+            )
+#endif
+        }
+    }
+
+    private func publishPictureInPictureActivity() {
+        let isActive = configuredPictureInPictureController?.isPictureInPictureActive == true
+            || retainedActivePictureInPictureControllers.contains {
+                $0.isPictureInPictureActive
+            }
+        pictureInPictureActiveSubject.send(isActive)
     }
 
     // MARK: - Audio Configuration
@@ -500,6 +561,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     private func startTimeUpdateTimer() {
         timeUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             guard let self, let player = self.player else { return }
+            self.refreshPictureInPictureController(for: player)
             let time = player.currentPlaybackTime
             guard time.isFinite, !time.isNaN else { return }
             self.currentTimeSubject.send(CMTime(seconds: time, preferredTimescale: 600))
@@ -593,6 +655,72 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             leadingMargin: position.leftMargin,
             trailingMargin: position.rightMargin
         )
+    }
+}
+
+// MARK: - AVPictureInPictureControllerDelegate
+
+extension KSPlayerEngine: AVPictureInPictureControllerDelegate {
+    func pictureInPictureControllerWillStartPictureInPicture(
+        _ pictureInPictureController: AVPictureInPictureController
+    ) {
+        pictureInPictureActiveSubject.send(true)
+#if DEBUG
+        print("[Debug][PiP] event=willStart engine=ksplayer")
+#endif
+    }
+
+    func pictureInPictureControllerDidStartPictureInPicture(
+        _ pictureInPictureController: AVPictureInPictureController
+    ) {
+        pictureInPictureActiveSubject.send(true)
+#if DEBUG
+        print("[Debug][PiP] event=didStart engine=ksplayer")
+#endif
+    }
+
+    func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        failedToStartPictureInPictureWithError error: Error
+    ) {
+        retainedActivePictureInPictureControllers.removeAll {
+            $0 === pictureInPictureController
+        }
+        publishPictureInPictureActivity()
+#if DEBUG
+        let nsError = error as NSError
+        print("[Debug][PiP] event=failed engine=ksplayer domain=\(nsError.domain) code=\(nsError.code)")
+#endif
+    }
+
+    func pictureInPictureControllerWillStopPictureInPicture(
+        _ pictureInPictureController: AVPictureInPictureController
+    ) {
+#if DEBUG
+        print("[Debug][PiP] event=willStop engine=ksplayer")
+#endif
+    }
+
+    func pictureInPictureControllerDidStopPictureInPicture(
+        _ pictureInPictureController: AVPictureInPictureController
+    ) {
+        retainedActivePictureInPictureControllers.removeAll {
+            $0 === pictureInPictureController
+        }
+        publishPictureInPictureActivity()
+#if DEBUG
+        print("[Debug][PiP] event=didStop engine=ksplayer")
+#endif
+    }
+
+    func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+    ) {
+#if DEBUG
+        print("[Debug][PiP] event=restoreUI engine=ksplayer")
+#endif
+        completionHandler(true)
     }
 }
 

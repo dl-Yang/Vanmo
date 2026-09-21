@@ -4,6 +4,8 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
+- [`2026-09-21-media-detail-metadata-loading.md`](2026-09-21-media-detail-metadata-loading.md) — **Completed.** iOS and macOS real-source TV detail runs passed progressive collections, seasons, and metadata loading; the operator reported fast detail presentation and approved the change.
+- [`2026-09-18-ios-stability-and-experience.md`](2026-09-18-ios-stability-and-experience.md) — **Completed.** Physical-device acceptance passed audio-output stability, rich/bitmap subtitle behavior, automatic PiP, real landscape-to-portrait presentation, detail interactions and progressive artwork, episode-download series artwork, and the three-option appearance.
 - [`2026-08-25-mac-download-real-source-validation.md`](2026-08-25-mac-download-real-source-validation.md) — **Completed.** One HTTP-via-Emby macOS download run passed queue, pause, restart-from-part, and main-window detail navigation; SMB was not exercised.
 - [`2026-08-26-ios-download-parity.md`](2026-08-26-ios-download-parity.md) — **Completed.** iOS downloads page implemented from Figma Download; one HTTP-via-Emby simulator run passed enqueue, live progress, completion, and local play.
 - [`2026-08-27-ios-download-part-resume.md`](2026-08-27-ios-download-part-resume.md) — **Completed.** One iOS simulator HTTP-via-Emby run passed pause, terminate, restore from `.part`, and resume at the restored offset.

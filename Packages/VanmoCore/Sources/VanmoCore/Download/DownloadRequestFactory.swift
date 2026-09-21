@@ -21,7 +21,9 @@ public enum DownloadRequestFactory {
         )
         return DownloadRequest(
             sourceConnectionId: item.sourceConnectionId,
-            postUrl: item.posterURL ?? item.backdropURL,
+            postUrl: item.mediaType == .tvEpisode
+                ? (item.backdropURL ?? item.posterURL)
+                : (item.posterURL ?? item.backdropURL),
             sourceMediaItemID: item.id,
             sourceServerID: item.serverId,
             seriesServerID: item.seriesId,
@@ -87,6 +89,7 @@ public enum DownloadRequestFactory {
         return DownloadRequest(
             sourceConnectionId: show.sourceConnectionId,
             postUrl: episode.backdropURL ?? show.posterURL ?? show.backdropURL,
+            seriesPosterURL: show.posterURL,
             sourceMediaItemID: show.id,
             sourceServerID: episode.id,
             seriesServerID: show.serverId ?? show.seriesId,

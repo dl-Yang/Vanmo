@@ -60,13 +60,8 @@ struct DownloadManagementView: View {
             appState.consumeDownloadDetailRequest()
         }
         .fullScreenCover(item: $presentedSurface) { surface in
-            switch surface {
-            case .detail(let item):
-                NavigationStack {
-                    MediaDetailView(item: item)
-                }
-            case .player(let item):
-                PlayerView(item: item)
+            NavigationStack {
+                MediaDetailView(item: surface.item)
             }
         }
     }
@@ -285,7 +280,7 @@ struct DownloadManagementView: View {
         item.posterURL = task.request.postUrl
         item.container = fileURL.pathExtension.lowercased()
         item.originalFileName = task.request.fileName
-        presentedSurface = .player(item)
+        appState.play(item)
 #if DEBUG
         print("[Debug][Downloads] present player mediaType=\(item.mediaType.rawValue) ext=\(fileURL.pathExtension.lowercased())")
 #endif
@@ -316,18 +311,32 @@ struct DownloadManagementView: View {
     }
 
     private func storedMediaItem(for request: DownloadRequest) -> MediaItem? {
+        if request.mediaType == .tvEpisode,
+           let seriesID = request.seriesServerID,
+           let connectionID = request.sourceConnectionId {
+            let descriptor = FetchDescriptor<MediaItem>(
+                predicate: #Predicate {
+                    $0.serverId == seriesID && $0.sourceConnectionId == connectionID
+                }
+            )
+            if let series = try? modelContext.fetch(descriptor).first {
+                return series
+            }
+        }
+
         if let mediaID = request.sourceMediaItemID {
             let descriptor = FetchDescriptor<MediaItem>(
                 predicate: #Predicate { $0.id == mediaID }
             )
             if let item = try? modelContext.fetch(descriptor).first {
-                return item
+                if request.mediaType != .tvEpisode || item.mediaType == .tvShow {
+                    return item
+                }
             }
         }
 
-        let serverID = request.mediaType == .tvEpisode
-            ? request.seriesServerID
-            : request.sourceServerID
+        guard request.mediaType != .tvEpisode else { return nil }
+        let serverID = request.sourceServerID
         guard let serverID, let connectionID = request.sourceConnectionId else {
             return nil
         }
@@ -347,7 +356,7 @@ struct DownloadManagementView: View {
             mediaType: opensSeries ? .tvShow : request.mediaType,
             fileSize: request.totalBytes
         )
-        item.posterURL = request.postUrl
+        item.posterURL = opensSeries ? request.seriesPosterURL : request.postUrl
         item.backdropURL = request.postUrl
         item.sourceConnectionId = request.sourceConnectionId
         item.serverId = opensSeries ? request.seriesServerID : request.sourceServerID
@@ -359,14 +368,18 @@ struct DownloadManagementView: View {
 
 private enum PresentedDownloadSurface: Identifiable {
     case detail(MediaItem)
-    case player(MediaItem)
 
     var id: String {
         switch self {
         case .detail(let item):
             return "detail-\(item.id.uuidString)"
-        case .player(let item):
-            return "player-\(item.id.uuidString)"
+        }
+    }
+
+    var item: MediaItem {
+        switch self {
+        case .detail(let item):
+            return item
         }
     }
 }

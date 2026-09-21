@@ -162,15 +162,18 @@ struct ContentView: View {
 
 private struct PlayerPresentationModifier: ViewModifier {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.modelContext) private var modelContext
 
     func body(content: Content) -> some View {
         content
-            .fullScreenCover(isPresented: $appState.isPlayerPresented) {
-                if let item = appState.currentPlayingItem {
-                    PlayerView(item: item)
-                } else {
-                    Color.black.ignoresSafeArea()
-                }
+            .background {
+                LandscapePlayerPresenter(
+                    item: appState.currentPlayingItem,
+                    isPresented: appState.isPlayerPresented,
+                    modelContext: modelContext,
+                    onDismiss: { appState.stopPlayback() }
+                )
+                .frame(width: 0, height: 0)
             }
     }
 }

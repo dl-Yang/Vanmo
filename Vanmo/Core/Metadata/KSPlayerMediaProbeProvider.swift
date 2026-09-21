@@ -202,7 +202,19 @@ private enum ProbeError: LocalizedError {
 }
 
 enum MediaProbeBootstrap {
+    @MainActor private static var isConfigured = false
+
+    @MainActor
     static func configure() {
+        guard !isConfigured else { return }
+        isConfigured = true
+
+        // KSMEPlayer captures the global audio output type during initialization.
+        // Configure it before probe or thumbnail providers can create an instance.
+        KSOptions.audioPlayerType = AudioRendererPlayer.self
+#if DEBUG
+        print("[Debug][Player] audioOutput=AudioRendererPlayer scope=process")
+#endif
         Task {
             await MediaProbeQueue.shared.setProvider(KSPlayerMediaProbeProvider())
             await VideoThumbnailQueue.shared.setExtractor(KSPlayerVideoThumbnailExtractor())

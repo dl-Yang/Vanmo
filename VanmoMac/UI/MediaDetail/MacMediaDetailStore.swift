@@ -13,22 +13,122 @@ struct MacMediaDetailContent {
 }
 
 @MainActor
+final class MacMediaDetailSummaryState: ObservableObject {
+    @Published var content: MacMediaDetailContent?
+    @Published var isLoading = false
+}
+
+@MainActor
+final class MacMediaDetailCastState: ObservableObject {
+    @Published var members: [CastMemberDisplay] = []
+}
+
+@MainActor
+final class MacMediaDetailCollectionState: ObservableObject {
+    @Published var items: [ServerMediaItem] = []
+}
+
+@MainActor
+final class MacMediaDetailEpisodeState: ObservableObject {
+    @Published var seasons: [SeasonInfo] = []
+    @Published var selectedSeason: Int?
+    @Published var episodes: [EpisodeInfo] = []
+    @Published var isLoading = false
+    @Published var isLoadingMore = false
+    @Published var hasMore = false
+    @Published var totalCount = 0
+}
+
+@MainActor
+final class MacMediaDetailActionState: ObservableObject {
+    @Published var isRefreshingMetadata = false
+    @Published var refreshErrorMessage: String?
+}
+
+@MainActor
 final class MacMediaDetailStore: ObservableObject {
-    @Published private(set) var content: MacMediaDetailContent?
-    @Published private(set) var isLoading = false
-    @Published private(set) var selectedSeason: Int?
-    @Published private(set) var seasonEpisodes: [EpisodeInfo] = []
-    @Published private(set) var isLoadingEpisodes = false
-    @Published private(set) var isLoadingMoreEpisodes = false
-    @Published private(set) var hasMoreEpisodes = false
-    @Published private(set) var episodeTotalCount = 0
-    @Published private(set) var isRefreshingMetadata = false
+    let summaryState = MacMediaDetailSummaryState()
+    let castState = MacMediaDetailCastState()
+    let collectionState = MacMediaDetailCollectionState()
+    let episodeState = MacMediaDetailEpisodeState()
+    let actionState = MacMediaDetailActionState()
+
+    var content: MacMediaDetailContent? {
+        get {
+            guard var value = summaryState.content else { return nil }
+            value.castMembers = castState.members
+            value.seasons = episodeState.seasons
+            value.collections = collectionState.items
+            return value
+        }
+        set {
+            summaryState.content = newValue.map {
+                MacMediaDetailContent(
+                    enrichedOverview: $0.enrichedOverview,
+                    enrichedGenres: $0.enrichedGenres,
+                    logoURL: $0.logoURL,
+                    backdropURL: $0.backdropURL,
+                    castMembers: [],
+                    seasons: [],
+                    collections: []
+                )
+            }
+            castState.members = newValue?.castMembers ?? []
+            episodeState.seasons = newValue?.seasons ?? []
+            collectionState.items = newValue?.collections ?? []
+        }
+    }
+
+    var isLoading: Bool {
+        get { summaryState.isLoading }
+        set { summaryState.isLoading = newValue }
+    }
+
+    var selectedSeason: Int? {
+        get { episodeState.selectedSeason }
+        set { episodeState.selectedSeason = newValue }
+    }
+
+    var seasonEpisodes: [EpisodeInfo] {
+        get { episodeState.episodes }
+        set { episodeState.episodes = newValue }
+    }
+
+    var isLoadingEpisodes: Bool {
+        get { episodeState.isLoading }
+        set { episodeState.isLoading = newValue }
+    }
+
+    var isLoadingMoreEpisodes: Bool {
+        get { episodeState.isLoadingMore }
+        set { episodeState.isLoadingMore = newValue }
+    }
+
+    var hasMoreEpisodes: Bool {
+        get { episodeState.hasMore }
+        set { episodeState.hasMore = newValue }
+    }
+
+    var episodeTotalCount: Int {
+        get { episodeState.totalCount }
+        set { episodeState.totalCount = newValue }
+    }
+
     @Published private(set) var isUpdatingFavorite = false
     @Published private(set) var isUpdatingWatched = false
     /// 详情心形以 Store 为准：Home 临时 MediaItem 的 isFavorite 不会可靠驱动 SwiftUI 刷新。
     @Published private(set) var isFavorite = false
     @Published var favoriteErrorMessage: String?
-    @Published var refreshErrorMessage: String?
+
+    var isRefreshingMetadata: Bool {
+        get { actionState.isRefreshingMetadata }
+        set { actionState.isRefreshingMetadata = newValue }
+    }
+
+    var refreshErrorMessage: String? {
+        get { actionState.refreshErrorMessage }
+        set { actionState.refreshErrorMessage = newValue }
+    }
 
     private var loadedKey: String?
     private var loadGeneration = 0
@@ -36,6 +136,8 @@ final class MacMediaDetailStore: ObservableObject {
     private var episodeLoadGeneration = 0
     private var metadataCacheRecord: MetadataCacheRecord?
     private var metadataRootDirectory: URL?
+    private var initialEpisodeTask: Task<Void, Never>?
+    private let metadataLoader = MediaDetailProgressiveLoader()
 
     private let episodePageSize = 20
 
@@ -89,10 +191,18 @@ final class MacMediaDetailStore: ObservableObject {
         loadedKey = key
         loadGeneration += 1
         let generation = loadGeneration
+        defer {
+            if generation == loadGeneration {
+                isLoading = false
+                if Task.isCancelled {
+                    loadedKey = nil
+                }
+            }
+        }
 
         isLoading = true
-        content = nil
         resetEpisodePagingState()
+        content = baseContent(for: item)
 
         await performAggregate(
             item: item,
@@ -107,13 +217,17 @@ final class MacMediaDetailStore: ObservableObject {
         guard !isRefreshingMetadata else { return }
         isRefreshingMetadata = true
         defer { isRefreshingMetadata = false }
+        loadGeneration += 1
+        let generation = loadGeneration
+        initialEpisodeTask?.cancel()
+        episodeLoadGeneration += 1
 
         await performAggregate(
             item: item,
             modelContext: modelContext,
             autoDownloadMetadata: true,
             force: force,
-            generation: loadGeneration
+            generation: generation
         )
     }
 
@@ -128,8 +242,7 @@ final class MacMediaDetailStore: ObservableObject {
         await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: false)
     }
 
-    /// 并行发起全部异步请求，等待全部完成后聚合成一份快照，对 UI 做一次性刷新。
-    /// - Parameter generation: 本次加载的代际号，回写前校验，避免旧 item 的结果覆盖新 item。
+    /// 缓存、详情、季和合集按完成顺序发布，避免最慢请求阻塞其它组件。
     private func performAggregate(
         item: MediaItem,
         modelContext: ModelContext,
@@ -137,93 +250,100 @@ final class MacMediaDetailStore: ObservableObject {
         force: Bool,
         generation: Int
     ) async {
-        let key = MetadataCacheKey.from(item)
-
-        async let cacheRecordTask = MetadataCache.shared.load(for: key)
-        async let networkRecordTask = fetchNetworkRecord(
-            item: item,
-            modelContext: modelContext,
-            enabled: autoDownloadMetadata,
-            force: force
-        )
-        async let seasonsTask = fetchSeasons(item: item, modelContext: modelContext)
-        async let collectionsTask = fetchCollections(item: item, modelContext: modelContext)
-
-        let cacheRecord = await cacheRecordTask
-        let networkRecord = await networkRecordTask
-        var loadedSeasons = await seasonsTask
-        let loadedCollections = await collectionsTask
-
-        // 代际 / 取消 / 已删：回写前丢弃，避免访问已 detach 的 MediaItem 属性。
-        guard generation == loadGeneration, !Task.isCancelled, !item.isDeleted else {
-            if generation == loadGeneration {
-                isLoading = false
-            }
-            return
-        }
-
-        let record = networkRecord ?? cacheRecord
         let root = (try? await MetadataCache.shared.rootDirectoryURL())
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
-
-        guard generation == loadGeneration, !Task.isCancelled, !item.isDeleted else {
-            if generation == loadGeneration {
-                isLoading = false
-            }
-            return
-        }
-
-        metadataCacheRecord = record
         metadataRootDirectory = root
-
-        if loadedSeasons.isEmpty, let record, item.mediaType == .tvShow {
-            loadedSeasons = seasonInfos(from: record)
-        }
-
-        var snapshot = MacMediaDetailContent(
-            enrichedOverview: nil,
-            enrichedGenres: [],
-            logoURL: item.logoURL,
-            backdropURL: item.backdropURL,
-            castMembers: [],
-            seasons: loadedSeasons,
-            collections: loadedCollections
+        let connection = try? mediaServerConnectionSnapshot(for: item, in: modelContext)
+        let canRefresh = supportsMetadataRefresh(for: item, in: modelContext)
+        let updates = metadataLoader.updates(
+            for: item,
+            connection: connection,
+            autoDownloadMetadata: autoDownloadMetadata && canRefresh,
+            force: force
         )
 
-        if let record {
-            if let overview = record.overview, !overview.isEmpty {
-                snapshot.enrichedOverview = overview
-                if item.overview?.isEmpty != false {
-                    item.overview = overview
+        for await event in updates {
+            guard generation == loadGeneration, !Task.isCancelled, !item.isDeleted else { return }
+            switch event {
+            case .cached(let record), .metadata(let record):
+                applyMetadataRecord(record, root: root, item: item)
+                if episodeState.seasons.isEmpty, item.mediaType == .tvShow {
+                    applySeasons(seasonInfos(from: record), item: item, modelContext: modelContext)
                 }
-            }
-            if !record.genres.isEmpty {
-                snapshot.enrichedGenres = record.genres
-            }
-            if let resolvedLogo = record.resolvedLogoURL(rootDirectory: root) {
-                snapshot.logoURL = resolvedLogo
-            }
-            snapshot.castMembers = record.makeCastDisplays(rootDirectory: root)
-            if let resolvedBackdrop = record.resolvedBackdropURL(rootDirectory: root) {
-                snapshot.backdropURL = resolvedBackdrop
-                item.backdropURL = resolvedBackdrop
+            case .seasons(let seasons):
+                applySeasons(seasons, item: item, modelContext: modelContext)
+            case .collections(let collections):
+                collectionState.items = collections
+            case .failed(let component, let message):
+                if component == .metadata {
+                    refreshErrorMessage = message
+                }
+            case .finished:
+                isLoading = false
             }
         }
 
-        // 代际校验：加载期间若切换到其它 item（generation 已递增），丢弃本次结果，
-        // 避免旧 item 的快照覆盖新 item，或误清新 item 的骨架态。
-        guard generation == loadGeneration, !item.isDeleted else { return }
+        guard generation == loadGeneration else { return }
+        isLoading = false
+    }
 
-        content = snapshot
+    private func baseContent(for item: MediaItem) -> MacMediaDetailContent {
+        let members = item.cast.prefix(5).map { name in
+            CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
+        }
+        return MacMediaDetailContent(
+            enrichedOverview: item.overview,
+            enrichedGenres: item.genres,
+            logoURL: item.logoURL,
+            backdropURL: item.backdropURL ?? item.posterURL,
+            castMembers: members,
+            seasons: [],
+            collections: []
+        )
+    }
+
+    private func applyMetadataRecord(
+        _ record: MetadataCacheRecord,
+        root: URL,
+        item: MediaItem
+    ) {
+        metadataCacheRecord = record
+        var snapshot = summaryState.content ?? baseContent(for: item)
+        if let overview = record.overview, !overview.isEmpty {
+            snapshot.enrichedOverview = overview
+        }
+        if !record.genres.isEmpty {
+            snapshot.enrichedGenres = record.genres
+        }
+        snapshot.logoURL = record.resolvedLogoURL(rootDirectory: root) ?? snapshot.logoURL
+        if let backdrop = record.resolvedBackdropURL(rootDirectory: root) ?? record.posterRemoteURL {
+            snapshot.backdropURL = backdrop
+        }
+        summaryState.content = snapshot
+
+        let members = record.makeCastDisplays(rootDirectory: root)
+        if !members.isEmpty {
+            castState.members = members
+        }
+    }
+
+    private func applySeasons(
+        _ seasons: [SeasonInfo],
+        item: MediaItem,
+        modelContext: ModelContext
+    ) {
+        guard !seasons.isEmpty else { return }
+        episodeState.seasons = seasons
         let previousSeason = selectedSeason
-        if let previousSeason, loadedSeasons.contains(where: { $0.seasonNumber == previousSeason }) {
+        if let previousSeason, seasons.contains(where: { $0.seasonNumber == previousSeason }) {
             selectedSeason = previousSeason
         } else {
-            selectedSeason = loadedSeasons.first?.seasonNumber
+            selectedSeason = seasons.first?.seasonNumber
         }
-        isLoading = false
 
-        if item.mediaType == .tvShow, selectedSeason != nil {
+        initialEpisodeTask?.cancel()
+        initialEpisodeTask = Task { [weak self] in
+            guard let self else { return }
             await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
         }
     }
@@ -231,12 +351,15 @@ final class MacMediaDetailStore: ObservableObject {
     func invalidate() {
         loadGeneration += 1
         episodeLoadGeneration += 1
+        loadedKey = nil
+        initialEpisodeTask?.cancel()
         isLoading = false
         isLoadingEpisodes = false
         isLoadingMoreEpisodes = false
     }
 
     private func resetEpisodePagingState() {
+        initialEpisodeTask?.cancel()
         episodeLoadGeneration += 1
         selectedSeason = nil
         seasonEpisodes = []
@@ -249,64 +372,12 @@ final class MacMediaDetailStore: ObservableObject {
         metadataRootDirectory = nil
     }
 
-    // MARK: - Parallel fetch helpers
-
-    private func fetchNetworkRecord(
-        item: MediaItem,
-        modelContext: ModelContext,
-        enabled: Bool,
-        force: Bool
-    ) async -> MetadataCacheRecord? {
-        guard enabled else { return nil }
-        guard supportsMetadataRefresh(for: item, in: modelContext) else { return nil }
-
-        do {
-            let connection = try? mediaServerConnectionSnapshot(for: item, in: modelContext)
-            if let draft = try await MetadataRefreshCoordinator.shared.prepareRefreshDraft(
-                item,
-                force: force,
-                connection: connection
-            ) {
-                return try await MetadataCache.shared.save(draft)
-            }
-            return nil
-        } catch {
-            refreshErrorMessage = error.localizedDescription
-            return nil
-        }
-    }
-
-    private func fetchSeasons(item: MediaItem, modelContext: ModelContext) async -> [SeasonInfo] {
-        guard item.mediaType == .tvShow, let seriesServerId = item.serverId else { return [] }
-
-        do {
-            let snapshot = try? mediaServerConnectionSnapshot(for: item, in: modelContext)
-            switch item.fileURL.host {
-            case "plex-series":
-                if let snapshot {
-                    return try await PlexEpisodeFetcher.fetchSeasons(
-                        seriesRatingKey: seriesServerId,
-                        connection: snapshot
-                    )
-                }
-                return try await PlexEpisodeFetcher.fetchSeasons(seriesRatingKey: seriesServerId)
-            default:
-                if let snapshot {
-                    return try await EmbyEpisodeFetcher.fetchSeasons(
-                        seriesId: seriesServerId,
-                        connection: snapshot
-                    )
-                }
-                return try await EmbyEpisodeFetcher.fetchSeasons(seriesId: seriesServerId)
-            }
-        } catch {
-            VanmoLogger.library.error("[MacMediaDetail] Failed to load seasons: \(error.localizedDescription)")
-            return []
-        }
-    }
-
     private func loadSeasonEpisodes(item: MediaItem, modelContext: ModelContext, reset: Bool) async {
-        guard item.mediaType == .tvShow else { return }
+        guard !Task.isCancelled,
+              loadedKey == detailKey(for: item),
+              item.mediaType == .tvShow else {
+            return
+        }
         guard let season = selectedSeason else { return }
 
         if reset {
@@ -356,6 +427,10 @@ final class MacMediaDetailStore: ObservableObject {
             // 满页则继续；末页不足 pageSize，或 totalSize 回退哨兵耗尽后自然停
             hasMoreEpisodes = page.items.count >= episodePageSize
                 && episodeStartIndex < page.totalRecordCount
+            let cacheKey = MetadataCacheKey.from(item)
+            Task(priority: .utility) {
+                try? await MetadataCache.shared.cacheEpisodes(page.items, for: cacheKey)
+            }
         } catch {
             VanmoLogger.library.error("[MacMediaDetail] Failed to load season episodes: \(error.localizedDescription)")
             guard generation == episodeLoadGeneration else { return }
@@ -438,24 +513,6 @@ final class MacMediaDetailStore: ObservableObject {
                 startIndex: startIndex,
                 pageSize: pageSize
             )
-        }
-    }
-
-    private func fetchCollections(item: MediaItem, modelContext: ModelContext) async -> [ServerMediaItem] {
-        guard let serverId = item.serverId, item.mediaType != .boxSet else { return [] }
-
-        do {
-            if let snapshot = try? mediaServerConnectionSnapshot(for: item, in: modelContext) {
-                guard snapshot.type == .emby || snapshot.type == .jellyfin else { return [] }
-                return try await EmbyCollectionsFetcher.fetchCollections(containing: serverId, connection: snapshot)
-            } else if isEmbyOriginItem(item) {
-                return try await EmbyCollectionsFetcher.fetchCollections(containing: serverId)
-            } else {
-                return []
-            }
-        } catch {
-            VanmoLogger.library.error("[MacMediaDetail] Failed to load collections: \(error.localizedDescription)")
-            return []
         }
     }
 
@@ -689,21 +746,6 @@ final class MacMediaDetailStore: ObservableObject {
         try MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
     }
 
-    private func isEmbyOriginItem(_ item: MediaItem) -> Bool {
-        if item.fileURL.scheme == "vanmo" {
-            switch item.fileURL.host?.lowercased() {
-            case "series", "emby-container", "emby-item":
-                return true
-            default:
-                return false
-            }
-        }
-        guard let baseHost = EmbyCredentialStore.baseURL.flatMap({ URL(string: $0)?.host?.lowercased() }),
-              let itemHost = item.fileURL.host?.lowercased() else {
-            return false
-        }
-        return baseHost == itemHost
-    }
 }
 
 extension Notification.Name {

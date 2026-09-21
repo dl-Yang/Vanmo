@@ -83,6 +83,7 @@ public struct MetadataCacheRecord: Codable, Sendable {
     public var year: Int?
     public var overview: String?
     public var rating: Double?
+    public var contentRating: String?
     public var genres: [String]
     public var director: String?
     public var cast: [String]
@@ -94,6 +95,9 @@ public struct MetadataCacheRecord: Codable, Sendable {
     public var logoRemoteURL: URL?
     public var backdropRemoteURL: URL?
     public var posterRemoteURL: URL?
+    public var videoWidth: Int?
+    public var videoHeight: Int?
+    public var dynamicRange: String?
     public var episodes: [CachedEpisodeInfo]
     public var fetchedAt: Date
     public var source: MetadataSource
@@ -129,9 +133,9 @@ public struct MetadataCacheRecord: Codable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case key, title, originalTitle, year, overview, rating, genres, director, cast, castMembers
+        case key, title, originalTitle, year, overview, rating, contentRating, genres, director, cast, castMembers
         case originCountry, tmdbID, logoLocalPath, backdropLocalPath, logoRemoteURL, backdropRemoteURL
-        case posterRemoteURL, episodes, fetchedAt, source
+        case posterRemoteURL, videoWidth, videoHeight, dynamicRange, episodes, fetchedAt, source
     }
 
     public init(
@@ -141,6 +145,7 @@ public struct MetadataCacheRecord: Codable, Sendable {
         year: Int? = nil,
         overview: String? = nil,
         rating: Double? = nil,
+        contentRating: String? = nil,
         genres: [String] = [],
         director: String? = nil,
         cast: [String] = [],
@@ -152,6 +157,9 @@ public struct MetadataCacheRecord: Codable, Sendable {
         logoRemoteURL: URL? = nil,
         backdropRemoteURL: URL? = nil,
         posterRemoteURL: URL? = nil,
+        videoWidth: Int? = nil,
+        videoHeight: Int? = nil,
+        dynamicRange: String? = nil,
         episodes: [CachedEpisodeInfo] = [],
         fetchedAt: Date = Date(),
         source: MetadataSource
@@ -162,6 +170,7 @@ public struct MetadataCacheRecord: Codable, Sendable {
         self.year = year
         self.overview = overview
         self.rating = rating
+        self.contentRating = contentRating
         self.genres = genres
         self.director = director
         self.cast = cast
@@ -173,6 +182,9 @@ public struct MetadataCacheRecord: Codable, Sendable {
         self.logoRemoteURL = logoRemoteURL
         self.backdropRemoteURL = backdropRemoteURL
         self.posterRemoteURL = posterRemoteURL
+        self.videoWidth = videoWidth
+        self.videoHeight = videoHeight
+        self.dynamicRange = dynamicRange
         self.episodes = episodes
         self.fetchedAt = fetchedAt
         self.source = source
@@ -186,6 +198,7 @@ public struct MetadataCacheRecord: Codable, Sendable {
         year = try container.decodeIfPresent(Int.self, forKey: .year)
         overview = try container.decodeIfPresent(String.self, forKey: .overview)
         rating = try container.decodeIfPresent(Double.self, forKey: .rating)
+        contentRating = try container.decodeIfPresent(String.self, forKey: .contentRating)
         genres = try container.decodeIfPresent([String].self, forKey: .genres) ?? []
         director = try container.decodeIfPresent(String.self, forKey: .director)
         cast = try container.decodeIfPresent([String].self, forKey: .cast) ?? []
@@ -197,6 +210,9 @@ public struct MetadataCacheRecord: Codable, Sendable {
         logoRemoteURL = try container.decodeIfPresent(URL.self, forKey: .logoRemoteURL)
         backdropRemoteURL = try container.decodeIfPresent(URL.self, forKey: .backdropRemoteURL)
         posterRemoteURL = try container.decodeIfPresent(URL.self, forKey: .posterRemoteURL)
+        videoWidth = try container.decodeIfPresent(Int.self, forKey: .videoWidth)
+        videoHeight = try container.decodeIfPresent(Int.self, forKey: .videoHeight)
+        dynamicRange = try container.decodeIfPresent(String.self, forKey: .dynamicRange)
         episodes = try container.decodeIfPresent([CachedEpisodeInfo].self, forKey: .episodes) ?? []
         fetchedAt = try container.decodeIfPresent(Date.self, forKey: .fetchedAt) ?? Date()
         source = try container.decode(MetadataSource.self, forKey: .source)

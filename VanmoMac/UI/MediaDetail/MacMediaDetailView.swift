@@ -28,12 +28,8 @@ struct MacMediaDetailView: View {
         ZStack(alignment: .topLeading) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    if isContentReady {
-                        heroSection
-                        contentSection
-                    } else {
-                        skeletonView
-                    }
+                    observedHeroSection
+                    contentSection
                 }
             }
         }
@@ -76,11 +72,7 @@ struct MacMediaDetailView: View {
         } message: {
             Text(store.favoriteErrorMessage ?? "")
         }
-        .alert(L10n.tr("刷新失败"), isPresented: refreshErrorBinding) {
-            Button(L10n.tr("确定")) {}
-        } message: {
-            Text(store.refreshErrorMessage ?? "")
-        }
+        .modifier(MacMediaDetailRefreshErrorPresenter(state: store.actionState))
         .alert(L10n.tr("下载失败"), isPresented: Binding(
             get: { downloadErrorMessage != nil },
             set: { if !$0 { downloadErrorMessage = nil } }
@@ -90,21 +82,23 @@ struct MacMediaDetailView: View {
             Text(downloadErrorMessage ?? "")
         }
         .sheet(isPresented: $isDownloadPickerPresented) {
-            MacEpisodeDownloadPicker(
-                episodes: store.currentSeasonEpisodes,
-                seasonNumbers: store.seasonNumbers,
-                selectedSeason: store.selectedSeason,
-                selectedEpisodes: $selectedDownloadEpisodes,
-                isLoading: store.isLoadingEpisodes || store.isLoadingMoreEpisodes,
-                isConfirming: isEnqueueingDownload,
-                onSelectSeason: { season in
-                    Task {
-                        await store.selectSeason(season, item: item, modelContext: modelContext)
-                        await loadAllEpisodesForDownload()
-                    }
-                },
-                onConfirm: enqueueSelectedEpisodes
-            )
+            MacMediaDetailObservedObject(state: store.episodeState) { episodeState in
+                MacEpisodeDownloadPicker(
+                    episodes: episodeState.episodes,
+                    seasonNumbers: episodeState.seasons.map(\.seasonNumber),
+                    selectedSeason: episodeState.selectedSeason,
+                    selectedEpisodes: $selectedDownloadEpisodes,
+                    isLoading: episodeState.isLoading || episodeState.isLoadingMore,
+                    isConfirming: isEnqueueingDownload,
+                    onSelectSeason: { season in
+                        Task {
+                            await store.selectSeason(season, item: item, modelContext: modelContext)
+                            await loadAllEpisodesForDownload()
+                        }
+                    },
+                    onConfirm: enqueueSelectedEpisodes
+                )
+            }
         }
     }
 
@@ -146,9 +140,22 @@ struct MacMediaDetailView: View {
             .frame(height: height)
     }
 
-    private var heroSection: some View {
+    private var observedHeroSection: some View {
+        MacMediaDetailObservedObject(state: store.summaryState) { summaryState in
+            MacMediaDetailObservedObject(state: store.episodeState) { episodeState in
+                heroSection(summaryState: summaryState, episodeState: episodeState)
+            }
+        }
+    }
+
+    private func heroSection(
+        summaryState: MacMediaDetailSummaryState,
+        episodeState: MacMediaDetailEpisodeState
+    ) -> some View {
         ZStack(alignment: .bottomLeading) {
-            MacRemoteImage(url: store.content?.backdropURL ?? item.backdropURL ?? item.posterURL)
+            MacRemoteImage(
+                url: summaryState.content?.backdropURL ?? item.backdropURL ?? item.posterURL
+            )
                 .frame(height: MacDesignTokens.Layout.heroHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()
@@ -167,10 +174,10 @@ struct MacMediaDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MacMediaDetailTitleLogoView(
                     title: displayTitle,
-                    logoURL: store.content?.logoURL ?? item.logoURL
+                    logoURL: summaryState.content?.logoURL ?? item.logoURL
                 )
 
-                metadataRow
+                metadataRow(summaryState: summaryState, episodeState: episodeState)
                 actionButtons
             }
             .padding(.horizontal, MacDesignTokens.Layout.detailContentPadding)
@@ -178,7 +185,10 @@ struct MacMediaDetailView: View {
         }
     }
 
-    private var metadataRow: some View {
+    private func metadataRow(
+        summaryState: MacMediaDetailSummaryState,
+        episodeState: MacMediaDetailEpisodeState
+    ) -> some View {
         HStack(spacing: 12) {
             if let rating = item.rating, rating > 0 {
                 HStack(spacing: 6) {
@@ -202,12 +212,12 @@ struct MacMediaDetailView: View {
                 metadataDot
                 metadataChip(L10n.tr("电视剧"))
                 metadataDot
-                Text(episodeCountText)
+                Text(episodeCountText(episodeState: episodeState))
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(theme.secondaryText)
             }
 
-            let genres = displayGenres
+            let genres = displayGenres(summaryState: summaryState)
             if !genres.isEmpty {
                 metadataDot
                 HStack(spacing: 8) {
@@ -228,7 +238,7 @@ struct MacMediaDetailView: View {
                         favoriteButton
                         downloadButton
                         watchedButton
-                        moreMenu
+                        observedMoreMenu
                     }
                 }
             } else {
@@ -237,7 +247,7 @@ struct MacMediaDetailView: View {
                     favoriteButton
                     downloadButton
                     watchedButton
-                    moreMenu
+                    observedMoreMenu
                 }
             }
         }
@@ -408,15 +418,21 @@ struct MacMediaDetailView: View {
         .help(isWatched ? L10n.tr("标记未看") : L10n.tr("标记已看"))
     }
 
+    private var observedMoreMenu: some View {
+        MacMediaDetailObservedObject(state: store.actionState) { actionState in
+            moreMenu(actionState: actionState)
+        }
+    }
+
     @ViewBuilder
-    private var moreMenu: some View {
+    private func moreMenu(actionState: MacMediaDetailActionState) -> some View {
         let menuContent = Group {
             Button {
                 Task { await store.refreshMetadata(for: item, modelContext: modelContext, force: true) }
             } label: {
                 Label(L10n.tr("刷新元数据"), systemImage: "arrow.clockwise")
             }
-            .disabled(store.isRefreshingMetadata)
+            .disabled(actionState.isRefreshingMetadata)
 
             Button {
                 Task { await store.toggleWatched(for: item, modelContext: modelContext) }
@@ -455,25 +471,38 @@ struct MacMediaDetailView: View {
 
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: 28) {
-            if let overview = displayOverview, !overview.isEmpty {
-                Text(overview)
-                    .font(.system(size: 16))
-                    .foregroundStyle(theme.secondaryText)
-                    .lineSpacing(6)
-                    .frame(maxWidth: 896, alignment: .leading)
-            }
-
-            episodesSection
-            collectionsSection
-            castSection
+            observedOverview
+            observedEpisodesSection
+            observedCollectionsSection
+            observedCastSection
         }
         .padding(.horizontal, MacDesignTokens.Layout.detailContentPadding)
         .padding(.top, 24)
         .padding(.bottom, 48)
     }
 
+    private var observedOverview: some View {
+        MacMediaDetailObservedObject(state: store.summaryState) { summaryState in
+            Group {
+                if let overview = displayOverview(summaryState: summaryState), !overview.isEmpty {
+                    Text(overview)
+                        .font(.system(size: 16))
+                        .foregroundStyle(theme.secondaryText)
+                        .lineSpacing(6)
+                        .frame(maxWidth: 896, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private var observedEpisodesSection: some View {
+        MacMediaDetailObservedObject(state: store.episodeState) { episodeState in
+            episodesSection(episodeState: episodeState)
+        }
+    }
+
     @ViewBuilder
-    private var episodesSection: some View {
+    private func episodesSection(episodeState: MacMediaDetailEpisodeState) -> some View {
         if item.mediaType == .tvShow {
             VStack(alignment: .leading, spacing: 16) {
                 
@@ -482,31 +511,36 @@ struct MacMediaDetailView: View {
                         .font(MacDesignTokens.Typography.detailSectionTitle)
                         .foregroundStyle(theme.primaryText)
                     
-                    if store.seasonNumbers.count > 1 {
+                    if episodeState.seasons.count > 1 {
                         Picker("", selection: Binding(
-                            get: { store.selectedSeason ?? store.seasonNumbers.first ?? 1 },
+                            get: {
+                                episodeState.selectedSeason
+                                    ?? episodeState.seasons.first?.seasonNumber
+                                    ?? 1
+                            },
                             set: { season in
                                 Task {
                                     await store.selectSeason(season, item: item, modelContext: modelContext)
                                 }
                             }
                         )) {
-                            ForEach(store.seasonNumbers, id: \.self) { season in
-                                Text(LocalizedFormat.seasonLabel(season)).tag(season)
+                            ForEach(episodeState.seasons) { season in
+                                Text(LocalizedFormat.seasonLabel(season.seasonNumber))
+                                    .tag(season.seasonNumber)
                             }
                         }
                         .pickerStyle(.automatic)
                     }
                 }
 
-                if store.isLoadingEpisodes && store.currentSeasonEpisodes.isEmpty {
+                if episodeState.isLoading && episodeState.episodes.isEmpty {
                     LoadingIndicatorView()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical, 24)
 //                    ProgressView()
 //                        .frame(maxWidth: .infinity, alignment: .leading)
 //                        .padding(.vertical, 24)
-                } else if store.currentSeasonEpisodes.isEmpty {
+                } else if episodeState.episodes.isEmpty {
                     Text(L10n.tr("暂无季集数据"))
                         .font(.subheadline)
                         .foregroundStyle(theme.secondaryText)
@@ -514,7 +548,7 @@ struct MacMediaDetailView: View {
                     ScrollViewReader { proxy in
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(alignment: .center, spacing: 16) {
-                                ForEach(store.currentSeasonEpisodes) { episode in
+                                ForEach(episodeState.episodes) { episode in
                                     episodeCard(episode)
                                         .id(episode.id)
                                         .onAppear {
@@ -524,7 +558,7 @@ struct MacMediaDetailView: View {
                                         }
                                 }
 
-                                if store.hasMoreEpisodes || store.isLoadingMoreEpisodes {
+                                if episodeState.hasMore || episodeState.isLoadingMore {
                                     LoadingIndicatorView()
                                         .frame(width: 44, height: 112)
                                         .onAppear {
@@ -624,8 +658,14 @@ struct MacMediaDetailView: View {
     }
 
     @ViewBuilder
-    private var collectionsSection: some View {
-        let collections = store.content?.collections ?? []
+    private var observedCollectionsSection: some View {
+        MacMediaDetailObservedObject(state: store.collectionState) { collectionState in
+            collectionsSection(collections: collectionState.items)
+        }
+    }
+
+    @ViewBuilder
+    private func collectionsSection(collections: [ServerMediaItem]) -> some View {
         if !collections.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 Text(L10n.tr("合集"))
@@ -662,9 +702,14 @@ struct MacMediaDetailView: View {
         }
     }
 
-    private var castSection: some View {
+    private var observedCastSection: some View {
+        MacMediaDetailObservedObject(state: store.castState) { castState in
+            castSection(members: castState.members)
+        }
+    }
+
+    private func castSection(members: [CastMemberDisplay]) -> some View {
         Group {
-            let members = castMembers
             if !members.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(L10n.tr("演职人员"))
@@ -797,34 +842,21 @@ struct MacMediaDetailView: View {
         return request.remotePath == expectedPath
     }
 
-    private var isContentReady: Bool {
-        !store.isLoading && store.content != nil
+    private func displayOverview(summaryState: MacMediaDetailSummaryState) -> String? {
+        summaryState.content?.enrichedOverview ?? item.overview
     }
 
-    private var displayOverview: String? {
-        store.content?.enrichedOverview ?? item.overview
-    }
-
-    private var displayGenres: [String] {
-        let enriched = store.content?.enrichedGenres ?? []
+    private func displayGenres(summaryState: MacMediaDetailSummaryState) -> [String] {
+        let enriched = summaryState.content?.enrichedGenres ?? []
         return enriched.isEmpty ? item.genres : enriched
     }
 
-    private var episodeCountText: String {
-        let count = store.episodeTotalCount
+    private func episodeCountText(episodeState: MacMediaDetailEpisodeState) -> String {
+        let count = episodeState.totalCount
         if count == 0 {
             return L10n.tr("剧集")
         }
         return L10n.tr("本季 %d 集", count)
-    }
-
-    private var castMembers: [CastMemberDisplay] {
-        if let members = store.content?.castMembers, !members.isEmpty {
-            return members
-        }
-        return item.cast.prefix(5).map { name in
-            CastMemberDisplay(id: name, name: name, role: nil, profileURL: nil)
-        }
     }
 
     private var favoriteErrorBinding: Binding<Bool> {
@@ -832,14 +864,6 @@ struct MacMediaDetailView: View {
             store.favoriteErrorMessage != nil
         } set: { isPresented in
             if !isPresented { store.favoriteErrorMessage = nil }
-        }
-    }
-
-    private var refreshErrorBinding: Binding<Bool> {
-        Binding {
-            store.refreshErrorMessage != nil
-        } set: { isPresented in
-            if !isPresented { store.refreshErrorMessage = nil }
         }
     }
 
@@ -923,6 +947,46 @@ struct MacMediaDetailView: View {
             predicate: #Predicate { $0.id == connectionId }
         )
         return try modelContext.fetch(descriptor).first?.type
+    }
+}
+
+private struct MacMediaDetailRefreshErrorPresenter: ViewModifier {
+    @ObservedObject var state: MacMediaDetailActionState
+
+    private var isPresented: Binding<Bool> {
+        Binding {
+            state.refreshErrorMessage != nil
+        } set: { value in
+            if !value {
+                state.refreshErrorMessage = nil
+            }
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .alert(L10n.tr("刷新失败"), isPresented: isPresented) {
+                Button(L10n.tr("确定")) {}
+            } message: {
+                Text(state.refreshErrorMessage ?? "")
+            }
+    }
+}
+
+private struct MacMediaDetailObservedObject<State: ObservableObject, Content: View>: View {
+    @ObservedObject var state: State
+    private let content: (State) -> Content
+
+    init(
+        state: State,
+        @ViewBuilder content: @escaping (State) -> Content
+    ) {
+        self.state = state
+        self.content = content
+    }
+
+    var body: some View {
+        content(state)
     }
 }
 

@@ -161,6 +161,8 @@ struct SettingsView: View {
         Section {
             Toggle(L10n.tr("自动加载字幕"), isOn: $viewModel.subtitleAutoLoad)
 
+            SubtitleStylePreview(style: subtitlePreviewStyle)
+
             HStack {
                 Text(L10n.tr("字幕大小"))
                 Spacer()
@@ -241,6 +243,15 @@ struct SettingsView: View {
         } footer: {
             Text(L10n.tr("字幕外观为全局默认值，进入播放器后仍可临时调整。OpenSubtitles 搜索使用官方 REST API；下载需要账户额度，API Key、用户名和密码会保存在 Keychain。"))
         }
+    }
+
+    private var subtitlePreviewStyle: SubtitleStyle {
+        SubtitleStyle(
+            fontSize: CGFloat(viewModel.subtitleFontSize),
+            textColor: viewModel.subtitleTextColor,
+            backgroundColor: viewModel.subtitleBackgroundColor,
+            position: SubtitleStyle.SubtitlePosition(rawValue: viewModel.subtitlePositionRaw) ?? .bottom
+        )
     }
 
     private var librarySection: some View {

@@ -59,7 +59,8 @@ struct SubtitleOverlayView: View {
     }
 
     private var imageSubtitleScale: CGFloat {
-        min(0.75, max(0.45, style.fontSize / 32))
+        let progress = (style.fontSize - 12) / 24
+        return min(1, max(0.5, 0.5 + progress * 0.5))
     }
 
     private var positionedSubtitleBody: some View {
@@ -72,9 +73,12 @@ struct SubtitleOverlayView: View {
     private var subtitleBody: some View {
         if let content, !content.isEmpty {
             Group {
-                if let attributedText = content.attributedText {
-                    AttributedSubtitleLabel(attributedText: attributedText)
-                        .fixedSize(horizontal: false, vertical: true)
+                if let attributedText = content.richAttributedText {
+                    attributedSubtitleLabel(attributedText)
+                } else if let uiImage = content.image {
+                    ImageSubtitleView(uiImage: uiImage, targetScale: imageSubtitleScale)
+                } else if let attributedText = content.attributedText {
+                    attributedSubtitleLabel(attributedText)
                 } else if let text = content.text, !text.isEmpty {
                     Text(text)
                         .font(.system(size: style.fontSize))
@@ -85,13 +89,33 @@ struct SubtitleOverlayView: View {
                         .padding(.vertical, 6)
                         .background(style.backgroundColor)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-                } else if let uiImage = content.image {
-                    ImageSubtitleView(uiImage: uiImage, targetScale: imageSubtitleScale)
                 }
             }
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.15), value: content.text)
         }
+    }
+
+    private func attributedSubtitleLabel(_ attributedText: NSAttributedString) -> some View {
+        AttributedSubtitleLabel(
+            attributedText: attributedText,
+            style: style
+        )
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(style.backgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+private extension SubtitleContent {
+    var richAttributedText: NSAttributedString? {
+        guard let attributedText else { return nil }
+        let visibleText = attributedText.string
+            .replacingOccurrences(of: "\u{FFFC}", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return visibleText.isEmpty ? nil : attributedText
     }
 }
 
@@ -100,39 +124,60 @@ private struct ImageSubtitleView: View {
     let targetScale: CGFloat
 
     var body: some View {
-        let preferredHeight = max(1, uiImage.size.height * targetScale)
-
-        GeometryReader { proxy in
-            let size = displaySize(maxWidth: proxy.size.width)
-
+        ImageSubtitleLayout(imageSize: uiImage.size, relativeScale: targetScale) {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFit()
-                .frame(width: size.width, height: size.height)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(height: preferredHeight)
+        .onChange(of: targetScale, initial: true) { _, scale in
+#if DEBUG
+            print(
+                "[Debug][Subtitle] imageScale=\(scale) "
+                    + "width=\(Int(uiImage.size.width)) height=\(Int(uiImage.size.height))"
+            )
+#endif
+        }
     }
+}
 
-    private func displaySize(maxWidth: CGFloat) -> CGSize {
-        let imageSize = uiImage.size
+private struct ImageSubtitleLayout: Layout {
+    let imageSize: CGSize
+    let relativeScale: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
         guard imageSize.width > 0, imageSize.height > 0 else {
             return CGSize(width: 1, height: 1)
         }
 
-        let targetWidth = imageSize.width * targetScale
-        let targetHeight = imageSize.height * targetScale
-        guard targetWidth > maxWidth else {
-            return CGSize(width: targetWidth, height: targetHeight)
-        }
-
+        let availableWidth = proposal.width ?? imageSize.width
         let aspectRatio = imageSize.width / imageSize.height
-        return CGSize(width: maxWidth, height: maxWidth / aspectRatio)
+        let fittedWidth = min(imageSize.width, availableWidth)
+        let width = max(1, fittedWidth * relativeScale)
+        return CGSize(width: width, height: max(1, width / aspectRatio))
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        guard let subview = subviews.first else { return }
+        subview.place(
+            at: CGPoint(x: bounds.midX, y: bounds.midY),
+            anchor: .center,
+            proposal: ProposedViewSize(bounds.size)
+        )
     }
 }
 
 private struct AttributedSubtitleLabel: UIViewRepresentable {
     let attributedText: NSAttributedString
+    let style: SubtitleStyle
 
     func makeUIView(context: Context) -> UILabel {
         let label = UILabel()
@@ -144,12 +189,25 @@ private struct AttributedSubtitleLabel: UIViewRepresentable {
     }
 
     func updateUIView(_ label: UILabel, context: Context) {
-        label.attributedText = attributedText
+        let styledText = NSMutableAttributedString(attributedString: attributedText)
+        let fullRange = NSRange(location: 0, length: styledText.length)
+        guard fullRange.length > 0 else {
+            label.attributedText = styledText
+            return
+        }
+
+        styledText.enumerateAttribute(.font, in: fullRange) { value, range, _ in
+            let font = (value as? UIFont)?.withSize(style.fontSize)
+                ?? UIFont.systemFont(ofSize: style.fontSize, weight: .medium)
+            styledText.addAttribute(.font, value: font, range: range)
+        }
+        styledText.addAttribute(.foregroundColor, value: UIColor(style.textColor), range: fullRange)
+        label.attributedText = styledText
     }
 }
 
 struct SubtitleStyle {
-    var fontSize: CGFloat = 14
+    var fontSize: CGFloat = 18
     var textColor: Color = .white
     var backgroundColor: Color = Color.black.opacity(0.6)
     var bottomPadding: CGFloat = 40
@@ -195,6 +253,49 @@ enum SubtitleStylePreferences {
     }
 }
 
+struct SubtitleStylePreview: View {
+    let style: SubtitleStyle
+
+    private var previewStyle: SubtitleStyle {
+        var preview = style
+        preview.bottomPadding = 14
+        preview.position = .bottom
+        return preview
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.08, green: 0.10, blue: 0.15),
+                        Color(red: 0.02, green: 0.03, blue: 0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Image(systemName: "film.stack")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(.white.opacity(0.12))
+
+                SubtitleOverlayView(
+                    content: SubtitleContent(text: L10n.tr("这是一段字幕文本")),
+                    style: previewStyle
+                )
+            }
+            .frame(height: 132)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Text(L10n.tr("位图字幕仅支持大小调整"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L10n.tr("字幕实时预览"))
+    }
+}
+
 struct SubtitleSettingsView: View {
     @Binding var style: SubtitleStyle
     @Binding var delay: Double
@@ -203,6 +304,10 @@ struct SubtitleSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section(L10n.tr("实时预览")) {
+                    SubtitleStylePreview(style: style)
+                }
+
                 Section(L10n.tr("字体")) {
                     HStack {
                         Text(L10n.tr("大小"))

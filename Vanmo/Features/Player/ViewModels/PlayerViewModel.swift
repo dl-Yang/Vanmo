@@ -19,6 +19,7 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var currentSubtitleContent: SubtitleContent?
     @Published private(set) var episodeGroups: [PlayerEpisodeSeason] = []
     @Published private(set) var currentEpisodeID: String?
+    @Published private(set) var isPictureInPictureActive = false
 
     @Published var config = PlayerConfig()
     @Published var subtitleStyle = SubtitleStyle() {
@@ -70,6 +71,10 @@ final class PlayerViewModel: ObservableObject {
         !episodeGroups.isEmpty
     }
 
+    var hasEmbeddedSubtitleTracks: Bool {
+        subtitleTracks.contains { $0.isEmbedded }
+    }
+
     var selectedSeasonEpisodes: [PlayerEpisode] {
         let season = selectedEpisodeSeason ?? episodeGroups.first?.seasonNumber
         return episodeGroups.first { $0.seasonNumber == season }?.episodes ?? []
@@ -98,13 +103,6 @@ final class PlayerViewModel: ObservableObject {
 
     var canShowPictureInPictureButton: Bool {
         avPlayer != nil || engine is KSPlayerEngine
-    }
-
-    var isPictureInPictureActive: Bool {
-        if let ksEngine = engine as? KSPlayerEngine {
-            return ksEngine.isPictureInPictureActive
-        }
-        return false
     }
 
     var isPictureInPicturePossible: Bool {
@@ -157,9 +155,56 @@ final class PlayerViewModel: ObservableObject {
                 self?.currentSubtitleContent = content
             }
             .store(in: &cancellables)
+
+        if let ksEngine = engine as? KSPlayerEngine {
+            ksEngine.pictureInPictureActivePublisher
+                .removeDuplicates()
+                .receive(on: DispatchQueue.main)
+                .assign(to: &$isPictureInPictureActive)
+        }
+
+#if DEBUG
+        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { notification in
+                let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+                let type = rawType.flatMap { AVAudioSession.InterruptionType(rawValue: $0) }
+                print("[Debug][PiP] audioInterruption type=\(String(describing: type))")
+            }
+            .store(in: &cancellables)
+#endif
     }
 
     // MARK: - Lifecycle
+
+    func handleScenePhase(_ phase: ScenePhase) {
+#if DEBUG
+        let name: String
+        switch phase {
+        case .active:
+            name = "active"
+        case .inactive:
+            name = "inactive"
+        case .background:
+            name = "background"
+        @unknown default:
+            name = "unknown"
+        }
+        print(
+            "[Debug][PiP] scenePhase=\(name) playback=\(String(describing: playbackState)) "
+                + "possible=\(isPictureInPicturePossible) active=\(isPictureInPictureActive)"
+        )
+#endif
+    }
+
+    func handleMemoryWarning() {
+#if DEBUG
+        print(
+            "[Debug][PiP] memoryWarning playback=\(String(describing: playbackState)) "
+                + "possible=\(isPictureInPicturePossible) active=\(isPictureInPictureActive)"
+        )
+#endif
+    }
 
     func onAppear(modelContext: ModelContext? = nil) async {
         self.modelContext = modelContext
@@ -181,17 +226,19 @@ final class PlayerViewModel: ObservableObject {
     func onDisappear(keepingPlaybackActive: Bool = false) {
         VanmoLogger.player.info("[PlayerVM] onDisappear, saving progress at \(self.currentTime)s")
         saveProgress()
-        // 离开播放页时 ViewModel 即将销毁；即便 PiP 保活 AVPlayer，也要结束 Emby 会话，
-        // 避免服务端 Now Playing 悬挂。
+        guard !keepingPlaybackActive else {
+            VanmoLogger.player.info("[PlayerVM] keeping playback alive for Picture in Picture")
+            return
+        }
+        stopPlaybackResources()
+    }
+
+    private func stopPlaybackResources() {
         let stopPosition = currentTime
         let session = playbackSession
         playbackSession = nil
         Task {
             await session?.stopped(position: stopPosition)
-        }
-        guard !keepingPlaybackActive else {
-            VanmoLogger.player.info("[PlayerVM] keeping playback alive for Picture in Picture")
-            return
         }
         engine.stop()
         if let token = prefetchToken {

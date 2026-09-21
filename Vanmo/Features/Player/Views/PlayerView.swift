@@ -7,23 +7,40 @@ import VanmoCore
 struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: PlayerViewModel
     @StateObject private var pictureInPicture = PlayerPictureInPictureController()
     @State private var showSpeedPicker = false
     @State private var showScaleModePicker = false
     @State private var dragAxis: DragAxis?
     @State private var lastVerticalTranslation: CGFloat = 0
+    @State private var isClosingPlayer = false
+    private let onClose: (() -> Void)?
 
     private enum DragAxis {
         case horizontal
         case vertical
     }
 
-    init(item: MediaItem) {
+    init(item: MediaItem, onClose: (() -> Void)? = nil) {
         _viewModel = StateObject(wrappedValue: PlayerViewModel(item: item))
+        self.onClose = onClose
     }
 
     var body: some View {
+        playerSurface(horizontalSafeArea: iPhoneLandscapeHorizontalSafeArea)
+    }
+
+    private var iPhoneLandscapeHorizontalSafeArea: CGFloat {
+        let insets = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets ?? .zero
+        return max(insets.left, insets.right)
+    }
+
+    private func playerSurface(horizontalSafeArea: CGFloat) -> some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -55,10 +72,17 @@ struct PlayerView: View {
                 .allowsHitTesting(!viewModel.controlsVisible)
 
             if viewModel.controlsVisible {
-                controlsOverlay
+                controlsOverlay(horizontalSafeArea: horizontalSafeArea)
             }
 
             feedbackOverlays
+
+            if let notice = viewModel.notice {
+                PlayerNoticeOverlay(notice: notice) {
+                    viewModel.notice = nil
+                }
+                .zIndex(90)
+            }
 
             if viewModel.isRateBoosting {
                 rateBoostIndicator
@@ -83,22 +107,27 @@ struct PlayerView: View {
             if showScaleModePicker {
                 scalePickerPanel
             }
+
         }
         .statusBarHidden(true)
-        .onAppear {
-            AppOrientation.lockForPlayer()
-        }
         .task { await viewModel.onAppear(modelContext: modelContext) }
         .onDisappear {
-            viewModel.onDisappear(keepingPlaybackActive: pictureInPicture.isActive || viewModel.isPictureInPictureActive)
-            AppOrientation.restoreDefault()
-        }
-        .alert(item: $viewModel.notice) { notice in
-            Alert(
-                title: Text(notice.title),
-                message: Text(notice.message),
-                dismissButton: .default(Text(L10n.tr("知道了")))
+            let keepPlaybackActive = scenePhase != .active
+                || pictureInPicture.isActive
+                || viewModel.isPictureInPictureActive
+#if DEBUG
+            print(
+                "[Debug][PiP] playerDisappear scenePhase=\(String(describing: scenePhase)) "
+                    + "keepPlayback=\(keepPlaybackActive)"
             )
+#endif
+            viewModel.onDisappear(keepingPlaybackActive: keepPlaybackActive)
+        }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            viewModel.handleScenePhase(phase)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+            viewModel.handleMemoryWarning()
         }
         .sheet(isPresented: $viewModel.showTrackSelector) {
             TrackSelectorView(viewModel: viewModel)
@@ -216,7 +245,7 @@ struct PlayerView: View {
 
     // MARK: - Controls Overlay
 
-    private var controlsOverlay: some View {
+    private func controlsOverlay(horizontalSafeArea: CGFloat) -> some View {
         ZStack {
             Color.black.opacity(0.3)
                 .ignoresSafeArea()
@@ -231,7 +260,8 @@ struct PlayerView: View {
                 Spacer()
                 bottomBar
             }
-            .padding()
+            .padding(.vertical, 16)
+            .padding(.horizontal, 16 + horizontalSafeArea)
         }
         .transition(.opacity)
     }
@@ -239,7 +269,7 @@ struct PlayerView: View {
     private var topBar: some View {
         HStack {
             Button {
-                dismiss()
+                closePlayer()
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.title3)
@@ -301,14 +331,16 @@ struct PlayerView: View {
                         .foregroundStyle(.white)
                 }
 
-                Button {
-                    viewModel.showSubtitleSettings = true
-                } label: {
-                    Image(systemName: "textformat")
-                        .font(.title3)
-                        .foregroundStyle(.white)
+                if viewModel.hasEmbeddedSubtitleTracks {
+                    Button {
+                        viewModel.showSubtitleSettings = true
+                    } label: {
+                        Image(systemName: "textformat")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                    .accessibilityLabel(L10n.tr("字幕设置"))
                 }
-                .accessibilityLabel(L10n.tr("字幕设置"))
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -337,6 +369,16 @@ struct PlayerView: View {
                         .foregroundStyle(.white)
                 }
             }
+        }
+    }
+
+    private func closePlayer() {
+        guard !isClosingPlayer else { return }
+        isClosingPlayer = true
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 
@@ -548,7 +590,7 @@ struct PlayerView: View {
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .padding(.top, 56)
-        .padding(.trailing, 16)
+        .padding(.trailing, 16 + iPhoneLandscapeHorizontalSafeArea)
         .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
     }
 
@@ -586,8 +628,36 @@ struct PlayerView: View {
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .padding(.top, 56)
-        .padding(.trailing, 16)
+        .padding(.trailing, 16 + iPhoneLandscapeHorizontalSafeArea)
         .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
+    }
+}
+
+private struct PlayerNoticeOverlay: View {
+    let notice: PlayerNotice
+    let dismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                Text(notice.title)
+                    .font(.headline)
+
+                Text(notice.message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button(L10n.tr("知道了"), action: dismiss)
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding(24)
+            .frame(maxWidth: 340)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        }
     }
 }
 

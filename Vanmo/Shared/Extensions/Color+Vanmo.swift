@@ -39,62 +39,38 @@ extension Color {
     }
 }
 
-// MARK: - 配色主题
+// MARK: - 外观主题
 
-/// 全局配色主题。每套主题定义 primary / background / surface 三色组合，
-/// 并影响整体 ColorScheme（浅色 / 深色 / 跟随系统）。
+/// 全局外观主题，仅控制浅色、深色或跟随系统。
 enum ColorTheme: String, CaseIterable, Identifiable {
-    /// 跟随系统：浅色 / 深色随 iOS 设置自动切换
     case system
-    /// 系统级浅色系
     case light
-    /// 系统级深色系
     case dark
-    /// 撞色 1：栗咖 / 米色 / 薄荷
-    case warmEarth
-    /// 撞色 2：墨蓝 / 奶油 / 橄榄
-    case forestCream
-    /// 撞色 3：胭脂 / 雪粉 / 丁香紫
-    case roseLilac
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .system:       return L10n.tr("跟随系统")
-        case .light:        return L10n.tr("系统浅色")
-        case .dark:         return L10n.tr("系统深色")
-        case .warmEarth:    return L10n.tr("栗咖薄荷")
-        case .forestCream:  return L10n.tr("墨蓝橄榄")
-        case .roseLilac:    return L10n.tr("胭脂丁香")
+        case .system: return L10n.tr("跟随系统")
+        case .light: return L10n.tr("日间")
+        case .dark: return L10n.tr("夜间")
         }
     }
 
     var subtitle: String {
         switch self {
-        case .system:       return L10n.tr("随系统外观自动切换浅 / 深色")
-        case .light:        return L10n.tr("标准浅色界面 · 暖咖主色")
-        case .dark:         return L10n.tr("标准深色界面 · 柔咖主色")
-        case .warmEarth:    return L10n.tr("深咖 · 米色 · 薄荷绿")
-        case .forestCream:  return L10n.tr("墨蓝 · 奶油 · 橄榄绿")
-        case .roseLilac:    return L10n.tr("胭脂 · 雪粉 · 丁香紫")
+        case .system: return L10n.tr("随系统外观自动切换日间 / 夜间")
+        case .light: return L10n.tr("始终使用日间外观")
+        case .dark: return L10n.tr("始终使用夜间外观")
         }
     }
 
     /// 用于 `.preferredColorScheme(_:)`，nil 代表跟随系统
     var preferredColorScheme: ColorScheme? {
         switch self {
-        case .system:                                   return nil
-        case .light, .warmEarth, .forestCream, .roseLilac: return .light
-        case .dark:                                     return .dark
-        }
-    }
-
-    /// 是否为内置撞色配置（用于 UI 上区分系统主题与自定义主题）
-    var isContrastTheme: Bool {
-        switch self {
-        case .warmEarth, .forestCream, .roseLilac: return true
-        default: return false
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
         }
     }
 
@@ -108,11 +84,8 @@ enum ColorTheme: String, CaseIterable, Identifiable {
                     ? UIColor(red: 0xA7 / 255, green: 0x84 / 255, blue: 0x82 / 255, alpha: 1)
                     : UIColor(red: 0x5C / 255, green: 0x44 / 255, blue: 0x44 / 255, alpha: 1)
             })
-        case .light:        return Color(hex: "#5C4444")!
-        case .dark:         return Color(hex: "#A78482")!
-        case .warmEarth:    return Color(hex: "#5C4444")!
-        case .forestCream:  return Color(hex: "#393C54")!
-        case .roseLilac:    return Color(hex: "#6E3537")!
+        case .light: return Color(hex: "#5C4444")!
+        case .dark: return Color(hex: "#A78482")!
         }
     }
 
@@ -126,9 +99,6 @@ enum ColorTheme: String, CaseIterable, Identifiable {
             return Color(uiColor: UIColor { _ in
                 UIColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1)
             })
-        case .warmEarth:    return Color(hex: "#EDE7D5")!
-        case .forestCream:  return Color(hex: "#F8FAEC")!
-        case .roseLilac:    return Color(hex: "#FCEFF5")!
         }
     }
 
@@ -144,15 +114,26 @@ enum ColorTheme: String, CaseIterable, Identifiable {
             return Color(uiColor: UIColor { _ in
                 UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)
             })
-        case .warmEarth:    return Color(hex: "#B4CFCB")!
-        case .forestCream:  return Color(hex: "#97B077")!
-        case .roseLilac:    return Color(hex: "#A79EC9")!
         }
     }
 
     // MARK: - 当前主题
 
     static let storageKey = "appearance.theme"
+    private static let retiredLightThemeValues: Set<String> = [
+        "warmEarth",
+        "forestCream",
+        "roseLilac"
+    ]
+
+    static func migrateStoredValue(in defaults: UserDefaults = .standard) {
+        guard let rawValue = defaults.string(forKey: storageKey) else { return }
+        if retiredLightThemeValues.contains(rawValue) {
+            defaults.set(ColorTheme.light.rawValue, forKey: storageKey)
+        } else if ColorTheme(rawValue: rawValue) == nil {
+            defaults.set(ColorTheme.system.rawValue, forKey: storageKey)
+        }
+    }
 
     /// 当前 UserDefaults 中保存的主题，未设置时回落到 `.system`
     static var current: ColorTheme {

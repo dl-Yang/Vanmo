@@ -209,22 +209,6 @@
         }
       }
     },
-    "下载进度": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download progress"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下载进度"
-          }
-        }
-      }
-    },
     "外观": {
       "localizations": {
         "en": {
@@ -1985,6 +1969,70 @@
         }
       }
     },
+    "字幕实时预览": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live subtitle preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕实时预览"
+          }
+        }
+      }
+    },
+    "实时预览": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实时预览"
+          }
+        }
+      }
+    },
+    "位图字幕仅支持大小调整": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitmap subtitles support size adjustments only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位图字幕仅支持大小调整"
+          }
+        }
+      }
+    },
+    "这是一段字幕文本": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtitle preview text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是一段字幕文本"
+          }
+        }
+      }
+    },
     "首选语言": {
       "localizations": {
         "en": {
@@ -2417,6 +2465,38 @@
         }
       }
     },
+    "下载进度": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download progress"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载进度"
+          }
+        }
+      }
+    },
+    "下载完成": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download complete"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载完成"
+          }
+        }
+      }
+    },
     "下载位置": {
       "localizations": {
         "en": {
@@ -2689,178 +2769,82 @@
         }
       }
     },
-    "系统浅色": {
+    "日间": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "System Light"
+            "value": "Day"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "系统浅色"
+            "value": "日间"
           }
         }
       }
     },
-    "系统深色": {
+    "夜间": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "System Dark"
+            "value": "Night"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "系统深色"
+            "value": "夜间"
           }
         }
       }
     },
-    "栗咖薄荷": {
+    "随系统外观自动切换日间 / 夜间": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chestnut Mint"
+            "value": "Switch between Day and Night with the system appearance"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "栗咖薄荷"
+            "value": "随系统外观自动切换日间 / 夜间"
           }
         }
       }
     },
-    "墨蓝橄榄": {
+    "始终使用日间外观": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ink Olive"
+            "value": "Always use the Day appearance"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "墨蓝橄榄"
+            "value": "始终使用日间外观"
           }
         }
       }
     },
-    "胭脂丁香": {
+    "始终使用夜间外观": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rose Lilac"
+            "value": "Always use the Night appearance"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "胭脂丁香"
-          }
-        }
-      }
-    },
-    "随系统外观自动切换浅 / 深色": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Follow the system light or dark appearance"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "随系统外观自动切换浅 / 深色"
-          }
-        }
-      }
-    },
-    "标准浅色界面 · 暖咖主色": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Standard light interface · warm coffee accent"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "标准浅色界面 · 暖咖主色"
-          }
-        }
-      }
-    },
-    "标准深色界面 · 柔咖主色": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Standard dark interface · soft coffee accent"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "标准深色界面 · 柔咖主色"
-          }
-        }
-      }
-    },
-    "深咖 · 米色 · 薄荷绿": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Deep coffee · beige · mint"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "深咖 · 米色 · 薄荷绿"
-          }
-        }
-      }
-    },
-    "墨蓝 · 奶油 · 橄榄绿": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ink blue · cream · olive"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "墨蓝 · 奶油 · 橄榄绿"
-          }
-        }
-      }
-    },
-    "胭脂 · 雪粉 · 丁香紫": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rouge · snow pink · lilac"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "胭脂 · 雪粉 · 丁香紫"
+            "value": "始终使用夜间外观"
           }
         }
       }
@@ -4877,22 +4861,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "等待中 · 即将开始"
-          }
-        }
-      }
-    },
-    "下载完成": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Download complete"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下载完成"
           }
         }
       }

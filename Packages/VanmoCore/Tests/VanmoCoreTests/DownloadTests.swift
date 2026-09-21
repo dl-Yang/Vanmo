@@ -79,6 +79,7 @@ final class DownloadTests: XCTestCase {
         object.removeValue(forKey: "sourceMediaItemID")
         object.removeValue(forKey: "sourceServerID")
         object.removeValue(forKey: "seriesServerID")
+        object.removeValue(forKey: "seriesPosterURL")
 
         let legacyData = try JSONSerialization.data(withJSONObject: object)
         let decoded = try JSONDecoder().decode(DownloadRequest.self, from: legacyData)
@@ -86,6 +87,7 @@ final class DownloadTests: XCTestCase {
         XCTAssertNil(decoded.sourceMediaItemID)
         XCTAssertNil(decoded.sourceServerID)
         XCTAssertNil(decoded.seriesServerID)
+        XCTAssertNil(decoded.seriesPosterURL)
     }
 
     @MainActor
@@ -107,7 +109,7 @@ final class DownloadTests: XCTestCase {
             duration: 2_400,
             overview: nil,
             streamURL: URL(string: "https://example.com/episode-7.mkv")!,
-            backdropURL: nil
+            backdropURL: URL(string: "https://example.com/episode-7-backdrop.jpg")
         )
 
         let request = try DownloadRequestFactory.make(
@@ -119,7 +121,8 @@ final class DownloadTests: XCTestCase {
         XCTAssertEqual(request.sourceMediaItemID, show.id)
         XCTAssertEqual(request.sourceServerID, episode.id)
         XCTAssertEqual(request.seriesServerID, show.serverId)
-        XCTAssertEqual(request.postUrl, show.posterURL)
+        XCTAssertEqual(request.postUrl, episode.backdropURL)
+        XCTAssertEqual(request.seriesPosterURL, show.posterURL)
         XCTAssertNil(request.sourceFileURL)
     }
 
@@ -157,6 +160,26 @@ final class DownloadTests: XCTestCase {
         XCTAssertNil(request.sourceConnectionId)
         XCTAssertEqual(request.seasonNumber, 1)
         XCTAssertEqual(request.episodeNumber, 1)
+    }
+
+    @MainActor
+    func testEpisodeMediaItemDoesNotPromoteArtworkToSeriesPoster() throws {
+        let item = MediaItem(
+            title: "Example Show",
+            fileURL: URL(string: "https://example.com/episode-8.mkv")!,
+            mediaType: .tvEpisode
+        )
+        item.sourceConnectionId = UUID()
+        item.serverId = "episode-8"
+        item.seriesId = "series-42"
+        item.posterURL = URL(string: "https://example.com/episode-8-primary.jpg")
+        item.backdropURL = URL(string: "https://example.com/episode-8-backdrop.jpg")
+        item.originalFileName = "episode-8.mkv"
+
+        let request = try DownloadRequestFactory.make(from: item, connectionType: .emby)
+
+        XCTAssertEqual(request.postUrl, item.backdropURL)
+        XCTAssertNil(request.seriesPosterURL)
     }
 
     @MainActor

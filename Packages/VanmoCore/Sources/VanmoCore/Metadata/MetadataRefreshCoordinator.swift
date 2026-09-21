@@ -21,7 +21,9 @@ public actor MetadataRefreshCoordinator {
         }
 
         let draft = try await buildDraft(for: item, key: key, connection: connection)
-        return try await cache.save(draft)
+        let stored = try await cache.store(draft)
+        await cache.scheduleImageCaching(for: stored)
+        return stored
     }
 
     public func prepareRefreshDraft(
@@ -132,16 +134,6 @@ public actor MetadataRefreshCoordinator {
             source = EmbyCredentialStore.apiPrefix.isEmpty ? .jellyfin : .emby
         }
 
-        var episodes: [CachedEpisodeInfo] = []
-        if item.mediaType == .tvShow {
-            let fetched = if let connection {
-                try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: serverId, connection: connection)
-            } else {
-                try await EmbyEpisodeFetcher.fetchEpisodes(seriesId: serverId)
-            }
-            episodes = fetched.map(makeCachedEpisode)
-        }
-
         let castMembers = detail.castMembers.map { $0.makeCachedMember() }
 
         return MetadataCacheRecord(
@@ -151,6 +143,7 @@ public actor MetadataRefreshCoordinator {
             year: detail.year,
             overview: detail.overview,
             rating: detail.rating,
+            contentRating: detail.contentRating,
             genres: detail.genres,
             director: detail.director,
             cast: detail.cast,
@@ -162,7 +155,10 @@ public actor MetadataRefreshCoordinator {
             logoRemoteURL: detail.logoURL,
             backdropRemoteURL: detail.backdropURL,
             posterRemoteURL: detail.posterURL,
-            episodes: episodes,
+            videoWidth: detail.videoWidth,
+            videoHeight: detail.videoHeight,
+            dynamicRange: detail.dynamicRange,
+            episodes: [],
             fetchedAt: Date(),
             source: source
         )
@@ -177,16 +173,11 @@ public actor MetadataRefreshCoordinator {
             throw MetadataRefreshError.missingServerId
         }
 
-        let detail: ServerMediaItem
-        let fetched: [EpisodeInfo]
-        if let connection {
-            detail = try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId, connection: connection)
-            fetched = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: serverId, connection: connection)
+        let detail = if let connection {
+            try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId, connection: connection)
         } else {
-            detail = try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId)
-            fetched = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: serverId)
+            try await PlexItemDetailFetcher.fetchDetail(ratingKey: serverId)
         }
-        let episodes = fetched.map(makeCachedEpisode)
         let castMembers = makeCastMembers(from: detail.cast)
 
         return MetadataCacheRecord(
@@ -196,6 +187,7 @@ public actor MetadataRefreshCoordinator {
             year: detail.year,
             overview: detail.overview,
             rating: detail.rating,
+            contentRating: detail.contentRating,
             genres: detail.genres,
             director: detail.director,
             cast: detail.cast,
@@ -207,7 +199,10 @@ public actor MetadataRefreshCoordinator {
             logoRemoteURL: detail.logoURL,
             backdropRemoteURL: detail.backdropURL,
             posterRemoteURL: detail.posterURL,
-            episodes: episodes,
+            videoWidth: detail.videoWidth,
+            videoHeight: detail.videoHeight,
+            dynamicRange: detail.dynamicRange,
+            episodes: [],
             fetchedAt: Date(),
             source: .plex
         )
@@ -236,6 +231,7 @@ public actor MetadataRefreshCoordinator {
             year: detail.year,
             overview: detail.overview,
             rating: detail.rating,
+            contentRating: detail.contentRating,
             genres: detail.genres,
             director: detail.director,
             cast: detail.cast,
@@ -247,27 +243,12 @@ public actor MetadataRefreshCoordinator {
             logoRemoteURL: detail.logoURL,
             backdropRemoteURL: detail.backdropURL,
             posterRemoteURL: detail.posterURL,
+            videoWidth: detail.videoWidth,
+            videoHeight: detail.videoHeight,
+            dynamicRange: detail.dynamicRange,
             episodes: [],
             fetchedAt: Date(),
             source: .plex
-        )
-    }
-
-    private func makeCachedEpisode(_ episode: EpisodeInfo) -> CachedEpisodeInfo {
-        CachedEpisodeInfo(
-            id: episode.id,
-            title: episode.title,
-            seasonNumber: episode.seasonNumber,
-            episodeNumber: episode.episodeNumber,
-            duration: episode.duration,
-            overview: episode.overview,
-            streamURL: episode.streamURL,
-            backdropLocalPath: nil,
-            backdropRemoteURL: episode.backdropURL,
-            fileSize: episode.fileSize,
-            originalFileName: episode.originalFileName,
-            container: episode.container,
-            remotePath: episode.remotePath
         )
     }
 

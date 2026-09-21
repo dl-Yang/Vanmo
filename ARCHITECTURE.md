@@ -154,7 +154,7 @@ There is no dependency-injection framework. SwiftUI environment objects, local `
 
 Each tab owns a separate `NavigationStack`. The settings path is stored in `AppState.settingsPath`, preserving nested navigation when a theme change recreates `ContentView`.
 
-Playback is driven by `AppState.currentPlayingItem` and `isPlayerPresented`. `PlayerPresentationModifier` presents `PlayerView` through a `fullScreenCover`.
+Playback is driven by `AppState.currentPlayingItem` and `isPlayerPresented`. `PlayerPresentationModifier` installs a zero-size UIKit presentation anchor, and `LandscapePlayerPresenter` presents `PlayerView` in a dedicated full-screen `LandscapePlayerHostingController`. On iPhone, that controller and the app-delegate mask request a real landscape scene. Entering landscape and restoring portrait temporarily disable UIKit animations and use request generations so a stale orientation callback cannot re-enable animation during a newer transition. Close places a black, window-sized transition cover above the player; its centered snapshot keeps the original landscape dimensions while the scene restores portrait, preventing aspect-ratio distortion and hiding the live controller. The host then dismisses and the cover fades away. iPad preserves its current orientation and native multi-orientation layout.
 
 `AppState` owns:
 
@@ -251,7 +251,7 @@ This window lifecycle is one of the largest platform differences between iOS and
 
 - `MacConnectionsViewModel` mirrors the iOS connection flow and adds local-file readability checks. Drag-and-drop playback is coordinated by `VanmoMacRootView` and `MacLocalFilePlayback`.
 - `MacLibraryViewModel` adds desktop-specific home-cache, refresh coalescing, and redraw-suppression behavior.
-- `MacMediaDetailStore` concurrently loads cached metadata, network metadata, seasons, and collections. Generation checks prevent stale async results from overwriting the active detail.
+- `MacMediaDetailStore` consumes the shared progressive detail loader. Cache, detail, seasons, and collections publish into component-scoped observable state as they finish; generation checks prevent stale async results from overwriting the active detail.
 - `MacSearchViewModel` owns desktop search state.
 - `MacSettingsViewModel` drives the native settings window.
 
@@ -362,6 +362,8 @@ Scanning persists catalog URLs in the `vanmo://playback/...` form instead of sto
 - HTTP(S) uses 4 MiB Range chunks and handles refreshed URLs after 401/403 responses as well as 200, 206, and 416 responses.
 - Completed files are moved through a temporary destination into the default or security-scoped custom directory.
 
+`DownloadRequest.postUrl` is presentation artwork for the download row and can be an episode backdrop. Episode requests separately persist `seriesPosterURL` so navigation to series detail does not reinterpret that backdrop as a portrait poster. Legacy requests resolve the stored series or metadata enrichment and leave the poster empty rather than promoting a backdrop.
+
 The queue is suspended and resumed with application lifecycle changes.
 
 iOS maps `DownloadManager.tasks` through `DownloadActivityPresentation`. The `Vanmo` `App` scene, `ContentView`, Settings, and media detail do not subscribe to per-tick progress or hero frames, so TabView and the player do not remount when a download starts. Only the island overlay, notch status bar, fallback bar, and the detail download button observe `DownloadManager`. While the app is active on a Dynamic Island device, ActivityKit is requested alongside the in-app overlay. A 2026-09-17 operator walk confirmed the system island does not steal Compact/Expanded hits, and requesting in the foreground lets the scene absorb into the hardware island on background. The foreground overlay uses an explicit `hidden | flying | compact | expanded` mode. Compact matches LibraryHome `569:38` (262×41 artwork, title, status, trailing ring). Compact paused matches `572:14` (ring hidden, pause icon resumes). Expanded matches `570:259` (poster, title, status • percent, bar, bytes, pause pill). Compact and Expanded share one pure-black blob. Compact→Expanded uses a system-island spring; Expanded→Compact is critically damped so the blob cannot shrink below the hardware island. The flying capsule grows from the island top, not its center, so the Compact handoff does not jump. Compact tap expands; a press outside Expanded collapses. Compact has no pause button; Expanded pause/resume and the Compact pause-icon resume call the same `DownloadManager` APIs as Live Activity intents and read `task.status` only. Appear runs only on `hidden → compact`. Pause/resume never changes mode. Detail enqueue flies a material capsule to the hardware island, aligns, then morphs once to Compact; `restoreAndResume` and Reduce Motion skip the flight and show Compact whenever a presentable task exists. Island phones hide the system status bar while the app is active. Those phones never show the status-bar fallback bar. `UIApplication.willResignActive` hides the in-app overlay immediately (no dismiss spring), unhides the status bar, and requests ActivityKit on the same callback so the home snapshot cannot keep the fake island and the system can absorb the scene into the hardware island. Returning to the foreground keeps the activity and restores Compact with `playAppear`. Expanded content sits below the hardware island. `.background` retries the request after `DownloadManager.suspend`. ActivityKit compact stays leading/trailing replicas of `569:38` because it cannot draw a free-floating 262pt capsule; Expanded and lock screen follow `570:259`. The widget can pause or resume the displayed task. Notch iPhones without a Dynamic Island hide the system status bar, shrink the capsule to the leading slot during flight, then show a solid-blue capsule (white icon, white progress border, no video info, no Expanded) in the key-window overlay. The system location/microphone/hotspot privacy indicator is not a third-party host; island and notch phones both request ActivityKit for lock-screen / banner Live Activities. A 2026-09-17 operator recording `tem/cmp.mp4` on iPhone 13 mini passed the shrinking flight, the landed blue capsule, lock-screen Live Activity, and pause-control sync. iPhone SE and iPad still show an in-app fallback bar after the capsule lands. macOS uses the same presentation rules only for title text on the flying capsule; progress remains in the downloads window.
@@ -373,7 +375,7 @@ Metadata has two complementary paths:
 - Catalog identification uses `FileNameParser`, `DirectorySemanticsParser`, `NFOMetadataParser`, `MediaIdentificationPipeline`, `EpisodeClusterPlanner`, and `MediaItemFactory`.
 - Detail refresh uses `MetadataRefreshCoordinator` to load metadata, episodes, and cast from Emby, Jellyfin, or Plex before persisting a `MetadataCacheRecord`.
 
-`MetadataCache` is an actor that serializes disk-cache operations. The UI first renders basic `MediaItem` fields and then merges cached or network-enriched data.
+`MetadataCache` is an actor that serializes index operations. Text fields and remote artwork URLs are persisted before a bounded, deduplicated background artwork task downloads logo, backdrop, cast, and episode images. `MediaDetailProgressiveLoader` starts cache, server detail, seasons, and collections together and emits typed events in completion order. iOS and macOS stores merge those events into separate summary, cast, collection, episode, technical, and action states instead of publishing one aggregate detail snapshot. The UI renders basic `MediaItem` fields immediately; artwork completion is not on the text or list critical path.
 
 ### 6.7 Subtitles
 
@@ -381,6 +383,7 @@ Metadata has two complementary paths:
 - `SubtitleManager` loads external subtitles, handles encoding, and finds the active cue.
 - `OnlineSubtitleService` aggregates providers. OpenSubtitles, Shooter, and SubHD are registered at app startup.
 - AVFoundation or KSPlayer supplies embedded subtitles. Platform code converts them into renderable SwiftUI state.
+- iOS applies the persisted `SubtitleStyle` live to plain and attributed text, including ASS/SSA text, while preserving basic font traits where possible. Attributed content with real text outranks image content; attachment-only attributed strings fall through to the bitmap renderer. Bitmap subtitles retain their pixel colors, fit proportionally to the available subtitle area, and then apply the user size scale. The in-player format action is hidden when no embedded subtitle track exists.
 
 ### 6.8 CloudKit Synchronization
 
@@ -408,7 +411,7 @@ After launch or foreground merge, iOS and macOS reload CloudStore connections vi
 - Follow System maps system Chinese to `zh-Hans` and every other system language to `en`.
 - Brand and protocol names stay in their original form. Server titles and system `localizedDescription` values are not translated.
 
-Appearance settings on both apps expose the three options and remind the user that the next launch applies the change.
+Interface-language settings on both apps expose the three options and remind the user that the next launch applies the change. iOS appearance separately exposes Follow System, Day, and Night; retired light-only color themes migrate to Day.
 
 ## 7. Playback Architecture
 
@@ -430,6 +433,8 @@ Appearance settings on both apps expose the three options and remind the user th
 
 - `AVPlayerEngine` wraps AVPlayer, native media selection, system buffering state, and text subtitles.
 - `KSPlayerEngine` handles FFmpeg demuxing and decoding, software-decode fallback after hardware-decode failure, rich-text/image subtitles, chapters, and Picture in Picture adaptation. Direct `smb` / `ftp` / `sftp` loads hold `LibavformatOpenGate` from `prepareToPlay` until shutdown plus a short close drain so probe and cover extraction cannot open a second libsmbclient context.
+- iOS configures KSPlayer's process-wide audio output as `AudioRendererPlayer` before registering probe and thumbnail providers. This keeps probe, cover extraction, and playback off the `AudioEnginePlayer` format-connection path that can abort on a multichannel-to-device format mismatch.
+- The direct iOS `KSMEPlayer` adapter also configures and observes its sample-buffer Picture in Picture controller instead of relying on `KSPlayerLayer`, which Vanmo does not instantiate. Inactive/background presentation transitions keep the engine alive while PiP starts; normal active dismissal still performs the unified player and prefetch cleanup.
 
 `PlayerViewModel` subscribes to engine Combine publishers and manages:
 
@@ -513,10 +518,11 @@ sequenceDiagram
 ### 8.3 Metadata Detail
 
 1. The detail screen immediately renders base fields from `MediaItem`.
-2. It concurrently reads `MetadataCache` and media-server detail data.
-3. Network results are converted into `MetadataCacheRecord` values and related images are cached.
-4. The Store or ViewModel merges metadata, seasons, episodes, and collections.
-5. Generation and cancellation checks prevent stale requests from overwriting the current detail.
+2. `MediaDetailProgressiveLoader` concurrently reads `MetadataCache` and starts supported detail, season, and collection requests.
+3. Each completed request emits a typed update; the selected season starts its first episode page without waiting for unrelated requests.
+4. Detail text and remote artwork URLs are persisted first. Bounded background image caching cannot delay summary, cast names, seasons, episodes, or collections.
+5. Platform stores apply updates to component-scoped observable state, so a cast, collection, episode, or artwork update does not invalidate the root detail view.
+6. Generation and cancellation checks prevent stale requests from overwriting the current detail.
 
 ### 8.4 iOS Visual Verification
 
