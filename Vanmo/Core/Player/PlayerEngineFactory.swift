@@ -12,6 +12,15 @@ enum PlayerEngineFactory {
             return KSPlayerEngine()
         }
 
+#if DEBUG
+        if PlaybackPreferences.debugNativeVideoEngine == .avFoundation,
+           format == .native,
+           MediaFormatProbe.nativeVideoExtensions.contains(ext) {
+            VanmoLogger.player.info("[EngineFactory] Debug A/B override: AVPlayerEngine")
+            return AVPlayerEngine()
+        }
+#endif
+
         // Local downloads and remote HTTP remuxes in .mp4/.mov often fail in
         // AVPlayer on Simulator and some device profiles. HLS stays native.
         if SupportedFormat.prefersKSPlayer(for: url) {

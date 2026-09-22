@@ -22,6 +22,10 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 
 ## Current Plans
 
+### Playback performance
+
+- [`2026-09-21-playback-performance.md`](2026-09-21-playback-performance.md) — **In progress.** Dual-platform playback diagnostics, lifecycle, prefetch, and measured engine-routing optimization
+
 ### Implemented, ready to run
 
 - [`2026-08-28-plex-connection-validation.md`](2026-08-28-plex-connection-validation.md) — **Not started.** plex.tv sign-in, PMS listing, and play

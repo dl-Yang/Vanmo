@@ -28,6 +28,7 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
     }
 
     private var player: KSMEPlayer?
+    private var seekGeneration: UInt64 = 0
     private var timeUpdateTimer: Timer?
     private var shouldResumeAfterBuffering = false
     private var lastPlayableTime: CFAbsoluteTime = 0
@@ -35,6 +36,16 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
     private var cachedSubtitleParts: [SubtitlePart] = []
     private var readyContinuation: CheckedContinuation<Void, Error>?
     private var volumeValue: Float = 0.7
+
+#if DEBUG
+    private var performanceLoadStartedAt: CFAbsoluteTime?
+    private var performanceBufferingStartedAt: CFAbsoluteTime?
+    private var performanceBufferingCount = 0
+    private var performanceLastSampleAt: CFAbsoluteTime = 0
+    private var performanceLastBytesRead: Int64 = 0
+    private var performanceLastDroppedFrames: UInt32 = 0
+    private var performanceDidLogFirstFrame = false
+#endif
 
     override init() {
         super.init()
@@ -53,9 +64,16 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
     ) async throws {
         VanmoLogger.player.info("[MacKSEngine] load() called, url: \(url.safePlaybackLogDescription)")
         stop()
+#if DEBUG
+        resetPerformanceDiagnostics()
+        performanceLoadStartedAt = CFAbsoluteTimeGetCurrent()
+#endif
         stateSubject.send(.loading)
 
         let hardwareDecode = PlaybackPreferences.hardwareDecodingEnabled
+        // KSPlayer already performs decoder-level VideoToolbox fallback.
+        // Retrying source failures with hardware decoding disabled can hide a
+        // transient network error behind a needlessly hot software session.
         do {
             try await loadPlayer(
                 url: url,
@@ -64,20 +82,9 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
                 hardwareDecode: hardwareDecode
             )
         } catch {
-            guard hardwareDecode else { throw error }
-            VanmoLogger.player.error(
-                "[MacKSEngine] hardware decode load failed, retrying with software decode: \(error.localizedDescription)"
-            )
-            player?.shutdown()
-            player = nil
+            stop()
             readyContinuation = nil
-            stateSubject.send(.loading)
-            try await loadPlayer(
-                url: url,
-                headers: headers,
-                startPosition: startPosition,
-                hardwareDecode: false
-            )
+            throw error
         }
     }
 
@@ -93,25 +100,44 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
 
     func seek(to time: CMTime) async {
         let seconds = time.seconds
-        guard seconds.isFinite, seconds >= 0 else { return }
+        guard seconds.isFinite, seconds >= 0, let player else { return }
 
         let wasPlaying = state == .playing || state == .buffering
         shouldResumeAfterBuffering = wasPlaying
+        seekGeneration &+= 1
+        let generation = seekGeneration
+#if DEBUG
+        let startedAt = CFAbsoluteTimeGetCurrent()
+#endif
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            player?.seek(time: seconds) { _ in
-                continuation.resume()
+            let gate = PlaybackSeekCompletionGate(continuation)
+            player.seek(time: seconds) { _ in
+                gate.resume()
             }
+            let timeout = Task {
+                try? await Task.sleep(for: .seconds(3))
+                if gate.resume() {
+                    VanmoLogger.player.error("[MacKSEngine] seek callback timed out after 3s")
+                }
+            }
+            gate.installTimeout(timeout)
         }
+        guard seekGeneration == generation else { return }
         currentTimeSubject.send(time)
+#if DEBUG
+        let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=seekEnd platform=macos engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+#endif
 
         if wasPlaying {
-            player?.play()
+            player.play()
             stateSubject.send(.playing)
         }
     }
 
     func stop() {
+        seekGeneration &+= 1
         timeUpdateTimer?.invalidate()
         timeUpdateTimer = nil
         player?.shutdown()
@@ -212,7 +238,7 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
             options.startPlayTime = startPosition.seconds
         }
         options.isAccurateSeek = true
-        options.isSecondOpen = true
+        options.isSecondOpen = !PrefetchConfig.shouldDisableSecondOpen(for: playbackURL)
         options.preferredForwardBufferDuration = 10
         options.maxBufferDuration = 60
         options.formatContextOptions["buffer_size"] = 8 * 1024 * 1024
@@ -238,6 +264,12 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
         startTimeUpdateTimer()
         stateSubject.send(.paused)
         VanmoLogger.player.info("[MacKSEngine] load complete: \(url.lastPathComponent)")
+#if DEBUG
+        if let startedAt = performanceLoadStartedAt {
+            let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=ready platform=macos engine=ks elapsedMs=\(elapsedMs, privacy: .public) hardware=\(hardwareDecode, privacy: .public)")
+        }
+#endif
     }
 
     private static func configureAudioOptions(_ options: KSOptions) {
@@ -270,7 +302,52 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
         guard time.isFinite, !time.isNaN else { return }
         currentTimeSubject.send(CMTime(seconds: time, preferredTimescale: 600))
         updateSubtitleText(at: time)
+#if DEBUG
+        logPerformanceSampleIfNeeded(player: player)
+#endif
     }
+
+#if DEBUG
+    private func resetPerformanceDiagnostics() {
+        performanceLoadStartedAt = nil
+        performanceBufferingStartedAt = nil
+        performanceBufferingCount = 0
+        performanceLastSampleAt = 0
+        performanceLastBytesRead = 0
+        performanceLastDroppedFrames = 0
+        performanceDidLogFirstFrame = false
+    }
+
+    private func logPerformanceSampleIfNeeded(player: KSMEPlayer) {
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - performanceLastSampleAt >= 5, let info = player.dynamicInfo else { return }
+        performanceLastSampleAt = now
+
+        let droppedFrames = info.droppedVideoFrameCount + info.droppedVideoPacketCount
+        let droppedDelta = droppedFrames >= performanceLastDroppedFrames
+            ? droppedFrames - performanceLastDroppedFrames
+            : droppedFrames
+        performanceLastDroppedFrames = droppedFrames
+
+        let bytesRead = info.bytesRead
+        let bytesDelta = max(bytesRead - performanceLastBytesRead, 0)
+        performanceLastBytesRead = bytesRead
+
+        if !performanceDidLogFirstFrame, info.displayFPS >= 1 {
+            performanceDidLogFirstFrame = true
+            let elapsedMs = performanceLoadStartedAt.map {
+                Int((now - $0) * 1_000)
+            } ?? -1
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=macos engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+        }
+
+        let fps = String(format: "%.2f", info.displayFPS)
+        let avSyncMs = Int(info.audioVideoSyncDiff * 1_000)
+        let videoBitrate = info.videoBitrate
+        let bufferingCount = performanceBufferingCount
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=sample platform=macos engine=ks fps=\(fps, privacy: .public) avSyncMs=\(avSyncMs, privacy: .public) droppedDelta=\(droppedDelta, privacy: .public) bytesDelta=\(bytesDelta, privacy: .public) videoBitrate=\(videoBitrate, privacy: .public) bufferingCount=\(bufferingCount, privacy: .public)")
+    }
+#endif
 
     private func updateSubtitleText(at time: TimeInterval) {
         guard let searchable = selectedSubtitleSearchable else {
@@ -327,9 +404,24 @@ extension MacKSPlayerEngine: MediaPlayerDelegate {
                 if sinceLastPlayable < 0.5 { break }
                 if state == .playing || state == .paused {
                     stateSubject.send(.buffering)
+#if DEBUG
+                    if performanceBufferingStartedAt == nil {
+                        performanceBufferingStartedAt = CFAbsoluteTimeGetCurrent()
+                        performanceBufferingCount += 1
+                        let bufferingCount = performanceBufferingCount
+                        VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingStart platform=macos engine=ks count=\(bufferingCount, privacy: .public)")
+                    }
+#endif
                 }
             case .playable:
                 lastPlayableTime = CFAbsoluteTimeGetCurrent()
+#if DEBUG
+                if let startedAt = performanceBufferingStartedAt {
+                    let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+                    performanceBufferingStartedAt = nil
+                    VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingEnd platform=macos engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+                }
+#endif
                 if state == .buffering {
                     if shouldResumeAfterBuffering || player.isPlaying {
                         player.play()

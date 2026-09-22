@@ -106,10 +106,29 @@ Current evidence as of September 17, 2026:
 ### Debug
 
 - Reproduce on the relevant device or Mac and inspect Xcode Console or Console.app.
-- Prefer the project's existing logs. Add narrowly scoped `#if DEBUG` local console logs only at critical entry points, state transitions, asynchronous boundaries, error branches, and return values.
-- Use a stable searchable prefix such as `[Debug][Downloads]`.
+- Use `VanmoLogger` for all debug and diagnostic logs. Do not add `print`, `NSLog`, or a raw `os.Logger`. Choose the matching category (`player`, `prefetch`, `network`, `library`, `metadata`, `subtitle`, or `storage`).
+- Add narrowly scoped `#if DEBUG` local console logs only at critical entry points, state transitions, asynchronous boundaries, error branches, and return values.
+- Use a stable searchable prefix such as `[Debug][Downloads]` or `[Debug][PlaybackPerf]`.
 - Never add remote instrumentation, telemetry, log upload, or an external observation service for device debugging unless explicitly authorized.
 - Redact credentials, tokens, cookies, complete authenticated URLs, private file contents, and sensitive path components before sharing logs.
+
+### Playback Performance
+
+Playback performance evidence uses local Debug `VanmoLogger` output and Instruments only. Filter Console for `[Debug][PlaybackPerf]` (Player or Prefetch category) to capture engine-ready timing, buffering duration, seek recovery, KS frame/A-V-sync/drop aggregates, prefetch response work, and iOS thermal-state changes. These logs contain source categories and aggregate values, not complete URLs or media titles.
+
+Use the same media, source, network, device, and build for before-and-after comparisons. Record at least three cold starts plus one 15-minute steady run, two non-adjacent seeks, pause/resume, item switching, and close cleanup. iOS requires a physical-device Energy Log, Time Profiler, Network, and Allocations pass for heat claims; Simulator output is compile and functional evidence only.
+
+Debug A/B controls:
+
+```bash
+# Keep normal native-container routing unless explicitly comparing AVFoundation.
+VANMO_NATIVE_VIDEO_ENGINE=av
+
+# Compare localhost HTTP prefetch pipelines without changing the Release default.
+VANMO_PREFETCH_PIPELINE_DEPTH=4 # or 8 / 16
+```
+
+The default native-container policy still prefers KSPlayer for MP4/MOV/M4V, and the default HTTP prefetch depth remains 16 until same-source device evidence supports a lower value. SMB, FTP, and SFTP byte sources use a single in-flight chunk because their source actors serialize reads.
 
 ## Debug and Release CloudKit Boundary
 

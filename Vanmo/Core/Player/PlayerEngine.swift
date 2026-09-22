@@ -103,6 +103,14 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     private let bufferProgressSubject = CurrentValueSubject<Double, Never>(0)
     private let subtitleContentSubject = CurrentValueSubject<SubtitleContent?, Never>(nil)
 
+#if DEBUG
+    private var performanceLoadStartedAt: CFAbsoluteTime?
+    private var performanceBufferingStartedAt: CFAbsoluteTime?
+    private var performanceBufferingCount = 0
+    private var performanceLastSampleAt: CFAbsoluteTime = 0
+    private var performanceThermalState = ProcessInfo.processInfo.thermalState
+#endif
+
     var statePublisher: AnyPublisher<PlaybackState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentTimePublisher: AnyPublisher<CMTime, Never> { currentTimeSubject.eraseToAnyPublisher() }
     var durationPublisher: AnyPublisher<CMTime, Never> { durationSubject.eraseToAnyPublisher() }
@@ -137,6 +145,13 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     func load(url: URL, startPosition: CMTime? = nil) async throws {
         VanmoLogger.player.info("[AVEngine] load() called, url: \(url.safePlaybackLogDescription)")
         stop()
+#if DEBUG
+        performanceLoadStartedAt = CFAbsoluteTimeGetCurrent()
+        performanceBufferingStartedAt = nil
+        performanceBufferingCount = 0
+        performanceLastSampleAt = 0
+        performanceThermalState = ProcessInfo.processInfo.thermalState
+#endif
         stateSubject.send(.loading)
 
         let (cleanURL, options) = Self.assetURL(from: url)
@@ -171,6 +186,12 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         VanmoLogger.player.info("[AVEngine] waiting for playerItem to become ready...")
         try await waitForReady(playerItem)
         VanmoLogger.player.info("[AVEngine] playerItem is ready, duration: \(playerItem.duration.seconds)s")
+#if DEBUG
+        if let startedAt = performanceLoadStartedAt {
+            let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=ready platform=ios engine=av elapsedMs=\(elapsedMs, privacy: .public)")
+        }
+#endif
     }
 
     func play() {
@@ -186,8 +207,15 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     }
 
     func seek(to time: CMTime) async {
+#if DEBUG
+        let startedAt = CFAbsoluteTimeGetCurrent()
+#endif
         await player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
         currentTimeSubject.send(time)
+#if DEBUG
+        let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=seekEnd platform=ios engine=av elapsedMs=\(elapsedMs, privacy: .public)")
+#endif
     }
 
     func stop() {
@@ -299,6 +327,9 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             self?.currentTimeSubject.send(time)
+#if DEBUG
+            self?.logPerformanceSampleIfNeeded()
+#endif
         }
 
         item.publisher(for: \.status)
@@ -332,6 +363,13 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
             .sink { [weak self] isEmpty in
                 if isEmpty, self?.state == .playing {
                     self?.stateSubject.send(.buffering)
+#if DEBUG
+                    guard let self, self.performanceBufferingStartedAt == nil else { return }
+                    self.performanceBufferingStartedAt = CFAbsoluteTimeGetCurrent()
+                    self.performanceBufferingCount += 1
+                    let bufferingCount = self.performanceBufferingCount
+                    VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingStart platform=ios engine=av count=\(bufferingCount, privacy: .public)")
+#endif
                 }
             }
             .store(in: &cancellables)
@@ -342,6 +380,13 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
                 if isReady, self?.state == .buffering {
                     self?.player?.rate = self?.playbackRate ?? 1.0
                     self?.stateSubject.send(.playing)
+#if DEBUG
+                    if let self, let startedAt = self.performanceBufferingStartedAt {
+                        let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+                        self.performanceBufferingStartedAt = nil
+                        VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingEnd platform=ios engine=av elapsedMs=\(elapsedMs, privacy: .public)")
+                    }
+#endif
                 }
             }
             .store(in: &cancellables)
@@ -364,6 +409,24 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
             }
             .store(in: &cancellables)
     }
+
+#if DEBUG
+    private func logPerformanceSampleIfNeeded() {
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - performanceLastSampleAt >= 5 else { return }
+        performanceLastSampleAt = now
+
+        let thermalState = ProcessInfo.processInfo.thermalState
+        if thermalState != performanceThermalState {
+            performanceThermalState = thermalState
+            let thermal = thermalState.rawValue
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=thermal platform=ios state=\(thermal, privacy: .public)")
+        }
+
+        let bufferingCount = performanceBufferingCount
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=sample platform=ios engine=av bufferingCount=\(bufferingCount, privacy: .public)")
+    }
+#endif
 
     private func waitForReady(_ item: AVPlayerItem) async throws {
         for await status in item.publisher(for: \.status).values {

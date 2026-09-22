@@ -72,4 +72,17 @@ final class PlaybackFormatTests: XCTestCase {
         let url = URL(string: "https://example.com/movie.mp4")!
         XCTAssertNil(SMBConnectionEndpoint.playbackTarget(from: url))
     }
+
+    func testSeekCompletionGateResumesOnlyOnce() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let gate = PlaybackSeekCompletionGate(continuation)
+            let timeout = Task {
+                try? await Task.sleep(for: .seconds(10))
+                gate.resume()
+            }
+            gate.installTimeout(timeout)
+            XCTAssertTrue(gate.resume())
+            XCTAssertFalse(gate.resume())
+        }
+    }
 }

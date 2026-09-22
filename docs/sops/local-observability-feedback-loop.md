@@ -14,9 +14,9 @@ device, or macOS without introducing a remote observation pipeline.
 
 - Xcode Console for an attached run or device
 - Console.app for iOS device or macOS process output
-- the project's existing logs
-- narrowly scoped `print`, `os.Logger`, or `NSLog` output when no suitable
-  project logger exists
+- the project's existing `VanmoLogger` categories
+- narrowly scoped `#if DEBUG` `VanmoLogger` output with a searchable prefix
+  such as `[Debug][PlaybackPerf]`
 
 Remote telemetry, log upload, external observability SDKs, proxy collection,
 and server-side instrumentation are not the default debugging path. They
@@ -26,8 +26,12 @@ require explicit authorization and a separate security review.
 
 - Instrument only the smallest suspected path: entry points, state changes,
   asynchronous boundaries, error branches, return values, and critical timing.
+- Emit debug logs through `VanmoLogger` only. Do not add `print`, `NSLog`, or
+  a raw `os.Logger`.
 - Use a stable searchable prefix such as `[Debug][Player]`,
-  `[Debug][Downloads]`, or `[Debug][CloudSync]`.
+  `[Debug][Downloads]`, `[Debug][PlaybackPerf]`, or `[Debug][CloudSync]`.
+- Bind instance properties to locals before interpolating, and mark
+  diagnostic values `privacy: .public` so Console.app does not redact them.
 - Include only useful context: safe object identifiers, source type, sanitized
   host/path fragments, state names, task boundaries, error types, and elapsed
   time.

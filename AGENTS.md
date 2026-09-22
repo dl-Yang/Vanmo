@@ -124,7 +124,7 @@ A feature or infrastructure concern is complete only when:
 ## Security, Frontend, and Device Debugging
 
 - Follow [`docs/SECURITY.md`](docs/SECURITY.md) for credentials, sensitive URLs, external actions, dependencies, and review.
-- Device debugging uses local console logs only. Never add remote logging, telemetry, upload pipelines, or external observation services unless explicitly requested. Keep logs non-sensitive and follow `.cursor/rules/ios-device-debug-logs.mdc`.
+- Device debugging uses local console logs only. Never add remote logging, telemetry, upload pipelines, or external observation services unless explicitly requested. Keep logs non-sensitive and follow `.cursor/rules/ios-device-debug-logs.mdc`. Debug and diagnostic logs must use `VanmoLogger`; do not add `print`, `NSLog`, or a raw `os.Logger`.
 - Follow [`docs/FRONTEND.md`](docs/FRONTEND.md) for UI work. Figma is the visual source of truth, and iOS/macOS behavior remains platform-specific.
 - Follow `.cursor/rules/swift-coding.mdc` for Swift style.
 - Follow `.codex/skills/git-workflow/SKILL.md` for Git operations.

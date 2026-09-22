@@ -238,7 +238,7 @@
 		2808E3F2654CF170151A05FD /* box.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = box.png; sourceTree = "<group>"; };
 		2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDesignTokens.swift; sourceTree = "<group>"; };
 		2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaTitleLogoView.swift; sourceTree = "<group>"; };
-		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F0583048E7F8AAC51FA8D37 /* MacScannedShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedShowDetailView.swift; sourceTree = "<group>"; };
 		38C765C23D38D32911EEDECB /* ScanSyncBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSyncBanner.swift; sourceTree = "<group>"; };
 		39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedLibraryListView.swift; sourceTree = "<group>"; };
@@ -1155,7 +1155,6 @@
 						ProvisioningStyle = Automatic;
 					};
 					0F6607F78A5C0B637140BEB4 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					2665CCBF2B3B9026EEF76906 = {
@@ -1534,6 +1533,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",
@@ -1567,6 +1567,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",

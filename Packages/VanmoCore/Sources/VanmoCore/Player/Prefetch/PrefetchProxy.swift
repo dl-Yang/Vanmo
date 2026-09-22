@@ -46,7 +46,7 @@ public actor PrefetchProxy {
         comp.path = PrefetchConfig.streamPathPrefix + token
 
         guard let url = comp.url else {
-            unregister(token: token)
+            await unregister(token: token)
             return nil
         }
 
@@ -64,9 +64,10 @@ public actor PrefetchProxy {
         return PrefetchRegistration(url: url, token: token)
     }
 
-    public func unregister(token: String) {
-        sessions[token]?.cleanup()
+    public func unregister(token: String) async {
+        let session = sessions[token]
         sessions[token] = nil
+        await session?.cleanup()
         VanmoLogger.prefetch.info("[Prefetch] unregistered token=\(token.prefix(8))…")
     }
 
@@ -148,7 +149,7 @@ public actor PrefetchProxy {
             nwListener.newConnectionHandler = { connection in
                 connection.start(queue: Self.connectionQueue)
                 Task {
-                    await PrefetchProxy.shared.handleIncoming(connection)
+                    await Self.handleIncoming(connection)
                 }
             }
 
@@ -163,43 +164,51 @@ public actor PrefetchProxy {
 
     // MARK: - Connections
 
-    private func handleIncoming(_ connection: NWConnection) async {
+    private func prepareResponse(
+        token: String,
+        rangeHeader: String?
+    ) async throws -> (Data, AsyncThrowingStream<Data, Error>)? {
+        guard let session = sessions[token] else {
+            return nil
+        }
+        return try await session.makeResponse(rangeHeader: rangeHeader)
+    }
+
+    private nonisolated static func handleIncoming(_ connection: NWConnection) async {
         do {
-            let headerOnly = try await Self.readHTTPHeader(on: connection)
+            let headerOnly = try await readHTTPHeader(on: connection)
             guard let parsed = HTTPProtocolHandler.parseRequest(headerOnly) else {
-                try await Self.send(connection, HTTPProtocolHandler.build400())
+                try await send(connection, HTTPProtocolHandler.build400())
                 connection.cancel()
                 return
             }
 
             guard parsed.method.uppercased() == "GET" else {
-                try await Self.send(connection, HTTPProtocolHandler.build400())
+                try await send(connection, HTTPProtocolHandler.build400())
                 connection.cancel()
                 return
             }
 
             guard let token = HTTPProtocolHandler.streamToken(from: parsed.path) else {
-                try await Self.send(connection, HTTPProtocolHandler.build400())
+                try await send(connection, HTTPProtocolHandler.build400())
                 connection.cancel()
                 return
             }
 
-            let session = sessions[token]
-
-            guard let session else {
+            guard let (header, body) = try await PrefetchProxy.shared.prepareResponse(
+                token: token,
+                rangeHeader: parsed.headers["range"]
+            ) else {
                 VanmoLogger.prefetch.error("[Prefetch] handleIncoming 404 session not found token=\(token.prefix(8)) path=\(parsed.path)")
-                try await Self.send(connection, HTTPProtocolHandler.build404())
+                try await send(connection, HTTPProtocolHandler.build404())
                 connection.cancel()
                 return
             }
 
-            let rangeHeader = parsed.headers["range"]
-            let (header, body) = try await session.makeResponse(rangeHeader: rangeHeader)
-
-            try await Self.send(connection, header)
+            try await send(connection, header)
 
             for try await chunk in body {
-                try await Self.send(connection, chunk)
+                try await send(connection, chunk)
             }
 
             connection.cancel()

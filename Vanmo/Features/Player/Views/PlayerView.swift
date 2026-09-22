@@ -112,13 +112,26 @@ struct PlayerView: View {
         .statusBarHidden(true)
         .task { await viewModel.onAppear(modelContext: modelContext) }
         .onDisappear {
-            let keepPlaybackActive = scenePhase != .active
-                || pictureInPicture.isActive
-                || viewModel.isPictureInPictureActive
+            let keepPlaybackActive = !isClosingPlayer
+                && (
+                    pictureInPicture.isActive
+                    || viewModel.isPictureInPictureActive
+                    || scenePhase == .background
+                )
 #if DEBUG
-            print(
-                "[Debug][PiP] playerDisappear scenePhase=\(String(describing: scenePhase)) "
-                    + "keepPlayback=\(keepPlaybackActive)"
+            let phaseName: String
+            switch scenePhase {
+            case .active:
+                phaseName = "active"
+            case .inactive:
+                phaseName = "inactive"
+            case .background:
+                phaseName = "background"
+            @unknown default:
+                phaseName = "unknown"
+            }
+            VanmoLogger.player.info(
+                "[Debug][PiP] playerDisappear scenePhase=\(phaseName, privacy: .public) keepPlayback=\(keepPlaybackActive, privacy: .public) closing=\(isClosingPlayer, privacy: .public)"
             )
 #endif
             viewModel.onDisappear(keepingPlaybackActive: keepPlaybackActive)
@@ -375,6 +388,8 @@ struct PlayerView: View {
     private func closePlayer() {
         guard !isClosingPlayer else { return }
         isClosingPlayer = true
+        pictureInPicture.prepareForDismissal()
+        viewModel.closePlayback()
         if let onClose {
             onClose()
         } else {
@@ -757,6 +772,14 @@ final class PlayerPictureInPictureController: NSObject, ObservableObject {
             controller.startPictureInPicture()
         }
         refreshPossibleState()
+    }
+
+    func prepareForDismissal() {
+        controller?.canStartPictureInPictureAutomaticallyFromInline = false
+        if controller?.isPictureInPictureActive == true {
+            controller?.stopPictureInPicture()
+        }
+        isActive = false
     }
 
     private func refreshPossibleState() {

@@ -52,8 +52,13 @@ final class PlayerViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
     private var prefetchToken: String?
+    private var didStopPlaybackResources = false
     private var liveRetryCount = 0
     private let externalSubtitleManager = SubtitleManager()
+    private var subtitleDiscoveryTask: Task<Void, Never>?
+    private var externalSubtitleCueTask: Task<Void, Never>?
+    private var mediaGeneration: UInt64 = 0
+    private var seekRequestGeneration: UInt64 = 0
     private var activeExternalSubtitleID: Int?
     private var activeRichSubtitleID: Int?
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
@@ -169,7 +174,8 @@ final class PlayerViewModel: ObservableObject {
             .sink { notification in
                 let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
                 let type = rawType.flatMap { AVAudioSession.InterruptionType(rawValue: $0) }
-                print("[Debug][PiP] audioInterruption type=\(String(describing: type))")
+                let typeName = String(describing: type)
+                VanmoLogger.player.info("[Debug][PiP] audioInterruption type=\(typeName, privacy: .public)")
             }
             .store(in: &cancellables)
 #endif
@@ -190,19 +196,19 @@ final class PlayerViewModel: ObservableObject {
         @unknown default:
             name = "unknown"
         }
-        print(
-            "[Debug][PiP] scenePhase=\(name) playback=\(String(describing: playbackState)) "
-                + "possible=\(isPictureInPicturePossible) active=\(isPictureInPictureActive)"
-        )
+        let playback = String(describing: playbackState)
+        let possible = isPictureInPicturePossible
+        let active = isPictureInPictureActive
+        VanmoLogger.player.info("[Debug][PiP] scenePhase=\(name, privacy: .public) playback=\(playback, privacy: .public) possible=\(possible, privacy: .public) active=\(active, privacy: .public)")
 #endif
     }
 
     func handleMemoryWarning() {
 #if DEBUG
-        print(
-            "[Debug][PiP] memoryWarning playback=\(String(describing: playbackState)) "
-                + "possible=\(isPictureInPicturePossible) active=\(isPictureInPictureActive)"
-        )
+        let playback = String(describing: playbackState)
+        let possible = isPictureInPicturePossible
+        let active = isPictureInPictureActive
+        VanmoLogger.player.info("[Debug][PiP] memoryWarning playback=\(playback, privacy: .public) possible=\(possible, privacy: .public) active=\(active, privacy: .public)")
 #endif
     }
 
@@ -217,10 +223,23 @@ final class PlayerViewModel: ObservableObject {
             VanmoLogger.player.error("[PlayerVM] load failed: \(error.localizedDescription)")
 #if DEBUG
             let nsError = error as NSError
-            print("[Debug][Player] load failed domain=\(nsError.domain) code=\(nsError.code) ext=\(item.fileURL.pathExtension.lowercased()) isFile=\(item.fileURL.isFileURL)")
+            let domain = nsError.domain
+            let code = nsError.code
+            let ext = item.fileURL.pathExtension.lowercased()
+            let isFile = item.fileURL.isFileURL
+            VanmoLogger.player.info("[Debug][Player] load failed domain=\(domain, privacy: .public) code=\(code, privacy: .public) ext=\(ext, privacy: .public) isFile=\(isFile, privacy: .public)")
 #endif
             playbackState = .error(error.localizedDescription)
         }
+    }
+
+    func closePlayback() {
+#if os(iOS)
+        if let ksEngine = engine as? KSPlayerEngine {
+            ksEngine.disableAutomaticPictureInPicture()
+        }
+#endif
+        onDisappear(keepingPlaybackActive: false)
     }
 
     func onDisappear(keepingPlaybackActive: Bool = false) {
@@ -233,7 +252,15 @@ final class PlayerViewModel: ObservableObject {
         stopPlaybackResources()
     }
 
-    private func stopPlaybackResources() {
+    private func stopPlaybackResources(force: Bool = false) {
+        guard force || !didStopPlaybackResources else { return }
+        didStopPlaybackResources = true
+        subtitleDiscoveryTask?.cancel()
+        subtitleDiscoveryTask = nil
+        externalSubtitleCueTask?.cancel()
+        externalSubtitleCueTask = nil
+        mediaGeneration &+= 1
+        seekRequestGeneration &+= 1
         let stopPosition = currentTime
         let session = playbackSession
         playbackSession = nil
@@ -250,6 +277,14 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func loadAndPlayCurrentItem() async throws {
+        subtitleDiscoveryTask?.cancel()
+        subtitleDiscoveryTask = nil
+        externalSubtitleCueTask?.cancel()
+        externalSubtitleCueTask = nil
+        mediaGeneration &+= 1
+        seekRequestGeneration &+= 1
+        didStopPlaybackResources = false
+        let generation = mediaGeneration
         try await unregisterPrefetchIfNeeded()
         resetPlaybackMetadata()
 
@@ -260,8 +295,12 @@ final class PlayerViewModel: ObservableObject {
         var loadHeaders: [String: String] = [:]
         if playbackURL.isFileURL || Self.shouldBypassPrefetch(for: playbackURL) {
             loadURL = playbackURL
+            if PrefetchConfig.isMediaServerStreamURL(playbackURL) {
+                VanmoLogger.player.info("[PlayerVM] media-server stream, skip prefetch")
+            }
         } else if usesOfficialDownloadLink(), let headerProvider {
             let headers = await headerProvider()
+            guard generation == mediaGeneration else { return }
             guard !headers.isEmpty else {
                 throw PlayerError.networkError("无法为该网盘注入播放鉴权头")
             }
@@ -272,11 +311,16 @@ final class PlayerViewModel: ObservableObject {
             originalURL: playbackURL,
             headerProvider: headerProvider
         ) {
+            guard generation == mediaGeneration else {
+                await PrefetchProxy.shared.unregister(token: registration.token)
+                return
+            }
             loadURL = registration.url
             prefetchToken = registration.token
             VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
         } else if let headerProvider {
             let headers = await headerProvider()
+            guard generation == mediaGeneration else { return }
             guard !headers.isEmpty else {
                 throw PlayerError.networkError("无法为该网盘注入播放鉴权头")
             }
@@ -292,23 +336,60 @@ final class PlayerViewModel: ObservableObject {
             ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
             : nil
         VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
-        try await loadEngine(url: loadURL, startPosition: startPosition, headers: loadHeaders)
+        do {
+            try await loadEngine(url: loadURL, startPosition: startPosition, headers: loadHeaders)
+        } catch {
+            guard generation == mediaGeneration else { return }
+            throw error
+        }
+        guard generation == mediaGeneration else {
+            // close() 之后仍可能完成 engine.load() 并重建播放器；必须强制拆掉。
+            stopPlaybackResources(force: true)
+            return
+        }
         VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
-        audioTracks = await engine.availableAudioTracks()
-        let embeddedSubtitleTracks = await engine.availableSubtitleTracks()
-        externalSubtitleTracks = await discoverExternalSubtitleTracks(for: originalURL)
-        subtitleTracks = embeddedSubtitleTracks + externalSubtitleTracks
-        await applyPreferredSubtitleIfNeeded()
-        VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
-        await updateDynamicRangeIfNeeded(for: originalURL)
-        loadChapters()
-        preparePlaybackSession()
         VanmoLogger.player.info("[PlayerVM] calling engine.play()")
         engine.play()
         VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
+        audioTracks = await engine.availableAudioTracks()
+        let embeddedSubtitleTracks = await engine.availableSubtitleTracks()
+        guard generation == mediaGeneration else { return }
+        subtitleTracks = embeddedSubtitleTracks
+        await applyPreferredSubtitleIfNeeded(generation: generation)
+        guard generation == mediaGeneration else { return }
+        VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
+        await updateDynamicRangeIfNeeded(for: originalURL)
+        guard generation == mediaGeneration else { return }
+        loadChapters()
+        preparePlaybackSession()
         let reportPosition = startPosition?.seconds ?? currentTime
         Task {
+            guard generation == mediaGeneration else { return }
             await playbackSession?.started(position: reportPosition)
+        }
+        scheduleExternalSubtitleDiscovery(
+            for: originalURL,
+            embeddedTracks: embeddedSubtitleTracks,
+            generation: generation
+        )
+    }
+
+    private func scheduleExternalSubtitleDiscovery(
+        for videoURL: URL,
+        embeddedTracks: [SubtitleTrackInfo],
+        generation: UInt64
+    ) {
+        subtitleDiscoveryTask = Task { [weak self] in
+            guard let self else { return }
+            let tracks = await discoverExternalSubtitleTracks(for: videoURL)
+            guard !Task.isCancelled, generation == mediaGeneration else { return }
+            externalSubtitleTracks = tracks
+            subtitleTracks = embeddedTracks + tracks
+            await applyPreferredSubtitleIfNeeded(generation: generation)
+            guard !Task.isCancelled, generation == mediaGeneration else { return }
+            VanmoLogger.subtitle.info(
+                "[PlayerVM] asynchronous external subtitle discovery completed count=\(tracks.count)"
+            )
         }
     }
 
@@ -442,8 +523,14 @@ final class PlayerViewModel: ObservableObject {
 
     func seek(to time: TimeInterval) {
         let clampedTime = max(0, min(time, duration))
-        Task {
+        seekRequestGeneration &+= 1
+        let seekGeneration = seekRequestGeneration
+        let itemGeneration = mediaGeneration
+        Task { [weak self] in
+            guard let self else { return }
             await engine.seek(to: CMTime(seconds: clampedTime, preferredTimescale: 600))
+            guard seekRequestGeneration == seekGeneration,
+                  mediaGeneration == itemGeneration else { return }
             let isPaused = playbackState == .paused || playbackState == .ended
             await playbackSession?.progress(
                 position: clampedTime,
@@ -583,12 +670,17 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
-    private func applySubtitleSelection(_ index: Int?) async {
+    private func applySubtitleSelection(
+        _ index: Int?,
+        generation: UInt64? = nil
+    ) async {
+        guard isCurrentMediaGeneration(generation) else { return }
         guard let index else {
             activeExternalSubtitleID = nil
             activeRichSubtitleID = nil
             currentSubtitleContent = nil
             await externalSubtitleManager.clear()
+            guard isCurrentMediaGeneration(generation) else { return }
             (engine as? KSPlayerEngine)?.clearExternalRichSubtitle()
             await engine.selectSubtitleTrack(index: nil)
             return
@@ -598,24 +690,30 @@ final class PlayerViewModel: ObservableObject {
         if let fileURL = track.fileURL, !track.isEmbedded {
             do {
                 await engine.selectSubtitleTrack(index: nil)
+                guard isCurrentMediaGeneration(generation) else { return }
                 if SubtitleFormat.detect(from: fileURL).isRichTextFormat {
                     guard let ksEngine = engine as? KSPlayerEngine else {
                         throw SubtitleError.assRenderingUnavailable
                     }
                     await externalSubtitleManager.clear()
+                    guard isCurrentMediaGeneration(generation) else { return }
                     try await ksEngine.selectExternalRichSubtitle(url: fileURL, delay: config.subtitleDelay)
+                    guard isCurrentMediaGeneration(generation) else { return }
                     activeExternalSubtitleID = nil
                     activeRichSubtitleID = track.id
                     currentSubtitleContent = nil
                 } else {
                     (engine as? KSPlayerEngine)?.clearExternalRichSubtitle()
                     try await externalSubtitleManager.load(from: fileURL)
+                    guard isCurrentMediaGeneration(generation) else { return }
                     await externalSubtitleManager.setDelay(config.subtitleDelay)
+                    guard isCurrentMediaGeneration(generation) else { return }
                     activeExternalSubtitleID = track.id
                     activeRichSubtitleID = nil
                     updateExternalSubtitle(at: currentTime)
                 }
             } catch {
+                guard isCurrentMediaGeneration(generation) else { return }
                 VanmoLogger.subtitle.error("[PlayerVM] Failed to load external subtitle: \(error.localizedDescription)")
                 activeExternalSubtitleID = nil
                 activeRichSubtitleID = nil
@@ -627,9 +725,14 @@ final class PlayerViewModel: ObservableObject {
             activeRichSubtitleID = nil
             currentSubtitleContent = nil
             await externalSubtitleManager.clear()
+            guard isCurrentMediaGeneration(generation) else { return }
             (engine as? KSPlayerEngine)?.clearExternalRichSubtitle()
             await engine.selectSubtitleTrack(index: index)
         }
+    }
+
+    private func isCurrentMediaGeneration(_ generation: UInt64?) -> Bool {
+        generation == nil || generation == mediaGeneration
     }
 
     private func nextExternalSubtitleID() -> Int {
@@ -640,7 +743,8 @@ final class PlayerViewModel: ObservableObject {
         return (maxExternalID ?? (Self.externalSubtitleIDOffset - 1)) + 1
     }
 
-    private func applyPreferredSubtitleIfNeeded() async {
+    private func applyPreferredSubtitleIfNeeded(generation: UInt64? = nil) async {
+        guard isCurrentMediaGeneration(generation) else { return }
         guard !subtitleTracks.isEmpty else {
             VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: no subtitle tracks available")
             return
@@ -650,12 +754,12 @@ final class PlayerViewModel: ObservableObject {
         case .off:
             VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: restoring saved selection (off)")
             config.selectedSubtitleTrack = nil
-            await applySubtitleSelection(nil)
+            await applySubtitleSelection(nil, generation: generation)
             return
         case .track(let savedIndex):
             VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: restoring saved track index=\(savedIndex)")
             config.selectedSubtitleTrack = savedIndex
-            await applySubtitleSelection(savedIndex)
+            await applySubtitleSelection(savedIndex, generation: generation)
             return
         case .none:
             break
@@ -664,6 +768,7 @@ final class PlayerViewModel: ObservableObject {
         if !subtitleAutoLoad {
             VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: auto-load disabled")
             config.selectedSubtitleTrack = nil
+            guard isCurrentMediaGeneration(generation) else { return }
             await engine.selectSubtitleTrack(index: nil)
             return
         }
@@ -678,7 +783,7 @@ final class PlayerViewModel: ObservableObject {
 
         VanmoLogger.player.info("[PlayerVM] applyPreferredSubtitle: auto-selecting index=\(preferredIndex) for '\(self.subtitlePreferredLanguage)'")
         config.selectedSubtitleTrack = preferredIndex
-        await applySubtitleSelection(preferredIndex)
+        await applySubtitleSelection(preferredIndex, generation: generation)
     }
 
     private enum SavedSubtitleSelection {
@@ -883,8 +988,16 @@ final class PlayerViewModel: ObservableObject {
             let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
             let config = ConnectionConfig(from: connection, password: password)
             try await service.connect(config: config)
+            guard !Task.isCancelled else {
+                await service.disconnect()
+                return []
+            }
 
             let siblings = try await service.listDirectory(path: parentPath)
+            guard !Task.isCancelled else {
+                await service.disconnect()
+                return []
+            }
             let matches = siblings.filter { file in
                 guard !file.isDirectory else { return false }
                 let stem = (file.name as NSString).deletingPathExtension
@@ -903,6 +1016,10 @@ final class PlayerViewModel: ObservableObject {
             let cacheDir = try Self.remoteSubtitleCacheDirectory()
             var tracks: [SubtitleTrackInfo] = []
             for (index, file) in matches.enumerated() {
+                guard !Task.isCancelled else {
+                    await service.disconnect()
+                    return []
+                }
                 let localURL = cacheDir.appendingPathComponent("\(item.id.uuidString)-\(file.name)")
                 do {
                     try await service.download(file: file, to: localURL, progress: { _ in })
@@ -1188,7 +1305,7 @@ final class PlayerViewModel: ObservableObject {
         case "concat", "smb":
             return true
         default:
-            return false
+            return PrefetchConfig.isMediaServerStreamURL(url)
         }
     }
 
@@ -1367,16 +1484,18 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func updateExternalSubtitle(at time: TimeInterval) {
-        guard activeExternalSubtitleID != nil else { return }
-        Task { [weak self] in
+        guard let subtitleID = activeExternalSubtitleID else { return }
+        let generation = mediaGeneration
+        externalSubtitleCueTask?.cancel()
+        externalSubtitleCueTask = Task { [weak self] in
             guard let self else { return }
             let cue = await externalSubtitleManager.cue(at: time)
-            await MainActor.run {
-                guard self.activeExternalSubtitleID != nil else { return }
-                let content = cue.map { SubtitleContent(text: $0.text) }
-                if content != self.currentSubtitleContent {
-                    self.currentSubtitleContent = content
-                }
+            guard !Task.isCancelled,
+                  mediaGeneration == generation,
+                  activeExternalSubtitleID == subtitleID else { return }
+            let content = cue.map { SubtitleContent(text: $0.text) }
+            if content != currentSubtitleContent {
+                currentSubtitleContent = content
             }
         }
     }

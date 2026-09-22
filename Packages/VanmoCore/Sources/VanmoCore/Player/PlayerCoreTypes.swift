@@ -51,6 +51,57 @@ public enum PlaybackPreferences {
     public static var hardwareDecodingEnabled: Bool {
         UserDefaults.standard.object(forKey: hardwareDecodingKey) as? Bool ?? true
     }
+
+#if DEBUG
+    public enum DebugNativeVideoEngine: String {
+        case avFoundation = "av"
+    }
+
+    public static var debugNativeVideoEngine: DebugNativeVideoEngine? {
+        guard let value = ProcessInfo.processInfo.environment["VANMO_NATIVE_VIDEO_ENGINE"]?.lowercased() else {
+            return nil
+        }
+        return DebugNativeVideoEngine(rawValue: value)
+    }
+#endif
+}
+
+public final class PlaybackSeekCompletionGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var timeoutTask: Task<Void, Never>?
+
+    public init(_ continuation: CheckedContinuation<Void, Never>) {
+        self.continuation = continuation
+    }
+
+    public func installTimeout(_ task: Task<Void, Never>) {
+        lock.lock()
+        let isCompleted = continuation == nil
+        if !isCompleted {
+            timeoutTask = task
+        }
+        lock.unlock()
+
+        if isCompleted {
+            task.cancel()
+        }
+    }
+
+    @discardableResult
+    public func resume() -> Bool {
+        lock.lock()
+        let continuation = continuation
+        self.continuation = nil
+        let timeoutTask = timeoutTask
+        self.timeoutTask = nil
+        lock.unlock()
+
+        guard let continuation else { return false }
+        timeoutTask?.cancel()
+        continuation.resume()
+        return true
+    }
 }
 
 public enum AudioOutputMode: String, CaseIterable, Sendable {

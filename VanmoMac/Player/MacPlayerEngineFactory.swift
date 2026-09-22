@@ -19,6 +19,15 @@ enum MacPlayerEngineFactory {
             return .unsupportedDisc
         }
 
+#if DEBUG
+        if PlaybackPreferences.debugNativeVideoEngine == .avFoundation,
+           format == .native,
+           MediaFormatProbe.nativeVideoExtensions.contains(url.pathExtension.lowercased()) {
+            VanmoLogger.player.info("[MacEngineFactory] Debug A/B override: AVPlayer")
+            return .avFoundation
+        }
+#endif
+
         if SupportedFormat.prefersKSPlayer(for: url) {
             VanmoLogger.player.info("[MacEngineFactory] 选择 MacKSPlayerEngine (KSPlayer/FFmpeg)")
             return .ksPlayer

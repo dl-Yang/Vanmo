@@ -61,6 +61,13 @@ actor PlaybackStateManager {
 }
 ```
 
+## 日志
+
+- 调试日志、诊断日志和运行日志一律使用 `VanmoLogger`，按领域选择 `player`、`prefetch`、`network`、`library`、`metadata`、`subtitle` 或 `storage`。
+- 不要使用 `print`、`NSLog` 或裸 `os.Logger`。诊断日志保留可搜索前缀（例如 `[Debug][PlaybackPerf]`），并尽量用 `#if DEBUG` 包裹。
+- `VanmoLogger` 插值在闭包中求值：先把实例属性绑成局部变量，诊断字段使用 `privacy: .public`，避免 Console 显示 `<private>`。
+- 不要记录完整 URL、token、cookie、密码或用户文件内容。
+
 ## 文件组织
 
 每个 Swift 文件按以下顺序组织：

@@ -42,6 +42,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     private var player: KSMEPlayer?
     private let libavformatGateLock = NSLock()
     private var holdsLibavformatGate = false
+    private let seekGenerationLock = NSLock()
+    private var seekGeneration: UInt64 = 0
     private var timeUpdateTimer: Timer?
     private var shouldResumeAfterBuffering = false
     private var lastPlayableTime: CFAbsoluteTime = 0
@@ -52,6 +54,17 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     private var cachedSubtitleParts: [SubtitlePart] = []
     private weak var configuredPictureInPictureController: AVPictureInPictureController?
     private var retainedActivePictureInPictureControllers: [AVPictureInPictureController] = []
+
+#if DEBUG
+    private var performanceLoadStartedAt: CFAbsoluteTime?
+    private var performanceBufferingStartedAt: CFAbsoluteTime?
+    private var performanceBufferingCount = 0
+    private var performanceLastSampleAt: CFAbsoluteTime = 0
+    private var performanceLastBytesRead: Int64 = 0
+    private var performanceLastDroppedFrames: UInt32 = 0
+    private var performanceDidLogFirstFrame = false
+    private var performanceThermalState = ProcessInfo.processInfo.thermalState
+#endif
 
     // MARK: - Video View
 
@@ -121,9 +134,17 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         VanmoLogger.player.info("[KSEngine] load() called, url: \(url.safePlaybackLogDescription)")
         await MainActor.run { stopPlaybackResources() }
         await releaseLibavformatGateIfHeld()
+#if DEBUG
+        resetPerformanceDiagnostics()
+        performanceLoadStartedAt = CFAbsoluteTimeGetCurrent()
+#endif
         stateSubject.send(.loading)
 
         let hardwareDecode = PlaybackPreferences.hardwareDecodingEnabled
+        // KSPlayer already falls back from VideoToolbox to its FFmpeg decoder at
+        // the decoder level. Retrying every open/auth/network failure with
+        // hardware decoding disabled can turn a transient source failure into a
+        // successful but needlessly hot full-software playback session.
         do {
             try await loadPlayer(
                 url: url,
@@ -132,21 +153,12 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
                 headers: headers
             )
         } catch {
-            guard hardwareDecode else { throw error }
-            VanmoLogger.player.error("[KSEngine] hardware decode load failed, retrying with software decode: \(error.localizedDescription)")
             await MainActor.run {
-                player?.shutdown()
-                player = nil
+                stopPlaybackResources()
             }
             readyContinuation = nil
             await releaseLibavformatGateIfHeld()
-            stateSubject.send(.loading)
-            try await loadPlayer(
-                url: url,
-                startPosition: startPosition,
-                hardwareDecode: false,
-                headers: headers
-            )
+            throw error
         }
     }
 
@@ -162,7 +174,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         }
         options.isAccurateSeek = true
         // 缓冲水位：吸收稳态吞吐略低于码率时的抖动，降低 buffering 次数。
-        options.isSecondOpen = true
+        // Prefetch 代理会在第二次 GET 时取消第一条 body；KS isSecondOpen
+        // 正好会打出探测连接，导致满缓冲条假死直到用户 seek。
+        let disableSecondOpen = PrefetchConfig.shouldDisableSecondOpen(for: url)
+        options.isSecondOpen = !disableSecondOpen
         options.preferredForwardBufferDuration = 10
         options.maxBufferDuration = 60
         options.formatContextOptions["buffer_size"] = 8 * 1024 * 1024
@@ -170,7 +185,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         // 接通设置页「硬件解码优先」开关（VideoToolbox 硬解）。
         // HDR 显示标准（preferredDisplayCriteria）由 KSPlayer 依据内容动态范围内部自动配置。
         options.hardwareDecode = hardwareDecode
-        VanmoLogger.player.info("[KSEngine] hardwareDecode: \(hardwareDecode)")
+        VanmoLogger.player.info("[KSEngine] hardwareDecode: \(hardwareDecode) isSecondOpen: \(!disableSecondOpen)")
 
         if !headers.isEmpty {
             options.appendHeader(headers)
@@ -183,31 +198,32 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             markLibavformatGateHeld()
         }
 
-        do {
-            let mePlayer = await MainActor.run {
-                let p = KSMEPlayer(url: url, options: options)
-                p.delegate = self
-                self.player = p
-                self.refreshPictureInPictureController(for: p)
-                p.prepareToPlay()
-                return p
-            }
-
-            try await waitForReady()
-
-            let dur = mePlayer.duration
-            if dur > 0 {
-                durationSubject.send(CMTime(seconds: dur, preferredTimescale: 600))
-            }
-            VanmoLogger.player.info("[KSEngine] duration: \(dur)s")
-
-            await MainActor.run { startTimeUpdateTimer() }
-            stateSubject.send(.paused)
-            VanmoLogger.player.info("[KSEngine] load complete: \(url.lastPathComponent)")
-        } catch {
-            await releaseLibavformatGateIfHeld()
-            throw error
+        let mePlayer = await MainActor.run {
+            let player = KSMEPlayer(url: url, options: options)
+            player.delegate = self
+            self.player = player
+            self.refreshPictureInPictureController(for: player)
+            player.prepareToPlay()
+            return player
         }
+
+        try await waitForReady()
+
+        let duration = mePlayer.duration
+        if duration > 0 {
+            durationSubject.send(CMTime(seconds: duration, preferredTimescale: 600))
+        }
+        VanmoLogger.player.info("[KSEngine] duration: \(duration)s")
+
+        await MainActor.run { startTimeUpdateTimer() }
+        stateSubject.send(.paused)
+        VanmoLogger.player.info("[KSEngine] load complete: \(url.lastPathComponent)")
+#if DEBUG
+        if let startedAt = performanceLoadStartedAt {
+            let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=ready platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public) hardware=\(hardwareDecode, privacy: .public)")
+        }
+#endif
     }
 
     func play() {
@@ -224,20 +240,37 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
 
     func seek(to time: CMTime) async {
         let seconds = time.seconds
-        guard seconds.isFinite, seconds >= 0 else { return }
+        guard seconds.isFinite, seconds >= 0, let player else { return }
 
         let wasPlaying = state == .playing || state == .buffering
         shouldResumeAfterBuffering = wasPlaying
+        let generation = beginSeek()
+#if DEBUG
+        let startedAt = CFAbsoluteTimeGetCurrent()
+#endif
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            player?.seek(time: seconds) { _ in
-                continuation.resume()
+            let gate = PlaybackSeekCompletionGate(continuation)
+            player.seek(time: seconds) { _ in
+                gate.resume()
             }
+            let timeout = Task {
+                try? await Task.sleep(for: .seconds(3))
+                if gate.resume() {
+                    VanmoLogger.player.error("[KSEngine] seek callback timed out after 3s")
+                }
+            }
+            gate.installTimeout(timeout)
         }
+        guard isCurrentSeek(generation) else { return }
         currentTimeSubject.send(time)
+#if DEBUG
+        let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=seekEnd platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+#endif
 
         if wasPlaying {
-            player?.play()
+            player.play()
             stateSubject.send(.playing)
         }
     }
@@ -253,11 +286,13 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     }
 
     private func stopPlaybackResources() {
+        invalidateSeeks()
         stopTimeUpdateTimer()
         if #available(iOS 15.0, tvOS 15.0, *) {
             let controllers = retainedActivePictureInPictureControllers
                 + [configuredPictureInPictureController].compactMap { $0 }
             for controller in controllers {
+                controller.canStartPictureInPictureAutomaticallyFromInline = false
                 controller.delegate = nil
                 controller.stopPictureInPicture()
             }
@@ -276,6 +311,26 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         durationSubject.send(.zero)
         bufferProgressSubject.send(0)
         subtitleContentSubject.send(nil)
+    }
+
+    private func beginSeek() -> UInt64 {
+        seekGenerationLock.lock()
+        seekGeneration &+= 1
+        let generation = seekGeneration
+        seekGenerationLock.unlock()
+        return generation
+    }
+
+    private func invalidateSeeks() {
+        seekGenerationLock.lock()
+        seekGeneration &+= 1
+        seekGenerationLock.unlock()
+    }
+
+    private func isCurrentSeek(_ generation: UInt64) -> Bool {
+        seekGenerationLock.lock()
+        defer { seekGenerationLock.unlock() }
+        return seekGeneration == generation
     }
 
     private func markLibavformatGateHeld() {
@@ -447,20 +502,37 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     }
 
     @MainActor
+    func disableAutomaticPictureInPicture() {
+        guard #available(iOS 15.0, tvOS 15.0, *) else { return }
+        let controllers = retainedActivePictureInPictureControllers
+            + [configuredPictureInPictureController].compactMap { $0 }
+        for controller in controllers {
+            controller.canStartPictureInPictureAutomaticallyFromInline = false
+            if controller.isPictureInPictureActive {
+                controller.stopPictureInPicture()
+            }
+        }
+        pictureInPictureActiveSubject.send(false)
+#if DEBUG
+        VanmoLogger.player.info("[Debug][PiP] action=disableAutomatic engine=ksplayer")
+#endif
+    }
+
+    @MainActor
     func togglePictureInPicture() -> Bool {
         guard isPictureInPictureSupported else { return false }
         refreshPictureInPictureController()
         guard let controller = player?.pipController else { return false }
         if controller.isPictureInPictureActive {
 #if DEBUG
-            print("[Debug][PiP] action=stop engine=ksplayer")
+            VanmoLogger.player.info("[Debug][PiP] action=stop engine=ksplayer")
 #endif
             controller.stopPictureInPicture()
             return true
         }
         guard controller.isPictureInPicturePossible else { return false }
 #if DEBUG
-        print("[Debug][PiP] action=start engine=ksplayer")
+        VanmoLogger.player.info("[Debug][PiP] action=start engine=ksplayer")
 #endif
         controller.startPictureInPicture()
         return true
@@ -489,10 +561,9 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
                     }
             )
 #if DEBUG
-            print(
-                "[Debug][PiP] configured engine=ksplayer possible=\(controller.isPictureInPicturePossible) "
-                    + "automatic=\(controller.canStartPictureInPictureAutomaticallyFromInline)"
-            )
+            let possible = controller.isPictureInPicturePossible
+            let automatic = controller.canStartPictureInPictureAutomaticallyFromInline
+            VanmoLogger.player.info("[Debug][PiP] configured engine=ksplayer possible=\(possible, privacy: .public) automatic=\(automatic, privacy: .public)")
 #endif
         }
     }
@@ -566,8 +637,61 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             guard time.isFinite, !time.isNaN else { return }
             self.currentTimeSubject.send(CMTime(seconds: time, preferredTimescale: 600))
             self.updateSubtitleText(at: time)
+#if DEBUG
+            self.logPerformanceSampleIfNeeded(player: player)
+#endif
         }
     }
+
+#if DEBUG
+    private func resetPerformanceDiagnostics() {
+        performanceLoadStartedAt = nil
+        performanceBufferingStartedAt = nil
+        performanceBufferingCount = 0
+        performanceLastSampleAt = 0
+        performanceLastBytesRead = 0
+        performanceLastDroppedFrames = 0
+        performanceDidLogFirstFrame = false
+        performanceThermalState = ProcessInfo.processInfo.thermalState
+    }
+
+    private func logPerformanceSampleIfNeeded(player: KSMEPlayer) {
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - performanceLastSampleAt >= 5, let info = player.dynamicInfo else { return }
+        performanceLastSampleAt = now
+
+        let droppedFrames = info.droppedVideoFrameCount + info.droppedVideoPacketCount
+        let droppedDelta = droppedFrames >= performanceLastDroppedFrames
+            ? droppedFrames - performanceLastDroppedFrames
+            : droppedFrames
+        performanceLastDroppedFrames = droppedFrames
+
+        let bytesRead = info.bytesRead
+        let bytesDelta = max(bytesRead - performanceLastBytesRead, 0)
+        performanceLastBytesRead = bytesRead
+
+        if !performanceDidLogFirstFrame, info.displayFPS >= 1 {
+            performanceDidLogFirstFrame = true
+            let elapsedMs = performanceLoadStartedAt.map {
+                Int((now - $0) * 1_000)
+            } ?? -1
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+        }
+
+        let thermalState = ProcessInfo.processInfo.thermalState
+        if thermalState != performanceThermalState {
+            performanceThermalState = thermalState
+            let thermal = thermalState.rawValue
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=thermal platform=ios state=\(thermal, privacy: .public)")
+        }
+
+        let fps = String(format: "%.2f", info.displayFPS)
+        let avSyncMs = Int(info.audioVideoSyncDiff * 1_000)
+        let videoBitrate = info.videoBitrate
+        let bufferingCount = performanceBufferingCount
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=sample platform=ios engine=ks fps=\(fps, privacy: .public) avSyncMs=\(avSyncMs, privacy: .public) droppedDelta=\(droppedDelta, privacy: .public) bytesDelta=\(bytesDelta, privacy: .public) videoBitrate=\(videoBitrate, privacy: .public) bufferingCount=\(bufferingCount, privacy: .public)")
+    }
+#endif
 
     private func updateSubtitleText(at time: TimeInterval) {
         guard let searchable = selectedSubtitleSearchable else {
@@ -666,7 +790,7 @@ extension KSPlayerEngine: AVPictureInPictureControllerDelegate {
     ) {
         pictureInPictureActiveSubject.send(true)
 #if DEBUG
-        print("[Debug][PiP] event=willStart engine=ksplayer")
+        VanmoLogger.player.info("[Debug][PiP] event=willStart engine=ksplayer")
 #endif
     }
 
@@ -675,7 +799,7 @@ extension KSPlayerEngine: AVPictureInPictureControllerDelegate {
     ) {
         pictureInPictureActiveSubject.send(true)
 #if DEBUG
-        print("[Debug][PiP] event=didStart engine=ksplayer")
+        VanmoLogger.player.info("[Debug][PiP] event=didStart engine=ksplayer")
 #endif
     }
 
@@ -689,7 +813,9 @@ extension KSPlayerEngine: AVPictureInPictureControllerDelegate {
         publishPictureInPictureActivity()
 #if DEBUG
         let nsError = error as NSError
-        print("[Debug][PiP] event=failed engine=ksplayer domain=\(nsError.domain) code=\(nsError.code)")
+        let domain = nsError.domain
+        let code = nsError.code
+        VanmoLogger.player.info("[Debug][PiP] event=failed engine=ksplayer domain=\(domain, privacy: .public) code=\(code, privacy: .public)")
 #endif
     }
 
@@ -697,7 +823,7 @@ extension KSPlayerEngine: AVPictureInPictureControllerDelegate {
         _ pictureInPictureController: AVPictureInPictureController
     ) {
 #if DEBUG
-        print("[Debug][PiP] event=willStop engine=ksplayer")
+        VanmoLogger.player.info("[Debug][PiP] event=willStop engine=ksplayer")
 #endif
     }
 
@@ -709,7 +835,7 @@ extension KSPlayerEngine: AVPictureInPictureControllerDelegate {
         }
         publishPictureInPictureActivity()
 #if DEBUG
-        print("[Debug][PiP] event=didStop engine=ksplayer")
+        VanmoLogger.player.info("[Debug][PiP] event=didStop engine=ksplayer")
 #endif
     }
 
@@ -718,7 +844,7 @@ extension KSPlayerEngine: AVPictureInPictureControllerDelegate {
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
     ) {
 #if DEBUG
-        print("[Debug][PiP] event=restoreUI engine=ksplayer")
+        VanmoLogger.player.info("[Debug][PiP] event=restoreUI engine=ksplayer")
 #endif
         completionHandler(true)
     }
@@ -744,9 +870,24 @@ extension KSPlayerEngine: MediaPlayerDelegate {
             if sinceLastPlayable < 0.5 { break }
             if state == .playing || state == .paused {
                 stateSubject.send(.buffering)
+#if DEBUG
+                if performanceBufferingStartedAt == nil {
+                    performanceBufferingStartedAt = CFAbsoluteTimeGetCurrent()
+                    performanceBufferingCount += 1
+                    let bufferingCount = performanceBufferingCount
+                    VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingStart platform=ios engine=ks count=\(bufferingCount, privacy: .public)")
+                }
+#endif
             }
         case .playable:
             lastPlayableTime = CFAbsoluteTimeGetCurrent()
+#if DEBUG
+            if let startedAt = performanceBufferingStartedAt {
+                let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+                performanceBufferingStartedAt = nil
+                VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingEnd platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+            }
+#endif
             if state == .buffering {
                 if shouldResumeAfterBuffering || player.isPlaying {
                     player.play()

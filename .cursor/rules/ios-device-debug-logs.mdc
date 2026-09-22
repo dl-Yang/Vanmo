@@ -15,7 +15,7 @@ alwaysApply: true
 ## 工作流程
 
 1. 先定位最小可疑路径，只在关键入口、状态变化、异步边界、错误分支和返回值处加日志。
-2. 优先使用项目已有的日志工具；如果没有合适工具，再使用 `print`、`os.Logger` 或 `NSLog` 等能出现在本地 console 的方式。
+2. 调试日志一律使用 `VanmoLogger`（`player` / `prefetch` / `network` / `library` / `metadata` / `subtitle` / `storage`）。不要使用 `print`、`NSLog` 或裸 `os.Logger`。
 3. 对临时诊断日志使用稳定前缀，例如 `[Debug][Player]`，并输出足够复现问题的上下文：对象 id、URL host/path、状态枚举、线程/任务边界、错误类型和关键耗时。
 4. 避免输出隐私数据、认证信息、完整 token、cookie、用户文件内容或其他敏感值。
 5. 需要用户提供运行证据时，请让用户在真机上复现后，从 Xcode Console 或 Console.app 手动复制相关日志片段回来。
@@ -27,4 +27,6 @@ alwaysApply: true
 - 真机 Debug 排查默认不修改后端、云端、代理或远程日志管线。
 - 临时日志应尽量用 `#if DEBUG` 包裹，避免进入 Release 行为路径。
 - 日志文本要便于用户搜索和复制，避免过长、过密或跨多行难以匹配。
+- 触达含有旧 `print` 调试日志的文件时，把该文件内的调试日志改成 `VanmoLogger`，不要再新增 `print`。
+- 测试套件里的断言输出不受此条约束。
 - 如果远程插桩看起来是唯一可行方案，先向用户说明原因并等待确认。

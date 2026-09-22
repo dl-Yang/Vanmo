@@ -48,11 +48,22 @@ final class MacPlayerViewModel: ObservableObject {
     private var legibleOutput: AVPlayerItemLegibleOutput?
     private let legibleHandler = MacLegibleOutputHandler()
     private let externalSubtitleManager = SubtitleManager()
+    private var subtitleDiscoveryTask: Task<Void, Never>?
+    private var externalSubtitleCueTask: Task<Void, Never>?
+    private var mediaGeneration: UInt64 = 0
+    private var seekRequestGeneration: UInt64 = 0
     private var ksEngine: MacKSPlayerEngine?
     private var activeExternalSubtitleID: Int?
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
     private var embeddedSubtitleActive = false
     private weak var connectionsViewModel: MacConnectionsViewModel?
+
+#if DEBUG
+    private var avPerformanceLoadStartedAt: CFAbsoluteTime?
+    private var avPerformanceBufferingStartedAt: CFAbsoluteTime?
+    private var avPerformanceBufferingCount = 0
+    private var avPerformanceLastSampleAt: CFAbsoluteTime = 0
+#endif
 
     private static let externalSubtitleIDOffset = 10_000
 
@@ -109,6 +120,12 @@ final class MacPlayerViewModel: ObservableObject {
     func cleanup() {
         guard !didCleanup else { return }
         didCleanup = true
+        subtitleDiscoveryTask?.cancel()
+        subtitleDiscoveryTask = nil
+        externalSubtitleCueTask?.cancel()
+        externalSubtitleCueTask = nil
+        mediaGeneration &+= 1
+        seekRequestGeneration &+= 1
 
         saveProgress()
         let stopPosition = currentTime
@@ -390,6 +407,13 @@ final class MacPlayerViewModel: ObservableObject {
 
     private func loadAndPlayCurrentItem() async throws {
         try throwIfInactive()
+        subtitleDiscoveryTask?.cancel()
+        subtitleDiscoveryTask = nil
+        externalSubtitleCueTask?.cancel()
+        externalSubtitleCueTask = nil
+        mediaGeneration &+= 1
+        seekRequestGeneration &+= 1
+        let generation = mediaGeneration
         resetPlaybackMetadata()
         stopActiveEngines()
 
@@ -407,14 +431,20 @@ final class MacPlayerViewModel: ObservableObject {
         case .unsupportedDisc:
             throw MacPlayerPlaybackError.unsupportedDiscFormat
         case .ksPlayer:
-            try await loadWithKSPlayer(originalURL: originalURL)
+            try await loadWithKSPlayer(originalURL: originalURL, generation: generation)
         case .avFoundation:
-            try await loadWithAVPlayer(originalURL: originalURL)
+            try await loadWithAVPlayer(originalURL: originalURL, generation: generation)
         }
     }
 
-    private func loadWithAVPlayer(originalURL: URL) async throws {
+    private func loadWithAVPlayer(originalURL: URL, generation: UInt64) async throws {
         activeEngineKind = .avFoundation
+#if DEBUG
+        avPerformanceLoadStartedAt = CFAbsoluteTimeGetCurrent()
+        avPerformanceBufferingStartedAt = nil
+        avPerformanceBufferingCount = 0
+        avPerformanceLastSampleAt = 0
+#endif
 
         let loadURL: URL
         let headerProvider = cloudDriveStreamingHeaderProvider()
@@ -422,8 +452,12 @@ final class MacPlayerViewModel: ObservableObject {
 
         if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
             loadURL = originalURL
+            if PrefetchConfig.isMediaServerStreamURL(originalURL) {
+                VanmoLogger.player.info("[MacPlayerVM] media-server stream, skip prefetch")
+            }
         } else if usesOfficialDownloadLink() {
             try await requireOfficialDownloadHeaders(headerProvider)
+            guard generation == mediaGeneration else { return }
             loadURL = originalURL
             VanmoLogger.player.info("[MacPlayerVM] official download link, skip prefetch")
         } else if let registration = await PrefetchProxy.shared.register(
@@ -431,6 +465,10 @@ final class MacPlayerViewModel: ObservableObject {
             headerProvider: headerProvider
         ) {
             try throwIfInactive()
+            guard generation == mediaGeneration else {
+                await PrefetchProxy.shared.unregister(token: registration.token)
+                return
+            }
             loadURL = registration.url
             prefetchRegistration = registration
             usesPrefetch = true
@@ -445,6 +483,7 @@ final class MacPlayerViewModel: ObservableObject {
             headerProvider: usesPrefetch ? nil : headerProvider
         )
         try throwIfInactive()
+        guard generation == mediaGeneration else { return }
 
         attachLegibleOutput(to: playerItem)
         player.replaceCurrentItem(with: playerItem)
@@ -452,6 +491,7 @@ final class MacPlayerViewModel: ObservableObject {
 
         let assetDuration = try? await playerItem.asset.load(.duration)
         try throwIfInactive()
+        guard generation == mediaGeneration else { return }
 
         if let assetDuration, assetDuration.isNumeric {
             duration = assetDuration.seconds
@@ -461,9 +501,10 @@ final class MacPlayerViewModel: ObservableObject {
 
         audioTracks = await availableAudioTracks(for: playerItem)
         let embeddedTracks = await availableSubtitleTracks(for: playerItem)
-        externalSubtitleTracks = await discoverExternalSubtitleTracks(for: originalURL)
-        subtitleTracks = embeddedTracks + externalSubtitleTracks
-        await applyPreferredSubtitleIfNeeded()
+        guard generation == mediaGeneration else { return }
+        subtitleTracks = embeddedTracks
+        await applyPreferredSubtitleIfNeeded(generation: generation)
+        guard generation == mediaGeneration else { return }
 
         setupItemObservers(for: playerItem)
 
@@ -477,11 +518,17 @@ final class MacPlayerViewModel: ObservableObject {
         playbackState = .playing
         preparePlaybackSession()
         Task {
+            guard generation == mediaGeneration else { return }
             await playbackSession?.started(position: seekPosition)
         }
+        scheduleExternalSubtitleDiscovery(
+            for: originalURL,
+            embeddedTracks: embeddedTracks,
+            generation: generation
+        )
     }
 
-    private func loadWithKSPlayer(originalURL: URL) async throws {
+    private func loadWithKSPlayer(originalURL: URL, generation: UInt64) async throws {
         activeEngineKind = .ksPlayer
 
         let loadURL: URL
@@ -490,8 +537,12 @@ final class MacPlayerViewModel: ObservableObject {
 
         if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
             loadURL = originalURL
+            if PrefetchConfig.isMediaServerStreamURL(originalURL) {
+                VanmoLogger.player.info("[MacPlayerVM] media-server stream, skip prefetch")
+            }
         } else if usesOfficialDownloadLink() {
             try await requireOfficialDownloadHeaders(headerProvider)
+            guard generation == mediaGeneration else { return }
             loadURL = originalURL
             VanmoLogger.player.info("[MacPlayerVM] KS official download link, skip prefetch")
         } else if let registration = await PrefetchProxy.shared.register(
@@ -499,6 +550,10 @@ final class MacPlayerViewModel: ObservableObject {
             headerProvider: headerProvider
         ) {
             try throwIfInactive()
+            guard generation == mediaGeneration else {
+                await PrefetchProxy.shared.unregister(token: registration.token)
+                return
+            }
             loadURL = registration.url
             prefetchRegistration = registration
             usesPrefetch = true
@@ -530,10 +585,12 @@ final class MacPlayerViewModel: ObservableObject {
         do {
             try await engine.load(url: loadURL, headers: headers, startPosition: startTime)
         } catch {
+            guard generation == mediaGeneration else { return }
             throw MacPlayerPlaybackError.ffmpegLoadFailed(error.localizedDescription)
         }
 
         try throwIfInactive()
+        guard generation == mediaGeneration else { return }
 
         if engine.duration.seconds > 0 {
             duration = engine.duration.seconds
@@ -541,20 +598,45 @@ final class MacPlayerViewModel: ObservableObject {
             duration = item.duration
         }
 
-        audioTracks = await engine.availableAudioTracks()
-        let embeddedTracks = await engine.availableSubtitleTracks()
-        externalSubtitleTracks = await discoverExternalSubtitleTracks(for: originalURL)
-        subtitleTracks = embeddedTracks + externalSubtitleTracks
-        await applyPreferredSubtitleIfNeeded()
-
         engine.playbackRate = config.playbackRate
         engine.play()
         currentTime = seekPosition
         isPlaying = true
         playbackState = .playing
+        audioTracks = await engine.availableAudioTracks()
+        let embeddedTracks = await engine.availableSubtitleTracks()
+        guard generation == mediaGeneration else { return }
+        subtitleTracks = embeddedTracks
+        await applyPreferredSubtitleIfNeeded(generation: generation)
+        guard generation == mediaGeneration else { return }
         preparePlaybackSession()
         Task {
+            guard generation == mediaGeneration else { return }
             await playbackSession?.started(position: seekPosition)
+        }
+        scheduleExternalSubtitleDiscovery(
+            for: originalURL,
+            embeddedTracks: embeddedTracks,
+            generation: generation
+        )
+    }
+
+    private func scheduleExternalSubtitleDiscovery(
+        for videoURL: URL,
+        embeddedTracks: [SubtitleTrackInfo],
+        generation: UInt64
+    ) {
+        subtitleDiscoveryTask = Task { [weak self] in
+            guard let self else { return }
+            let tracks = await discoverExternalSubtitleTracks(for: videoURL)
+            guard !Task.isCancelled, generation == mediaGeneration else { return }
+            externalSubtitleTracks = tracks
+            subtitleTracks = embeddedTracks + tracks
+            await applyPreferredSubtitleIfNeeded(generation: generation)
+            guard !Task.isCancelled, generation == mediaGeneration else { return }
+            VanmoLogger.subtitle.info(
+                "[MacPlayerVM] asynchronous external subtitle discovery completed count=\(tracks.count)"
+            )
         }
     }
 
@@ -579,7 +661,6 @@ final class MacPlayerViewModel: ObservableObject {
         legibleOutput = nil
         itemCancellables.removeAll()
         ksCancellables.removeAll()
-        cancellables.removeAll()
         ksEngine?.stop()
         ksEngine = nil
     }
@@ -739,6 +820,13 @@ final class MacPlayerViewModel: ObservableObject {
                     if self?.playbackState != .ended {
                         self?.playbackState = .playing
                     }
+#if DEBUG
+                    if let self, let startedAt = self.avPerformanceBufferingStartedAt {
+                        let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+                        self.avPerformanceBufferingStartedAt = nil
+                        VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingEnd platform=macos engine=av elapsedMs=\(elapsedMs, privacy: .public)")
+                    }
+#endif
                 case .paused:
                     self?.isPlaying = false
                     if self?.playbackState != .ended {
@@ -746,6 +834,13 @@ final class MacPlayerViewModel: ObservableObject {
                     }
                 case .waitingToPlayAtSpecifiedRate:
                     self?.playbackState = .buffering
+#if DEBUG
+                    guard let self, self.avPerformanceBufferingStartedAt == nil else { break }
+                    self.avPerformanceBufferingStartedAt = CFAbsoluteTimeGetCurrent()
+                    self.avPerformanceBufferingCount += 1
+                    let bufferingCount = self.avPerformanceBufferingCount
+                    VanmoLogger.player.info("[Debug][PlaybackPerf] event=bufferingStart platform=macos engine=av count=\(bufferingCount, privacy: .public)")
+#endif
                 @unknown default:
                     break
                 }
@@ -766,6 +861,18 @@ final class MacPlayerViewModel: ObservableObject {
                 self?.handlePlaybackEnded()
             }
             .store(in: &itemCancellables)
+
+#if DEBUG
+        playerItem.publisher(for: \.status)
+            .filter { $0 == .readyToPlay }
+            .prefix(1)
+            .sink { [weak self] _ in
+                guard let self, let startedAt = self.avPerformanceLoadStartedAt else { return }
+                let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+                VanmoLogger.player.info("[Debug][PlaybackPerf] event=ready platform=macos engine=av elapsedMs=\(elapsedMs, privacy: .public)")
+            }
+            .store(in: &itemCancellables)
+#endif
 
         playerItem.publisher(for: \.loadedTimeRanges)
             .receive(on: RunLoop.main)
@@ -789,8 +896,21 @@ final class MacPlayerViewModel: ObservableObject {
             }
             self.updateExternalSubtitle(at: time.seconds)
             self.reportPlaybackTimeUpdate(at: time.seconds)
+#if DEBUG
+            self.logAVPerformanceSampleIfNeeded()
+#endif
         }
     }
+
+#if DEBUG
+    private func logAVPerformanceSampleIfNeeded() {
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - avPerformanceLastSampleAt >= 5 else { return }
+        avPerformanceLastSampleAt = now
+        let bufferingCount = avPerformanceBufferingCount
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=sample platform=macos engine=av bufferingCount=\(bufferingCount, privacy: .public)")
+    }
+#endif
 
     private func handlePlaybackEnded() {
         playbackState = .ended
@@ -831,9 +951,15 @@ final class MacPlayerViewModel: ObservableObject {
 
     private func seek(toSeconds seconds: TimeInterval) {
         let clamped = min(max(seconds, 0), max(duration, 0))
+        seekRequestGeneration &+= 1
+        let seekGeneration = seekRequestGeneration
+        let itemGeneration = mediaGeneration
         if usesKSPlayer {
-            Task {
+            Task { [weak self] in
+                guard let self else { return }
                 await ksEngine?.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
+                guard seekRequestGeneration == seekGeneration,
+                      mediaGeneration == itemGeneration else { return }
                 currentTime = clamped
                 updateExternalSubtitle(at: clamped)
                 await playbackSession?.progress(
@@ -848,7 +974,10 @@ final class MacPlayerViewModel: ObservableObject {
         player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600))
         currentTime = clamped
         updateExternalSubtitle(at: clamped)
-        Task {
+        Task { [weak self] in
+            guard let self,
+                  seekRequestGeneration == seekGeneration,
+                  mediaGeneration == itemGeneration else { return }
             await playbackSession?.progress(
                 position: clamped,
                 isPaused: playbackState == .paused || playbackState == .ended,
@@ -902,13 +1031,18 @@ final class MacPlayerViewModel: ObservableObject {
         playerItem.select(options[index], in: group)
     }
 
-    private func applySubtitleSelection(_ index: Int?) async -> Bool {
+    private func applySubtitleSelection(
+        _ index: Int?,
+        generation: UInt64? = nil
+    ) async -> Bool {
+        guard isCurrentMediaGeneration(generation) else { return false }
         embeddedSubtitleActive = false
         currentSubtitleText = nil
 
         guard let index else {
             activeExternalSubtitleID = nil
             await externalSubtitleManager.clear()
+            guard isCurrentMediaGeneration(generation) else { return false }
             if usesKSPlayer {
                 await ksEngine?.selectSubtitleTrack(index: nil)
             } else {
@@ -925,15 +1059,19 @@ final class MacPlayerViewModel: ObservableObject {
                 return false
             }
             await selectEmbeddedSubtitleTrack(nil)
+            guard isCurrentMediaGeneration(generation) else { return false }
             switch SubtitleFormat.detect(from: fileURL) {
             case .srt, .vtt:
                 do {
                     try await externalSubtitleManager.load(from: fileURL)
+                    guard isCurrentMediaGeneration(generation) else { return false }
                     await externalSubtitleManager.setDelay(config.subtitleDelay)
+                    guard isCurrentMediaGeneration(generation) else { return false }
                     activeExternalSubtitleID = track.id
                     updateExternalSubtitle(at: currentTime)
                     return true
                 } catch {
+                    guard isCurrentMediaGeneration(generation) else { return false }
                     activeExternalSubtitleID = nil
                     alertMessage = error.localizedDescription
                     return false
@@ -949,15 +1087,22 @@ final class MacPlayerViewModel: ObservableObject {
 
         activeExternalSubtitleID = nil
         await externalSubtitleManager.clear()
+        guard isCurrentMediaGeneration(generation) else { return false }
         if usesKSPlayer {
             embeddedSubtitleActive = true
             await ksEngine?.selectSubtitleTrack(index: index)
+            guard isCurrentMediaGeneration(generation) else { return false }
             currentSubtitleText = nil
             return true
         }
         await selectEmbeddedSubtitleTrack(index)
+        guard isCurrentMediaGeneration(generation) else { return false }
         embeddedSubtitleActive = true
         return true
+    }
+
+    private func isCurrentMediaGeneration(_ generation: UInt64?) -> Bool {
+        generation == nil || generation == mediaGeneration
     }
 
     private func selectEmbeddedSubtitleTrack(_ index: Int?) async {
@@ -971,13 +1116,17 @@ final class MacPlayerViewModel: ObservableObject {
     }
 
     private func updateExternalSubtitle(at time: TimeInterval) {
-        guard activeExternalSubtitleID != nil else { return }
-        Task { [weak self] in
+        guard let subtitleID = activeExternalSubtitleID else { return }
+        let generation = mediaGeneration
+        externalSubtitleCueTask?.cancel()
+        externalSubtitleCueTask = Task { [weak self] in
             guard let self else { return }
             let cue = await externalSubtitleManager.cue(at: time)
-            await MainActor.run {
-                guard self.activeExternalSubtitleID != nil else { return }
-                self.currentSubtitleText = cue?.text
+            guard !Task.isCancelled,
+                  mediaGeneration == generation,
+                  activeExternalSubtitleID == subtitleID else { return }
+            if currentSubtitleText != cue?.text {
+                currentSubtitleText = cue?.text
             }
         }
     }
@@ -990,16 +1139,17 @@ final class MacPlayerViewModel: ObservableObject {
         return (maxExternalID ?? (Self.externalSubtitleIDOffset - 1)) + 1
     }
 
-    private func applyPreferredSubtitleIfNeeded() async {
-        guard !subtitleTracks.isEmpty else { return }
+    private func applyPreferredSubtitleIfNeeded(generation: UInt64? = nil) async {
+        guard isCurrentMediaGeneration(generation), !subtitleTracks.isEmpty else { return }
 
         switch resolveSavedSubtitleSelection() {
         case .off:
             config.selectedSubtitleTrack = nil
-            _ = await applySubtitleSelection(nil)
+            _ = await applySubtitleSelection(nil, generation: generation)
             return
         case .track(let savedIndex):
-            if await applySubtitleSelection(savedIndex) {
+            if await applySubtitleSelection(savedIndex, generation: generation),
+               isCurrentMediaGeneration(generation) {
                 config.selectedSubtitleTrack = savedIndex
             }
             return
@@ -1010,7 +1160,7 @@ final class MacPlayerViewModel: ObservableObject {
         let subtitleAutoLoad = UserDefaults.standard.object(forKey: "subtitle.autoLoad") as? Bool ?? true
         if !subtitleAutoLoad {
             config.selectedSubtitleTrack = nil
-            _ = await applySubtitleSelection(nil)
+            _ = await applySubtitleSelection(nil, generation: generation)
             return
         }
 
@@ -1019,7 +1169,8 @@ final class MacPlayerViewModel: ObservableObject {
             return
         }
 
-        if await applySubtitleSelection(preferredIndex) {
+        if await applySubtitleSelection(preferredIndex, generation: generation),
+           isCurrentMediaGeneration(generation) {
             config.selectedSubtitleTrack = preferredIndex
         }
     }
@@ -1210,8 +1361,16 @@ final class MacPlayerViewModel: ObservableObject {
             let password = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
             let config = ConnectionConfig(from: connection, password: password)
             try await service.connect(config: config)
+            guard !Task.isCancelled else {
+                await service.disconnect()
+                return []
+            }
 
             let siblings = try await service.listDirectory(path: parentPath)
+            guard !Task.isCancelled else {
+                await service.disconnect()
+                return []
+            }
             let matches = siblings.filter { file in
                 guard !file.isDirectory else { return false }
                 let stem = (file.name as NSString).deletingPathExtension
@@ -1230,6 +1389,10 @@ final class MacPlayerViewModel: ObservableObject {
             let cacheDir = try Self.remoteSubtitleCacheDirectory()
             var tracks: [SubtitleTrackInfo] = []
             for (index, file) in matches.enumerated() {
+                guard !Task.isCancelled else {
+                    await service.disconnect()
+                    return []
+                }
                 let localURL = cacheDir.appendingPathComponent("\(item.id.uuidString)-\(file.name)")
                 do {
                     try await service.download(file: file, to: localURL, progress: { _ in })
@@ -1500,7 +1663,7 @@ final class MacPlayerViewModel: ObservableObject {
         case "concat":
             return true
         default:
-            return false
+            return PrefetchConfig.isMediaServerStreamURL(url)
         }
     }
 

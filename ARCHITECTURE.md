@@ -347,6 +347,7 @@ Scanning persists catalog URLs in the `vanmo://playback/...` form instead of sto
 - It listens on a random `127.0.0.1` port.
 - Each item receives a token and a `PrefetchSession`.
 - `RemoteFetcher`, `RangeCache`, and temporary files handle remote Range requests and caching.
+- Response preparation remains actor-isolated, but each `NWConnection` reads and sends its body outside `PrefetchProxy` actor isolation so an abandoned long response cannot block a newer seek request. HTTP uses the established 16-chunk pipeline by default (Debug can compare 4/8/16 through `VANMO_PREFETCH_PIPELINE_DEPTH`); actor-backed SMB, FTP, and SFTP sources use one in-flight chunk. Upstream HTTP chunk reads require a matching `206 Content-Range`; an ignored Range response is rejected instead of being cached as a 256 KiB slice. Session unregister waits for byte-source close, in-flight cancellation, and temporary-cache removal.
 - Header providers come from `StreamingRequestHeaders` and inject dynamic credentials such as Google Drive bearer tokens and the Baidu Netdisk User-Agent. Play and Google/Baidu cover extraction share that helper. iOS play falls back to `KSOptions.appendHeader` only when prefetch registration fails; it does not open those sources without headers.
 - `smb://`, `ftp://`, and `sftp://` registrations use protocol-specific byte sources. KSPlayer loads the localhost proxy for FTP and SFTP on both platforms.
 
@@ -433,6 +434,7 @@ Interface-language settings on both apps expose the three options and remind the
 
 - `AVPlayerEngine` wraps AVPlayer, native media selection, system buffering state, and text subtitles.
 - `KSPlayerEngine` handles FFmpeg demuxing and decoding, software-decode fallback after hardware-decode failure, rich-text/image subtitles, chapters, and Picture in Picture adaptation. Direct `smb` / `ftp` / `sftp` loads hold `LibavformatOpenGate` from `prepareToPlay` until shutdown plus a short close drain so probe and cover extraction cannot open a second libsmbclient context.
+- Vanmo no longer retries every KSPlayer source-open failure by reopening the full session with hardware decoding disabled. KSPlayer keeps its decoder-level VideoToolbox-to-FFmpeg fallback; network, authentication, cancellation, and container-open failures remain source errors instead of silently becoming a hot software-only session.
 - iOS configures KSPlayer's process-wide audio output as `AudioRendererPlayer` before registering probe and thumbnail providers. This keeps probe, cover extraction, and playback off the `AudioEnginePlayer` format-connection path that can abort on a multichannel-to-device format mismatch.
 - The direct iOS `KSMEPlayer` adapter also configures and observes its sample-buffer Picture in Picture controller instead of relying on `KSPlayerLayer`, which Vanmo does not instantiate. Inactive/background presentation transitions keep the engine alive while PiP starts; normal active dismissal still performs the unified player and prefetch cleanup.
 
@@ -442,6 +444,7 @@ Interface-language settings on both apps expose the three options and remind the
 - Resume position, progress persistence, completion state, and CloudKit change markers.
 - Emby/Jellyfin playback reporting.
 - External and online subtitles with preference restoration.
+- Remote external-subtitle listing and download starts after playback and is generation-guarded, so it cannot delay first play or write stale tracks after an episode switch.
 - Episode lists and episode switching.
 - Live-stream retries, gesture state, playback rate, and chapters.
 
@@ -454,6 +457,8 @@ macOS does not reuse the iOS `PlayerEngine` implementation:
 - `MacPlayerEngineFactory` returns an engine kind that the ViewModel uses to select the implementation.
 
 This supports AppKit window and keyboard-command integration, but creates two playback orchestration paths that must remain behaviorally aligned.
+
+macOS follows the same post-play, generation-guarded remote-subtitle discovery and KS source-error policy as iOS. Its KS seek bridge uses bounded one-shot completion so a missing callback cannot leak a continuation. The persistent AVPlayer time-control observer remains installed across item loads; per-item and KS subscriptions are still replaced during engine cleanup.
 
 ## 8. Key Data Flows
 

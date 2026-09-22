@@ -26,7 +26,7 @@ This document defines Vanmo's durable rules for credentials, persisted data, URL
 - Log only the minimum diagnostic context, such as source type, safe host/path fragments, object identifiers, state, error type, and timing.
 - Never log complete tokens, cookies, authorization headers, passwords, private media contents, or complete authenticated URLs.
 - The localhost prefetch proxy must remain bound to loopback and use unguessable per-item session tokens.
-- Device debugging uses local console output. Remote log collection or telemetry requires explicit authorization and a separate security review.
+- Device debugging uses local console output through `VanmoLogger`. Do not add `print`, `NSLog`, a raw `os.Logger`, remote log collection, or telemetry without explicit authorization and a separate security review.
 
 ## Privacy Manifests
 
