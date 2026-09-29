@@ -46,8 +46,10 @@ public enum PrefetchConfig {
     /// prefetch 会把首包截成数 KB，4K 首帧出不来。
     public static func isMediaServerStreamURL(_ url: URL) -> Bool {
         let path = url.path.lowercased()
-        guard path.contains("/videos/") else { return false }
-        return path.contains("/stream")
+        if path.contains("/videos/"), path.contains("/stream") || path.contains("/master.m3u8") {
+            return true
+        }
+        return path.contains("/transcode/universal/start.m3u8")
     }
 
     /// Prefetch 二次 GET 会掐掉第一条 body；Emby/Jellyfin 直连上

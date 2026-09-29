@@ -4,6 +4,7 @@ This folder contains current user-visible behavior and acceptance targets. It do
 
 ## Active Specifications
 
+- [`ios-player-controls.md`](ios-player-controls.md): iOS seek-preview frames, client-side quality cap, skip-intro markers plus local memory, and AirPlay route limits
 - [`playback-performance.md`](playback-performance.md): iOS and macOS playback performance matrix, local Debug diagnostics, lifecycle and cleanup requirements, and evidence-based AVFoundation / KSPlayer routing acceptance
 - [`media-detail-metadata.md`](media-detail-metadata.md): iOS and macOS detail pages render base catalog fields immediately, progressively publish cached/detail/season/collection/episode results to component-scoped state, and keep artwork caching outside the metadata critical path
 - [`ios-subtitles-and-appearance.md`](ios-subtitles-and-appearance.md): iOS live subtitle-style previews and rendering semantics, MediaDetail Liquid Glass actions, and Follow System / Day / Night appearance

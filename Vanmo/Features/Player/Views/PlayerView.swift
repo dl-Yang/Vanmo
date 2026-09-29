@@ -12,6 +12,7 @@ struct PlayerView: View {
     @StateObject private var pictureInPicture = PlayerPictureInPictureController()
     @State private var showSpeedPicker = false
     @State private var showScaleModePicker = false
+    @State private var showQualityPicker = false
     @State private var dragAxis: DragAxis?
     @State private var lastVerticalTranslation: CGFloat = 0
     @State private var isClosingPlayer = false
@@ -45,6 +46,14 @@ struct PlayerView: View {
             Color.black.ignoresSafeArea()
 
             videoLayer
+
+            if let holdImage = viewModel.qualityHoldImage {
+                Image(uiImage: holdImage)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
 
             if case .error(let message) = viewModel.playbackState {
                 VStack(spacing: 8) {
@@ -88,7 +97,7 @@ struct PlayerView: View {
                 rateBoostIndicator
             }
 
-            if showSpeedPicker || showScaleModePicker {
+            if showSpeedPicker || showScaleModePicker || showQualityPicker {
                 Color.clear
                     .contentShape(Rectangle())
                     .ignoresSafeArea()
@@ -96,6 +105,7 @@ struct PlayerView: View {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showSpeedPicker = false
                             showScaleModePicker = false
+                            showQualityPicker = false
                         }
                     }
             }
@@ -106,6 +116,10 @@ struct PlayerView: View {
 
             if showScaleModePicker {
                 scalePickerPanel
+            }
+
+            if showQualityPicker {
+                qualityPickerPanel
             }
 
         }
@@ -185,6 +199,7 @@ struct PlayerView: View {
                 .ignoresSafeArea()
         } else if let ksView = viewModel.ksPlayerVideoView {
             KSPlayerVideoLayer(videoView: ksView, scaleMode: viewModel.config.scaleMode)
+                .id(ObjectIdentifier(ksView))
                 .ignoresSafeArea()
         }
     }
@@ -300,6 +315,10 @@ struct PlayerView: View {
             Spacer()
 
             HStack(spacing: 16) {
+                AirPlayRouteButton()
+                    .frame(width: 28, height: 28)
+                    .accessibilityLabel(L10n.tr("投屏"))
+
                 if pictureInPicture.isSupported && viewModel.canShowPictureInPictureButton {
                     Button {
                         if viewModel.avPlayer != nil {
@@ -326,15 +345,14 @@ struct PlayerView: View {
                     }
                 }
 
-                if !viewModel.chapters.isEmpty {
-                    Button {
-                        viewModel.showChapterList = true
-                    } label: {
-                        Image(systemName: "list.bullet")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
+                Button {
+                    viewModel.showChapterList = true
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.title3)
+                        .foregroundStyle(.white)
                 }
+                .accessibilityLabel(L10n.tr("章节与片头"))
 
                 Button {
                     viewModel.showTrackSelector = true
@@ -357,8 +375,27 @@ struct PlayerView: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
+                        showQualityPicker.toggle()
+                        showSpeedPicker = false
+                        showScaleModePicker = false
+                    }
+                } label: {
+                    Text(viewModel.videoQuality.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                }
+                .accessibilityLabel(L10n.tr("画质"))
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
                         showSpeedPicker.toggle()
                         showScaleModePicker = false
+                        showQualityPicker = false
                     }
                 } label: {
                     Text("\(viewModel.config.playbackRate, specifier: "%.1f")x")
@@ -375,6 +412,7 @@ struct PlayerView: View {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showScaleModePicker.toggle()
                         showSpeedPicker = false
+                        showQualityPicker = false
                     }
                 } label: {
                     Image(systemName: viewModel.config.scaleMode.icon)
@@ -441,24 +479,48 @@ struct PlayerView: View {
             }
         } else {
             VStack(spacing: 8) {
+                if viewModel.canSkipIntro {
+                    HStack {
+                        Spacer()
+                        Button {
+                            viewModel.skipIntro()
+                        } label: {
+                            Text(L10n.tr("跳过片头"))
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Capsule())
+                        }
+                        .accessibilityLabel(L10n.tr("跳过片头"))
+                    }
+                }
+
                 PlayerProgressBar(
                     progress: viewModel.progress,
                     bufferProgress: viewModel.bufferProgress,
+                    previewImage: viewModel.seekPreviewImage,
+                    previewTimeText: viewModel.displayTime.formattedDuration,
                     isSeeking: $viewModel.isSeeking,
+                    onScrub: { fraction in
+                        viewModel.updateScrubTarget(fraction)
+                    },
                     onSeek: { fraction in
                         viewModel.seek(to: fraction * viewModel.duration)
                     }
                 )
 
                 HStack {
-                    Text(viewModel.currentTime.formattedDuration)
+                    Text(viewModel.displayTime.formattedDuration)
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.white.opacity(0.8))
 
                     Spacer()
 
-                    Text("-\((viewModel.duration - viewModel.currentTime).formattedDuration)")
+                    Text("-\((viewModel.duration - viewModel.displayTime).formattedDuration)")
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.white.opacity(0.8))
@@ -529,8 +591,22 @@ struct PlayerView: View {
 
     private var seekPreviewOverlay: some View {
         VStack(spacing: 8) {
-            Image(systemName: viewModel.seekPreviewForward ? "forward.fill" : "backward.fill")
-                .font(.title3)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(.white.opacity(0.08))
+                if let image = viewModel.seekPreviewImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: viewModel.seekPreviewForward ? "forward.fill" : "backward.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                }
+            }
+            .frame(width: 160, height: 90)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
             HStack(spacing: 4) {
                 Text(viewModel.seekTime.formattedDuration)
                     .foregroundStyle(.white)
@@ -638,6 +714,42 @@ struct PlayerView: View {
             }
         }
         .frame(width: 160)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.top, 56)
+        .padding(.trailing, 16 + iPhoneLandscapeHorizontalSafeArea)
+        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
+    }
+
+    private var qualityPickerPanel: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(viewModel.availableVideoQualities.enumerated()), id: \.element) { index, quality in
+                Button {
+                    viewModel.setVideoQuality(quality)
+                    withAnimation(.easeInOut(duration: 0.2)) { showQualityPicker = false }
+                } label: {
+                    HStack {
+                        Text(quality.displayName)
+                        Spacer()
+                        if viewModel.videoQuality == quality {
+                            Image(systemName: "checkmark")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                if index < viewModel.availableVideoQualities.count - 1 {
+                    Divider().overlay(.white.opacity(0.15))
+                }
+            }
+        }
+        .frame(width: 150)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
@@ -836,6 +948,17 @@ struct KSPlayerVideoLayer: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
+        if videoView.superview !== uiView {
+            uiView.subviews.forEach { $0.removeFromSuperview() }
+            videoView.translatesAutoresizingMaskIntoConstraints = false
+            uiView.addSubview(videoView)
+            NSLayoutConstraint.activate([
+                videoView.leadingAnchor.constraint(equalTo: uiView.leadingAnchor),
+                videoView.trailingAnchor.constraint(equalTo: uiView.trailingAnchor),
+                videoView.topAnchor.constraint(equalTo: uiView.topAnchor),
+                videoView.bottomAnchor.constraint(equalTo: uiView.bottomAnchor),
+            ])
+        }
         videoView.contentMode = scaleMode.uiViewContentMode
     }
 }
@@ -984,6 +1107,10 @@ struct ChapterListView: View {
     var body: some View {
         NavigationStack {
             List {
+                if viewModel.chapters.isEmpty {
+                    Text(L10n.tr("暂无章节"))
+                        .foregroundStyle(.secondary)
+                }
                 ForEach(viewModel.chapters) { chapter in
                     Button {
                         viewModel.seekToChapter(chapter)
@@ -1008,8 +1135,15 @@ struct ChapterListView: View {
                     }
                     .tint(.primary)
                 }
+
+                Button {
+                    viewModel.markIntroEnd()
+                    dismiss()
+                } label: {
+                    Text(L10n.tr("将当前时间设为片头结束"))
+                }
             }
-            .navigationTitle(L10n.tr("章节"))
+            .navigationTitle(L10n.tr("章节与片头"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

@@ -1,5 +1,6 @@
-import Foundation
+import CoreGraphics
 import CoreMedia
+import Foundation
 
 public enum PlaybackState: Equatable {
     case idle, loading, playing, paused, buffering, error(String), ended
@@ -45,11 +46,82 @@ public struct PlayerConfig: Sendable {
     public init() {}
 }
 
+public enum PlaybackVideoQuality: String, CaseIterable, Sendable {
+    case p360
+    case p480
+    case p720
+    case p1080
+    case original
+
+    public var displayName: String {
+        switch self {
+        case .p360: return "360p"
+        case .p480: return "480p"
+        case .p720: return "720p"
+        case .p1080: return "1080p"
+        case .original: return L10n.tr("原画")
+        }
+    }
+
+    public var maxHeight: Int? {
+        switch self {
+        case .p360: return 360
+        case .p480: return 480
+        case .p720: return 720
+        case .p1080: return 1080
+        case .original: return nil
+        }
+    }
+
+    public var ffmpegScaleFilter: String? {
+        guard let maxHeight else { return nil }
+        return "scale=-2:\(maxHeight)"
+    }
+
+    public var preferredMaximumResolution: CGSize? {
+        guard let maxHeight else { return nil }
+        return CGSize(width: (maxHeight * 16) / 9, height: maxHeight)
+    }
+
+    public var preferredPeakBitRate: Double? {
+        switch self {
+        case .p360: return 1_000_000
+        case .p480: return 2_500_000
+        case .p720: return 5_000_000
+        case .p1080: return 8_000_000
+        case .original: return nil
+        }
+    }
+
+    public func isAvailable(sourceHeight: Int?) -> Bool {
+        guard let maxHeight, let sourceHeight, sourceHeight > 0 else { return true }
+        return sourceHeight >= maxHeight
+    }
+
+    public static func resolved(
+        requested: PlaybackVideoQuality,
+        sourceHeight: Int?
+    ) -> PlaybackVideoQuality {
+        guard !requested.isAvailable(sourceHeight: sourceHeight) else { return requested }
+        return .original
+    }
+}
+
 public enum PlaybackPreferences {
     public static let hardwareDecodingKey = "playback.hardwareDecoding"
     public static let audioOutputModeKey = "audio.outputMode"
+    public static let videoQualityKey = "playback.videoQuality"
     public static var hardwareDecodingEnabled: Bool {
         UserDefaults.standard.object(forKey: hardwareDecodingKey) as? Bool ?? true
+    }
+    public static var videoQuality: PlaybackVideoQuality {
+        get {
+            let raw = UserDefaults.standard.string(forKey: videoQualityKey) ?? PlaybackVideoQuality.original.rawValue
+            return PlaybackVideoQuality(rawValue: raw) ?? .original
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: videoQualityKey)
+        }
     }
 
 #if DEBUG

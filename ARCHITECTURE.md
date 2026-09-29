@@ -446,7 +446,11 @@ Interface-language settings on both apps expose the three options and remind the
 - External and online subtitles with preference restoration.
 - Remote external-subtitle listing and download starts after playback and is generation-guarded, so it cannot delay first play or write stale tracks after an episode switch.
 - Episode lists and episode switching.
-- Live-stream retries, gesture state, playback rate, and chapters.
+- Live-stream retries, gesture state, playback rate, chapters, video quality, local intro-skip marks, and seek-preview requests.
+- KSPlayer seek preview uses a second muted player created on the first scrub. Media-server URLs open directly. SMB, FTP, SFTP, and other proxied sources use a new prefetch token so the playback body is not cancelled. The preview player is shut down with playback. AVPlayer seek preview still uses a serial `AVAssetImageGenerator`. iOS SMB playback stays a direct `smb://` open and does not take a second libavformat context for preview.
+- Quality options (`360p`–`1080p` plus original) persist in `PlaybackPreferences`. Emby and Jellyfin lower choices call PlaybackInfo and open the returned transcoding playlist with AVPlayer. Plex lower choices open a transcoded `start.m3u8`. Original stays the direct file URL. If the transcode URL fails to open, playback falls back to that direct URL. A multi-variant HLS item already on AVPlayer changes `preferredMaximumResolution` and `preferredPeakBitRate` in place. Local files and SMB/FTP/SFTP keep the original bitstream. Media-server stream and transcode URLs bypass prefetch.
+- Skip Intro appears when the current time is inside a chapter-title, Emby/Jellyfin/Plex marker, or locally stored intro window.
+- The AirPlay route picker is always visible. Video AirPlay is enabled only on AVFoundation HTTP(S) MP4/HLS paths. KSPlayer formats show an unsupported-video-AirPlay notice.
 
 ### 7.3 macOS
 

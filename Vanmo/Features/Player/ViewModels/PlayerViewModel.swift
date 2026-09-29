@@ -39,6 +39,10 @@ final class PlayerViewModel: ObservableObject {
     @Published var isRateBoosting = false
     @Published var seekPreviewActive = false
     @Published var seekPreviewForward = true
+    @Published var seekPreviewImage: UIImage?
+    @Published var scrubTargetTime: TimeInterval?
+    @Published var videoQuality = PlaybackPreferences.videoQuality
+    @Published var introWindow: IntroSkipWindow?
     @Published var notice: PlayerNotice?
     @Published private(set) var onlineSubtitleResults: [OnlineSubtitleResult] = []
     @Published private(set) var isSearchingOnlineSubtitles = false
@@ -46,10 +50,11 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var downloadingOnlineSubtitleID: String?
     @Published private(set) var onlineSubtitleStatusMessage: String?
 
-    let engine: PlayerEngine
+    private(set) var engine: PlayerEngine
     private var item: MediaItem
     private var modelContext: ModelContext?
     private var cancellables = Set<AnyCancellable>()
+    private var engineCancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
     private var prefetchToken: String?
     private var didStopPlaybackResources = false
@@ -64,6 +69,26 @@ final class PlayerViewModel: ObservableObject {
     private var externalSubtitleTracks: [SubtitleTrackInfo] = []
     private var discChapters: [Chapter] = []
     private var seekBaseTime: TimeInterval?
+    private var seekPreviewTask: Task<Void, Never>?
+    private var seekPreviewRequestedTime: TimeInterval?
+    private var previewWarmTask: Task<Void, Never>?
+    private var previewWarmDuration: TimeInterval = 0
+    private let scrubPreviewLane = ScrubPreviewLane()
+    private var directPlaybackURL: URL?
+    private var activePlaybackURL: URL?
+    private var playbackTimeOrigin: TimeInterval = 0
+    private var qualityClockMode: QualityClockMode = .direct
+    private var qualityClockCorrectUntil: CFAbsoluteTime = 0
+    private var qualityClockFrozenAt: TimeInterval?
+    private var qualityReloadID: UInt64 = 0
+    private var programDuration: TimeInterval = 0
+    @Published var qualityHoldImage: UIImage?
+    private var clearQualityHoldOnFrame = false
+    private var qualitySwitchTask: Task<Void, Never>?
+    private var previewLaneURL: URL?
+    private var previewLaneHeaders: [String: String] = [:]
+    private var previewLaneHeaderProvider: (() async -> [String: String])?
+    private var introMarkerTask: Task<Void, Never>?
     private var playbackSession: EmbyPlaybackSession?
     private var didReportWatchedToServer = false
     #if os(iOS)
@@ -71,6 +96,13 @@ final class PlayerViewModel: ObservableObject {
     #endif
 
     private static let externalSubtitleIDOffset = 10_000
+
+    private enum QualityClockMode {
+        case direct
+        case pending
+        case relative
+        case absolute
+    }
 
     var canSelectEpisode: Bool {
         !episodeGroups.isEmpty
@@ -115,9 +147,53 @@ final class PlayerViewModel: ObservableObject {
         return (engine as? KSPlayerEngine)?.isPictureInPicturePossible == true
     }
 
+    var supportsVideoAirPlay: Bool {
+        (engine as? AirPlayRouting)?.supportsVideoAirPlay == true
+    }
+
+    var canSkipIntro: Bool {
+        guard let introWindow, !isLiveStream else { return false }
+        return introWindow.contains(displayTime)
+    }
+
+    var displayTime: TimeInterval {
+        if seekPreviewActive { return seekTime }
+        if let scrubTargetTime { return scrubTargetTime }
+        return currentTime
+    }
+
+    var availableVideoQualities: [PlaybackVideoQuality] {
+        PlaybackVideoQuality.allCases.filter { quality in
+            quality == .original || quality.isAvailable(sourceHeight: item.videoHeight)
+        }
+    }
+
     // MARK: - Setup
 
     private func setupBindings() {
+        bindEngine()
+
+        NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.handleAirPlayRouteChange()
+            }
+            .store(in: &cancellables)
+
+#if DEBUG
+        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { notification in
+                let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+                let type = rawType.flatMap { AVAudioSession.InterruptionType(rawValue: $0) }
+                let typeName = String(describing: type)
+                VanmoLogger.player.info("[Debug][PiP] audioInterruption type=\(typeName, privacy: .public)")
+            }
+            .store(in: &cancellables)
+#endif
+    }
+
+    private func bindEngine() {
         engine.statePublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] state in
@@ -125,28 +201,47 @@ final class PlayerViewModel: ObservableObject {
                 self?.playbackState = state
                 self?.handleLiveStreamStateIfNeeded(state)
             }
-            .store(in: &cancellables)
+            .store(in: &engineCancellables)
 
         engine.currentTimePublisher
             .receive(on: DispatchQueue.main)
             .map { $0.seconds }
             .filter { $0.isFinite && !$0.isNaN }
             .sink { [weak self] time in
-                self?.currentTime = time
-                self?.updateExternalSubtitle(at: time)
-                self?.reportPlaybackTimeUpdate(at: time)
+                guard let self else { return }
+                if let frozen = self.qualityClockFrozenAt {
+                    self.currentTime = frozen
+                    return
+                }
+                self.reconcileQualityClock(engineTime: time)
+                let absolute = time + self.playbackTimeOrigin
+                self.currentTime = absolute
+                if self.clearQualityHoldOnFrame, time > 0.2 {
+                    self.qualityHoldImage = nil
+                    self.clearQualityHoldOnFrame = false
+                }
+                self.updateExternalSubtitle(at: absolute)
+                self.reportPlaybackTimeUpdate(at: absolute)
             }
-            .store(in: &cancellables)
+            .store(in: &engineCancellables)
 
         engine.durationPublisher
             .receive(on: DispatchQueue.main)
             .map { $0.seconds }
             .filter { $0.isFinite && !$0.isNaN }
             .sink { [weak self] dur in
+                guard let self else { return }
+                if self.playbackTimeOrigin > 0, self.programDuration > dur + 5 {
+                    return
+                }
                 VanmoLogger.player.info("[PlayerVM] duration updated: \(dur)s")
-                self?.duration = dur
+                self.duration = dur
+                if dur > self.programDuration {
+                    self.programDuration = dur
+                }
+                self.startSeekPreviewWarmupIfNeeded()
             }
-            .store(in: &cancellables)
+            .store(in: &engineCancellables)
 
         engine.bufferProgressPublisher
             .receive(on: DispatchQueue.main)
@@ -159,7 +254,7 @@ final class PlayerViewModel: ObservableObject {
                 guard self?.activeExternalSubtitleID == nil else { return }
                 self?.currentSubtitleContent = content
             }
-            .store(in: &cancellables)
+            .store(in: &engineCancellables)
 
         if let ksEngine = engine as? KSPlayerEngine {
             ksEngine.pictureInPictureActivePublisher
@@ -167,17 +262,18 @@ final class PlayerViewModel: ObservableObject {
                 .receive(on: DispatchQueue.main)
                 .assign(to: &$isPictureInPictureActive)
         }
+    }
 
+    private func useEngine(for url: URL) {
+        let needsAV = url.path.lowercased().contains(".m3u8")
+        if needsAV == (engine is AVPlayerEngine) { return }
+        engine.stop()
+        engineCancellables.removeAll()
+        engine = needsAV ? AVPlayerEngine() : KSPlayerEngine()
+        bindEngine()
 #if DEBUG
-        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { notification in
-                let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
-                let type = rawType.flatMap { AVAudioSession.InterruptionType(rawValue: $0) }
-                let typeName = String(describing: type)
-                VanmoLogger.player.info("[Debug][PiP] audioInterruption type=\(typeName, privacy: .public)")
-            }
-            .store(in: &cancellables)
+        let name = needsAV ? "AVPlayer" : "KSPlayer"
+        VanmoLogger.player.info("[Debug][Player] event=videoQualityEngine engine=\(name, privacy: .public) path=\(url.safePlaybackLogDescription, privacy: .public)")
 #endif
     }
 
@@ -219,6 +315,8 @@ final class PlayerViewModel: ObservableObject {
             try await loadAndPlayCurrentItem()
             await loadEpisodesIfNeeded(modelContext: modelContext)
             scheduleHideControls()
+        } catch is CancellationError {
+            return
         } catch {
             VanmoLogger.player.error("[PlayerVM] load failed: \(error.localizedDescription)")
 #if DEBUG
@@ -259,6 +357,21 @@ final class PlayerViewModel: ObservableObject {
         subtitleDiscoveryTask = nil
         externalSubtitleCueTask?.cancel()
         externalSubtitleCueTask = nil
+        introMarkerTask?.cancel()
+        introMarkerTask = nil
+        seekPreviewTask?.cancel()
+        seekPreviewTask = nil
+        seekPreviewRequestedTime = nil
+        previewWarmTask?.cancel()
+        previewWarmTask = nil
+        previewWarmDuration = 0
+        scrubPreviewLane.close()
+        qualitySwitchTask?.cancel()
+        qualitySwitchTask = nil
+        qualityReloadID &+= 1
+        previewLaneURL = nil
+        previewLaneHeaders = [:]
+        previewLaneHeaderProvider = nil
         mediaGeneration &+= 1
         seekRequestGeneration &+= 1
         let stopPosition = currentTime
@@ -281,6 +394,18 @@ final class PlayerViewModel: ObservableObject {
         subtitleDiscoveryTask = nil
         externalSubtitleCueTask?.cancel()
         externalSubtitleCueTask = nil
+        introMarkerTask?.cancel()
+        introMarkerTask = nil
+        seekPreviewTask?.cancel()
+        seekPreviewTask = nil
+        seekPreviewRequestedTime = nil
+        previewWarmTask?.cancel()
+        previewWarmTask = nil
+        previewWarmDuration = 0
+        scrubPreviewLane.close()
+        qualitySwitchTask?.cancel()
+        qualitySwitchTask = nil
+        qualityReloadID &+= 1
         mediaGeneration &+= 1
         seekRequestGeneration &+= 1
         didStopPlaybackResources = false
@@ -290,12 +415,33 @@ final class PlayerViewModel: ObservableObject {
 
         let originalURL = await resolveCloudDriveStreamURLIfNeeded(item.fileURL)
         let playbackURL = await resolveDiscPlaybackURLIfNeeded(originalURL)
+        directPlaybackURL = playbackURL
+        let resolvedQuality = PlaybackVideoQuality.resolved(
+            requested: videoQuality,
+            sourceHeight: item.videoHeight
+        )
+        if resolvedQuality != videoQuality {
+            videoQuality = resolvedQuality
+            PlaybackPreferences.videoQuality = resolvedQuality
+        }
+        let qualified = await resolvedPlaybackURL(
+            direct: playbackURL,
+            quality: videoQuality,
+            startTime: item.lastPlaybackPosition
+        )
+        beginQualityClock(origin: qualified.timeOrigin)
+        if item.duration > 1 {
+            programDuration = item.duration
+            duration = item.duration
+        }
         let headerProvider = cloudDriveStreamingHeaderProvider()
+        previewLaneURL = playbackURL
+        previewLaneHeaderProvider = headerProvider
         let loadURL: URL
         var loadHeaders: [String: String] = [:]
-        if playbackURL.isFileURL || Self.shouldBypassPrefetch(for: playbackURL) {
-            loadURL = playbackURL
-            if PrefetchConfig.isMediaServerStreamURL(playbackURL) {
+        if qualified.url.isFileURL || Self.shouldBypassPrefetch(for: qualified.url) {
+            loadURL = qualified.url
+            if PrefetchConfig.isMediaServerStreamURL(qualified.url) {
                 VanmoLogger.player.info("[PlayerVM] media-server stream, skip prefetch")
             }
         } else if usesOfficialDownloadLink(), let headerProvider {
@@ -332,31 +478,57 @@ final class PlayerViewModel: ObservableObject {
             VanmoLogger.player.info("[PlayerVM] prefetch unavailable, loading remote URL directly")
         }
 
-        let startPosition: CMTime? = item.lastPlaybackPosition > 0
-            ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
-            : nil
-        VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s")
+        let startPosition: CMTime? = playbackTimeOrigin > 0 || item.lastPlaybackPosition <= 0
+            ? nil
+            : CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
+        let primeTime = playbackTimeOrigin > 1 ? playbackTimeOrigin : (startPosition?.seconds ?? 0)
+        await HlsTranscodePrimer.prime(playlistURL: loadURL, startTime: primeTime)
+        useEngine(for: loadURL)
+        VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s url=\(loadURL.safePlaybackLogDescription, privacy: .public)")
+#if DEBUG
+        let openSummary = PlaybackQualityStream.debugSummary(of: loadURL)
+        VanmoLogger.player.info("[Debug][Player] event=videoQualityOpen quality=\(self.videoQuality.rawValue, privacy: .public) \(openSummary, privacy: .public)")
+#endif
+        var openedURL = loadURL
         do {
             try await loadEngine(url: loadURL, startPosition: startPosition, headers: loadHeaders)
         } catch {
             guard generation == mediaGeneration else { return }
-            throw error
+            guard loadURL != playbackURL else { throw error }
+            VanmoLogger.player.error("[PlayerVM] transcode open failed, falling back to direct url=\(playbackURL.safePlaybackLogDescription, privacy: .public)")
+#if DEBUG
+            let nsError = error as NSError
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=fallbackDirect domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public) path=\(playbackURL.safePlaybackLogDescription, privacy: .public)")
+            await Self.logQualityResponse(loadURL)
+#endif
+            playbackTimeOrigin = 0
+            qualityClockMode = .direct
+            let fallbackStart: CMTime? = item.lastPlaybackPosition > 0
+                ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
+                : nil
+            useEngine(for: playbackURL)
+            try await loadEngine(url: playbackURL, startPosition: fallbackStart, headers: loadHeaders)
+            openedURL = playbackURL
         }
         guard generation == mediaGeneration else {
             // close() 之后仍可能完成 engine.load() 并重建播放器；必须强制拆掉。
             stopPlaybackResources(force: true)
             return
         }
+        activePlaybackURL = openedURL
+        armQualityClockCorrection()
         VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
-        VanmoLogger.player.info("[PlayerVM] calling engine.play()")
-        engine.play()
-        VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
+        previewLaneHeaders = loadHeaders
+        configureSeekPreviewSource(originalURL: originalURL, headers: loadHeaders)
         audioTracks = await engine.availableAudioTracks()
         let embeddedSubtitleTracks = await engine.availableSubtitleTracks()
         guard generation == mediaGeneration else { return }
         subtitleTracks = embeddedSubtitleTracks
         await applyPreferredSubtitleIfNeeded(generation: generation)
         guard generation == mediaGeneration else { return }
+        VanmoLogger.player.info("[PlayerVM] calling engine.play()")
+        engine.play()
+        VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
         VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
         await updateDynamicRangeIfNeeded(for: originalURL)
         guard generation == mediaGeneration else { return }
@@ -383,6 +555,7 @@ final class PlayerViewModel: ObservableObject {
             guard let self else { return }
             let tracks = await discoverExternalSubtitleTracks(for: videoURL)
             guard !Task.isCancelled, generation == mediaGeneration else { return }
+            guard !tracks.isEmpty else { return }
             externalSubtitleTracks = tracks
             subtitleTracks = embeddedTracks + tracks
             await applyPreferredSubtitleIfNeeded(generation: generation)
@@ -396,10 +569,18 @@ final class PlayerViewModel: ObservableObject {
     private func resetPlaybackMetadata() {
         currentTime = 0
         duration = 0
+        playbackTimeOrigin = 0
+        qualityClockMode = .direct
+        qualityClockCorrectUntil = 0
+        qualityClockFrozenAt = nil
+        programDuration = 0
+        qualityHoldImage = nil
+        clearQualityHoldOnFrame = false
         bufferProgress = 0
         audioTracks = []
         subtitleTracks = []
         chapters = []
+        introWindow = nil
         currentSubtitleContent = nil
         activeExternalSubtitleID = nil
         activeRichSubtitleID = nil
@@ -522,13 +703,36 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func seek(to time: TimeInterval) {
-        let clampedTime = max(0, min(time, duration))
+        let limit = programDuration > 0 ? programDuration : duration
+        let clampedTime = max(0, min(time, limit > 0 ? limit : time))
         seekRequestGeneration &+= 1
         let seekGeneration = seekRequestGeneration
         let itemGeneration = mediaGeneration
+        if shouldReopenTranscode(at: clampedTime) {
+            let from = currentTime
+            qualityClockFrozenAt = clampedTime
+            currentTime = clampedTime
+            qualityReloadID &+= 1
+            let reloadID = qualityReloadID
+            qualitySwitchTask?.cancel()
+            qualitySwitchTask = Task { [weak self] in
+                guard let self else { return }
+#if DEBUG
+                VanmoLogger.player.info("[Debug][Player] event=videoQualitySeek mode=reopen time=\(clampedTime, privacy: .public) from=\(from, privacy: .public) hold=\(clampedTime, privacy: .public)")
+#endif
+                guard !Task.isCancelled, reloadID == self.qualityReloadID else { return }
+                await self.reopenTranscodedPlayback(
+                    at: clampedTime,
+                    generation: itemGeneration,
+                    reloadID: reloadID
+                )
+            }
+            return
+        }
         Task { [weak self] in
             guard let self else { return }
-            await engine.seek(to: CMTime(seconds: clampedTime, preferredTimescale: 600))
+            let engineTime = max(0, clampedTime - playbackTimeOrigin)
+            await engine.seek(to: CMTime(seconds: engineTime, preferredTimescale: 600))
             guard seekRequestGeneration == seekGeneration,
                   mediaGeneration == itemGeneration else { return }
             let isPaused = playbackState == .paused || playbackState == .ended
@@ -566,6 +770,329 @@ final class PlayerViewModel: ObservableObject {
         if let ksEngine = engine as? KSPlayerEngine {
             ksEngine.setContentMode(mode.uiViewContentMode)
         }
+    }
+
+    func setVideoQuality(_ quality: PlaybackVideoQuality) {
+        let resolved = PlaybackVideoQuality.resolved(requested: quality, sourceHeight: item.videoHeight)
+#if DEBUG
+        let sourceHeight = item.videoHeight ?? 0
+        VanmoLogger.player.info("[Debug][Player] event=videoQualitySelect requested=\(quality.rawValue, privacy: .public) resolved=\(resolved.rawValue, privacy: .public) current=\(self.videoQuality.rawValue, privacy: .public) sourceHeight=\(sourceHeight, privacy: .public)")
+#endif
+        guard resolved != videoQuality || quality != PlaybackPreferences.videoQuality else {
+#if DEBUG
+            VanmoLogger.player.info("[Debug][Player] event=videoQualitySkip reason=unchanged")
+#endif
+            return
+        }
+        videoQuality = resolved
+        PlaybackPreferences.videoQuality = resolved
+        let generation = mediaGeneration
+        qualityReloadID &+= 1
+        let reloadID = qualityReloadID
+        qualitySwitchTask?.cancel()
+        qualitySwitchTask = Task { [weak self] in
+            guard let self, !Task.isCancelled, reloadID == self.qualityReloadID else { return }
+            await self.applyVideoQualitySelection(resolved, generation: generation, reloadID: reloadID)
+        }
+    }
+
+    private func resolvedPlaybackURL(
+        direct: URL,
+        quality: PlaybackVideoQuality,
+        startTime: TimeInterval
+    ) async -> (url: URL, timeOrigin: TimeInterval) {
+        guard quality != .original,
+              let connectionType = currentMediaServerType() else {
+            return (direct, 0)
+        }
+        if engine is AVPlayerEngine, direct.path.lowercased().contains("m3u8") {
+            return (direct, 0)
+        }
+        if connectionType == .emby || connectionType == .jellyfin, let itemID = item.serverId {
+            if let transcoded = await EmbyTranscodeClient.transcodeURL(
+                directURL: direct,
+                itemID: itemID,
+                quality: quality,
+                startTime: startTime
+            ) {
+                return (transcoded, max(0, startTime))
+            }
+            return (direct, 0)
+        }
+        let transcoded = PlaybackQualityStream.playbackURL(
+            directURL: direct,
+            serverItemID: item.serverId,
+            connectionType: connectionType,
+            quality: quality,
+            startTime: startTime
+        )
+        guard transcoded != direct else { return (direct, 0) }
+        return (transcoded, max(0, startTime))
+    }
+
+    private func currentMediaServerType() -> ConnectionType? {
+        try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext)?.type
+    }
+
+    private func applyVideoQualitySelection(
+        _ quality: PlaybackVideoQuality,
+        generation: UInt64,
+        reloadID: UInt64
+    ) async {
+        guard generation == mediaGeneration else { return }
+        if let avEngine = engine as? AVPlayerEngine,
+           directPlaybackURL?.path.lowercased().contains("m3u8") == true {
+#if DEBUG
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityApply mode=variant quality=\(quality.rawValue, privacy: .public)")
+#endif
+            avEngine.applyVideoQuality(quality)
+            return
+        }
+        guard let direct = directPlaybackURL, let connectionType = currentMediaServerType() else {
+#if DEBUG
+            let hasDirect = directPlaybackURL != nil
+            VanmoLogger.player.info("[Debug][Player] event=videoQualitySkip reason=notServer hasDirect=\(hasDirect, privacy: .public)")
+#endif
+            return
+        }
+        let position = currentTime
+        let resolved = await resolvedPlaybackURL(direct: direct, quality: quality, startTime: position)
+        let target = resolved.url
+        let timeOrigin = resolved.timeOrigin
+        let startPosition: CMTime? = timeOrigin > 0 || position <= 0
+            ? nil
+            : CMTime(seconds: position, preferredTimescale: 600)
+#if DEBUG
+        let summary = PlaybackQualityStream.debugSummary(of: target)
+        let sameAsDirect = target == direct
+        VanmoLogger.player.info("[Debug][Player] event=videoQualityApply mode=reload quality=\(quality.rawValue, privacy: .public) server=\(String(describing: connectionType), privacy: .public) sameAsDirect=\(sameAsDirect, privacy: .public) origin=\(timeOrigin, privacy: .public) \(summary, privacy: .public)")
+#endif
+        await reloadPlaybackSource(
+            url: target,
+            startPosition: startPosition,
+            timeOrigin: timeOrigin,
+            generation: generation,
+            reloadID: reloadID
+        )
+    }
+
+    private func shouldReopenTranscode(at time: TimeInterval) -> Bool {
+        guard videoQuality != .original else { return false }
+        guard let type = currentMediaServerType(), type == .emby || type == .jellyfin else { return false }
+        guard activePlaybackURL?.path.lowercased().contains(".m3u8") == true else { return false }
+        if playbackTimeOrigin > 0, time + 0.5 < playbackTimeOrigin { return true }
+        return abs(time - currentTime) > 1
+    }
+
+    private func reopenTranscodedPlayback(
+        at time: TimeInterval,
+        generation: UInt64,
+        reloadID: UInt64
+    ) async {
+        guard generation == mediaGeneration,
+              let direct = directPlaybackURL,
+              let connectionType = currentMediaServerType() else { return }
+        let resolved = await resolvedPlaybackURL(direct: direct, quality: videoQuality, startTime: time)
+        let target = resolved.url
+        let timeOrigin = resolved.timeOrigin
+        let startPosition: CMTime? = timeOrigin > 0 || time <= 0
+            ? nil
+            : CMTime(seconds: time, preferredTimescale: 600)
+        await reloadPlaybackSource(
+            url: target,
+            startPosition: startPosition,
+            timeOrigin: timeOrigin,
+            generation: generation,
+            reloadID: reloadID
+        )
+    }
+
+    private func reloadPlaybackSource(
+        url: URL,
+        startPosition: CMTime?,
+        timeOrigin: TimeInterval,
+        generation: UInt64,
+        reloadID: UInt64? = nil
+    ) async {
+        guard generation == mediaGeneration else { return }
+        if let reloadID, reloadID != qualityReloadID || Task.isCancelled { return }
+        let previousURL = activePlaybackURL
+        let previousOrigin = playbackTimeOrigin
+        #if os(iOS)
+        if let ksEngine = engine as? KSPlayerEngine, let image = await ksEngine.currentThumbnail() {
+            qualityHoldImage = image
+            clearQualityHoldOnFrame = true
+        }
+        #endif
+        let frozen = timeOrigin > 0.5 ? timeOrigin : max(startPosition?.seconds ?? currentTime, 0)
+        qualityClockFrozenAt = frozen
+        currentTime = frozen
+        engine.pause()
+#if DEBUG
+        VanmoLogger.player.info("[Debug][Player] event=videoQualityHold time=\(frozen, privacy: .public)")
+#endif
+        VanmoLogger.player.info("[PlayerVM] videoQuality reload url=\(url.safePlaybackLogDescription, privacy: .public) origin=\(timeOrigin, privacy: .public)")
+        let mediaTime = timeOrigin > 1 ? timeOrigin : max(0, startPosition?.seconds ?? 0)
+        do {
+            try await openEngine(url: url, startPosition: startPosition, mediaTime: mediaTime)
+            guard generation == mediaGeneration, !Task.isCancelled else { return }
+            if let reloadID, reloadID != qualityReloadID { return }
+            beginQualityClock(origin: timeOrigin)
+            qualityClockFrozenAt = nil
+            activePlaybackURL = url
+            armQualityClockCorrection()
+            engine.playbackRate = config.playbackRate
+            engine.play()
+#if DEBUG
+            let summary = PlaybackQualityStream.debugSummary(of: url)
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=opened \(summary, privacy: .public)")
+#endif
+        } catch {
+            let stale = Task.isCancelled
+                || generation != mediaGeneration
+                || (reloadID.map { $0 != qualityReloadID } ?? false)
+            if stale { return }
+            qualityHoldImage = nil
+            clearQualityHoldOnFrame = false
+            qualityClockFrozenAt = nil
+            playbackTimeOrigin = previousOrigin
+            qualityClockMode = previousOrigin > 0.5 ? .pending : .direct
+            VanmoLogger.player.error("[PlayerVM] videoQuality reload failed: \(error.localizedDescription)")
+#if DEBUG
+            let nsError = error as NSError
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=reloadFailed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
+            await Self.logQualityResponse(url)
+#endif
+            guard let previousURL, previousURL != url else { return }
+            let restoreStart: CMTime? = previousOrigin > 0
+                ? nil
+                : CMTime(seconds: max(0, currentTime), preferredTimescale: 600)
+            let restoreTime = previousOrigin > 1 ? previousOrigin : max(0, currentTime)
+            do {
+                try await openEngine(url: previousURL, startPosition: restoreStart, mediaTime: restoreTime)
+                activePlaybackURL = previousURL
+                armQualityClockCorrection()
+                engine.playbackRate = config.playbackRate
+                engine.play()
+#if DEBUG
+                let summary = PlaybackQualityStream.debugSummary(of: previousURL)
+                VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=restored \(summary, privacy: .public)")
+#endif
+            } catch {
+                VanmoLogger.player.error("[PlayerVM] videoQuality restore failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func beginQualityClock(origin: TimeInterval) {
+        playbackTimeOrigin = origin
+        qualityClockMode = origin > 0.5 ? .pending : .direct
+        qualityClockCorrectUntil = 0
+    }
+
+    private func armQualityClockCorrection() {
+        guard qualityClockMode == .pending || qualityClockMode == .relative else { return }
+        qualityClockCorrectUntil = CFAbsoluteTimeGetCurrent() + 12
+    }
+
+    private func reconcileQualityClock(engineTime: TimeInterval) {
+        guard qualityClockMode == .pending || qualityClockMode == .relative else { return }
+        guard engineTime >= 0.25 else { return }
+        let origin = playbackTimeOrigin
+        guard origin > 0.5 else {
+            qualityClockMode = .direct
+            return
+        }
+        let looksAbsolute = abs(engineTime - origin) < 15
+        if qualityClockMode == .pending {
+            if looksAbsolute {
+                adoptAbsoluteQualityClock(engineTime: engineTime, origin: origin)
+            } else {
+                qualityClockMode = .relative
+#if DEBUG
+                VanmoLogger.player.info("[Debug][Player] event=videoQualityClock mode=relative engineTime=\(engineTime, privacy: .public) origin=\(origin, privacy: .public) displayed=\(engineTime + origin, privacy: .public)")
+#endif
+            }
+            return
+        }
+        if looksAbsolute, CFAbsoluteTimeGetCurrent() < qualityClockCorrectUntil {
+            adoptAbsoluteQualityClock(engineTime: engineTime, origin: origin)
+        }
+    }
+
+    private func adoptAbsoluteQualityClock(engineTime: TimeInterval, origin: TimeInterval) {
+        playbackTimeOrigin = 0
+        qualityClockMode = .absolute
+#if DEBUG
+        VanmoLogger.player.info("[Debug][Player] event=videoQualityClock mode=absolute engineTime=\(engineTime, privacy: .public) droppedOrigin=\(origin, privacy: .public) displayed=\(engineTime, privacy: .public)")
+#endif
+    }
+
+    private func openEngine(url: URL, startPosition: CMTime?, mediaTime: TimeInterval) async throws {
+        await HlsTranscodePrimer.prime(playlistURL: url, startTime: mediaTime)
+        try Task.checkCancellation()
+        useEngine(for: url)
+        if let avEngine = engine as? AVPlayerEngine {
+            try await avEngine.replacePlaybackItem(url: url, startPosition: startPosition)
+        } else {
+            try await loadEngine(url: url, startPosition: startPosition, headers: previewLaneHeaders)
+        }
+    }
+
+#if DEBUG
+    private static func logQualityResponse(_ url: URL) async {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 8
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        do {
+            let (bytes, response) = try await session.bytes(for: request)
+            var data = Data()
+            for try await byte in bytes {
+                data.append(byte)
+                if data.count >= 120 { break }
+            }
+            let http = response as? HTTPURLResponse
+            let status = http?.statusCode ?? -1
+            let type = http?.value(forHTTPHeaderField: "Content-Type") ?? "none"
+            let prefix = String(data: data.prefix(80), encoding: .utf8) ?? ""
+            let playlist = prefix.contains("#EXTM3U")
+            let lowered = prefix.lowercased()
+            let snippet = (lowered.contains("api_key") || lowered.contains("token"))
+                ? "redacted"
+                : prefix.replacingOccurrences(of: "\n", with: " ")
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityProbe status=\(status, privacy: .public) type=\(type, privacy: .public) playlist=\(playlist, privacy: .public) bytes=\(data.count, privacy: .public) body=\(snippet, privacy: .public)")
+        } catch {
+            let nsError = error as NSError
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityProbe status=transport domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
+        }
+    }
+#endif
+
+    func updateScrubTarget(_ fraction: Double?) {
+        guard let fraction, duration > 0 else {
+            seekPreviewRequestedTime = nil
+            scrubTargetTime = nil
+            return
+        }
+        let time = max(0, min(duration, fraction * duration))
+        scrubTargetTime = time
+        requestSeekPreview(at: time)
+    }
+
+    func skipIntro() {
+        guard let introWindow else { return }
+        seek(to: introWindow.end)
+        showControlsBriefly()
+    }
+
+    func markIntroEnd() {
+        let end = max(currentTime, 1)
+        let key = IntroSkipStore.mediaKey(for: item)
+        IntroSkipStore.save(manualEnd: end, for: key)
+        refreshIntroWindow(serverWindow: introWindow)
+        showNotice(title: L10n.tr("已标记片头结束"), message: end.formattedDuration)
     }
 
     func toggleKSPictureInPicture() {
@@ -1258,6 +1785,48 @@ final class PlayerViewModel: ObservableObject {
         } else if let ksEngine = engine as? KSPlayerEngine {
             chapters = ksEngine.availableChapters
         }
+        refreshIntroWindow(serverWindow: nil)
+        loadIntroMarkersIfNeeded()
+    }
+
+    private func refreshIntroWindow(serverWindow: IntroSkipWindow?) {
+        let key = IntroSkipStore.mediaKey(for: item)
+        introWindow = IntroSkipResolver.window(
+            chapters: chapters,
+            serverWindow: serverWindow,
+            manualEnd: IntroSkipStore.manualEnd(for: key)
+        )
+    }
+
+    private func loadIntroMarkersIfNeeded() {
+        introMarkerTask?.cancel()
+        guard let serverId = item.serverId else { return }
+        let generation = mediaGeneration
+        introMarkerTask = Task { [weak self] in
+            guard let self else { return }
+            let window = await self.fetchServerIntroWindow(serverId: serverId)
+            guard !Task.isCancelled, generation == mediaGeneration else { return }
+            refreshIntroWindow(serverWindow: window)
+        }
+    }
+
+    private func fetchServerIntroWindow(serverId: String) async -> IntroSkipWindow? {
+        guard let snapshot = try? MediaServerConnectionResolver.snapshot(for: item, in: modelContext) else {
+            return nil
+        }
+        do {
+            switch snapshot.type {
+            case .emby, .jellyfin:
+                return try await EmbyIntroMarkerFetcher.fetchWindow(itemId: serverId, connection: snapshot)
+            case .plex:
+                return try await PlexIntroMarkerFetcher.fetchWindow(ratingKey: serverId, connection: snapshot)
+            default:
+                return nil
+            }
+        } catch {
+            VanmoLogger.player.info("[PlayerVM] intro marker fetch failed")
+            return nil
+        }
     }
 
     private func resolveDiscPlaybackURLIfNeeded(_ url: URL) async -> URL {
@@ -1454,6 +2023,7 @@ final class PlayerViewModel: ObservableObject {
         let target = max(0, min(base + delta, duration))
         seekTime = target
         seekPreviewForward = target >= base
+        requestSeekPreview(at: target)
     }
 
     func commitSeekGesture() {
@@ -1461,7 +2031,96 @@ final class PlayerViewModel: ObservableObject {
         seek(to: seekTime)
         seekBaseTime = nil
         seekPreviewActive = false
+        seekPreviewRequestedTime = nil
+        seekPreviewImage = nil
         showControlsBriefly()
+    }
+
+    private func requestSeekPreview(at time: TimeInterval) {
+        if engine is KSPlayerEngine, let originalURL = previewLaneURL {
+            scrubPreviewLane.onFrame = { [weak self] image in
+                self?.seekPreviewImage = image
+            }
+            scrubPreviewLane.request(
+                at: time,
+                originalURL: originalURL,
+                headers: previewLaneHeaders,
+                headerProvider: previewLaneHeaderProvider
+            )
+            return
+        }
+
+        seekPreviewRequestedTime = time
+        if let cached = (engine as? SeekPreviewProviding)?.cachedPreview(at: time) {
+            seekPreviewImage = cached
+        }
+        if seekPreviewTask != nil {
+            (engine as? SeekPreviewProviding)?.cancelPreviewGeneration()
+            return
+        }
+        seekPreviewTask = Task { [weak self] in
+            await self?.runSeekPreviewLoop()
+        }
+    }
+
+    private func startSeekPreviewWarmupIfNeeded() {
+        guard duration > 1, abs(duration - previewWarmDuration) > 0.5 else { return }
+        guard engine is SeekPreviewProviding else { return }
+        previewWarmDuration = duration
+        previewWarmTask?.cancel()
+        let warmDuration = duration
+        previewWarmTask = Task { [weak self] in
+            var time: TimeInterval = 0
+            var failures = 0
+            while time < warmDuration, !Task.isCancelled {
+                guard let self else { return }
+                if self.seekPreviewRequestedTime != nil {
+                    try? await Task.sleep(for: .milliseconds(200))
+                    continue
+                }
+                let provider = self.engine as? SeekPreviewProviding
+                if provider?.hasExactCachedPreview(at: time) != true {
+                    _ = await provider?.previewFrame(at: time, maxPixelSize: 160)
+                    if self.seekPreviewRequestedTime != nil {
+                        continue
+                    }
+                    if provider?.hasExactCachedPreview(at: time) == true {
+                        failures = 0
+                    } else {
+                        failures += 1
+                        if failures >= 3 { return }
+                    }
+                }
+                time += 6
+            }
+        }
+    }
+
+    private func runSeekPreviewLoop() async {
+        defer { seekPreviewTask = nil }
+        while let time = seekPreviewRequestedTime {
+            seekPreviewRequestedTime = nil
+            let image = await (engine as? SeekPreviewProviding)?
+                .previewFrame(at: time, maxPixelSize: 240)
+            guard !Task.isCancelled else { return }
+            if let image {
+                seekPreviewImage = image
+            }
+        }
+    }
+
+    private func configureSeekPreviewSource(originalURL: URL, headers: [String: String]) {
+        guard let ksEngine = engine as? KSPlayerEngine else { return }
+        let previewURL: URL?
+        if LibavformatOpenGate.needsExclusiveOpen(originalURL) {
+            previewURL = nil
+        } else {
+            let scheme = originalURL.scheme?.lowercased() ?? ""
+            previewURL = originalURL.isFileURL || scheme == "http" || scheme == "https"
+                ? originalURL
+                : nil
+        }
+        ksEngine.configureSeekPreview(sourceURL: previewURL, headers: headers)
     }
 
     /// 整体长按时将播放速度提升至最高倍速，松手恢复。
@@ -1602,6 +2261,16 @@ final class PlayerViewModel: ObservableObject {
             try? await Task.sleep(for: .seconds(after))
             withAnimation { self[keyPath: keyPath] = nil }
         }
+    }
+
+    private func handleAirPlayRouteChange() {
+        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        let isAirPlay = outputs.contains { $0.portType == .airPlay }
+        guard isAirPlay, !supportsVideoAirPlay, !isLiveStream else { return }
+        showNotice(
+            title: L10n.tr("当前格式不支持视频投屏"),
+            message: L10n.tr("可用系统屏幕镜像")
+        )
     }
 
     private func showNotice(title: String, message: String) {

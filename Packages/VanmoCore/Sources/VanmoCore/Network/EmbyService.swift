@@ -1723,6 +1723,41 @@ public enum EmbyItemDetailFetcher {
     }
 }
 
+public enum EmbyIntroMarkerFetcher {
+    public static func fetchWindow(
+        itemId: String,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> IntroSkipWindow? {
+        let service = try await EmbyConnectionHelper.connect(connection)
+        defer { Task { await service.disconnect() } }
+        return try await fetchWindow(itemId: itemId, context: try service.makeSessionContext())
+    }
+
+    private static func fetchWindow(
+        itemId: String,
+        context: EmbySessionContext
+    ) async throws -> IntroSkipWindow? {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("\(context.apiPrefix)Users/\(context.userId)/Items/\(itemId)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "Fields", value: "Chapters"),
+            URLQueryItem(name: "api_key", value: context.token),
+        ]
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue(context.token, forHTTPHeaderField: "X-Emby-Token")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateEmbyResponse(response, body: data, context: "fetch intro chapters")
+        return try IntroMarkerParser.embyWindow(from: data)
+    }
+}
+
 public enum EmbyCollectionsFetcher {
     public static func fetchCollections(
         containing itemId: String,

@@ -76,6 +76,233 @@ protocol PlayerEngine: AnyObject {
     var subtitleContentPublisher: AnyPublisher<SubtitleContent?, Never> { get }
 }
 
+protocol SeekPreviewProviding: AnyObject {
+    func previewFrame(at time: TimeInterval, maxPixelSize: Int) async -> UIImage?
+    func cachedPreview(at time: TimeInterval) -> UIImage?
+    func hasExactCachedPreview(at time: TimeInterval) -> Bool
+    func cancelPreviewGeneration()
+}
+
+extension SeekPreviewProviding {
+    func cachedPreview(at time: TimeInterval) -> UIImage? { nil }
+    func hasExactCachedPreview(at time: TimeInterval) -> Bool { false }
+    func cancelPreviewGeneration() {}
+}
+
+/// 串行抽帧，避免预热和拖动同时打同一个 `AVAssetImageGenerator`。
+final class SeekPreviewSerializer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var tail: Task<Void, Never>?
+
+    func run<T: Sendable>(_ work: @escaping @Sendable () async -> T) async -> T {
+        lock.lock()
+        let previous = tail
+        let box = Task<T, Never> {
+            await previous?.value
+            return await work()
+        }
+        tail = Task {
+            _ = await box.value
+        }
+        lock.unlock()
+        return await box.value
+    }
+}
+
+private final class EmbyHlsResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
+    let queue = DispatchQueue(label: "vanmo.hls.rewrite")
+
+    func resourceLoader(
+        _ resourceLoader: AVAssetResourceLoader,
+        shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest
+    ) -> Bool {
+        guard let source = Self.sourceURL(from: loadingRequest.request.url) else {
+            loadingRequest.finishLoading(with: URLError(.badURL))
+            return true
+        }
+        let requestedStart = Self.startTime(from: loadingRequest.request.url)
+        let startTime = requestedStart > 1 ? requestedStart : Self.startTime(in: source)
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: source)
+                let text = String(data: data, encoding: .utf8) ?? ""
+                let rewritten = EmbyHlsPlaylist.muxedMaster(playlist: text, baseURL: source)
+                let started = EmbyHlsPlaylist.applyingStart(playlist: rewritten.playlist, startTime: startTime)
+                let nested = Self.wrapNestedPlaylists(started, startTime: startTime)
+                let playlist = await HlsSegmentFixServer.shared.rewrite(playlist: nested)
+#if DEBUG
+                let injected = playlist.contains("#EXT-X-START")
+                VanmoLogger.player.info("[Debug][Player] event=videoQualityPlaylist removedAudioGroups=\(rewritten.removedAudioGroups, privacy: .public) startOffset=\(startTime, privacy: .public) injectedStart=\(injected, privacy: .public)")
+#endif
+                let output = Data(playlist.utf8)
+                loadingRequest.contentInformationRequest?.contentType = "public.m3u-playlist"
+                loadingRequest.contentInformationRequest?.contentLength = Int64(output.count)
+                loadingRequest.contentInformationRequest?.isByteRangeAccessSupported = false
+                if let dataRequest = loadingRequest.dataRequest {
+                    let start = Int(dataRequest.requestedOffset)
+                    let end = min(output.count, start + dataRequest.requestedLength)
+                    if start < output.count, start <= end {
+                        dataRequest.respond(with: output.subdata(in: start..<end))
+                    }
+                }
+                loadingRequest.finishLoading()
+            } catch {
+                loadingRequest.finishLoading(with: error)
+            }
+        }
+        return true
+    }
+
+    private static func sourceURL(from url: URL?) -> URL? {
+        guard let url,
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let src = items.first(where: { $0.name == "src" })?.value else {
+            return nil
+        }
+        return URL(string: src)
+    }
+
+    private static func startTime(from url: URL?) -> TimeInterval {
+        guard let url,
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let raw = items.first(where: { $0.name == "start" })?.value,
+              let value = Double(raw) else {
+            return 0
+        }
+        return value
+    }
+
+    fileprivate static func startTime(in url: URL) -> TimeInterval {
+        guard let ticks = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name.caseInsensitiveCompare("StartTimeTicks") == .orderedSame })?
+            .value,
+              let value = Double(ticks) else {
+            return 0
+        }
+        return value / 10_000_000
+    }
+
+    /// 子播放列表写上 `#EXT-X-START`。媒体分段不走自定义协议，否则 AVPlayer 会解析失败并退回原画。
+    fileprivate static func wrapNestedPlaylists(_ playlist: String, startTime: TimeInterval) -> String {
+        guard startTime > 1 else { return playlist }
+        return playlist.components(separatedBy: "\n").map { line in
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("#"),
+                  trimmed.lowercased().contains(".m3u8"),
+                  let url = URL(string: trimmed),
+                  let scheme = url.scheme?.lowercased(),
+                  scheme == "http" || scheme == "https" else {
+                return line
+            }
+            return proxyPlaylistURL(url, startTime: startTime).absoluteString
+        }.joined(separator: "\n")
+    }
+
+    private static func respond(
+        _ loadingRequest: AVAssetResourceLoadingRequest,
+        data: Data,
+        contentType: String
+    ) {
+        loadingRequest.contentInformationRequest?.contentType = contentType
+        loadingRequest.contentInformationRequest?.contentLength = Int64(data.count)
+        loadingRequest.contentInformationRequest?.isByteRangeAccessSupported = true
+        if let dataRequest = loadingRequest.dataRequest {
+            let start = max(0, Int(dataRequest.requestedOffset))
+            if start < data.count {
+                let remaining = data.count - start
+                let length = dataRequest.requestedLength > remaining ? remaining : dataRequest.requestedLength
+                if length > 0 {
+                    dataRequest.respond(with: data.subdata(in: start..<(start + length)))
+                }
+            }
+        }
+        loadingRequest.finishLoading()
+    }
+
+    fileprivate static func proxyPlaylistURL(_ url: URL, startTime: TimeInterval) -> URL {
+        var components = URLComponents()
+        components.scheme = "vanmo-hls"
+        components.host = "playlist"
+        components.path = EmbyHlsPlaylist.playbackProxyPath(for: url)
+        var items = [URLQueryItem(name: "src", value: url.absoluteString)]
+        if startTime > 1 {
+            items.append(URLQueryItem(name: "start", value: String(format: "%.3f", startTime)))
+        }
+        components.queryItems = items
+        return components.url ?? url
+    }
+}
+
+private final class AVReadyContinuationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var cancellable: AnyCancellable?
+    private var finished = false
+    private var pendingError: Error?
+
+    func arm(_ continuation: CheckedContinuation<Void, Error>) {
+        lock.lock()
+        if finished {
+            let error = pendingError
+            lock.unlock()
+            if let error {
+                continuation.resume(throwing: error)
+            } else {
+                continuation.resume()
+            }
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func retain(_ cancellable: AnyCancellable) {
+        lock.lock()
+        if finished {
+            lock.unlock()
+            return
+        }
+        self.cancellable = cancellable
+        lock.unlock()
+    }
+
+    func resume() {
+        finish(returning: nil)
+    }
+
+    func fail(_ error: Error) {
+        finish(returning: error)
+    }
+
+    private func finish(returning error: Error?) {
+        lock.lock()
+        if finished {
+            lock.unlock()
+            return
+        }
+        finished = true
+        pendingError = error
+        let continuation = continuation
+        self.continuation = nil
+        cancellable = nil
+        lock.unlock()
+        if let error {
+            continuation?.resume(throwing: error)
+        } else {
+            continuation?.resume()
+        }
+    }
+}
+
+protocol VideoQualityApplying: AnyObject {
+    func applyVideoQuality(_ quality: PlaybackVideoQuality)
+}
+
+protocol AirPlayRouting: AnyObject {
+    var supportsVideoAirPlay: Bool { get }
+}
+
 enum EngineType {
     case avFoundation
     case ksPlayer
@@ -90,12 +317,18 @@ extension PlayerEngine {
     }
 }
 
-final class AVPlayerEngine: NSObject, PlayerEngine {
+final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQualityApplying, AirPlayRouting {
     private var player: AVPlayer?
     private var playerItem: AVPlayerItem?
+    private var playbackURL: URL?
     private var timeObserver: Any?
     private var legibleOutput: AVPlayerItemLegibleOutput?
     private var cancellables = Set<AnyCancellable>()
+    private var previewGenerator: AVAssetImageGenerator?
+    private var previewCache: [Int: UIImage] = [:]
+    private var previewCacheOrder: [Int] = []
+    private let previewSerializer = SeekPreviewSerializer()
+    private var hlsRewriteLoader: EmbyHlsResourceLoader?
 
     private let stateSubject = CurrentValueSubject<PlaybackState, Never>(.idle)
     private let currentTimeSubject = CurrentValueSubject<CMTime, Never>(.zero)
@@ -154,15 +387,19 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
 #endif
         stateSubject.send(.loading)
 
-        let (cleanURL, options) = Self.assetURL(from: url)
-        let asset = AVURLAsset(url: cleanURL, options: options)
+        let (cleanURL, asset) = makePlaybackAsset(from: url)
         VanmoLogger.player.info("[AVEngine] AVURLAsset created, isPlayable check pending")
         let playerItem = AVPlayerItem(asset: asset)
+        self.playbackURL = cleanURL
         self.playerItem = playerItem
+        if !Self.isTranscodedPlaylist(cleanURL) {
+            Self.assignVideoQuality(PlaybackPreferences.videoQuality, to: playerItem)
+        }
 
         // HDR 输出：让系统按帧应用 HDR 动态元数据（HDR10+/Dolby Vision），
         // 在支持 EDR 的屏幕上获得正确的高动态范围呈现。iOS 自动管理 SDR/HDR 切换。
-        playerItem.appliesPerFrameHDRDisplayMetadata = true
+        // 转码 HLS 关掉这项，避免画面比声音多走一截显示延迟。
+        playerItem.appliesPerFrameHDRDisplayMetadata = !Self.isTranscodedPlaylist(cleanURL)
         if PlayerCapabilityProbe.isHDRCandidate(url: cleanURL) {
             VanmoLogger.player.info("[AVEngine] HDR candidate detected, per-frame HDR metadata enabled")
         }
@@ -173,8 +410,22 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         playerItem.add(output)
         self.legibleOutput = output
 
-        let player = AVPlayer(playerItem: playerItem)
+        let player = AVPlayer()
+        player.allowsExternalPlayback = Self.supportsVideoAirPlay(for: cleanURL)
+        player.usesExternalPlaybackWhileExternalScreenIsActive = player.allowsExternalPlayback
+        if Self.isTranscodedPlaylist(cleanURL) {
+            player.automaticallyWaitsToMinimizeStalling = true
+        }
+        player.replaceCurrentItem(with: playerItem)
         self.player = player
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 240, height: 240)
+        generator.requestedTimeToleranceBefore = .positiveInfinity
+        generator.requestedTimeToleranceAfter = .positiveInfinity
+        previewCache.removeAll()
+        previewCacheOrder.removeAll()
+        previewGenerator = generator
 
         setupObservers(for: playerItem, player: player)
 
@@ -186,6 +437,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         VanmoLogger.player.info("[AVEngine] waiting for playerItem to become ready...")
         try await waitForReady(playerItem)
         VanmoLogger.player.info("[AVEngine] playerItem is ready, duration: \(playerItem.duration.seconds)s")
+        await alignTracksIfNeeded()
 #if DEBUG
         if let startedAt = performanceLoadStartedAt {
             let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
@@ -218,6 +470,73 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
 #endif
     }
 
+    func replacePlaybackItem(url: URL, startPosition: CMTime?) async throws {
+        guard let player else {
+            try await load(url: url, startPosition: startPosition)
+            return
+        }
+        VanmoLogger.player.info("[AVEngine] replace item url=\(url.safePlaybackLogDescription, privacy: .public)")
+        if let timeObserver {
+            player.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
+        cancellables.removeAll()
+        legibleOutput = nil
+        stateSubject.send(.loading)
+
+        let (cleanURL, asset) = makePlaybackAsset(from: url)
+        let playerItem = AVPlayerItem(asset: asset)
+        playbackURL = cleanURL
+        self.playerItem = playerItem
+        if !Self.isTranscodedPlaylist(cleanURL) {
+            Self.assignVideoQuality(PlaybackPreferences.videoQuality, to: playerItem)
+        }
+        playerItem.appliesPerFrameHDRDisplayMetadata = !Self.isTranscodedPlaylist(cleanURL)
+        let output = AVPlayerItemLegibleOutput()
+        output.setDelegate(self, queue: .main)
+        output.suppressesPlayerRendering = true
+        playerItem.add(output)
+        legibleOutput = output
+        player.replaceCurrentItem(with: playerItem)
+
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 240, height: 240)
+        generator.requestedTimeToleranceBefore = .positiveInfinity
+        generator.requestedTimeToleranceAfter = .positiveInfinity
+        previewCache.removeAll()
+        previewCacheOrder.removeAll()
+        previewGenerator = generator
+        setupObservers(for: playerItem, player: player)
+        if let startPosition, startPosition.seconds > 0 {
+            await player.seek(to: startPosition, toleranceBefore: .zero, toleranceAfter: .zero)
+        }
+        try await waitForReady(playerItem)
+        await alignTracksIfNeeded()
+    }
+
+    func alignTracksIfNeeded() async {
+        guard let player, let playerItem else { return }
+        guard Self.isTranscodedPlaylist(playbackURL) else { return }
+        player.automaticallyWaitsToMinimizeStalling = true
+        let time = playerItem.currentTime()
+        let seekable = playerItem.seekableTimeRanges.first?.timeRangeValue
+        let likely = playerItem.isPlaybackLikelyToKeepUp
+#if DEBUG
+        let seekStart = seekable?.start.seconds ?? -1
+        let seekEnd = seekable.map { $0.start.seconds + $0.duration.seconds } ?? -1
+        VanmoLogger.player.info("[Debug][Player] event=videoQualitySync likely=\(likely, privacy: .public) engineTime=\(time.seconds, privacy: .public) seekable=\(seekStart, privacy: .public)-\(seekEnd, privacy: .public)")
+#endif
+#if DEBUG
+        VanmoLogger.player.info("[Debug][Player] event=videoQualitySync result=kept engineTime=\(time.seconds, privacy: .public)")
+#endif
+    }
+
+    private static func isTranscodedPlaylist(_ url: URL?) -> Bool {
+        guard let query = url?.query?.lowercased() else { return false }
+        return query.contains("segmentcontainer") || query.contains("maxheight")
+    }
+
     func stop() {
         VanmoLogger.player.info("[AVEngine] stop()")
         if let timeObserver, let player {
@@ -230,6 +549,11 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
         player?.replaceCurrentItem(with: nil)
         player = nil
         playerItem = nil
+        playbackURL = nil
+        previewGenerator = nil
+        hlsRewriteLoader = nil
+        previewCache.removeAll()
+        previewCacheOrder.removeAll()
         stateSubject.send(.idle)
         currentTimeSubject.send(.zero)
         durationSubject.send(.zero)
@@ -250,12 +574,12 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     func selectSubtitleTrack(index: Int?) async {
         guard let item = playerItem,
               let group = try? await item.asset.loadMediaSelectionGroup(for: .legible) else { return }
+        let current = item.currentMediaSelection.selectedMediaOption(in: group)
         if let index {
             let options = group.options
-            if index < options.count {
-                item.select(options[index], in: group)
-            }
-        } else {
+            guard index < options.count, current != options[index] else { return }
+            item.select(options[index], in: group)
+        } else if current != nil {
             item.select(nil, in: group)
             subtitleContentSubject.send(nil)
         }
@@ -292,6 +616,35 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
     }
 
     // MARK: - URL Credential Handling
+
+    private func makePlaybackAsset(from url: URL) -> (URL, AVURLAsset) {
+        let (cleanURL, options) = Self.assetURL(from: url)
+        let playbackURL = Self.wrappedPlaylistURL(cleanURL)
+        let asset = AVURLAsset(url: playbackURL, options: options)
+        if playbackURL.scheme == "vanmo-hls" {
+            let loader = EmbyHlsResourceLoader()
+            hlsRewriteLoader = loader
+            asset.resourceLoader.setDelegate(loader, queue: loader.queue)
+        } else {
+            hlsRewriteLoader = nil
+        }
+        return (cleanURL, asset)
+    }
+
+    private static func wrappedPlaylistURL(_ url: URL) -> URL {
+        guard isTranscodedPlaylist(url) else { return url }
+        var components = URLComponents()
+        components.scheme = "vanmo-hls"
+        components.host = "playlist"
+        components.path = "/master.m3u8"
+        var items = [URLQueryItem(name: "src", value: url.absoluteString)]
+        let start = EmbyHlsResourceLoader.startTime(in: url)
+        if start > 1 {
+            items.append(URLQueryItem(name: "start", value: String(format: "%.3f", start)))
+        }
+        components.queryItems = items
+        return components.url ?? url
+    }
 
     private static func assetURL(from url: URL) -> (URL, [String: Any]?) {
         guard let user = url.user, !user.isEmpty else {
@@ -429,20 +782,134 @@ final class AVPlayerEngine: NSObject, PlayerEngine {
 #endif
 
     private func waitForReady(_ item: AVPlayerItem) async throws {
-        for await status in item.publisher(for: \.status).values {
-            VanmoLogger.player.info("[AVEngine] waitForReady: status=\(status.rawValue)")
-            switch status {
-            case .readyToPlay:
-                VanmoLogger.player.info("[AVEngine] waitForReady: ready!")
-                return
-            case .failed:
-                let msg = item.error?.localizedDescription ?? "Unknown error"
-                VanmoLogger.player.error("[AVEngine] waitForReady: failed - \(msg)")
-                throw PlayerError.loadFailed(msg)
-            default:
-                continue
+        let current = item.status
+        VanmoLogger.player.info("[AVEngine] waitForReady: status=\(current.rawValue)")
+        switch current {
+        case .readyToPlay:
+            VanmoLogger.player.info("[AVEngine] waitForReady: ready!")
+            return
+        case .failed:
+            let message = item.error?.localizedDescription ?? "Unknown error"
+            VanmoLogger.player.error("[AVEngine] waitForReady: failed - \(message)")
+            throw PlayerError.loadFailed(message)
+        default:
+            break
+        }
+
+        let gate = AVReadyContinuationGate()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                gate.arm(continuation)
+                let cancellable = item.publisher(for: \.status)
+                    .receive(on: DispatchQueue.main)
+                    .sink { status in
+                        VanmoLogger.player.info("[AVEngine] waitForReady: status=\(status.rawValue)")
+                        switch status {
+                        case .readyToPlay:
+                            VanmoLogger.player.info("[AVEngine] waitForReady: ready!")
+                            gate.resume()
+                        case .failed:
+                            let message = item.error?.localizedDescription ?? "Unknown error"
+                            VanmoLogger.player.error("[AVEngine] waitForReady: failed - \(message)")
+                            gate.fail(PlayerError.loadFailed(message))
+                        default:
+                            break
+                        }
+                    }
+                gate.retain(cancellable)
+            }
+        } onCancel: {
+            gate.fail(CancellationError())
+        }
+    }
+
+    // MARK: - Quality and AirPlay
+
+    var supportsVideoAirPlay: Bool {
+        player?.allowsExternalPlayback == true
+    }
+
+    func applyVideoQuality(_ quality: PlaybackVideoQuality) {
+        guard let playerItem, let playbackURL else { return }
+        let path = playbackURL.path.lowercased()
+        guard path.hasSuffix(".m3u8") || path.contains(".m3u8") else {
+            VanmoLogger.player.info("[AVEngine] videoQuality saved for next open")
+            return
+        }
+        Self.assignVideoQuality(quality, to: playerItem)
+    }
+
+    func cachedPreview(at time: TimeInterval) -> UIImage? {
+        nearestCachedPreview(at: time)
+    }
+
+    func hasExactCachedPreview(at time: TimeInterval) -> Bool {
+        previewCache[Self.previewBucket(for: time)] != nil
+    }
+
+    func cancelPreviewGeneration() {
+        previewGenerator?.cancelAllCGImageGeneration()
+    }
+
+    func previewFrame(at time: TimeInterval, maxPixelSize: Int) async -> UIImage? {
+        let bucket = Self.previewBucket(for: time)
+        if let cached = previewCache[bucket] {
+            return cached
+        }
+        let generated = await previewSerializer.run { [weak self] () -> UIImage? in
+            guard let self, let previewGenerator = self.previewGenerator else { return nil }
+            if self.previewCache[bucket] != nil { return self.previewCache[bucket] }
+            previewGenerator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
+            let cmTime = CMTime(seconds: max(0, time), preferredTimescale: 600)
+            do {
+                let image = try await previewGenerator.image(at: cmTime).image
+                return UIImage(cgImage: image)
+            } catch {
+                return nil
             }
         }
+        if let generated {
+            storePreview(generated, bucket: bucket)
+            return generated
+        }
+        return nearestCachedPreview(at: time)
+    }
+
+    private static func assignVideoQuality(_ quality: PlaybackVideoQuality, to item: AVPlayerItem) {
+        item.preferredMaximumResolution = quality.preferredMaximumResolution ?? .zero
+        item.preferredPeakBitRate = quality.preferredPeakBitRate ?? 0
+    }
+
+    private func nearestCachedPreview(at time: TimeInterval) -> UIImage? {
+        guard !previewCache.isEmpty else { return nil }
+        let bucket = Self.previewBucket(for: time)
+        if let exact = previewCache[bucket] { return exact }
+        return previewCache.min { abs($0.key - bucket) < abs($1.key - bucket) }?.value
+    }
+
+    private func storePreview(_ image: UIImage, bucket: Int) {
+        if previewCache[bucket] == nil {
+            previewCacheOrder.append(bucket)
+        }
+        previewCache[bucket] = image
+        while previewCache.count > 360, let oldest = previewCacheOrder.first {
+            previewCacheOrder.removeFirst()
+            previewCache.removeValue(forKey: oldest)
+        }
+    }
+
+    private static func previewBucket(for time: TimeInterval) -> Int {
+        Int((max(0, time) / 2).rounded(.down))
+    }
+
+    static func supportsVideoAirPlay(for url: URL) -> Bool {
+        let scheme = url.scheme?.lowercased() ?? ""
+        guard scheme == "http" || scheme == "https" else { return false }
+        let ext = url.pathExtension.lowercased()
+        if ["mp4", "m4v", "mov", "m3u8", "m3u"].contains(ext) {
+            return true
+        }
+        return url.path.lowercased().contains(".m3u8")
     }
 }
 

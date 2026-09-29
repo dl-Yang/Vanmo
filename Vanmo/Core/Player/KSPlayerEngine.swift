@@ -7,7 +7,7 @@ import SwiftUI
 import UIKit
 import VanmoCore
 
-final class KSPlayerEngine: NSObject, PlayerEngine {
+final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQualityApplying, AirPlayRouting {
 
     // MARK: - Publishers
 
@@ -40,6 +40,16 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     // MARK: - KSPlayer
 
     private var player: KSMEPlayer?
+    private var playbackURL: URL?
+    private var playbackHeaders: [String: String] = [:]
+    private var previewSourceURL: URL?
+    private var previewGeneratorURL: URL?
+    private var previewGenerator: AVAssetImageGenerator?
+    private var previewCache: [Int: UIImage] = [:]
+    private var previewCacheOrder: [Int] = []
+    private var lastPreviewCacheBucket: Int?
+    private let previewSerializer = SeekPreviewSerializer()
+    private var appliedVideoQuality = PlaybackPreferences.videoQuality
     private let libavformatGateLock = NSLock()
     private var holdsLibavformatGate = false
     private let seekGenerationLock = NSLock()
@@ -109,6 +119,146 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         }
     }
 
+    var supportsVideoAirPlay: Bool { false }
+
+    func cachedPreview(at time: TimeInterval) -> UIImage? {
+        nearestCachedPreview(at: time)
+    }
+
+    func hasExactCachedPreview(at time: TimeInterval) -> Bool {
+        previewCache[Self.previewBucket(for: time)] != nil
+    }
+
+    func cancelPreviewGeneration() {
+        previewGenerator?.cancelAllCGImageGeneration()
+    }
+
+    func previewFrame(at time: TimeInterval, maxPixelSize: Int) async -> UIImage? {
+        let bucket = Self.previewBucket(for: time)
+        if let exact = previewCache[bucket] {
+            return exact
+        }
+        let generated = await previewSerializer.run { [weak self] () -> UIImage? in
+            guard let self else { return nil }
+            if let exact = self.previewCache[bucket] { return exact }
+            return await self.generateAssetPreview(at: time, maxPixelSize: maxPixelSize)
+        }
+        if let generated {
+            storePreview(generated, bucket: bucket)
+            return generated
+        }
+        return nearestCachedPreview(at: time)
+    }
+
+    func configureSeekPreview(sourceURL: URL?, headers: [String: String]) {
+        previewSourceURL = sourceURL
+        if !headers.isEmpty {
+            playbackHeaders = headers
+        }
+        preparePreviewGeneratorIfNeeded()
+    }
+
+    func applyVideoQuality(_ quality: PlaybackVideoQuality) {
+        appliedVideoQuality = quality
+    }
+
+    func currentThumbnail() async -> UIImage? {
+        guard let cgImage = await player?.thumbnailImageAtCurrentTime() else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+
+    private func cacheLivePreviewIfNeeded(at time: TimeInterval) {
+        let bucket = Self.previewBucket(for: time)
+        guard lastPreviewCacheBucket != bucket else { return }
+        lastPreviewCacheBucket = bucket
+        Task { @MainActor [weak self] in
+            guard let self, let cgImage = await self.player?.thumbnailImageAtCurrentTime() else { return }
+            self.storePreview(Self.scaledPreview(cgImage, maxPixelSize: 240), bucket: bucket)
+        }
+    }
+
+    private static func scaledPreview(_ image: CGImage, maxPixelSize: Int) -> UIImage {
+        let width = image.width
+        let height = image.height
+        let longest = max(width, height)
+        guard longest > maxPixelSize else { return UIImage(cgImage: image) }
+        let scale = CGFloat(maxPixelSize) / CGFloat(longest)
+        let size = CGSize(width: CGFloat(width) * scale, height: CGFloat(height) * scale)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { _ in
+            UIImage(cgImage: image).draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
+    private func nearestCachedPreview(at time: TimeInterval) -> UIImage? {
+        guard !previewCache.isEmpty else { return nil }
+        let bucket = Self.previewBucket(for: time)
+        if let exact = previewCache[bucket] { return exact }
+        return previewCache.min { abs($0.key - bucket) < abs($1.key - bucket) }?.value
+    }
+
+    private func storePreview(_ image: UIImage, bucket: Int) {
+        if previewCache[bucket] == nil {
+            previewCacheOrder.append(bucket)
+        }
+        previewCache[bucket] = image
+        while previewCache.count > 360, let oldest = previewCacheOrder.first {
+            previewCacheOrder.removeFirst()
+            previewCache.removeValue(forKey: oldest)
+        }
+    }
+
+    private static func previewBucket(for time: TimeInterval) -> Int {
+        Int((max(0, time) / 2).rounded(.down))
+    }
+
+    private func generateAssetPreview(at time: TimeInterval, maxPixelSize: Int) async -> UIImage? {
+        preparePreviewGeneratorIfNeeded()
+        guard let previewGenerator else { return nil }
+        previewGenerator.maximumSize = CGSize(width: maxPixelSize, height: maxPixelSize)
+        do {
+            let image = try await previewGenerator.image(
+                at: CMTime(seconds: max(0, time), preferredTimescale: 600)
+            ).image
+            return UIImage(cgImage: image)
+        } catch {
+            return nil
+        }
+    }
+
+    private func preparePreviewGeneratorIfNeeded() {
+        guard let url = previewableURL() else {
+            previewGenerator = nil
+            previewGeneratorURL = nil
+            return
+        }
+        if previewGenerator != nil, previewGeneratorURL == url {
+            return
+        }
+        var options: [String: Any] = [:]
+        if !playbackHeaders.isEmpty {
+            options["AVURLAssetHTTPHeaderFieldsKey"] = playbackHeaders
+        }
+        let asset = AVURLAsset(url: url, options: options)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 160, height: 160)
+        generator.requestedTimeToleranceBefore = .positiveInfinity
+        generator.requestedTimeToleranceAfter = .positiveInfinity
+        previewGenerator = generator
+        previewGeneratorURL = url
+    }
+
+    private func previewableURL() -> URL? {
+        let candidates = [previewSourceURL, playbackURL].compactMap { $0 }
+        return candidates.first { url in
+            guard !LibavformatOpenGate.needsExclusiveOpen(url),
+                  !PrefetchConfig.isProxyURL(url) else { return false }
+            let scheme = url.scheme?.lowercased() ?? ""
+            return url.isFileURL || scheme == "http" || scheme == "https"
+        }
+    }
+
     override init() {
         super.init()
         setupAudioSession()
@@ -140,6 +290,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
 #endif
         stateSubject.send(.loading)
 
+        playbackHeaders = headers
+        appliedVideoQuality = PlaybackPreferences.videoQuality
         let hardwareDecode = PlaybackPreferences.hardwareDecodingEnabled
         // KSPlayer already falls back from VideoToolbox to its FFmpeg decoder at
         // the decoder level. Retrying every open/auth/network failure with
@@ -150,7 +302,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
                 url: url,
                 startPosition: startPosition,
                 hardwareDecode: hardwareDecode,
-                headers: headers
+                headers: headers,
+                quality: appliedVideoQuality
             )
         } catch {
             await MainActor.run {
@@ -166,32 +319,23 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         url: URL,
         startPosition: CMTime?,
         hardwareDecode: Bool,
-        headers: [String: String]
+        headers: [String: String],
+        quality: PlaybackVideoQuality
     ) async throws {
-        let options = KSOptions()
-        if let startPosition, startPosition.seconds > 0 {
-            options.startPlayTime = startPosition.seconds
-        }
-        options.isAccurateSeek = true
-        // 缓冲水位：吸收稳态吞吐略低于码率时的抖动，降低 buffering 次数。
-        // Prefetch 代理会在第二次 GET 时取消第一条 body；KS isSecondOpen
-        // 正好会打出探测连接，导致满缓冲条假死直到用户 seek。
-        let disableSecondOpen = PrefetchConfig.shouldDisableSecondOpen(for: url)
-        options.isSecondOpen = !disableSecondOpen
-        options.preferredForwardBufferDuration = 10
-        options.maxBufferDuration = 60
-        options.formatContextOptions["buffer_size"] = 8 * 1024 * 1024
-
-        // 接通设置页「硬件解码优先」开关（VideoToolbox 硬解）。
-        // HDR 显示标准（preferredDisplayCriteria）由 KSPlayer 依据内容动态范围内部自动配置。
-        options.hardwareDecode = hardwareDecode
-        VanmoLogger.player.info("[KSEngine] hardwareDecode: \(hardwareDecode) isSecondOpen: \(!disableSecondOpen)")
-
-        if !headers.isEmpty {
-            options.appendHeader(headers)
-        }
-
-        Self.configureAudioOptions(options)
+        let options = makeOptions(
+            url: url,
+            startPosition: startPosition,
+            hardwareDecode: hardwareDecode,
+            headers: headers
+        )
+        let previousAudio = String(describing: KSOptions.audioPlayerType)
+        KSOptions.audioPlayerType = AudioRendererPlayer.self
+        VanmoLogger.player.info(
+            "[KSEngine] hardwareDecode: \(hardwareDecode) isSecondOpen: \(options.isSecondOpen) quality=\(quality.rawValue, privacy: .public)"
+        )
+#if DEBUG
+        VanmoLogger.player.info("[Debug][Player] event=ksCreate previousAudio=\(previousAudio, privacy: .public) audioOutput=AudioRendererPlayer url=\(url.safePlaybackLogDescription, privacy: .public)")
+#endif
 
         if LibavformatOpenGate.needsExclusiveOpen(url) {
             await LibavformatOpenGate.shared.acquire()
@@ -202,6 +346,12 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             let player = KSMEPlayer(url: url, options: options)
             player.delegate = self
             self.player = player
+            self.playbackURL = url
+            self.playbackHeaders = headers
+            self.previewCache.removeAll()
+            self.previewCacheOrder.removeAll()
+            self.lastPreviewCacheBucket = nil
+            self.preparePreviewGeneratorIfNeeded()
             self.refreshPictureInPictureController(for: player)
             player.prepareToPlay()
             return player
@@ -239,11 +389,15 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
     }
 
     func seek(to time: CMTime) async {
+        let wasPlaying = state == .playing || state == .buffering
+        await seek(to: time, resume: wasPlaying)
+    }
+
+    private func seek(to time: CMTime, resume: Bool) async {
         let seconds = time.seconds
         guard seconds.isFinite, seconds >= 0, let player else { return }
 
-        let wasPlaying = state == .playing || state == .buffering
-        shouldResumeAfterBuffering = wasPlaying
+        shouldResumeAfterBuffering = resume
         let generation = beginSeek()
 #if DEBUG
         let startedAt = CFAbsoluteTimeGetCurrent()
@@ -269,7 +423,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         VanmoLogger.player.info("[Debug][PlaybackPerf] event=seekEnd platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
 #endif
 
-        if wasPlaying {
+        if resume {
             player.play()
             stateSubject.send(.playing)
         }
@@ -302,6 +456,14 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         pictureInPictureActiveSubject.send(false)
         player?.shutdown()
         player = nil
+        playbackURL = nil
+        playbackHeaders = [:]
+        previewSourceURL = nil
+        previewGenerator = nil
+        previewGeneratorURL = nil
+        previewCache.removeAll()
+        previewCacheOrder.removeAll()
+        lastPreviewCacheBucket = nil
         selectedSubtitleSearchable = nil
         externalRichSubtitle = nil
         externalRichSubtitleDelay = 0
@@ -501,6 +663,32 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
         player?.contentMode = contentMode
     }
 
+    private func makeOptions(
+        url: URL,
+        startPosition: CMTime?,
+        hardwareDecode: Bool,
+        headers: [String: String]
+    ) -> KSOptions {
+        let options = KSOptions()
+        if let startPosition, startPosition.seconds > 0 {
+            options.startPlayTime = startPosition.seconds
+        }
+        options.isAccurateSeek = true
+        // 缓冲水位：吸收稳态吞吐略低于码率时的抖动，降低 buffering 次数。
+        // Prefetch 代理会在第二次 GET 时取消第一条 body；KS isSecondOpen
+        // 正好会打出探测连接，导致满缓冲条假死直到用户 seek。
+        options.isSecondOpen = !PrefetchConfig.shouldDisableSecondOpen(for: url)
+        options.preferredForwardBufferDuration = 10
+        options.maxBufferDuration = 60
+        options.formatContextOptions["buffer_size"] = 8 * 1024 * 1024
+        options.hardwareDecode = hardwareDecode
+        if !headers.isEmpty {
+            options.appendHeader(headers)
+        }
+        Self.configureAudioOptions(options)
+        return options
+    }
+
     @MainActor
     func disableAutomaticPictureInPicture() {
         guard #available(iOS 15.0, tvOS 15.0, *) else { return }
@@ -637,6 +825,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine {
             guard time.isFinite, !time.isNaN else { return }
             self.currentTimeSubject.send(CMTime(seconds: time, preferredTimescale: 600))
             self.updateSubtitleText(at: time)
+            self.cacheLivePreviewIfNeeded(at: time)
 #if DEBUG
             self.logPerformanceSampleIfNeeded(player: player)
 #endif

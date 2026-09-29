@@ -690,6 +690,41 @@ public enum PlexItemDetailFetcher {
     }
 }
 
+public enum PlexIntroMarkerFetcher {
+    public static func fetchWindow(
+        ratingKey: String,
+        connection: MediaServerConnectionSnapshot
+    ) async throws -> IntroSkipWindow? {
+        let service = PlexService()
+        try await service.connect(config: connection.config)
+        defer { Task { await service.disconnect() } }
+        return try await fetchWindow(ratingKey: ratingKey, context: try service.makeSessionContext())
+    }
+
+    private static func fetchWindow(
+        ratingKey: String,
+        context: PlexSessionContext
+    ) async throws -> IntroSkipWindow? {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("library/metadata/\(ratingKey)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "includeMarkers", value: "1"),
+            URLQueryItem(name: "X-Plex-Token", value: context.token),
+        ]
+        guard let url = components.url else { throw NetworkError.invalidURL }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(PlexCredentialStore.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validatePlexResponse(response, body: data, context: "fetch intro markers")
+        return try IntroMarkerParser.plexWindow(from: data)
+    }
+}
+
 fileprivate func mapPlexMetadataToServerItem(
     _ meta: PlexMetadata,
     baseURL: URL,
