@@ -57,5 +57,5 @@ When work changes:
 - domain or layer confidence: update `docs/QUALITY_SCORE.md`
 - confirmed deferred risk: update `docs/exec-plans/tech-debt-tracker.md`
 - secrets, data handling, external actions, or dependency trust: update `docs/SECURITY.md`
-- platform UI conventions or validation expectations: update `docs/FRONTEND.md`
+- platform UI conventions or validation expectations: update `docs/FRONTEND.md` and, when the general UI rule or skill workflow changes, `docs/design-docs/ui-design-standards.md`
 - current execution progress, evidence, risks, or next action: update the governing active plan

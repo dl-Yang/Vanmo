@@ -17,6 +17,7 @@ alwaysApply: true
 ## Execution
 
 - Advance one user-visible feature or infrastructure concern at a time.
+- UI work follows `docs/FRONTEND.md` and `docs/design-docs/ui-design-standards.md`, and must read and run `.cursor/skills/ui-ux-pro-max/SKILL.md` before design or implementation. Figma and existing tokens stay above skill output.
 - Every status claim must trace to an actual command, test result, or manual verification.
 - Incomplete verification cannot be marked `passing`, and checks must not be weakened to obtain a pass.
 - Create and update repository documentation in English.

@@ -9,6 +9,15 @@ This document defines stable UI expectations for Vanmo's SwiftUI applications.
 - Match the repository's existing components, assets, typography, spacing, color tokens, and motion before introducing a new pattern.
 - Record visual verification against the relevant Figma frame; code existence is not design-fidelity evidence.
 
+## Design Guidance
+
+Before designing, building, reviewing, fixing, or restyling UI:
+
+1. Read [`.cursor/skills/ui-ux-pro-max/SKILL.md`](../.cursor/skills/ui-ux-pro-max/SKILL.md) and follow [`design-docs/ui-design-standards.md`](design-docs/ui-design-standards.md).
+2. Run the skill's `--design-system` search from the repository root. Use `--stack swiftui` only for a follow-up implementation search. Do not use the skill's `html-tailwind` default, and do not persist a generated master file.
+3. Apply the general rules in that design document: system controls, consistent SF Symbols, visible interaction states without layout shift, readable light and dark appearances, and the five-state model below.
+4. Let the platform Figma frame and existing tokens override any palette, font, or icon recommendation from the search.
+
 ## Platform Separation
 
 - iOS UI, navigation, full-screen player presentation, UIKit bridges, and device lifecycle behavior belong in `Vanmo/`.

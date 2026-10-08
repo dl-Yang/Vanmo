@@ -1,5 +1,5 @@
 VANMO DESIGN SYSTEM REFERENCE FOR LLMS
-Last reviewed: 2026-08-25
+Last reviewed: 2026-09-30
 
 PURPOSE
 This is a compact lookup guide. Figma is the visual source of truth for Vanmo
@@ -40,6 +40,12 @@ macOS:
   VanmoMac/Resources/Assets.xcassets/
 
 USAGE RULES
+- Before UI work, read .cursor/skills/ui-ux-pro-max/SKILL.md and
+  docs/design-docs/ui-design-standards.md. Run --design-system without a stack
+  flag. Use --stack swiftui only on a later implementation search. Do not let
+  the search palette, web font, or web icon set replace a Figma frame or an
+  existing token. Do not apply the skill's Heroicons, Lucide, Tailwind, or
+  cursor-pointer checklist.
 - Start from the correct iOS or macOS Figma frame.
 - Search the paths above before adding a token, component, icon, or asset.
 - Prefer existing SwiftUI components, SF Symbols, and approved project assets.
@@ -55,5 +61,7 @@ USAGE RULES
 RELATED REPOSITORY GUIDANCE
 - docs/FRONTEND.md
 - docs/DESIGN.md
+- docs/design-docs/ui-design-standards.md
+- .cursor/skills/ui-ux-pro-max/SKILL.md
 - docs/sops/apple-ui-validation-loop.md
 - project.yml

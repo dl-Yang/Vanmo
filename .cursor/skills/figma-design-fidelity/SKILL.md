@@ -47,6 +47,8 @@ description: Enforce that every UI change in the Vanmo iOS/macOS app strictly re
 
 ## 工作流程
 
+开始前阅读 `.cursor/skills/ui-ux-pro-max/SKILL.md`，检索命令以 `docs/design-docs/ui-design-standards.md` 为准：单独运行 `--design-system`，需要实现细节时再单独运行 `--stack swiftui`。不要把 `--stack` 加到 `--design-system` 上，也不要执行该 skill 自带的网页清单（Heroicons、Lucide、Tailwind、`cursor-pointer`、Google Fonts）。检索结果只用于质量检查和缺图简报；颜色、字体、图标仍以本平台 Figma 与现有 token 为准。不要把 `--persist` 产物写进仓库。
+
 ### A. 设计稿已存在 → 高保真还原（Figma → 代码）
 
 复制此清单并逐项推进：

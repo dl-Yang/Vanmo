@@ -1,11 +1,7 @@
-# Vanmo Core Beliefs
+# UI Design Style
 
-**Status:** Accepted  
-**Last reviewed:** 2026-08-25  
-**Update trigger:** ios, macOS app ui desgin style documentation
+**Status:** Deprecated  
+**Last reviewed:** 2026-09-30  
+**Update trigger:** Do not extend this file. Update [`ui-design-standards.md`](ui-design-standards.md).
 
-## ios and MacOS
-- For basic UI components( Button, Dialog or Navigation Bar and so on) , system components are always prioritized.
-- For iOS, prioritize using the liquid glass components from iOS 26，while maintaining compatibility with devices running system versions earlier than 26.
-- For macOS core components, priority is also given to the "Liquid Glass" components of macOS 26.
-
+Superseded by [`ui-design-standards.md`](ui-design-standards.md). The system-component and Liquid Glass rules now live there. This filename is retained so the old path still resolves.

@@ -17,11 +17,13 @@ This is the entry point for durable Vanmo product and system design decisions. D
 - SwiftData separates local media data from optional cloud-backed connection, bookmark, and minimal media-state data.
 - Credentials remain outside SwiftData in Keychain or OAuth storage.
 - Figma is the visual source of truth for UI changes, with platform-specific designs and runtime validation.
+- UI work also follows [`docs/design-docs/ui-design-standards.md`](design-docs/ui-design-standards.md) and the `ui-ux-pro-max` skill. Skill output checks quality and briefs missing screens; it does not replace a Figma frame or an existing token.
 
 ## Canonical Design Documents
 
 - `docs/design-docs/index.md`: status and discovery index
 - `docs/design-docs/core-beliefs.md`: durable Vanmo design and agent-harness beliefs
+- `docs/design-docs/ui-design-standards.md`: required `ui-ux-pro-max` workflow and general UI quality rules
 - `docs/design-docs/icloud-keychain-password-sync.md`: connection passwords stay on-device Keychain; iCloud Keychain sync rejected
 - `ARCHITECTURE.md`: implemented boundaries, targets, data flows, and known risks
 

@@ -1,7 +1,7 @@
 # Vanmo Core Beliefs
 
 **Status:** Accepted  
-**Last reviewed:** 2026-08-25  
+**Last reviewed:** 2026-09-30  
 **Update trigger:** A product, architecture, verification, or agent-workflow decision contradicts one of these beliefs.
 
 ## Product
@@ -24,6 +24,7 @@
 
 - Figma is the visual source of truth for each platform.
 - Missing UI states are designed before they are improvised in code.
+- UI work uses the `ui-ux-pro-max` skill and `docs/design-docs/ui-design-standards.md`. Search results guide quality and missing-screen briefs; they do not replace a platform frame or an existing token.
 - Empty, loading, success, error, and retry experiences are part of the feature.
 - Accessibility, keyboard behavior, pointer behavior, and lifecycle cleanup are acceptance requirements, not optional polish.
 

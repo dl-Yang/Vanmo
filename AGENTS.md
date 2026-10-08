@@ -32,6 +32,7 @@ Use progressive disclosure: start here, then open only the repository documents 
 - [`docs/RELIABILITY.md`](docs/RELIABILITY.md): bootstrap, verification, runtime evidence, recovery, and local debugging.
 - [`docs/SECURITY.md`](docs/SECURITY.md): credentials, data, external actions, dependency trust, and security review.
 - [`docs/FRONTEND.md`](docs/FRONTEND.md): Figma authority, platform UI separation, five-state UI expectations, accessibility, and visual verification.
+- [`docs/design-docs/ui-design-standards.md`](docs/design-docs/ui-design-standards.md): required `ui-ux-pro-max` workflow and general iOS/macOS UI quality rules.
 - [`docs/product-specs/index.md`](docs/product-specs/index.md): current user-visible behavior and acceptance targets.
 - [`docs/exec-plans/active/index.md`](docs/exec-plans/active/index.md): work still requiring implementation or evidence.
 - [`docs/exec-plans/tech-debt-tracker.md`](docs/exec-plans/tech-debt-tracker.md): confirmed deferred debt.
@@ -125,7 +126,7 @@ A feature or infrastructure concern is complete only when:
 
 - Follow [`docs/SECURITY.md`](docs/SECURITY.md) for credentials, sensitive URLs, external actions, dependencies, and review.
 - Device debugging uses local console logs only. Never add remote logging, telemetry, upload pipelines, or external observation services unless explicitly requested. Keep logs non-sensitive and follow `.cursor/rules/ios-device-debug-logs.mdc`. Debug and diagnostic logs must use `VanmoLogger`; do not add `print`, `NSLog`, or a raw `os.Logger`.
-- Follow [`docs/FRONTEND.md`](docs/FRONTEND.md) for UI work. Figma is the visual source of truth, and iOS/macOS behavior remains platform-specific.
+- Follow [`docs/FRONTEND.md`](docs/FRONTEND.md) and [`docs/design-docs/ui-design-standards.md`](docs/design-docs/ui-design-standards.md) for UI work. Read and run [`.cursor/skills/ui-ux-pro-max/SKILL.md`](.cursor/skills/ui-ux-pro-max/SKILL.md) before designing or changing UI. Figma remains the visual source of truth, skill output does not replace a platform frame or an existing token, and iOS/macOS behavior remains platform-specific.
 - Follow `.cursor/rules/swift-coding.mdc` for Swift style.
 - Follow `.codex/skills/git-workflow/SKILL.md` for Git operations.
 

@@ -6,6 +6,8 @@ Chrome/DOM validation with Figma and Apple-platform runtime evidence.
 ## Read First
 
 - [`../FRONTEND.md`](../FRONTEND.md)
+- [`../design-docs/ui-design-standards.md`](../design-docs/ui-design-standards.md)
+- [`.cursor/skills/ui-ux-pro-max/SKILL.md`](../../.cursor/skills/ui-ux-pro-max/SKILL.md)
 - [`../RELIABILITY.md`](../RELIABILITY.md)
 - [`../references/design-system-reference-llms.txt`](../references/design-system-reference-llms.txt)
 - [`local-observability-feedback-loop.md`](./local-observability-feedback-loop.md)

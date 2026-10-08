@@ -83,6 +83,7 @@ Visible connection types are not all production-ready. Do not infer support from
 - [`docs/RELIABILITY.md`](docs/RELIABILITY.md): verification, recovery, and debugging
 - [`docs/SECURITY.md`](docs/SECURITY.md): credential, data, dependency, and external-action rules
 - [`docs/FRONTEND.md`](docs/FRONTEND.md): Figma, platform UI, accessibility, and visual-validation rules
+- [`docs/design-docs/ui-design-standards.md`](docs/design-docs/ui-design-standards.md): required `ui-ux-pro-max` workflow and general UI quality rules
 
 ## License
 
