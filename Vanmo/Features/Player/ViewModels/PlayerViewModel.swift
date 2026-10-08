@@ -12,7 +12,8 @@ final class PlayerViewModel: ObservableObject {
     @Published private(set) var playbackState: PlaybackState = .idle
     @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
-    @Published private(set) var bufferProgress: Double = 0
+    @Published private(set) var cacheStart: Double = 0
+    @Published private(set) var cacheEnd: Double = 0
     @Published private(set) var audioTracks: [AudioTrackInfo] = []
     @Published private(set) var subtitleTracks: [SubtitleTrackInfo] = []
     @Published private(set) var chapters: [Chapter] = []
@@ -25,11 +26,21 @@ final class PlayerViewModel: ObservableObject {
     @Published var subtitleStyle = SubtitleStyle() {
         didSet { SubtitleStylePreferences.save(subtitleStyle) }
     }
-    @Published var showSubtitleSettings = false
     @Published var controlsVisible = true
-    @Published var isSeeking = false
+    /// 拖进度条时控制栏不能自动隐藏：进度条一旦移出视图，拖动手势就收不到结束事件，松手不会跳转。
+    @Published var isSeeking = false {
+        didSet {
+            guard oldValue != isSeeking else { return }
+            if isSeeking {
+                hideControlsTask?.cancel()
+            } else if controlsVisible {
+                scheduleHideControls()
+            }
+        }
+    }
     @Published var seekTime: TimeInterval = 0
-    @Published var showTrackSelector = false
+    @Published var showAudioSelector = false
+    @Published var showSubtitleSelector = false
     @Published var showChapterList = false
     @Published var showEpisodeSelector = false
     @Published var selectedEpisodeSeason: Int?
@@ -57,6 +68,11 @@ final class PlayerViewModel: ObservableObject {
     private var engineCancellables = Set<AnyCancellable>()
     private var hideControlsTask: Task<Void, Never>?
     private var prefetchToken: String?
+    private var prefetchProxyURL: URL?
+    private var showsFullLocalCache = false
+    private var lastPrefetchNoteTime: TimeInterval = -.infinity
+    /// 引擎 seek 到续播点之前会先报 0。此期间向前填充用这个时间。
+    private var pendingPrefetchStart: TimeInterval?
     private var didStopPlaybackResources = false
     private var liveRetryCount = 0
     private let externalSubtitleManager = SubtitleManager()
@@ -222,6 +238,7 @@ final class PlayerViewModel: ObservableObject {
                 }
                 self.updateExternalSubtitle(at: absolute)
                 self.reportPlaybackTimeUpdate(at: absolute)
+                self.notePrefetchPlayheadIfNeeded(time: absolute)
             }
             .store(in: &engineCancellables)
 
@@ -240,12 +257,16 @@ final class PlayerViewModel: ObservableObject {
                     self.programDuration = dur
                 }
                 self.startSeekPreviewWarmupIfNeeded()
+                self.notePrefetchPlayheadIfNeeded(time: self.currentTime, force: true)
             }
             .store(in: &engineCancellables)
 
-        engine.bufferProgressPublisher
+        engine.cacheSpanPublisher
             .receive(on: DispatchQueue.main)
-            .assign(to: &$bufferProgress)
+            .sink { [weak self] span in
+                self?.applyEngineCacheSpan(span)
+            }
+            .store(in: &engineCancellables)
 
         engine.subtitleContentPublisher
             .removeDuplicates()
@@ -383,6 +404,7 @@ final class PlayerViewModel: ObservableObject {
         engine.stop()
         if let token = prefetchToken {
             prefetchToken = nil
+            prefetchProxyURL = nil
             Task {
                 await PrefetchProxy.shared.unregister(token: token)
             }
@@ -439,10 +461,23 @@ final class PlayerViewModel: ObservableObject {
         previewLaneHeaderProvider = headerProvider
         let loadURL: URL
         var loadHeaders: [String: String] = [:]
+        showsFullLocalCache = false
+        prefetchProxyURL = nil
         if qualified.url.isFileURL || Self.shouldBypassPrefetch(for: qualified.url) {
             loadURL = qualified.url
-            if PrefetchConfig.isMediaServerStreamURL(qualified.url) {
-                VanmoLogger.player.info("[PlayerVM] media-server stream, skip prefetch")
+            if qualified.url.isFileURL {
+                showsFullLocalCache = true
+                cacheStart = 0
+                cacheEnd = 1
+#if DEBUG
+                VanmoLogger.prefetch.info("[Debug][Prefetch] event=skip reason=localFile span=0-1")
+#endif
+            }
+            if PrefetchConfig.isMediaServerPlaylist(qualified.url) {
+                VanmoLogger.player.info("[PlayerVM] media-server playlist, skip prefetch")
+#if DEBUG
+                VanmoLogger.prefetch.info("[Debug][Prefetch] event=skip reason=mediaServerPlaylist")
+#endif
             }
         } else if usesOfficialDownloadLink(), let headerProvider {
             let headers = await headerProvider()
@@ -463,7 +498,9 @@ final class PlayerViewModel: ObservableObject {
             }
             loadURL = registration.url
             prefetchToken = registration.token
+            prefetchProxyURL = registration.url
             VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
+            Self.logMediaServerPrefetchRegistration(playbackURL)
         } else if let headerProvider {
             let headers = await headerProvider()
             guard generation == mediaGeneration else { return }
@@ -506,9 +543,17 @@ final class PlayerViewModel: ObservableObject {
             let fallbackStart: CMTime? = item.lastPlaybackPosition > 0
                 ? CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
                 : nil
-            useEngine(for: playbackURL)
-            try await loadEngine(url: playbackURL, startPosition: fallbackStart, headers: loadHeaders)
-            openedURL = playbackURL
+            let fallbackURL: URL
+            if PrefetchConfig.isProxyURL(loadURL) {
+                try await unregisterPrefetchIfNeeded()
+                fallbackURL = playbackURL
+            } else {
+                fallbackURL = try await registerPrefetchReplacingCurrent(playbackURL)
+            }
+            useEngine(for: fallbackURL)
+            let fallbackHeaders = PrefetchConfig.isProxyURL(fallbackURL) ? [:] : loadHeaders
+            try await loadEngine(url: fallbackURL, startPosition: fallbackStart, headers: fallbackHeaders)
+            openedURL = fallbackURL
         }
         guard generation == mediaGeneration else {
             // close() 之后仍可能完成 engine.load() 并重建播放器；必须强制拆掉。
@@ -576,7 +621,11 @@ final class PlayerViewModel: ObservableObject {
         programDuration = 0
         qualityHoldImage = nil
         clearQualityHoldOnFrame = false
-        bufferProgress = 0
+        cacheStart = 0
+        cacheEnd = 0
+        showsFullLocalCache = false
+        lastPrefetchNoteTime = -.infinity
+        pendingPrefetchStart = nil
         audioTracks = []
         subtitleTracks = []
         chapters = []
@@ -593,9 +642,56 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    var displayTitle: String {
+        item.displayTitle
+    }
+
+    private func applyEngineCacheSpan(_ span: MediaCacheSpan) {
+        guard prefetchToken == nil, !showsFullLocalCache else { return }
+        cacheStart = span.startFraction
+        cacheEnd = span.endFraction
+    }
+
+    private func notePrefetchPlayheadIfNeeded(time: TimeInterval, force: Bool = false) {
+        guard let token = prefetchToken, duration > 1 else { return }
+        let resolved = PrefetchResumePlayhead.resolve(reported: time, pendingStart: pendingPrefetchStart)
+        pendingPrefetchStart = resolved.pendingStart
+        let playhead = resolved.time
+        if !force, abs(playhead - lastPrefetchNoteTime) < 1 { return }
+        lastPrefetchNoteTime = playhead
+#if DEBUG
+        if abs(playhead - time) > 0.001 {
+            VanmoLogger.prefetch.info(
+                "[Debug][Prefetch] event=resumePlayhead time=\(playhead, privacy: .public) reported=\(time, privacy: .public)"
+            )
+        }
+#endif
+        let fraction = min(max(playhead / duration, 0), 1)
+        let mediaDuration = duration
+        Task {
+            await PrefetchProxy.shared.notePlayhead(
+                token: token,
+                fraction: fraction,
+                duration: mediaDuration
+            )
+            let span = await PrefetchProxy.shared.cacheSpan(for: token)
+            guard self.prefetchToken == token else { return }
+            self.cacheStart = span.startFraction
+            self.cacheEnd = span.endFraction
+#if DEBUG
+            let start = span.startFraction
+            let end = span.endFraction
+            VanmoLogger.prefetch.info(
+                "[Debug][Prefetch] event=cacheSpan fraction=\(fraction, privacy: .public) start=\(start, privacy: .public) end=\(end, privacy: .public)"
+            )
+#endif
+        }
+    }
+
     private func unregisterPrefetchIfNeeded() async throws {
         guard let token = prefetchToken else { return }
         prefetchToken = nil
+        prefetchProxyURL = nil
         await PrefetchProxy.shared.unregister(token: token)
     }
 
@@ -628,6 +724,11 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func loadEngine(url: URL, startPosition: CMTime?, headers: [String: String]) async throws {
+        if let seconds = startPosition?.seconds, seconds > 1 {
+            pendingPrefetchStart = seconds
+        } else {
+            pendingPrefetchStart = nil
+        }
         if headers.isEmpty {
             try await engine.load(url: url, startPosition: startPosition)
             return
@@ -772,6 +873,19 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
+    func cycleScaleMode() {
+        let modes = VideoScaleMode.allCases
+        let index = modes.firstIndex(of: config.scaleMode) ?? 0
+        setScaleMode(modes[(index + 1) % modes.count])
+    }
+
+    func setVolume(_ value: Float) {
+        let clamped = max(0, min(1, value))
+        config.volume = clamped
+        avPlayer?.volume = clamped
+        (engine as? KSPlayerEngine)?.setPlaybackVolume(clamped)
+    }
+
     func setVideoQuality(_ quality: PlaybackVideoQuality) {
         let resolved = PlaybackVideoQuality.resolved(requested: quality, sourceHeight: item.videoHeight)
 #if DEBUG
@@ -785,14 +899,19 @@ final class PlayerViewModel: ObservableObject {
             return
         }
         videoQuality = resolved
-        PlaybackPreferences.videoQuality = resolved
         let generation = mediaGeneration
         qualityReloadID &+= 1
         let reloadID = qualityReloadID
         qualitySwitchTask?.cancel()
         qualitySwitchTask = Task { [weak self] in
             guard let self, !Task.isCancelled, reloadID == self.qualityReloadID else { return }
-            await self.applyVideoQualitySelection(resolved, generation: generation, reloadID: reloadID)
+            let opened = await self.applyVideoQualitySelection(resolved, generation: generation, reloadID: reloadID)
+            guard !Task.isCancelled, reloadID == self.qualityReloadID else { return }
+            if opened {
+                PlaybackPreferences.videoQuality = resolved
+            } else if self.videoQuality == resolved {
+                self.videoQuality = PlaybackPreferences.videoQuality
+            }
         }
     }
 
@@ -838,26 +957,33 @@ final class PlayerViewModel: ObservableObject {
         _ quality: PlaybackVideoQuality,
         generation: UInt64,
         reloadID: UInt64
-    ) async {
-        guard generation == mediaGeneration else { return }
+    ) async -> Bool {
+        guard generation == mediaGeneration else { return false }
         if let avEngine = engine as? AVPlayerEngine,
            directPlaybackURL?.path.lowercased().contains("m3u8") == true {
 #if DEBUG
             VanmoLogger.player.info("[Debug][Player] event=videoQualityApply mode=variant quality=\(quality.rawValue, privacy: .public)")
 #endif
             avEngine.applyVideoQuality(quality)
-            return
+            return true
         }
         guard let direct = directPlaybackURL, let connectionType = currentMediaServerType() else {
 #if DEBUG
             let hasDirect = directPlaybackURL != nil
             VanmoLogger.player.info("[Debug][Player] event=videoQualitySkip reason=notServer hasDirect=\(hasDirect, privacy: .public)")
 #endif
-            return
+            return false
         }
         let position = currentTime
         let resolved = await resolvedPlaybackURL(direct: direct, quality: quality, startTime: position)
         let target = resolved.url
+        guard quality == .original || Self.isTranscodePlaylist(target) else {
+#if DEBUG
+            VanmoLogger.player.info("[Debug][Player] event=videoQualitySkip reason=noPlaylist quality=\(quality.rawValue, privacy: .public)")
+#endif
+            await resumeDetachedProxyIfNeeded()
+            return false
+        }
         let timeOrigin = resolved.timeOrigin
         let startPosition: CMTime? = timeOrigin > 0 || position <= 0
             ? nil
@@ -867,13 +993,33 @@ final class PlayerViewModel: ObservableObject {
         let sameAsDirect = target == direct
         VanmoLogger.player.info("[Debug][Player] event=videoQualityApply mode=reload quality=\(quality.rawValue, privacy: .public) server=\(String(describing: connectionType), privacy: .public) sameAsDirect=\(sameAsDirect, privacy: .public) origin=\(timeOrigin, privacy: .public) \(summary, privacy: .public)")
 #endif
-        await reloadPlaybackSource(
+        return await reloadPlaybackSource(
             url: target,
             startPosition: startPosition,
             timeOrigin: timeOrigin,
             generation: generation,
             reloadID: reloadID
         )
+    }
+
+    private static func isTranscodePlaylist(_ url: URL) -> Bool {
+        url.path.lowercased().contains(".m3u8")
+    }
+
+    /// 清晰度切换若已停下正在读预取的播放器、但新地址没有打开，就用仍在的会话把原画接回来。
+    private func resumeDetachedProxyIfNeeded() async {
+        guard let proxy = prefetchProxyURL, prefetchToken != nil else { return }
+        guard playbackState != .playing else { return }
+        let resumeTime = currentTime > 1 ? currentTime : pendingPrefetchStart
+        let start = (resumeTime ?? 0) > 1
+            ? CMTime(seconds: resumeTime ?? 0, preferredTimescale: 600)
+            : nil
+        do {
+            try await loadEngine(url: proxy, startPosition: start, headers: [:])
+            engine.play()
+        } catch {
+            VanmoLogger.player.error("[PlayerVM] videoQuality resume proxy failed: \(error.localizedDescription)")
+        }
     }
 
     private func shouldReopenTranscode(at time: TimeInterval) -> Bool {
@@ -913,9 +1059,9 @@ final class PlayerViewModel: ObservableObject {
         timeOrigin: TimeInterval,
         generation: UInt64,
         reloadID: UInt64? = nil
-    ) async {
-        guard generation == mediaGeneration else { return }
-        if let reloadID, reloadID != qualityReloadID || Task.isCancelled { return }
+    ) async -> Bool {
+        guard generation == mediaGeneration else { return false }
+        if let reloadID, reloadID != qualityReloadID || Task.isCancelled { return false }
         let previousURL = activePlaybackURL
         let previousOrigin = playbackTimeOrigin
         #if os(iOS)
@@ -935,8 +1081,8 @@ final class PlayerViewModel: ObservableObject {
         let mediaTime = timeOrigin > 1 ? timeOrigin : max(0, startPosition?.seconds ?? 0)
         do {
             try await openEngine(url: url, startPosition: startPosition, mediaTime: mediaTime)
-            guard generation == mediaGeneration, !Task.isCancelled else { return }
-            if let reloadID, reloadID != qualityReloadID { return }
+            guard generation == mediaGeneration, !Task.isCancelled else { return false }
+            if let reloadID, reloadID != qualityReloadID { return false }
             beginQualityClock(origin: timeOrigin)
             qualityClockFrozenAt = nil
             activePlaybackURL = url
@@ -947,11 +1093,18 @@ final class PlayerViewModel: ObservableObject {
             let summary = PlaybackQualityStream.debugSummary(of: url)
             VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=opened \(summary, privacy: .public)")
 #endif
+            return true
         } catch {
             let stale = Task.isCancelled
                 || generation != mediaGeneration
                 || (reloadID.map { $0 != qualityReloadID } ?? false)
-            if stale { return }
+            if stale {
+                let superseded = reloadID.map { $0 != qualityReloadID } ?? false
+                if !superseded, generation == mediaGeneration {
+                    await resumeDetachedProxyIfNeeded()
+                }
+                return false
+            }
             qualityHoldImage = nil
             clearQualityHoldOnFrame = false
             qualityClockFrozenAt = nil
@@ -963,14 +1116,17 @@ final class PlayerViewModel: ObservableObject {
             VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=reloadFailed domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
             await Self.logQualityResponse(url)
 #endif
-            guard let previousURL, previousURL != url else { return }
+            guard let previousURL, previousURL != url else { return false }
+            let restoreURL = PrefetchConfig.isProxyURL(previousURL) && prefetchToken == nil
+                ? (directPlaybackURL ?? previousURL)
+                : previousURL
             let restoreStart: CMTime? = previousOrigin > 0
                 ? nil
                 : CMTime(seconds: max(0, currentTime), preferredTimescale: 600)
             let restoreTime = previousOrigin > 1 ? previousOrigin : max(0, currentTime)
             do {
-                try await openEngine(url: previousURL, startPosition: restoreStart, mediaTime: restoreTime)
-                activePlaybackURL = previousURL
+                try await openEngine(url: restoreURL, startPosition: restoreStart, mediaTime: restoreTime)
+                activePlaybackURL = restoreURL
                 armQualityClockCorrection()
                 engine.playbackRate = config.playbackRate
                 engine.play()
@@ -981,6 +1137,7 @@ final class PlayerViewModel: ObservableObject {
             } catch {
                 VanmoLogger.player.error("[PlayerVM] videoQuality restore failed: \(error.localizedDescription)")
             }
+            return false
         }
     }
 
@@ -1029,15 +1186,85 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func openEngine(url: URL, startPosition: CMTime?, mediaTime: TimeInterval) async throws {
-        await HlsTranscodePrimer.prime(playlistURL: url, startTime: mediaTime)
+        let detachProxy = prefetchToken != nil && url != prefetchProxyURL
+        if detachProxy {
+            engine.stop()
+        }
+        if Self.isTranscodePlaylist(url) {
+            await HlsTranscodePrimer.prime(playlistURL: url, startTime: mediaTime)
+        }
         try Task.checkCancellation()
-        useEngine(for: url)
+        if detachProxy {
+            try await unregisterPrefetchIfNeeded()
+        }
+        let loadURL = try await engineLoadURL(for: url)
+        if !Self.isTranscodePlaylist(url) {
+            await HlsTranscodePrimer.prime(playlistURL: loadURL, startTime: mediaTime)
+            try Task.checkCancellation()
+        }
+        useEngine(for: loadURL)
+        let headers = PrefetchConfig.isProxyURL(loadURL) ? [:] : previewLaneHeaders
         if let avEngine = engine as? AVPlayerEngine {
-            try await avEngine.replacePlaybackItem(url: url, startPosition: startPosition)
+            try await avEngine.replacePlaybackItem(url: loadURL, startPosition: startPosition)
         } else {
-            try await loadEngine(url: url, startPosition: startPosition, headers: previewLaneHeaders)
+            try await loadEngine(url: loadURL, startPosition: startPosition, headers: headers)
+        }
+        if !PrefetchConfig.isProxyURL(loadURL) {
+            try await unregisterPrefetchIfNeeded()
         }
     }
+
+    /// 清晰度切换和转码回退再决定一次预取。播放列表直连，并在打开成功后释放旧的文件会话。
+    private func engineLoadURL(for url: URL) async throws -> URL {
+        if PrefetchConfig.isProxyURL(url) { return url }
+        guard shouldProxyPlayback(url) else { return url }
+        return try await registerPrefetchReplacingCurrent(url)
+    }
+
+    private func shouldProxyPlayback(_ url: URL) -> Bool {
+        if url.isFileURL || Self.shouldBypassPrefetch(for: url) || usesOfficialDownloadLink() {
+            return false
+        }
+        switch url.scheme?.lowercased() {
+        case "http", "https", "ftp", "sftp":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func registerPrefetchReplacingCurrent(_ url: URL) async throws -> URL {
+        let generation = mediaGeneration
+        try await unregisterPrefetchIfNeeded()
+        guard generation == mediaGeneration else { throw CancellationError() }
+        guard let registration = await PrefetchProxy.shared.register(
+            originalURL: url,
+            headerProvider: previewLaneHeaderProvider
+        ) else {
+            return url
+        }
+        guard generation == mediaGeneration else {
+            await PrefetchProxy.shared.unregister(token: registration.token)
+            throw CancellationError()
+        }
+        prefetchToken = registration.token
+        prefetchProxyURL = registration.url
+        VanmoLogger.player.info("[PlayerVM] using prefetch proxy for remote URL")
+        Self.logMediaServerPrefetchRegistration(url)
+        return registration.url
+    }
+
+#if DEBUG
+    private static func logMediaServerPrefetchRegistration(_ url: URL) {
+        let path = url.path.lowercased()
+        guard PrefetchConfig.isMediaServerStreamURL(url) || path.contains("/library/parts") else { return }
+        VanmoLogger.prefetch.info(
+            "[Debug][Prefetch] event=register source=http path=\(url.safePlaybackLogDescription, privacy: .public)"
+        )
+    }
+#else
+    private static func logMediaServerPrefetchRegistration(_: URL) {}
+#endif
 
 #if DEBUG
     private static func logQualityResponse(_ url: URL) async {
@@ -1072,12 +1299,17 @@ final class PlayerViewModel: ObservableObject {
 
     func updateScrubTarget(_ fraction: Double?) {
         guard let fraction, duration > 0 else {
+            seekPreviewActive = false
             seekPreviewRequestedTime = nil
+            seekPreviewImage = nil
             scrubTargetTime = nil
             return
         }
         let time = max(0, min(duration, fraction * duration))
         scrubTargetTime = time
+        seekTime = time
+        seekPreviewForward = time >= currentTime
+        seekPreviewActive = true
         requestSeekPreview(at: time)
     }
 
@@ -1187,11 +1419,12 @@ final class PlayerViewModel: ObservableObject {
 
     /// 设置外挂字幕的时间偏移（正值表示字幕提前显示）。内嵌字幕由引擎渲染，暂不支持偏移。
     func setSubtitleDelay(_ delay: TimeInterval) {
-        config.subtitleDelay = delay
+        let clamped = min(10, max(-10, delay))
+        config.subtitleDelay = clamped
         Task {
-            await externalSubtitleManager.setDelay(delay)
+            await externalSubtitleManager.setDelay(clamped)
             if activeRichSubtitleID != nil, let ksEngine = engine as? KSPlayerEngine {
-                ksEngine.setExternalRichSubtitleDelay(delay)
+                ksEngine.setExternalRichSubtitleDelay(clamped)
             }
             updateExternalSubtitle(at: currentTime)
         }
@@ -1874,7 +2107,7 @@ final class PlayerViewModel: ObservableObject {
         case "concat", "smb":
             return true
         default:
-            return PrefetchConfig.isMediaServerStreamURL(url)
+            return PrefetchConfig.isMediaServerPlaylist(url)
         }
     }
 
@@ -1969,6 +2202,7 @@ final class PlayerViewModel: ObservableObject {
     // MARK: - Controls Visibility
 
     func toggleControls() {
+        guard !isSeeking else { return }
         withAnimation(.easeInOut(duration: 0.25)) {
             controlsVisible.toggle()
         }
@@ -1988,7 +2222,7 @@ final class PlayerViewModel: ObservableObject {
         hideControlsTask?.cancel()
         hideControlsTask = Task {
             try? await Task.sleep(for: .seconds(3))
-            guard !Task.isCancelled, playbackState == .playing else { return }
+            guard !Task.isCancelled, playbackState == .playing, !isSeeking else { return }
             withAnimation(.easeOut(duration: 0.3)) {
                 controlsVisible = false
             }
@@ -2007,7 +2241,7 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func handleVolumeChange(_ delta: Float) {
-        config.volume = max(0, min(1, config.volume + delta))
+        setVolume(config.volume + delta)
         volumeOverlay = config.volume
         dismissOverlay(\.volumeOverlay)
     }
@@ -2036,8 +2270,13 @@ final class PlayerViewModel: ObservableObject {
         showControlsBriefly()
     }
 
+    /// KSPlayer 拖动预览走 `scrubPreviewLane`，从不读引擎的预览缓存。
+    private var usesScrubPreviewLane: Bool {
+        engine is KSPlayerEngine && previewLaneURL != nil
+    }
+
     private func requestSeekPreview(at time: TimeInterval) {
-        if engine is KSPlayerEngine, let originalURL = previewLaneURL {
+        if usesScrubPreviewLane, let originalURL = previewLaneURL {
             scrubPreviewLane.onFrame = { [weak self] image in
                 self?.seekPreviewImage = image
             }
@@ -2045,7 +2284,8 @@ final class PlayerViewModel: ObservableObject {
                 at: time,
                 originalURL: originalURL,
                 headers: previewLaneHeaders,
-                headerProvider: previewLaneHeaderProvider
+                headerProvider: previewLaneHeaderProvider,
+                sharedProxyURL: prefetchProxyURL
             )
             return
         }
@@ -2066,6 +2306,13 @@ final class PlayerViewModel: ObservableObject {
     private func startSeekPreviewWarmupIfNeeded() {
         guard duration > 1, abs(duration - previewWarmDuration) > 0.5 else { return }
         guard engine is SeekPreviewProviding else { return }
+        if usesScrubPreviewLane {
+#if DEBUG
+            VanmoLogger.player.info("[Debug][Player] event=previewWarmSkip reason=previewLane")
+#endif
+            previewWarmDuration = duration
+            return
+        }
         previewWarmDuration = duration
         previewWarmTask?.cancel()
         let warmDuration = duration

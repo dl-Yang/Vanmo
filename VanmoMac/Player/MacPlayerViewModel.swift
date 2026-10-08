@@ -10,7 +10,10 @@ final class MacPlayerViewModel: ObservableObject {
     @Published private(set) var isPlaying = false
     @Published private(set) var currentTime: TimeInterval = 0
     @Published private(set) var duration: TimeInterval = 0
-    @Published private(set) var bufferProgress: Double = 0
+    @Published private(set) var cacheStart: Double = 0
+    @Published private(set) var cacheEnd: Double = 0
+    @Published private(set) var scrubPreviewTime: TimeInterval?
+    @Published private(set) var scrubPreviewImage: NSImage?
     @Published var volume: Double = 0.7
     @Published private(set) var playbackState: PlaybackState = .idle
     @Published private(set) var audioTracks: [AudioTrackInfo] = []
@@ -19,8 +22,11 @@ final class MacPlayerViewModel: ObservableObject {
     @Published private(set) var episodeGroups: [MacPlayerEpisodeSeason] = []
     @Published private(set) var currentEpisodeID: String?
     @Published var config = PlayerConfig()
-    @Published var subtitleStyle = MacSubtitleStylePreferences.load()
-    @Published var showTrackSelector = false
+    @Published var subtitleStyle = MacSubtitleStylePreferences.load() {
+        didSet { MacSubtitleStylePreferences.save(subtitleStyle) }
+    }
+    @Published var showAudioSelector = false
+    @Published var showSubtitleSelector = false
     @Published var showEpisodeSelector = false
     @Published private(set) var onlineSubtitleResults: [OnlineSubtitleResult] = []
     @Published private(set) var isSearchingOnlineSubtitles = false
@@ -41,6 +47,12 @@ final class MacPlayerViewModel: ObservableObject {
     private var itemCancellables = Set<AnyCancellable>()
     private var ksCancellables = Set<AnyCancellable>()
     private var prefetchRegistration: PrefetchRegistration?
+    private var showsFullLocalCache = false
+    private var lastPrefetchNoteTime: TimeInterval = -.infinity
+    /// 引擎 seek 到续播点之前会先报 0。此期间向前填充用这个时间。
+    private var pendingPrefetchStart: TimeInterval?
+    private var scrubPreviewTask: Task<Void, Never>?
+    private var playbackLoadURL: URL?
     private var didCleanup = false
     private var didSaveProgress = false
     private var playbackSession: EmbyPlaybackSession?
@@ -127,6 +139,8 @@ final class MacPlayerViewModel: ObservableObject {
         mediaGeneration &+= 1
         seekRequestGeneration &+= 1
 
+        scrubPreviewTask?.cancel()
+        scrubPreviewTask = nil
         saveProgress()
         let stopPosition = currentTime
         let session = playbackSession
@@ -261,6 +275,21 @@ final class MacPlayerViewModel: ObservableObject {
         seek(toSeconds: duration * clamped)
     }
 
+    func updateScrub(to progress: Double) {
+        let clamped = min(max(progress, 0), 1)
+        let time = duration * clamped
+        scrubPreviewTime = time
+        requestScrubPreview(at: time)
+    }
+
+    func commitScrub(to progress: Double) {
+        scrubPreviewTask?.cancel()
+        scrubPreviewTime = nil
+        scrubPreviewImage = nil
+        seek(to: progress)
+        notePrefetchPlayheadIfNeeded(time: duration * min(max(progress, 0), 1), force: true)
+    }
+
     func skip(by seconds: TimeInterval) {
         seek(toSeconds: currentTime + seconds)
     }
@@ -287,6 +316,12 @@ final class MacPlayerViewModel: ObservableObject {
         }
     }
 
+    func cycleScaleMode() {
+        let modes = VideoScaleMode.allCases
+        let index = modes.firstIndex(of: config.scaleMode) ?? 0
+        setScaleMode(modes[(index + 1) % modes.count])
+    }
+
     func setScaleMode(_ mode: VideoScaleMode) {
         config.scaleMode = mode
         if usesKSPlayer {
@@ -297,6 +332,16 @@ final class MacPlayerViewModel: ObservableObject {
     func selectAudioTrack(_ index: Int) {
         config.selectedAudioTrack = index
         Task { await applyAudioTrackSelection(index) }
+    }
+
+    func setSubtitleDelay(_ delay: TimeInterval) {
+        let clamped = min(10, max(-10, delay))
+        config.subtitleDelay = clamped
+        let time = currentTime
+        Task {
+            await externalSubtitleManager.setDelay(clamped)
+            updateExternalSubtitle(at: time)
+        }
     }
 
     func selectSubtitleTrack(_ index: Int?) {
@@ -452,8 +497,16 @@ final class MacPlayerViewModel: ObservableObject {
 
         if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
             loadURL = originalURL
-            if PrefetchConfig.isMediaServerStreamURL(originalURL) {
-                VanmoLogger.player.info("[MacPlayerVM] media-server stream, skip prefetch")
+            if originalURL.isFileURL {
+                showsFullLocalCache = true
+                cacheStart = 0
+                cacheEnd = 1
+            }
+            if PrefetchConfig.isMediaServerPlaylist(originalURL) {
+                VanmoLogger.player.info("[MacPlayerVM] media-server playlist, skip prefetch")
+#if DEBUG
+                VanmoLogger.prefetch.info("[Debug][Prefetch] event=skip reason=mediaServerPlaylist")
+#endif
             }
         } else if usesOfficialDownloadLink() {
             try await requireOfficialDownloadHeaders(headerProvider)
@@ -471,13 +524,18 @@ final class MacPlayerViewModel: ObservableObject {
             }
             loadURL = registration.url
             prefetchRegistration = registration
+            playbackLoadURL = registration.url
             usesPrefetch = true
             VanmoLogger.player.info("[MacPlayerVM] using prefetch proxy for remote URL")
+#if DEBUG
+            Self.logMediaServerPrefetchRegistration(originalURL)
+#endif
         } else {
             loadURL = originalURL
             VanmoLogger.player.info("[MacPlayerVM] prefetch unavailable, loading remote URL directly")
         }
 
+        playbackLoadURL = loadURL
         let playerItem = await makePlayerItem(
             url: loadURL,
             headerProvider: usesPrefetch ? nil : headerProvider
@@ -506,16 +564,15 @@ final class MacPlayerViewModel: ObservableObject {
         await applyPreferredSubtitleIfNeeded(generation: generation)
         guard generation == mediaGeneration else { return }
 
-        setupItemObservers(for: playerItem)
-
         let seekPosition = resolvedStartPosition()
+        pendingPrefetchStart = seekPosition > 1 ? seekPosition : nil
+        setupItemObservers(for: playerItem)
         if seekPosition > 0 {
             seek(toSeconds: seekPosition)
         }
 
         player.rate = config.playbackRate
         isPlaying = config.playbackRate > 0
-        playbackState = .playing
         preparePlaybackSession()
         Task {
             guard generation == mediaGeneration else { return }
@@ -537,8 +594,16 @@ final class MacPlayerViewModel: ObservableObject {
 
         if originalURL.isFileURL || Self.shouldBypassPrefetch(for: originalURL) {
             loadURL = originalURL
-            if PrefetchConfig.isMediaServerStreamURL(originalURL) {
-                VanmoLogger.player.info("[MacPlayerVM] media-server stream, skip prefetch")
+            if originalURL.isFileURL {
+                showsFullLocalCache = true
+                cacheStart = 0
+                cacheEnd = 1
+            }
+            if PrefetchConfig.isMediaServerPlaylist(originalURL) {
+                VanmoLogger.player.info("[MacPlayerVM] media-server playlist, skip prefetch")
+#if DEBUG
+                VanmoLogger.prefetch.info("[Debug][Prefetch] event=skip reason=mediaServerPlaylist")
+#endif
             }
         } else if usesOfficialDownloadLink() {
             try await requireOfficialDownloadHeaders(headerProvider)
@@ -556,13 +621,18 @@ final class MacPlayerViewModel: ObservableObject {
             }
             loadURL = registration.url
             prefetchRegistration = registration
+            playbackLoadURL = registration.url
             usesPrefetch = true
             VanmoLogger.player.info("[MacPlayerVM] KS using prefetch proxy for remote URL")
+#if DEBUG
+            Self.logMediaServerPrefetchRegistration(originalURL)
+#endif
         } else {
             loadURL = originalURL
             VanmoLogger.player.info("[MacPlayerVM] KS prefetch unavailable, loading remote URL directly")
         }
 
+        playbackLoadURL = loadURL
         let headers: [String: String]
         if usesPrefetch || loadURL.isFileURL {
             headers = [:]
@@ -574,12 +644,13 @@ final class MacPlayerViewModel: ObservableObject {
 
         let engine = MacKSPlayerEngine()
         ksEngine = engine
+        let seekPosition = resolvedStartPosition()
+        pendingPrefetchStart = seekPosition > 1 ? seekPosition : nil
         setupKSEngineObservers(for: engine)
         engine.setVolume(Float(volume))
         engine.setScaleMode(config.scaleMode)
 
         playbackState = .loading
-        let seekPosition = resolvedStartPosition()
         let startTime = seekPosition > 0 ? CMTime(seconds: seekPosition, preferredTimescale: 600) : nil
 
         do {
@@ -732,6 +803,7 @@ final class MacPlayerViewModel: ObservableObject {
                 guard let self else { return }
                 currentTime = time.seconds
                 reportPlaybackTimeUpdate(at: time.seconds)
+                notePrefetchPlayheadIfNeeded(time: time.seconds)
             }
             .store(in: &ksCancellables)
 
@@ -740,13 +812,7 @@ final class MacPlayerViewModel: ObservableObject {
             .sink { [weak self] time in
                 guard let self, time.seconds.isFinite, time.seconds > 0 else { return }
                 duration = time.seconds
-            }
-            .store(in: &ksCancellables)
-
-        engine.bufferProgressPublisher
-            .receive(on: RunLoop.main)
-            .sink { [weak self] progress in
-                self?.bufferProgress = progress
+                notePrefetchPlayheadIfNeeded(time: currentTime, force: true)
             }
             .store(in: &ksCancellables)
 
@@ -759,10 +825,68 @@ final class MacPlayerViewModel: ObservableObject {
             .store(in: &ksCancellables)
     }
 
+    private func notePrefetchPlayheadIfNeeded(time: TimeInterval, force: Bool = false) {
+        guard let token = prefetchRegistration?.token, duration > 1 else { return }
+        let resolved = PrefetchResumePlayhead.resolve(reported: time, pendingStart: pendingPrefetchStart)
+        pendingPrefetchStart = resolved.pendingStart
+        let playhead = resolved.time
+        if !force, abs(playhead - lastPrefetchNoteTime) < 1 { return }
+        lastPrefetchNoteTime = playhead
+#if DEBUG
+        if abs(playhead - time) > 0.001 {
+            VanmoLogger.prefetch.info(
+                "[Debug][Prefetch] event=resumePlayhead time=\(playhead, privacy: .public) reported=\(time, privacy: .public)"
+            )
+        }
+#endif
+        let fraction = min(max(playhead / duration, 0), 1)
+        let mediaDuration = duration
+        Task {
+            await PrefetchProxy.shared.notePlayhead(
+                token: token,
+                fraction: fraction,
+                duration: mediaDuration
+            )
+            let span = await PrefetchProxy.shared.cacheSpan(for: token)
+            guard self.prefetchRegistration?.token == token else { return }
+            self.cacheStart = span.startFraction
+            self.cacheEnd = span.endFraction
+        }
+    }
+
+    private func requestScrubPreview(at time: TimeInterval) {
+        scrubPreviewTask?.cancel()
+        guard let url = playbackLoadURL else { return }
+        scrubPreviewTask = Task { [weak self] in
+            let image = await Self.previewImage(at: time, url: url)
+            guard !Task.isCancelled else { return }
+            self?.scrubPreviewImage = image
+        }
+    }
+
+    private static func previewImage(at time: TimeInterval, url: URL) async -> NSImage? {
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 320, height: 180)
+        generator.requestedTimeToleranceBefore = CMTime(seconds: 1, preferredTimescale: 600)
+        generator.requestedTimeToleranceAfter = CMTime(seconds: 1, preferredTimescale: 600)
+        let requested = CMTime(seconds: max(0, time), preferredTimescale: 600)
+        guard let cgImage = try? await generator.image(at: requested).image else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+    }
+
     private func resetPlaybackMetadata() {
         currentTime = 0
         duration = 0
-        bufferProgress = 0
+        cacheStart = 0
+        cacheEnd = 0
+        showsFullLocalCache = false
+        lastPrefetchNoteTime = -.infinity
+        pendingPrefetchStart = nil
+        scrubPreviewTime = nil
+        scrubPreviewImage = nil
+        playbackLoadURL = nil
         audioTracks = []
         subtitleTracks = []
         currentSubtitleText = nil
@@ -877,11 +1001,20 @@ final class MacPlayerViewModel: ObservableObject {
         playerItem.publisher(for: \.loadedTimeRanges)
             .receive(on: RunLoop.main)
             .sink { [weak self] ranges in
-                guard let self,
-                      let first = ranges.first?.timeRangeValue,
-                      self.duration > 0 else { return }
-                let buffered = first.start.seconds + first.duration.seconds
-                self.bufferProgress = min(max(buffered / self.duration, 0), 1)
+                guard let self, self.duration > 0 else { return }
+                guard self.prefetchRegistration == nil, !self.showsFullLocalCache else { return }
+                let playhead = self.currentTime
+                let match = ranges.first { range in
+                    let value = range.timeRangeValue
+                    let start = value.start.seconds
+                    let end = start + value.duration.seconds
+                    return playhead >= start - 0.25 && playhead <= end + 0.25
+                }?.timeRangeValue ?? ranges.first?.timeRangeValue
+                guard let first = match else { return }
+                let start = first.start.seconds / self.duration
+                let end = (first.start.seconds + first.duration.seconds) / self.duration
+                self.cacheStart = min(max(start, 0), 1)
+                self.cacheEnd = min(max(end, 0), 1)
             }
             .store(in: &itemCancellables)
 
@@ -896,6 +1029,7 @@ final class MacPlayerViewModel: ObservableObject {
             }
             self.updateExternalSubtitle(at: time.seconds)
             self.reportPlaybackTimeUpdate(at: time.seconds)
+            self.notePrefetchPlayheadIfNeeded(time: time.seconds)
 #if DEBUG
             self.logAVPerformanceSampleIfNeeded()
 #endif
@@ -1663,9 +1797,19 @@ final class MacPlayerViewModel: ObservableObject {
         case "concat":
             return true
         default:
-            return PrefetchConfig.isMediaServerStreamURL(url)
+            return PrefetchConfig.isMediaServerPlaylist(url)
         }
     }
+
+#if DEBUG
+    private static func logMediaServerPrefetchRegistration(_ url: URL) {
+        let path = url.path.lowercased()
+        guard PrefetchConfig.isMediaServerStreamURL(url) || path.contains("/library/parts") else { return }
+        VanmoLogger.prefetch.info(
+            "[Debug][Prefetch] event=register source=http path=\(url.safePlaybackLogDescription, privacy: .public)"
+        )
+    }
+#endif
 
     private func unregisterPrefetchIfNeeded() async {
         guard let registration = prefetchRegistration else { return }

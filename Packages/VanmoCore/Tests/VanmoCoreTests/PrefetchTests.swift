@@ -57,6 +57,48 @@ final class PrefetchTests: XCTestCase {
                 for: URL(fileURLWithPath: "/tmp/movie.mkv")
             )
         )
+        XCTAssertFalse(
+            PrefetchConfig.isMediaServerPlaylist(
+                URL(string: "https://emby.example.com/emby/Videos/1/stream?static=true")!
+            )
+        )
+        XCTAssertTrue(
+            PrefetchConfig.isMediaServerPlaylist(
+                URL(string: "https://emby.example.com/emby/Videos/1/master.m3u8")!
+            )
+        )
+        XCTAssertTrue(
+            PrefetchConfig.isMediaServerPlaylist(
+                URL(string: "http://plex.local:32400/video/:/transcode/universal/start.m3u8")!
+            )
+        )
+        XCTAssertFalse(
+            PrefetchConfig.isMediaServerPlaylist(
+                URL(string: "http://plex.local:32400/library/parts/1/1/file.mkv")!
+            )
+        )
+    }
+
+    func testResumePlayheadIgnoresLeadingZeroUntilSeekLands() {
+        let waiting = PrefetchResumePlayhead.resolve(reported: 0, pendingStart: 1051.5)
+        XCTAssertEqual(waiting.time, 1051.5)
+        XCTAssertEqual(waiting.pendingStart, 1051.5)
+
+        let landed = PrefetchResumePlayhead.resolve(reported: 1051.2, pendingStart: 1051.5)
+        XCTAssertEqual(landed.time, 1051.2)
+        XCTAssertNil(landed.pendingStart)
+
+        let moved = PrefetchResumePlayhead.resolve(reported: 30, pendingStart: 1051.5)
+        XCTAssertEqual(moved.time, 30)
+        XCTAssertNil(moved.pendingStart)
+
+        let fromStart = PrefetchResumePlayhead.resolve(reported: 0, pendingStart: nil)
+        XCTAssertEqual(fromStart.time, 0)
+        XCTAssertNil(fromStart.pendingStart)
+
+        let shortResume = PrefetchResumePlayhead.resolve(reported: 0, pendingStart: 0.4)
+        XCTAssertEqual(shortResume.time, 0)
+        XCTAssertEqual(shortResume.pendingStart, 0.4)
     }
 
     func testFetchLimiterRemovesCancelledWaiter() async throws {
@@ -194,7 +236,7 @@ final class PrefetchTests: XCTestCase {
         await session.cleanup()
     }
 
-    func testSessionDeduplicatesSameChunkAndCancelsOldBody() async throws {
+    func testSessionDeduplicatesSameChunkAcrossConcurrentBodies() async throws {
         let fetchGate = TestAsyncGate()
         let source = FakePrefetchByteSource(
             totalSize: Int64(PrefetchConfig.chunkSize),
@@ -217,10 +259,56 @@ final class PrefetchTests: XCTestCase {
         let firstData = try await firstConsumer.value
         let secondData = try await secondConsumer.value
         let fetchCount = await source.fetchCount
-        XCTAssertTrue(firstData.isEmpty)
+        XCTAssertEqual(firstData.count, 1_024)
         XCTAssertEqual(secondData.count, 1_024)
         XCTAssertEqual(fetchCount, 1)
         await session.cleanup()
+    }
+
+    func testAheadFillStopsAtTimeBudgetAndPublishesCacheSpan() async throws {
+        let chunks = 4
+        let source = FakePrefetchByteSource(
+            totalSize: Int64(PrefetchConfig.chunkSize * chunks),
+            pipelineDepth: 2
+        )
+        let session = try PrefetchSession(
+            token: "ahead-\(UUID().uuidString)",
+            source: source
+        )
+        session.notePlayhead(fraction: 0, duration: TimeInterval(chunks))
+        try await waitUntil { session.cacheSpan().endFraction > 0.99 }
+        let span = session.cacheSpan()
+        XCTAssertEqual(span.startFraction, 0, accuracy: 0.01)
+        XCTAssertEqual(span.endFraction, 1, accuracy: 0.01)
+        let fetchCount = await source.fetchCount
+        XCTAssertEqual(fetchCount, chunks)
+        await session.cleanup()
+    }
+
+    func testAheadByteBudgetUsesTimeThenSessionCap() {
+        let total: Int64 = 10 * 1024 * 1024
+        let underCap = PrefetchConfig.aheadByteBudget(totalSize: total, duration: 100)
+        let expected = Int64((Double(total) / 100) * PrefetchConfig.aheadTargetSeconds)
+        XCTAssertEqual(underCap, max(Int64(PrefetchConfig.chunkSize), expected))
+        XCTAssertLessThan(underCap, PrefetchConfig.maxSessionCacheBytes)
+        let overCap = PrefetchConfig.aheadByteBudget(
+            totalSize: 512 * 1024 * 1024,
+            duration: 200
+        )
+        XCTAssertEqual(overCap, PrefetchConfig.maxSessionCacheBytes)
+        XCTAssertEqual(PrefetchConfig.aheadTargetSeconds, 180)
+    }
+
+    func testRangeCacheEvictsChunksFarthestFromPlayhead() throws {
+        let cache = try RangeCache(sessionId: "evict-\(UUID().uuidString)")
+        let chunk = PrefetchConfig.chunkSize
+        for index in 0..<6 {
+            cache.write(globalOffset: Int64(index * chunk), data: Data(repeating: 1, count: chunk))
+        }
+        cache.evictFarthest(from: 0, maxBytes: Int64(chunk * 2))
+        XCTAssertNotNil(cache.contiguousByteRange(containing: 0))
+        XCTAssertNil(cache.contiguousByteRange(containing: Int64(chunk * 5)))
+        cache.removeAll()
     }
 
     func testSessionHonorsSourcePipelineDepthWhileUsingMultipleChunks() async throws {

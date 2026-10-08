@@ -64,6 +64,14 @@ public actor PrefetchProxy {
         return PrefetchRegistration(url: url, token: token)
     }
 
+    public func notePlayhead(token: String, fraction: Double, duration: TimeInterval) {
+        sessions[token]?.notePlayhead(fraction: fraction, duration: duration)
+    }
+
+    public func cacheSpan(for token: String) -> MediaCacheSpan {
+        sessions[token]?.cacheSpan() ?? .empty
+    }
+
     public func unregister(token: String) async {
         let session = sessions[token]
         sessions[token] = nil

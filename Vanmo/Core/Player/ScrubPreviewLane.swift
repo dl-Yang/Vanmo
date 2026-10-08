@@ -11,6 +11,7 @@ final class ScrubPreviewLane {
     private var player: KSMEPlayer?
     private var delegate: PreviewLaneDelegate?
     private var proxyToken: String?
+    private var sharedProxyURL: URL?
     private var latestTime: TimeInterval?
     private var captureTask: Task<Void, Never>?
     private var openTask: Task<Void, Never>?
@@ -27,13 +28,15 @@ final class ScrubPreviewLane {
         at time: TimeInterval,
         originalURL: URL,
         headers: [String: String],
-        headerProvider: (() async -> [String: String])?
+        headerProvider: (() async -> [String: String])?,
+        sharedProxyURL: URL? = nil
     ) {
         isClosed = false
         latestTime = time
         sourceURL = originalURL
         sourceHeaders = headers
         sourceHeaderProvider = headerProvider
+        self.sharedProxyURL = sharedProxyURL
         kickCapture()
     }
 
@@ -70,7 +73,8 @@ final class ScrubPreviewLane {
         let resolved = await Self.resolve(
             originalURL: originalURL,
             headers: headers,
-            headerProvider: headerProvider
+            headerProvider: headerProvider,
+            sharedProxyURL: sharedProxyURL
         )
         guard !isClosed, !Task.isCancelled else {
             if let token = resolved.token {
@@ -121,9 +125,9 @@ final class ScrubPreviewLane {
         defer { captureTask = nil }
         while !isClosed, !Task.isCancelled {
             guard let started = latestTime else { return }
-            try? await Task.sleep(for: .milliseconds(200))
+            try? await Task.sleep(for: .milliseconds(100))
             guard !isClosed, let time = latestTime else { return }
-            if abs(time - started) > 0.35 {
+            if abs(time - started) > 1 {
                 continue
             }
             latestTime = nil
@@ -222,8 +226,12 @@ final class ScrubPreviewLane {
     private static func resolve(
         originalURL: URL,
         headers: [String: String],
-        headerProvider: (() async -> [String: String])?
+        headerProvider: (() async -> [String: String])?,
+        sharedProxyURL: URL?
     ) async -> (url: URL, headers: [String: String], token: String?, mode: String) {
+        if let sharedProxyURL, PrefetchConfig.isProxyURL(sharedProxyURL) {
+            return (sharedProxyURL, [:], nil, "shared")
+        }
         if Self.usesDirectConnection(originalURL) {
             return (originalURL, headers, nil, "direct")
         }
@@ -260,8 +268,7 @@ final class ScrubPreviewLane {
 
     private static func usesDirectConnection(_ url: URL) -> Bool {
         if url.isFileURL { return true }
-        if PrefetchConfig.isMediaServerStreamURL(url) { return true }
-        return url.path.lowercased().contains("/library/parts")
+        return PrefetchConfig.isMediaServerPlaylist(url)
     }
 
     private static func scaled(_ image: CGImage, maxPixelSize: Int) -> UIImage {

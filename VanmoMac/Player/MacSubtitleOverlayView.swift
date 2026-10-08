@@ -75,6 +75,14 @@ enum MacSubtitleStylePreferences {
         return style
     }
 
+    static func save(_ style: MacSubtitleStyle) {
+        let defaults = UserDefaults.standard
+        defaults.set(Double(style.fontSize), forKey: fontSizeKey)
+        defaults.set(style.textColor.rgbaHex, forKey: textColorKey)
+        defaults.set(style.backgroundColor.rgbaHex, forKey: backgroundColorKey)
+        defaults.set(style.position.rawValue, forKey: positionKey)
+    }
+
     private static func color(fromHex hex: String) -> Color? {
         var sanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if sanitized.hasPrefix("#") { sanitized.removeFirst() }

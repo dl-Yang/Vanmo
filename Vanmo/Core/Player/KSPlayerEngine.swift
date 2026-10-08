@@ -14,14 +14,14 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private let stateSubject = CurrentValueSubject<PlaybackState, Never>(.idle)
     private let currentTimeSubject = CurrentValueSubject<CMTime, Never>(.zero)
     private let durationSubject = CurrentValueSubject<CMTime, Never>(.zero)
-    private let bufferProgressSubject = CurrentValueSubject<Double, Never>(0)
+    private let cacheSpanSubject = CurrentValueSubject<MediaCacheSpan, Never>(.empty)
     private let subtitleContentSubject = CurrentValueSubject<SubtitleContent?, Never>(nil)
     private let pictureInPictureActiveSubject = CurrentValueSubject<Bool, Never>(false)
 
     var statePublisher: AnyPublisher<PlaybackState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentTimePublisher: AnyPublisher<CMTime, Never> { currentTimeSubject.eraseToAnyPublisher() }
     var durationPublisher: AnyPublisher<CMTime, Never> { durationSubject.eraseToAnyPublisher() }
-    var bufferProgressPublisher: AnyPublisher<Double, Never> { bufferProgressSubject.eraseToAnyPublisher() }
+    var cacheSpanPublisher: AnyPublisher<MediaCacheSpan, Never> { cacheSpanSubject.eraseToAnyPublisher() }
     var subtitleContentPublisher: AnyPublisher<SubtitleContent?, Never> { subtitleContentSubject.eraseToAnyPublisher() }
     var pictureInPictureActivePublisher: AnyPublisher<Bool, Never> {
         pictureInPictureActiveSubject.eraseToAnyPublisher()
@@ -260,6 +260,9 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     }
 
     override init() {
+        // iOS 上 KSPlayer 的 CADisplayLink 在主线程，每拍最多出一帧，落后 160ms 以内不追帧。
+        // 按片源帧率锁定刷新范围就没有余量，漏拍会让音画越拉越开。这是所有 KSPlayer 共用的全局开关。
+        KSOptions.preferredFrame = false
         super.init()
         setupAudioSession()
     }
@@ -334,7 +337,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
             "[KSEngine] hardwareDecode: \(hardwareDecode) isSecondOpen: \(options.isSecondOpen) quality=\(quality.rawValue, privacy: .public)"
         )
 #if DEBUG
-        VanmoLogger.player.info("[Debug][Player] event=ksCreate previousAudio=\(previousAudio, privacy: .public) audioOutput=AudioRendererPlayer url=\(url.safePlaybackLogDescription, privacy: .public)")
+        let preferredFrame = KSOptions.preferredFrame
+        let thermal = ProcessInfo.processInfo.thermalState.rawValue
+        let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        VanmoLogger.player.info("[Debug][Player] event=ksCreate previousAudio=\(previousAudio, privacy: .public) audioOutput=AudioRendererPlayer preferredFrame=\(preferredFrame, privacy: .public) thermal=\(thermal, privacy: .public) lowPower=\(lowPower, privacy: .public) url=\(url.safePlaybackLogDescription, privacy: .public)")
 #endif
 
         if LibavformatOpenGate.needsExclusiveOpen(url) {
@@ -471,7 +477,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         stateSubject.send(.idle)
         currentTimeSubject.send(.zero)
         durationSubject.send(.zero)
-        bufferProgressSubject.send(0)
+        cacheSpanSubject.send(.empty)
         subtitleContentSubject.send(nil)
     }
 
@@ -1091,8 +1097,13 @@ extension KSPlayerEngine: MediaPlayerDelegate {
         }
     }
 
+    func setPlaybackVolume(_ value: Float) {
+        player?.playbackVolume = min(max(value, 0), 1)
+    }
+
     func changeBuffering(player: some MediaPlayerProtocol, progress: Int) {
-        bufferProgressSubject.send(Double(progress) / 100.0)
+        _ = player
+        _ = progress
     }
 
     func playBack(player: some MediaPlayerProtocol, loopCount: Int) {

@@ -4,6 +4,9 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
+- [`2026-09-29-player-precache-and-chrome.md`](2026-09-29-player-precache-and-chrome.md) — **Completed.** iOS and macOS device walks on an Emby title passed Original playback through the prefetch proxy, resume, and forward fill with a growing gray span. iOS also passed shared preview-lane scrub, a 360p switch, and landscape chrome. Acceptance defects were fixed:
+  - Confirmed by device logs or recording: the 360p HLS main-thread freeze, the iOS KSPlayer low frame rate and audio-video drift (pinned display-link rate), and the macOS progress-bar window drag.
+  - Operator report only: the iOS progress-bar release after auto-hide.
 - [`2026-09-21-media-detail-metadata-loading.md`](2026-09-21-media-detail-metadata-loading.md) — **Completed.** iOS and macOS real-source TV detail runs passed progressive collections, seasons, and metadata loading; the operator reported fast detail presentation and approved the change.
 - [`2026-09-18-ios-stability-and-experience.md`](2026-09-18-ios-stability-and-experience.md) — **Completed.** Physical-device acceptance passed audio-output stability, rich/bitmap subtitle behavior, automatic PiP, real landscape-to-portrait presentation, detail interactions and progressive artwork, episode-download series artwork, and the three-option appearance.
 - [`2026-08-25-mac-download-real-source-validation.md`](2026-08-25-mac-download-real-source-validation.md) — **Completed.** One HTTP-via-Emby macOS download run passed queue, pause, restart-from-part, and main-window detail navigation; SMB was not exercised.

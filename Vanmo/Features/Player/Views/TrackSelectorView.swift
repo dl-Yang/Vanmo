@@ -1,17 +1,45 @@
 import SwiftUI
 import VanmoCore
 
-struct TrackSelectorView: View {
+struct AudioTrackSelectorView: View {
     @ObservedObject var viewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
-                audioSection
-                subtitleSection
+                Section(L10n.tr("音轨")) {
+                    if viewModel.audioTracks.isEmpty {
+                        Text(L10n.tr("无可用音轨"))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(viewModel.audioTracks) { track in
+                            Button {
+                                viewModel.selectAudioTrack(track.id)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(track.displayName)
+                                            .font(.subheadline)
+                                        if let codec = track.codec {
+                                            Text(codec)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    if viewModel.config.selectedAudioTrack == track.id {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(Color.vanmoPrimary)
+                                    }
+                                }
+                            }
+                            .tint(.primary)
+                        }
+                    }
+                }
             }
-            .navigationTitle(L10n.tr("音轨与字幕"))
+            .navigationTitle(L10n.tr("音轨"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -20,35 +48,29 @@ struct TrackSelectorView: View {
             }
         }
     }
+}
 
-    private var audioSection: some View {
-        Section(L10n.tr("音轨")) {
-            if viewModel.audioTracks.isEmpty {
-                Text(L10n.tr("无可用音轨"))
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(viewModel.audioTracks) { track in
-                    Button {
-                        viewModel.selectAudioTrack(track.id)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(track.displayName)
-                                    .font(.subheadline)
-                                if let codec = track.codec {
-                                    Text(codec)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            if viewModel.config.selectedAudioTrack == track.id {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.vanmoPrimary)
-                            }
-                        }
-                    }
-                    .tint(.primary)
+struct SubtitleSelectorView: View {
+    @ObservedObject var viewModel: PlayerViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                subtitleSection
+                SubtitleSettingsSections(
+                    style: $viewModel.subtitleStyle,
+                    delay: Binding(
+                        get: { viewModel.config.subtitleDelay },
+                        set: { viewModel.setSubtitleDelay($0) }
+                    )
+                )
+            }
+            .navigationTitle(L10n.tr("字幕"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(L10n.tr("完成")) { dismiss() }
                 }
             }
         }
@@ -154,6 +176,6 @@ struct TrackSelectorView: View {
             parts.append(L10n.tr("机器翻译"))
         }
         return parts
-        .joined(separator: " · ")
+            .joined(separator: " · ")
     }
 }

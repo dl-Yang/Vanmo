@@ -6,17 +6,21 @@
 
 ## Seek Preview
 
-Dragging the progress thumb shows a compressed preview frame above the slider together with the target time. The preview floats above the track and does not change the progress bar's layout height. A horizontal scrub gesture on the video surface keeps the existing center time card and adds the same preview frame above the time. Live streams hide both the progress bar and seek preview. Preview frames are reduced (about 160–200 pt wide) and are not source quality.
+Dragging the progress bar and a horizontal scrub on the video surface use the same center card: a compressed preview frame and the target time. The progress bar itself does not draw a preview. Live streams hide both the progress bar and seek preview. Preview frames are reduced (about 160–200 pt wide) and are not source quality.
 
-KSPlayer scrubbing keeps the playing picture running. The first drag starts a second muted KSPlayer that only keyframe-seeks. Emby, Jellyfin, and Plex open that player on the original URL. SMB, FTP, SFTP, and other proxied sources register a new prefetch token, separate from playback. Closing playback shuts down the preview player and unregisters its token. AVPlayer keeps `AVAssetImageGenerator` and does not pause or seek the picture while scrubbing.
+KSPlayer scrubbing keeps the playing picture running. The first drag starts a second muted KSPlayer that only keyframe-seeks, and uses Emby trickplay images when the server provides them. When playback already uses a prefetch proxy, the preview player opens that same localhost token. Progressive Emby, Jellyfin, and Plex playback registers that proxy; their HLS transcode playlists stay on the original URL. Closing playback shuts down the preview player and does not unregister the shared playback token. AVPlayer keeps `AVAssetImageGenerator` and does not pause or seek the picture while scrubbing.
+
+The progress-bar gray span is locally cached media, not a loading percentage. Loading chrome appears for every playback state other than playing and paused, including idle, loading, and buffering, and also while playback reports playing but the playhead has not moved for about 1.2 seconds. The center play button becomes a spinning arc, and a white dash travels along the inside of the screen edge above the controls. The dash stays visible when the controls are hidden and disappears when playback or pause resumes. The played portion of the track is white. iPhone playback is presented after the scene is landscape.
 
 Preview generation must not open a second libavformat context for SMB, FTP, or SFTP while that file is already playing.
 
-While the user is scrubbing, the bottom current-time label follows the target time.
+While the user is scrubbing, the bottom current-time label follows the target time. Controls do not auto-hide or toggle away while the progress bar is held, so releasing it seeks to the target. (macOS: dragging the progress bar or the volume slider does not move the player window.)
+
+KSPlayer on iOS does not pin its display link to the source frame rate, so idle playback keeps the source frame rate without growing audio-video drift.
 
 ## Video Quality
 
-The player top bar exposes a quality capsule with 360p, 480p, 720p, 1080p, and Original. On Emby and Jellyfin, a lower choice asks PlaybackInfo for a transcoded HLS playlist at that height and bitrate, plays it with AVPlayer, and resumes from the current position. Plex requests a transcoded HLS playlist. Original keeps the direct file URL. If the transcode URL fails to open, playback uses the direct file. An HLS item already playing on AVPlayer selects the matching rendition with `preferredMaximumResolution` and `preferredPeakBitRate`. Local files and SMB, FTP, and SFTP keep playing the original bitstream. A source shorter than the selected height falls back to Original. There is no AI enhancement control.
+The player top bar uses a glass circle in place of share. The circle shows the current quality as 360, 480, 720, HD, or 原画, and opens 360p, 480p, 720p, 1080p, and Original. On Emby and Jellyfin, a lower choice asks PlaybackInfo for a transcoded HLS playlist at that height and bitrate, plays it with AVPlayer, and resumes from the current position. Plex requests a transcoded HLS playlist. Original keeps the direct file URL. If the transcode URL fails to open, playback uses the direct file. An HLS item already playing on AVPlayer selects the matching rendition with `preferredMaximumResolution` and `preferredPeakBitRate`. Local files and SMB, FTP, and SFTP keep playing the original bitstream. A source shorter than the selected height falls back to Original. There is no AI enhancement control.
 
 ## Skip Intro
 
@@ -34,7 +38,7 @@ The top bar includes a system AirPlay route picker. HTTP(S) progressive MP4/MOV/
 
 ## Figma
 
-iOS Player frames live in Vanmo iOS file `miM6YTQAnerz6SgkkYZMjo`, page `Player` (`599:3`).
+iOS Player chrome follows Vanmo iOS file `miM6YTQAnerz6SgkkYZMjo`, page `Player`, component `iOS Video Player UI` (`606:6`). macOS uses the same glass control layout inside the player window.
 
 ## Acceptance
 

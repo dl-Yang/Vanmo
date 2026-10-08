@@ -438,9 +438,7 @@ extension MacKSPlayerEngine: MediaPlayerDelegate {
     }
 
     nonisolated func changeBuffering(player: some MediaPlayerProtocol, progress: Int) {
-        Task { @MainActor in
-            bufferProgressSubject.send(Double(progress) / 100.0)
-        }
+        _ = progress
     }
 
     nonisolated func playBack(player: some MediaPlayerProtocol, loopCount: Int) {}

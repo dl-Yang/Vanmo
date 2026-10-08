@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 import VanmoCore
 
@@ -108,9 +109,14 @@ struct ContentView: View {
             await DownloadManager.shared.restoreAndResume()
 #if DEBUG
             let statuses = DownloadManager.shared.tasks.map(\.status.rawValue).joined(separator: ",")
-            print("[Debug][Downloads] restore count=\(DownloadManager.shared.tasks.count) statuses=\(statuses)")
+            let restoreCount = DownloadManager.shared.tasks.count
+            VanmoLogger.library.info("[Debug][Downloads] restore count=\(restoreCount, privacy: .public) statuses=\(statuses, privacy: .public)")
             for task in DownloadManager.shared.tasks where task.status != .completed {
-                print("[Debug][Downloads] restore task=\(task.id.uuidString) status=\(task.status.rawValue) received=\(task.receivedBytes) total=\(task.totalBytes)")
+                let taskID = task.id.uuidString
+                let status = task.status.rawValue
+                let received = task.receivedBytes
+                let total = task.totalBytes
+                VanmoLogger.library.info("[Debug][Downloads] restore task=\(taskID, privacy: .public) status=\(status, privacy: .public) received=\(received, privacy: .public) total=\(total, privacy: .public)")
             }
 #endif
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
@@ -126,10 +132,30 @@ struct ContentView: View {
                         name: DownloadHeroWalkFixtures.openDetailNotification,
                         object: item.id
                     )
-                    print("[Debug][Downloads] hero walk presented kind=\(kind.rawValue) title=\(item.title)")
+                    let kindName = kind.rawValue
+                    VanmoLogger.library.info("[Debug][Downloads] hero walk presented kind=\(kindName, privacy: .public)")
                 } catch {
-                    print("[Debug][Downloads] hero walk seed failed")
+                    VanmoLogger.library.error("[Debug][Downloads] hero walk seed failed")
                 }
+            }
+            if let path = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAY_FILE"],
+               FileManager.default.fileExists(atPath: path) {
+                let url = URL(fileURLWithPath: path)
+                let descriptor = FetchDescriptor<MediaItem>()
+                let existing = try? modelContext.fetch(descriptor).first { $0.fileURL.path == url.path }
+                let item = existing ?? MediaItem(
+                    title: "Player Walk",
+                    fileURL: url,
+                    mediaType: .movie,
+                    duration: 3
+                )
+                if existing == nil {
+                    item.originalFileName = url.lastPathComponent
+                    modelContext.insert(item)
+                    try? modelContext.save()
+                }
+                appState.play(item)
+                VanmoLogger.player.info("[Debug][Player] debug play file opened")
             }
 #endif
         }

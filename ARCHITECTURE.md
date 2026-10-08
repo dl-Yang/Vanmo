@@ -440,15 +440,16 @@ Interface-language settings on both apps expose the three options and remind the
 
 `PlayerViewModel` subscribes to engine Combine publishers and manages:
 
-- Catalog URL resolution and prefetch registration.
+- Catalog URL resolution and prefetch registration. A prefetch session keeps concurrent range readers. After the playhead is reported, it fills forward until 180 seconds or 256 MiB, then drops fully written chunks farthest from the playhead. The progress-bar gray span is that contiguous cached range mapped across the file. KSPlayer buffering percentage is not drawn on the timeline. AVFoundation still publishes `loadedTimeRanges` when there is no prefetch session. Local files show the full duration as already local. Progressive Emby, Jellyfin, and Plex file URLs register the same localhost prefetch proxy as FTP and SFTP. Their HLS transcode playlists stay direct. Baidu official links still bypass the proxy.
 - Resume position, progress persistence, completion state, and CloudKit change markers.
 - Emby/Jellyfin playback reporting.
 - External and online subtitles with preference restoration.
 - Remote external-subtitle listing and download starts after playback and is generation-guarded, so it cannot delay first play or write stale tracks after an episode switch.
 - Episode lists and episode switching.
 - Live-stream retries, gesture state, playback rate, chapters, video quality, local intro-skip marks, and seek-preview requests.
-- KSPlayer seek preview uses a second muted player created on the first scrub. Media-server URLs open directly. SMB, FTP, SFTP, and other proxied sources use a new prefetch token so the playback body is not cancelled. The preview player is shut down with playback. AVPlayer seek preview still uses a serial `AVAssetImageGenerator`. iOS SMB playback stays a direct `smb://` open and does not take a second libavformat context for preview.
-- Quality options (`360p`–`1080p` plus original) persist in `PlaybackPreferences`. Emby and Jellyfin lower choices call PlaybackInfo and open the returned transcoding playlist with AVPlayer. Plex lower choices open a transcoded `start.m3u8`. Original stays the direct file URL. If the transcode URL fails to open, playback falls back to that direct URL. A multi-variant HLS item already on AVPlayer changes `preferredMaximumResolution` and `preferredPeakBitRate` in place. Local files and SMB/FTP/SFTP keep the original bitstream. Media-server stream and transcode URLs bypass prefetch.
+- KSPlayer seek preview uses a second muted player created on the first scrub. When playback already has a prefetch proxy, the preview player opens that same localhost token and does not register a second upstream session or unregister it on close. Local files and media-server HLS playlists stay direct. AVPlayer seek preview still uses a serial `AVAssetImageGenerator`. The engine-side preview warmup is skipped when KSPlayer uses the preview lane, because preview-lane scrubbing never reads that cache. iOS SMB playback stays a direct `smb://` open.
+- iOS `KSPlayerEngine` sets the global `KSOptions.preferredFrame = false`. KSPlayer's iOS `CADisplayLink` runs on the main run loop and presents at most one frame per tick. Pinning it to the source frame rate left no headroom. On an iPhone device run, that caused idle-playback frame drops and audio-video drift. macOS KSPlayer uses a `CVDisplayLink` wrapper and is unaffected.
+- Quality options (`360p`–`1080p` plus original) persist in `PlaybackPreferences`. Emby and Jellyfin lower choices call PlaybackInfo and open the returned transcoding playlist with AVPlayer. Plex lower choices open a transcoded `start.m3u8`. Original stays the direct file URL and plays through the localhost prefetch proxy. If the transcode URL fails to open, playback falls back to that direct URL. A multi-variant HLS item already on AVPlayer changes `preferredMaximumResolution` and `preferredPeakBitRate` in place. Local files and SMB/FTP/SFTP keep the original bitstream. Media-server HLS playlists bypass prefetch.
 - Skip Intro appears when the current time is inside a chapter-title, Emby/Jellyfin/Plex marker, or locally stored intro window.
 - The AirPlay route picker is always visible. Video AirPlay is enabled only on AVFoundation HTTP(S) MP4/HLS paths. KSPlayer formats show an unsupported-video-AirPlay notice.
 
@@ -462,7 +463,7 @@ macOS does not reuse the iOS `PlayerEngine` implementation:
 
 This supports AppKit window and keyboard-command integration, but creates two playback orchestration paths that must remain behaviorally aligned.
 
-macOS follows the same post-play, generation-guarded remote-subtitle discovery and KS source-error policy as iOS. Its KS seek bridge uses bounded one-shot completion so a missing callback cannot leak a continuation. The persistent AVPlayer time-control observer remains installed across item loads; per-item and KS subscriptions are still replaced during engine cleanup.
+macOS follows the same post-play, generation-guarded remote-subtitle discovery and KS source-error policy as iOS. Its KS seek bridge uses bounded one-shot completion so a missing callback cannot leak a continuation. The persistent AVPlayer time-control observer remains installed across item loads; per-item and KS subscriptions are still replaced during engine cleanup. The player window reapplies its aspect-fit frame after the autosaved frame is restored, so opening does not resize a second time. Scrubbing shows a preview card and, when a prefetch URL exists, reads frames from that same URL. Loading and buffering use a center indicator that is separate from the play button. The gray track span uses the same cache mapping as iOS.
 
 ## 8. Key Data Flows
 

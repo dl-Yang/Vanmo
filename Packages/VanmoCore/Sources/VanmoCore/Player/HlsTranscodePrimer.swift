@@ -55,21 +55,28 @@ public enum HlsTranscodePrimer {
         startTime > 1 && playlistURL.path.lowercased().contains(".m3u8")
     }
 
-    public static func prime(playlistURL: URL, startTime: TimeInterval) async {
-        guard shouldPrime(playlistURL: playlistURL, startTime: startTime) else { return }
+    public struct PrimedSegment: Equatable, Sendable {
+        public var url: URL
+        public var data: Data
+    }
+
+    /// 返回已经下完的目标分段，供本地代理直接回复，避免播放器再等一次完整下载。
+    public static func prime(playlistURL: URL, startTime: TimeInterval) async -> PrimedSegment? {
+        guard shouldPrime(playlistURL: playlistURL, startTime: startTime) else { return nil }
         var current = playlistURL
         for _ in 0..<3 {
-            guard let playlist = await fetchText(current) else { return }
+            guard let playlist = await fetchText(current) else { return nil }
             switch step(playlist: playlist, baseURL: current, startTime: startTime) {
             case .variant(let variant):
                 current = variant
             case .segment(let target):
-                await download(target)
-                return
+                guard let data = await download(target) else { return nil }
+                return PrimedSegment(url: target.url, data: data)
             case nil:
-                return
+                return nil
             }
         }
+        return nil
     }
 
     private static func firstReference(after marker: String, in lines: [String], baseURL: URL) -> URL? {
@@ -129,7 +136,7 @@ public enum HlsTranscodePrimer {
         }
     }
 
-    private static func download(_ target: SegmentTarget) async {
+    private static func download(_ target: SegmentTarget) async -> Data? {
         var previousCount = -1
         var previousLead: MpegTsTiming.StreamTiming?
         for attempt in 0..<3 {
@@ -150,8 +157,14 @@ public enum HlsTranscodePrimer {
                     return abs(sample.startLeadMilliseconds) <= 150 && overlapAligned
                 } ?? false
                 let stable = data.count == previousCount && timing == previousLead
-                if status != 200 || aligned || stable || attempt == 2 {
-                    return
+                if status == 200 {
+                    HlsPrimedSegmentStore.store(url: target.url, data: data)
+                }
+                if status != 200 {
+                    return nil
+                }
+                if aligned || stable || attempt == 2 {
+                    return data
                 }
                 previousCount = data.count
                 previousLead = timing
@@ -161,9 +174,44 @@ public enum HlsTranscodePrimer {
                 let nsError = error as NSError
                 VanmoLogger.player.info("[Debug][Player] event=videoQualityPrime status=transport segmentStart=\(target.start, privacy: .public) domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
 #endif
-                return
+                return nil
             }
         }
+        return nil
+    }
+}
+
+/// 开播前已经下完的那一个分段。本地代理用它立刻回复，避免播放器再等一轮下载。
+public enum HlsPrimedSegmentStore {
+    private static let lock = NSLock()
+    private static var url: URL?
+    private static var data: Data?
+
+    public static func store(url: URL, data: Data) {
+        lock.lock()
+        self.url = url
+        self.data = data
+        lock.unlock()
+    }
+
+    public static func data(for source: URL) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let url, let data, sameSegment(url, source) else { return nil }
+        return data
+    }
+
+    private static func sameSegment(_ lhs: URL, _ rhs: URL) -> Bool {
+        if lhs.absoluteString == rhs.absoluteString { return true }
+        guard lhs.host?.lowercased() == rhs.host?.lowercased(), lhs.path == rhs.path else { return false }
+        func ticks(_ url: URL) -> String? {
+            URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first { $0.name.caseInsensitiveCompare("runtimeTicks") == .orderedSame }?
+                .value
+        }
+        guard let left = ticks(lhs), let right = ticks(rhs) else { return false }
+        return left == right
     }
 }
 

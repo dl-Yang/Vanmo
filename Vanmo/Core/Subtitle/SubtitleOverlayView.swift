@@ -296,68 +296,56 @@ struct SubtitleStylePreview: View {
     }
 }
 
-struct SubtitleSettingsView: View {
+struct SubtitleSettingsSections: View {
     @Binding var style: SubtitleStyle
     @Binding var delay: Double
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section(L10n.tr("实时预览")) {
-                    SubtitleStylePreview(style: style)
-                }
+        Section(L10n.tr("实时预览")) {
+            SubtitleStylePreview(style: style)
+        }
 
-                Section(L10n.tr("字体")) {
-                    HStack {
-                        Text(L10n.tr("大小"))
-                        Spacer()
-                        Stepper("\(Int(style.fontSize))pt", value: $style.fontSize, in: 12...36, step: 2)
-                    }
-
-                    ColorPicker(L10n.tr("文字颜色"), selection: $style.textColor)
-                }
-
-                Section(L10n.tr("背景")) {
-                    ColorPicker(L10n.tr("背景颜色"), selection: $style.backgroundColor)
-                }
-
-                Section(L10n.tr("时间偏移")) {
-                    HStack {
-                        Text(String(format: "%+.1fs", delay))
-                            .monospacedDigit()
-                            .frame(width: 60)
-
-                        Slider(value: $delay, in: -10...10, step: 0.1)
-                    }
-
-                    HStack {
-                        Button("-0.5s") { delay -= 0.5 }
-                            .buttonStyle(.bordered)
-                        Spacer()
-                        Button(L10n.tr("重置")) { delay = 0 }
-                            .buttonStyle(.bordered)
-                        Spacer()
-                        Button("+0.5s") { delay += 0.5 }
-                            .buttonStyle(.bordered)
-                    }
-                }
-
-                Section(L10n.tr("位置")) {
-                    Picker(L10n.tr("位置"), selection: $style.position) {
-                        Text(L10n.tr("顶部")).tag(SubtitleStyle.SubtitlePosition.top)
-                        Text(L10n.tr("底部")).tag(SubtitleStyle.SubtitlePosition.bottom)
-                    }
-                    .pickerStyle(.segmented)
-                }
+        Section(L10n.tr("字体")) {
+            HStack {
+                Text(L10n.tr("大小"))
+                Spacer()
+                Stepper("\(Int(style.fontSize))pt", value: $style.fontSize, in: 12...36, step: 2)
             }
-            .navigationTitle(L10n.tr("字幕设置"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("完成")) { dismiss() }
-                }
+
+            ColorPicker(L10n.tr("文字颜色"), selection: $style.textColor)
+        }
+
+        Section(L10n.tr("背景")) {
+            ColorPicker(L10n.tr("背景颜色"), selection: $style.backgroundColor)
+        }
+
+        Section(L10n.tr("时间偏移")) {
+            HStack {
+                Text(String(format: "%+.1fs", delay))
+                    .monospacedDigit()
+                    .frame(width: 60)
+
+                Slider(value: $delay, in: -10...10, step: 0.1)
             }
+
+            HStack {
+                Button("-0.5s") { delay -= 0.5 }
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button(L10n.tr("重置")) { delay = 0 }
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button("+0.5s") { delay += 0.5 }
+                    .buttonStyle(.bordered)
+            }
+        }
+
+        Section(L10n.tr("位置")) {
+            Picker(L10n.tr("位置"), selection: $style.position) {
+                Text(L10n.tr("顶部")).tag(SubtitleStyle.SubtitlePosition.top)
+                Text(L10n.tr("底部")).tag(SubtitleStyle.SubtitlePosition.bottom)
+            }
+            .pickerStyle(.segmented)
         }
     }
 }

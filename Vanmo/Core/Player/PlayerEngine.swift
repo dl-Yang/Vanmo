@@ -55,7 +55,7 @@ protocol PlayerEngine: AnyObject {
     var statePublisher: AnyPublisher<PlaybackState, Never> { get }
     var currentTimePublisher: AnyPublisher<CMTime, Never> { get }
     var durationPublisher: AnyPublisher<CMTime, Never> { get }
-    var bufferProgressPublisher: AnyPublisher<Double, Never> { get }
+    var cacheSpanPublisher: AnyPublisher<MediaCacheSpan, Never> { get }
 
     var state: PlaybackState { get }
     var currentTime: CMTime { get }
@@ -122,6 +122,7 @@ private final class EmbyHlsResourceLoader: NSObject, AVAssetResourceLoaderDelega
         }
         let requestedStart = Self.startTime(from: loadingRequest.request.url)
         let startTime = requestedStart > 1 ? requestedStart : Self.startTime(in: source)
+        let loaderQueue = queue
         Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: source)
@@ -130,24 +131,23 @@ private final class EmbyHlsResourceLoader: NSObject, AVAssetResourceLoaderDelega
                 let started = EmbyHlsPlaylist.applyingStart(playlist: rewritten.playlist, startTime: startTime)
                 let nested = Self.wrapNestedPlaylists(started, startTime: startTime)
                 let playlist = await HlsSegmentFixServer.shared.rewrite(playlist: nested)
+                let output = Data(playlist.utf8)
 #if DEBUG
                 let injected = playlist.contains("#EXT-X-START")
-                VanmoLogger.player.info("[Debug][Player] event=videoQualityPlaylist removedAudioGroups=\(rewritten.removedAudioGroups, privacy: .public) startOffset=\(startTime, privacy: .public) injectedStart=\(injected, privacy: .public)")
+                let removedAudioGroups = rewritten.removedAudioGroups
+                let outputCount = output.count
+                VanmoLogger.player.info("[Debug][Player] event=videoQualityPlaylist removedAudioGroups=\(removedAudioGroups, privacy: .public) startOffset=\(startTime, privacy: .public) injectedStart=\(injected, privacy: .public)")
+                VanmoLogger.player.info("[Debug][Player] event=videoQualityPlaylistDeliver bytes=\(outputCount, privacy: .public)")
 #endif
-                let output = Data(playlist.utf8)
-                loadingRequest.contentInformationRequest?.contentType = "public.m3u-playlist"
-                loadingRequest.contentInformationRequest?.contentLength = Int64(output.count)
-                loadingRequest.contentInformationRequest?.isByteRangeAccessSupported = false
-                if let dataRequest = loadingRequest.dataRequest {
-                    let start = Int(dataRequest.requestedOffset)
-                    let end = min(output.count, start + dataRequest.requestedLength)
-                    if start < output.count, start <= end {
-                        dataRequest.respond(with: output.subdata(in: start..<end))
-                    }
+                loaderQueue.async {
+                    guard !loadingRequest.isCancelled else { return }
+                    Self.finishPlaylist(loadingRequest, data: output)
                 }
-                loadingRequest.finishLoading()
             } catch {
-                loadingRequest.finishLoading(with: error)
+                loaderQueue.async {
+                    guard !loadingRequest.isCancelled else { return }
+                    loadingRequest.finishLoading(with: error)
+                }
             }
         }
         return true
@@ -197,6 +197,24 @@ private final class EmbyHlsResourceLoader: NSObject, AVAssetResourceLoaderDelega
             }
             return proxyPlaylistURL(url, startTime: startTime).absoluteString
         }.joined(separator: "\n")
+    }
+
+    /// 只能在资源加载 delegate 队列上调用。播放列表不声明字节范围。
+    private static func finishPlaylist(
+        _ loadingRequest: AVAssetResourceLoadingRequest,
+        data: Data
+    ) {
+        loadingRequest.contentInformationRequest?.contentType = "public.m3u-playlist"
+        loadingRequest.contentInformationRequest?.contentLength = Int64(data.count)
+        loadingRequest.contentInformationRequest?.isByteRangeAccessSupported = false
+        if let dataRequest = loadingRequest.dataRequest {
+            let start = Int(dataRequest.requestedOffset)
+            let end = min(data.count, start + dataRequest.requestedLength)
+            if start < data.count, start <= end {
+                dataRequest.respond(with: data.subdata(in: start..<end))
+            }
+        }
+        loadingRequest.finishLoading()
     }
 
     private static func respond(
@@ -333,7 +351,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private let stateSubject = CurrentValueSubject<PlaybackState, Never>(.idle)
     private let currentTimeSubject = CurrentValueSubject<CMTime, Never>(.zero)
     private let durationSubject = CurrentValueSubject<CMTime, Never>(.zero)
-    private let bufferProgressSubject = CurrentValueSubject<Double, Never>(0)
+    private let cacheSpanSubject = CurrentValueSubject<MediaCacheSpan, Never>(.empty)
     private let subtitleContentSubject = CurrentValueSubject<SubtitleContent?, Never>(nil)
 
 #if DEBUG
@@ -347,7 +365,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     var statePublisher: AnyPublisher<PlaybackState, Never> { stateSubject.eraseToAnyPublisher() }
     var currentTimePublisher: AnyPublisher<CMTime, Never> { currentTimeSubject.eraseToAnyPublisher() }
     var durationPublisher: AnyPublisher<CMTime, Never> { durationSubject.eraseToAnyPublisher() }
-    var bufferProgressPublisher: AnyPublisher<Double, Never> { bufferProgressSubject.eraseToAnyPublisher() }
+    var cacheSpanPublisher: AnyPublisher<MediaCacheSpan, Never> { cacheSpanSubject.eraseToAnyPublisher() }
     var subtitleContentPublisher: AnyPublisher<SubtitleContent?, Never> { subtitleContentSubject.eraseToAnyPublisher() }
 
     var state: PlaybackState { stateSubject.value }
@@ -747,11 +765,24 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         item.publisher(for: \.loadedTimeRanges)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] ranges in
-                guard let first = ranges.first?.timeRangeValue,
-                      let duration = self?.durationSubject.value,
+                guard let duration = self?.durationSubject.value,
                       duration.seconds > 0 else { return }
-                let buffered = first.start.seconds + first.duration.seconds
-                self?.bufferProgressSubject.send(buffered / duration.seconds)
+                let playhead = self?.currentTime.seconds ?? 0
+                let match = ranges.first { range in
+                    let value = range.timeRangeValue
+                    let start = value.start.seconds
+                    let end = start + value.duration.seconds
+                    return playhead >= start - 0.25 && playhead <= end + 0.25
+                }?.timeRangeValue ?? ranges.first?.timeRangeValue
+                guard let first = match else { return }
+                let start = first.start.seconds / duration.seconds
+                let end = (first.start.seconds + first.duration.seconds) / duration.seconds
+                self?.cacheSpanSubject.send(
+                    MediaCacheSpan(
+                        startFraction: min(max(start, 0), 1),
+                        endFraction: min(max(end, 0), 1)
+                    )
+                )
             }
             .store(in: &cancellables)
 
@@ -807,11 +838,15 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
                         switch status {
                         case .readyToPlay:
                             VanmoLogger.player.info("[AVEngine] waitForReady: ready!")
-                            gate.resume()
+                            DispatchQueue.main.async {
+                                gate.resume()
+                            }
                         case .failed:
                             let message = item.error?.localizedDescription ?? "Unknown error"
                             VanmoLogger.player.error("[AVEngine] waitForReady: failed - \(message)")
-                            gate.fail(PlayerError.loadFailed(message))
+                            DispatchQueue.main.async {
+                                gate.fail(PlayerError.loadFailed(message))
+                            }
                         default:
                             break
                         }

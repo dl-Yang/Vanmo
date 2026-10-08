@@ -128,6 +128,58 @@ public final class RangeCache {
         }
     }
 
+    /// 包含 `offset` 的连续已缓存字节区间。没有覆盖该偏移时返回 nil。
+    public func contiguousByteRange(containing offset: Int64) -> Range<Int64>? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard offset >= 0 else { return nil }
+        let idx = Int(offset / Int64(chunkSize))
+        guard chunkHasDataLocked(idx) else { return nil }
+
+        var low = idx
+        while low > 0 && fullyWrittenChunks.contains(low - 1) {
+            low -= 1
+        }
+        var high = idx
+        while fullyWrittenChunks.contains(high + 1) {
+            high += 1
+        }
+
+        let start = Int64(low) * Int64(chunkSize)
+        let end: Int64
+        if fullyWrittenChunks.contains(high) {
+            end = Int64(high + 1) * Int64(chunkSize)
+        } else if let written = writtenIndexSets[high], let last = written.max() {
+            end = Int64(high) * Int64(chunkSize) + Int64(last + 1)
+        } else {
+            end = start
+        }
+        guard end > start else { return nil }
+        return start..<end
+    }
+
+    /// 已缓存体积超过 `maxBytes` 时，丢掉离 `anchor` 最远的完整 chunk。
+    public func evictFarthest(from anchor: Int64, maxBytes: Int64) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard maxBytes >= 0 else { return }
+        var total = Int64(fullyWrittenChunks.count) * Int64(chunkSize)
+        guard total > maxBytes else { return }
+        let anchorIndex = Int(max(0, anchor) / Int64(chunkSize))
+        let farthest = fullyWrittenChunks.sorted {
+            let left = abs($0 - anchorIndex)
+            let right = abs($1 - anchorIndex)
+            if left == right { return $0 > $1 }
+            return left > right
+        }
+        for index in farthest {
+            if total <= maxBytes { break }
+            if index == anchorIndex { continue }
+            removeChunkLocked(index)
+            total -= Int64(chunkSize)
+        }
+    }
+
     public func removeAll() {
         lock.lock()
         memoryChunks.removeAll()
@@ -141,6 +193,22 @@ public final class RangeCache {
     }
 
     // MARK: - Private
+
+    private func chunkHasDataLocked(_ idx: Int) -> Bool {
+        fullyWrittenChunks.contains(idx) || writtenIndexSets[idx]?.isEmpty == false
+    }
+
+    private func removeChunkLocked(_ index: Int) {
+        fullyWrittenChunks.remove(index)
+        writtenIndexSets.removeValue(forKey: index)
+        if let data = memoryChunks.removeValue(forKey: index) {
+            memoryUsage -= data.count
+        }
+        if let position = lruKeys.firstIndex(of: index) {
+            lruKeys.remove(at: position)
+        }
+        try? FileManager.default.removeItem(at: diskURL(for: index))
+    }
 
     private func chunkContainsLocked(idx: Int, range: Range<Int>) -> Bool {
         // 完整 chunk 命中（在内存或可从磁盘恢复）

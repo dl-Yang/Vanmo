@@ -32,7 +32,8 @@ public final class PrefetchSession: @unchecked Sendable {
         case perform(
             activeTasks: [Task<Void, Never>],
             downloadTasks: [Task<Data, Error>],
-            probeTask: Task<Int64, Error>?
+            probeTask: Task<Int64, Error>?,
+            aheadTask: Task<Void, Never>?
         )
     }
 
@@ -49,11 +50,15 @@ public final class PrefetchSession: @unchecked Sendable {
     /// 任一 task 完成后从 map 移除；移除时机使用 lock 同步保证可见性。
     private var inflight: [Int64: DownloadRecord] = [:]
 
-    /// 当前活跃的 bodyStream tasks。新 GET 进来时主动取消旧的 bodyStream，避免
-    /// 多个"幽灵 bodyStream"持续下载浪费带宽（FFmpeg 不再读老 connection，但
-    /// AsyncThrowingStream 默认 unbounded buffer 不会反压 producer）。
+    /// 当前活跃的 bodyStream。播放和预览可以同时读，连接结束才取消对应那一路。
+    /// 超过上限时取消最旧的一路，避免已经没人读的连接继续占带宽。
     private var activeBodyTaskID: UInt64 = 0
     private var activeBodyTasks: [UInt64: Task<Void, Never>] = [:]
+    private var activeBodyOrder: [UInt64] = []
+    private let maxConcurrentBodies = 4
+    private var aheadTask: Task<Void, Never>?
+    private var requestedFraction: Double = 0
+    private var requestedDuration: TimeInterval = 0
 
 #if DEBUG
     private var performanceWindowStartedAt = CFAbsoluteTimeGetCurrent()
@@ -93,21 +98,24 @@ public final class PrefetchSession: @unchecked Sendable {
         let activeTasks: [Task<Void, Never>]
         let downloadTasks: [Task<Data, Error>]
         let probeTask: Task<Int64, Error>?
+        let aheadTask: Task<Void, Never>?
         switch beginCleanup() {
         case .alreadyClosed:
             return
         case .waitForClose:
             await waitUntilClosed()
             return
-        case .perform(let active, let downloads, let probe):
+        case .perform(let active, let downloads, let probe, let ahead):
             activeTasks = active
             downloadTasks = downloads
             probeTask = probe
+            aheadTask = ahead
         }
 
         activeTasks.forEach { $0.cancel() }
         downloadTasks.forEach { $0.cancel() }
         probeTask?.cancel()
+        aheadTask?.cancel()
 
         await source.close()
         for task in activeTasks {
@@ -117,6 +125,7 @@ public final class PrefetchSession: @unchecked Sendable {
             _ = try? await task.value
         }
         _ = try? await probeTask?.value
+        await aheadTask?.value
         cache.removeAll()
         finishCleanup()
     }
@@ -137,6 +146,9 @@ public final class PrefetchSession: @unchecked Sendable {
 
         let activeTasks = Array(activeBodyTasks.values)
         activeBodyTasks.removeAll()
+        activeBodyOrder.removeAll()
+        let ahead = aheadTask
+        aheadTask = nil
         let downloadTasks = inflight.values.map(\.task)
         inflight.removeAll()
         let probeTask = probeRecord?.task
@@ -147,7 +159,8 @@ public final class PrefetchSession: @unchecked Sendable {
         return .perform(
             activeTasks: activeTasks,
             downloadTasks: downloadTasks,
-            probeTask: probeTask
+            probeTask: probeTask,
+            aheadTask: ahead
         )
     }
 
@@ -426,12 +439,14 @@ public final class PrefetchSession: @unchecked Sendable {
             throw CancellationError()
         }
 
-        // 取消旧 body 与注册新 body 必须处于同一临界区，cleanup 才不可能在两者之间
-        // 截获空集合后让一个新 producer 逃逸。
-        activeBodyTasks.values.forEach { $0.cancel() }
-        activeBodyTasks.removeAll()
+        // 注册新 body 必须和 lifecycle 检查处在同一临界区，cleanup 才不可能
+        // 在两者之间截获空集合后让一个新 producer 逃逸。
         activeBodyTaskID &+= 1
         let myID = activeBodyTaskID
+        while activeBodyOrder.count >= maxConcurrentBodies, let oldest = activeBodyOrder.first {
+            activeBodyOrder.removeFirst()
+            activeBodyTasks.removeValue(forKey: oldest)?.cancel()
+        }
         let task = Task { [weak self] in
             guard let self else {
                 pair.continuation.finish(throwing: CancellationError())
@@ -444,6 +459,7 @@ public final class PrefetchSession: @unchecked Sendable {
             )
         }
         activeBodyTasks[myID] = task
+        activeBodyOrder.append(myID)
         stateLock.unlock()
 
         pair.continuation.onTermination = { [weak self] _ in
@@ -573,12 +589,150 @@ public final class PrefetchSession: @unchecked Sendable {
     private func removeBodyTask(identity: UInt64) {
         stateLock.lock()
         activeBodyTasks[identity] = nil
+        activeBodyOrder.removeAll { $0 == identity }
         stateLock.unlock()
+    }
+
+    /// 记录播放点并开始向后填充。`fraction` 是当前时间占时长的比例。
+    public func notePlayhead(fraction: Double, duration: TimeInterval) {
+        stateLock.lock()
+        guard lifecycle == .open, duration > 0 else {
+            stateLock.unlock()
+            return
+        }
+        requestedFraction = min(max(fraction, 0), 1)
+        requestedDuration = duration
+        let shouldStart = aheadTask == nil
+        stateLock.unlock()
+#if DEBUG
+        VanmoLogger.prefetch.info(
+            "[Debug][Prefetch] event=notePlayhead fraction=\(min(max(fraction, 0), 1), privacy: .public) duration=\(duration, privacy: .public) startAhead=\(shouldStart, privacy: .public)"
+        )
+#endif
+        guard shouldStart else { return }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.runAheadLoop()
+        }
+        if !storeAheadTask(task) {
+            task.cancel()
+        }
+    }
+
+    private func storeAheadTask(_ task: Task<Void, Never>) -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard lifecycle == .open, aheadTask == nil else { return false }
+        aheadTask = task
+        return true
+    }
+
+    private func clearAheadTask() {
+        stateLock.lock()
+        aheadTask = nil
+        stateLock.unlock()
+    }
+
+    private func playheadRequest() -> (open: Bool, fraction: Double, duration: TimeInterval, size: Int64?) {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return (lifecycle == .open, requestedFraction, requestedDuration, totalSize)
+    }
+
+    /// 包含当前播放点的连续缓存区间。还没有缓存时为空区间。
+    public func cacheSpan() -> MediaCacheSpan {
+        stateLock.lock()
+        let fraction = requestedFraction
+        let size = totalSize
+        stateLock.unlock()
+        guard let size, size > 0 else { return .empty }
+        let anchor = min(size - 1, max(0, Int64((Double(size) * fraction).rounded(.down))))
+        guard let range = cache.contiguousByteRange(containing: anchor) else { return .empty }
+        let start = Double(range.lowerBound) / Double(size)
+        let end = Double(min(Int64(range.upperBound), size)) / Double(size)
+        return MediaCacheSpan(
+            startFraction: min(max(start, 0), 1),
+            endFraction: min(max(end, 0), 1)
+        )
+    }
+
+    private func runAheadLoop() async {
+        defer { clearAheadTask() }
+        while !Task.isCancelled {
+            let request = playheadRequest()
+            guard request.open, request.duration > 0 else { return }
+
+            do {
+                let size = try await loadTotalSize()
+                guard size > 0 else { return }
+                let anchor = min(size - 1, max(0, Int64((Double(size) * request.fraction).rounded(.down))))
+                let budget = PrefetchConfig.aheadByteBudget(totalSize: size, duration: request.duration)
+                let end = min(size - 1, anchor + budget - 1)
+                try await fillAhead(from: anchor, through: max(anchor, end))
+                let latest = playheadRequest()
+                let evictAnchor: Int64
+                if let size = latest.size, size > 0 {
+                    evictAnchor = min(size - 1, max(0, Int64((Double(size) * latest.fraction).rounded(.down))))
+                } else {
+                    evictAnchor = anchor
+                }
+                cache.evictFarthest(from: evictAnchor, maxBytes: PrefetchConfig.maxSessionCacheBytes)
+#if DEBUG
+                let span = cacheSpan()
+                VanmoLogger.prefetch.info(
+                    "[Debug][Prefetch] event=aheadFill fraction=\(request.fraction, privacy: .public) spanStart=\(span.startFraction, privacy: .public) spanEnd=\(span.endFraction, privacy: .public)"
+                )
+#endif
+
+                let afterEvict = playheadRequest()
+                guard afterEvict.open else { return }
+                if abs(afterEvict.fraction - request.fraction) < 0.002 {
+                    try await Task.sleep(for: .milliseconds(400))
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                try? await Task.sleep(for: .milliseconds(400))
+            }
+        }
+    }
+
+    private func fillAhead(from anchor: Int64, through end: Int64) async throws {
+        let depth = min(2, max(1, source.pipelineDepth))
+        var cursor = (anchor / Int64(chunkSize)) * Int64(chunkSize)
+        var pipeline: [Task<Data, Error>] = []
+
+        func enqueue() throws {
+            while pipeline.count < depth, cursor <= end {
+                let chunkStart = cursor
+                let chunkEnd = min(end, chunkStart + Int64(chunkSize) - 1)
+                cursor = chunkEnd + 1
+                if cache.hasEntire(range: chunkStart..<(chunkEnd + 1)) {
+                    continue
+                }
+                pipeline.append(try sharedDownload(chunkStart: chunkStart, chunkEnd: chunkEnd))
+            }
+        }
+
+        while true {
+            try Task.checkCancellation()
+            let request = playheadRequest()
+            guard request.open, let size = request.size, size > 0 else { throw CancellationError() }
+            let latestAnchor = min(size - 1, max(0, Int64((Double(size) * request.fraction).rounded(.down))))
+            if abs(latestAnchor - anchor) > Int64(chunkSize) * 2 {
+                return
+            }
+            try enqueue()
+            guard !pipeline.isEmpty else { return }
+            _ = try await pipeline.removeFirst().value
+        }
     }
 
     private func cancelBodyTask(identity: UInt64) {
         stateLock.lock()
         let task = activeBodyTasks.removeValue(forKey: identity)
+        activeBodyOrder.removeAll { $0 == identity }
         stateLock.unlock()
         task?.cancel()
     }

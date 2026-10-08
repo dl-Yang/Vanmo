@@ -13,9 +13,13 @@ struct PlayerView: View {
     @State private var showSpeedPicker = false
     @State private var showScaleModePicker = false
     @State private var showQualityPicker = false
+    @State private var debugHoldLoading = false
+    @State private var playbackStalled = false
+    @State private var lastPlaybackAdvance = Date()
     @State private var dragAxis: DragAxis?
     @State private var lastVerticalTranslation: CGFloat = 0
     @State private var isClosingPlayer = false
+    @State private var suppressEntranceAnimation = true
     private let onClose: (() -> Void)?
 
     private enum DragAxis {
@@ -29,7 +33,7 @@ struct PlayerView: View {
     }
 
     var body: some View {
-        playerSurface(horizontalSafeArea: iPhoneLandscapeHorizontalSafeArea)
+        playerSurface()
     }
 
     private var iPhoneLandscapeHorizontalSafeArea: CGFloat {
@@ -41,7 +45,7 @@ struct PlayerView: View {
         return max(insets.left, insets.right)
     }
 
-    private func playerSurface(horizontalSafeArea: CGFloat) -> some View {
+    private func playerSurface() -> some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
@@ -80,8 +84,21 @@ struct PlayerView: View {
             gestureLayer
                 .allowsHitTesting(!viewModel.controlsVisible)
 
+            if showSpeedPicker || showScaleModePicker || showQualityPicker {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showSpeedPicker = false
+                            showScaleModePicker = false
+                            showQualityPicker = false
+                        }
+                    }
+            }
+
             if viewModel.controlsVisible {
-                controlsOverlay(horizontalSafeArea: horizontalSafeArea)
+                controlsOverlay()
             }
 
             feedbackOverlays
@@ -97,19 +114,6 @@ struct PlayerView: View {
                 rateBoostIndicator
             }
 
-            if showSpeedPicker || showScaleModePicker || showQualityPicker {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showSpeedPicker = false
-                            showScaleModePicker = false
-                            showQualityPicker = false
-                        }
-                    }
-            }
-
             if showSpeedPicker {
                 speedPickerPanel
             }
@@ -118,12 +122,48 @@ struct PlayerView: View {
                 scalePickerPanel
             }
 
-            if showQualityPicker {
-                qualityPickerPanel
+        }
+        .overlay {
+            if showsLoadingChrome {
+                ScreenEdgeLoadingLight()
+                    .allowsHitTesting(false)
             }
-
+        }
+        .overlayPreferenceValue(QualityButtonAnchorKey.self) { anchor in
+            if showQualityPicker, let anchor {
+                GeometryReader { proxy in
+                    let rect = proxy[anchor]
+                    ZStack(alignment: .topLeading) {
+                        Color.clear
+                            .allowsHitTesting(false)
+                        qualityPickerCard
+                            .fixedSize()
+                            .offset(x: rect.minX, y: rect.maxY + 8)
+                    }
+                }
+                .ignoresSafeArea()
+            }
         }
         .statusBarHidden(true)
+        .transaction { transaction in
+            if suppressEntranceAnimation {
+                transaction.disablesAnimations = true
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.async {
+                suppressEntranceAnimation = false
+            }
+#if DEBUG
+            if ProcessInfo.processInfo.environment["VANMO_DEBUG_HOLD_LOADING"] == "1" {
+                debugHoldLoading = true
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    debugHoldLoading = false
+                }
+            }
+#endif
+        }
         .task { await viewModel.onAppear(modelContext: modelContext) }
         .onDisappear {
             let keepPlaybackActive = !isClosingPlayer
@@ -156,9 +196,13 @@ struct PlayerView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
             viewModel.handleMemoryWarning()
         }
-        .sheet(isPresented: $viewModel.showTrackSelector) {
-            TrackSelectorView(viewModel: viewModel)
+        .sheet(isPresented: $viewModel.showAudioSelector) {
+            AudioTrackSelectorView(viewModel: viewModel)
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $viewModel.showSubtitleSelector) {
+            SubtitleSelectorView(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $viewModel.showChapterList) {
             ChapterListView(viewModel: viewModel)
@@ -168,20 +212,31 @@ struct PlayerView: View {
             EpisodeSelectorView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
         }
-        .sheet(isPresented: $viewModel.showSubtitleSettings) {
-            SubtitleSettingsView(
-                style: $viewModel.subtitleStyle,
-                delay: Binding(
-                    get: { viewModel.config.subtitleDelay },
-                    set: { viewModel.setSubtitleDelay($0) }
-                )
-            )
-            .presentationDetents([.medium, .large])
+        .onChange(of: viewModel.currentTime) { _, _ in
+            lastPlaybackAdvance = Date()
+            playbackStalled = false
+        }
+        .onChange(of: viewModel.playbackState) { _, state in
+            lastPlaybackAdvance = Date()
+            if state != .playing {
+                playbackStalled = false
+            }
+        }
+        .task(id: viewModel.playbackState) {
+            guard viewModel.playbackState == .playing else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                guard viewModel.playbackState == .playing else { return }
+                if Date().timeIntervalSince(lastPlaybackAdvance) > 1.2 {
+                    playbackStalled = true
+                }
+            }
         }
         .onChange(of: viewModel.controlsVisible) { _, visible in
             if !visible {
                 showSpeedPicker = false
                 showScaleModePicker = false
+                showQualityPicker = false
             }
         }
     }
@@ -273,153 +328,207 @@ struct PlayerView: View {
 
     // MARK: - Controls Overlay
 
-    private func controlsOverlay(horizontalSafeArea: CGFloat) -> some View {
-        ZStack {
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    viewModel.toggleControls()
-                }
-
-            VStack {
-                topBar
-                Spacer()
-                centerControls
-                Spacer()
-                bottomBar
-            }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 16 + horizontalSafeArea)
+    private var showsLoadingChrome: Bool {
+        if debugHoldLoading { return true }
+        switch viewModel.playbackState {
+        case .playing:
+            return playbackStalled
+        case .paused:
+            return false
+        default:
+            return true
         }
+    }
+
+    private func controlsOverlay() -> some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(0.3), location: 0),
+                    .init(color: .black.opacity(0), location: 0.45),
+                    .init(color: .black.opacity(0.6), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+
+            ZStack {
+                VStack(spacing: 0) {
+                    topBar
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if showQualityPicker || showSpeedPicker || showScaleModePicker {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showQualityPicker = false
+                                    showSpeedPicker = false
+                                    showScaleModePicker = false
+                                }
+                            } else {
+                                viewModel.toggleControls()
+                            }
+                        }
+                    bottomBar
+                }
+                centerControls
+            }
+            .safeAreaPadding(.horizontal, 16)
+            .safeAreaPadding(.top, 8)
+            .safeAreaPadding(.bottom, 6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transition(.opacity)
     }
 
     private var topBar: some View {
-        HStack {
-            Button {
-                closePlayer()
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(8)
-            }
+        GeometryReader { proxy in
+            let compact = proxy.size.width < 480
+            topBarContent(
+                diameter: compact ? 44 : 48,
+                spacing: compact ? 8 : 20,
+                volumeWidth: compact ? 112 : 192,
+                sliderWidth: compact ? 48 : 114
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        }
+        .frame(height: 48)
+    }
 
-            Spacer()
+    private func topBarContent(
+        diameter: CGFloat,
+        spacing: CGFloat,
+        volumeWidth: CGFloat,
+        sliderWidth: CGFloat
+    ) -> some View {
+        HStack(alignment: .center, spacing: spacing) {
+            HStack(spacing: spacing) {
+                Button(action: closePlayer) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: diameter, height: diameter)
+                        .playerGlassCircle()
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("关闭"))
 
-            Text(viewModel.engine.state.isActive ? "" : "")
-                .font(.subheadline)
-                .foregroundStyle(.white)
-
-            Spacer()
-
-            HStack(spacing: 16) {
+                pictureInPictureButton(diameter: diameter)
                 AirPlayRouteButton()
-                    .frame(width: 28, height: 28)
+                    .frame(width: 24, height: 24)
+                    .frame(width: diameter, height: diameter)
+                    .playerGlassCircle()
                     .accessibilityLabel(L10n.tr("投屏"))
-
-                if pictureInPicture.isSupported && viewModel.canShowPictureInPictureButton {
-                    Button {
-                        if viewModel.avPlayer != nil {
-                            pictureInPicture.toggle()
-                        } else {
-                            viewModel.toggleKSPictureInPicture()
-                        }
-                    } label: {
-                        Image(systemName: (pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "pip.exit" : "pip.enter")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                    .disabled(viewModel.avPlayer != nil && !pictureInPicture.isPossible && !pictureInPicture.isActive)
-                    .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? L10n.tr("退出画中画") : L10n.tr("进入画中画"))
-                }
-
-                if viewModel.canSelectEpisode {
-                    Button {
-                        viewModel.showEpisodeSelector = true
-                    } label: {
-                        Image(systemName: "rectangle.stack")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                }
-
-                Button {
-                    viewModel.showChapterList = true
-                } label: {
-                    Image(systemName: "list.bullet")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                }
-                .accessibilityLabel(L10n.tr("章节与片头"))
-
-                Button {
-                    viewModel.showTrackSelector = true
-                } label: {
-                    Image(systemName: "text.bubble")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                }
-
-                if viewModel.hasEmbeddedSubtitleTracks {
-                    Button {
-                        viewModel.showSubtitleSettings = true
-                    } label: {
-                        Image(systemName: "textformat")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                    .accessibilityLabel(L10n.tr("字幕设置"))
-                }
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showQualityPicker.toggle()
-                        showSpeedPicker = false
-                        showScaleModePicker = false
-                    }
-                } label: {
-                    Text(viewModel.videoQuality.displayName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                }
-                .accessibilityLabel(L10n.tr("画质"))
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showSpeedPicker.toggle()
-                        showScaleModePicker = false
-                        showQualityPicker = false
-                    }
-                } label: {
-                    Text("\(viewModel.config.playbackRate, specifier: "%.1f")x")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                }
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        showScaleModePicker.toggle()
-                        showSpeedPicker = false
-                        showQualityPicker = false
-                    }
-                } label: {
-                    Image(systemName: viewModel.config.scaleMode.icon)
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                }
+                qualityButton(diameter: diameter)
             }
+            .contextMenu {
+                extraPlayerActions
+            }
+
+            Spacer(minLength: 8)
+
+            volumePill(width: volumeWidth, sliderWidth: sliderWidth, height: diameter)
+        }
+    }
+
+    private func qualityButton(diameter: CGFloat) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showQualityPicker.toggle()
+                showSpeedPicker = false
+                showScaleModePicker = false
+            }
+        } label: {
+            Text(qualityShortLabel)
+                .font(.system(size: diameter < 48 ? 11 : 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+                .frame(width: diameter, height: diameter)
+                .playerGlassCircle()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.tr("画质"))
+        .anchorPreference(key: QualityButtonAnchorKey.self, value: .bounds) { $0 }
+    }
+
+    private var qualityShortLabel: String {
+        switch viewModel.videoQuality {
+        case .p360: return "360"
+        case .p480: return "480"
+        case .p720: return "720"
+        case .p1080: return "HD"
+        case .original: return L10n.tr("原画")
+        }
+    }
+
+    private func pictureInPictureButton(diameter: CGFloat) -> some View {
+        Button {
+            if viewModel.avPlayer != nil {
+                pictureInPicture.toggle()
+            } else {
+                viewModel.toggleKSPictureInPicture()
+            }
+        } label: {
+            Image(systemName: (pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "pip.exit" : "pip.enter")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: diameter, height: diameter)
+                .playerGlassCircle()
+        }
+        .buttonStyle(.plain)
+        .disabled(!(pictureInPicture.isSupported && viewModel.canShowPictureInPictureButton))
+        .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? L10n.tr("退出画中画") : L10n.tr("进入画中画"))
+    }
+
+    private func volumePill(width: CGFloat, sliderWidth: CGFloat, height: CGFloat) -> some View {
+        HStack(spacing: 12) {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.2))
+                    Capsule()
+                        .fill(.white)
+                        .frame(width: max(0, proxy.size.width * CGFloat(viewModel.config.volume)))
+                }
+                .frame(height: 8)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let fraction = value.location.x / max(proxy.size.width, 1)
+                            viewModel.setVolume(Float(fraction))
+                        }
+                )
+            }
+            .frame(width: sliderWidth, height: height)
+
+            Image(systemName: viewModel.config.volume > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+        }
+        .padding(.horizontal, 16)
+        .frame(width: width, height: height)
+        .playerGlassCapsule()
+    }
+
+    @ViewBuilder
+    private var extraPlayerActions: some View {
+        if viewModel.canSelectEpisode {
+            Button(L10n.tr("选集")) { viewModel.showEpisodeSelector = true }
+        }
+        Button(L10n.tr("章节与片头")) { viewModel.showChapterList = true }
+        Button(L10n.tr("画质")) {
+            showQualityPicker = true
+            showSpeedPicker = false
+            showScaleModePicker = false
+        }
+        Button(L10n.tr("倍速")) {
+            showSpeedPicker = true
+            showQualityPicker = false
+            showScaleModePicker = false
         }
     }
 
@@ -436,38 +545,60 @@ struct PlayerView: View {
     }
 
     private var centerControls: some View {
-        HStack(spacing: 48) {
-            Button { viewModel.skipBackward() } label: {
-                Image(systemName: "gobackward.10")
-                    .font(.title)
-                    .foregroundStyle(.white)
-            }
+        ViewThatFits(in: .horizontal) {
+            centerControlsContent(play: 96, skip: 64, spacing: 64, playIcon: 34, skipIcon: 22)
+            centerControlsContent(play: 72, skip: 48, spacing: 20, playIcon: 28, skipIcon: 18)
+        }
+    }
 
+    private func centerControlsContent(
+        play: CGFloat,
+        skip: CGFloat,
+        spacing: CGFloat,
+        playIcon: CGFloat,
+        skipIcon: CGFloat
+    ) -> some View {
+        HStack(spacing: spacing) {
+            skipGlassButton(forward: false, diameter: skip, icon: skipIcon)
             Button { viewModel.togglePlayPause() } label: {
                 Group {
-                    switch viewModel.playbackState {
-                    case .loading, .buffering:
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                    case .playing:
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 44))
-                    default:
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 44))
+                    if showsLoadingChrome {
+                        PlayerLoadingArc()
+                    } else {
+                        Image(systemName: viewModel.playbackState == .playing ? "pause.fill" : "play.fill")
+                            .font(.system(size: playIcon, weight: .semibold))
+                            .foregroundStyle(.white)
                     }
                 }
-                .foregroundStyle(.white)
-                .frame(width: 60, height: 60)
+                .frame(width: play, height: play)
+                .playerGlassCircle()
             }
-
-            Button { viewModel.skipForward() } label: {
-                Image(systemName: "goforward.10")
-                    .font(.title)
-                    .foregroundStyle(.white)
-            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                showsLoadingChrome
+                    ? L10n.tr("正在加载")
+                    : (viewModel.playbackState == .playing ? L10n.tr("暂停") : L10n.tr("播放"))
+            )
+            skipGlassButton(forward: true, diameter: skip, icon: skipIcon)
         }
+    }
+
+    private func skipGlassButton(forward: Bool, diameter: CGFloat, icon: CGFloat) -> some View {
+        Button {
+            if forward {
+                viewModel.skipForward()
+            } else {
+                viewModel.skipBackward()
+            }
+        } label: {
+            Image(systemName: forward ? "goforward.10" : "gobackward.10")
+                .font(.system(size: icon, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: diameter, height: diameter)
+                .playerGlassCircle()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(forward ? L10n.tr("快进") : L10n.tr("快退"))
     }
 
     @ViewBuilder
@@ -478,31 +609,53 @@ struct PlayerView: View {
                 Spacer()
             }
         } else {
-            VStack(spacing: 8) {
-                if viewModel.canSkipIntro {
-                    HStack {
-                        Spacer()
+            VStack(spacing: 16) {
+                HStack(alignment: .center) {
+                    if viewModel.canSkipIntro {
                         Button {
                             viewModel.skipIntro()
                         } label: {
                             Text(L10n.tr("跳过片头"))
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
+                                .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(.ultraThinMaterial)
-                                .clipShape(Capsule())
+                                .frame(height: 36)
+                                .playerGlassCapsule()
                         }
+                        .buttonStyle(.plain)
                         .accessibilityLabel(L10n.tr("跳过片头"))
+                    }
+                    Spacer()
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 20) {
+                            glassCircleButton("text.bubble", label: L10n.tr("字幕"), diameter: 48) {
+                                viewModel.showSubtitleSelector = true
+                            }
+                            glassCircleButton("waveform", label: L10n.tr("音轨"), diameter: 48) {
+                                viewModel.showAudioSelector = true
+                            }
+                            glassCircleButton("arrow.triangle.2.circlepath", label: L10n.tr("缩放"), diameter: 48) {
+                                viewModel.cycleScaleMode()
+                            }
+                        }
+                        HStack(spacing: 8) {
+                            glassCircleButton("text.bubble", label: L10n.tr("字幕"), diameter: 44) {
+                                viewModel.showSubtitleSelector = true
+                            }
+                            glassCircleButton("waveform", label: L10n.tr("音轨"), diameter: 44) {
+                                viewModel.showAudioSelector = true
+                            }
+                            glassCircleButton("arrow.triangle.2.circlepath", label: L10n.tr("缩放"), diameter: 44) {
+                                viewModel.cycleScaleMode()
+                            }
+                        }
                     }
                 }
 
                 PlayerProgressBar(
                     progress: viewModel.progress,
-                    bufferProgress: viewModel.bufferProgress,
-                    previewImage: viewModel.seekPreviewImage,
-                    previewTimeText: viewModel.displayTime.formattedDuration,
+                    cacheStart: viewModel.cacheStart,
+                    cacheEnd: viewModel.cacheEnd,
                     isSeeking: $viewModel.isSeeking,
                     onScrub: { fraction in
                         viewModel.updateScrubTarget(fraction)
@@ -511,22 +664,25 @@ struct PlayerView: View {
                         viewModel.seek(to: fraction * viewModel.duration)
                     }
                 )
-
-                HStack {
-                    Text(viewModel.displayTime.formattedDuration)
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.8))
-
-                    Spacer()
-
-                    Text("-\((viewModel.duration - viewModel.displayTime).formattedDuration)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.8))
-                }
             }
         }
+    }
+
+    private func glassCircleButton(
+        _ systemName: String,
+        label: String,
+        diameter: CGFloat,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: diameter, height: diameter)
+                .playerGlassCircle()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private var liveBadge: some View {
@@ -723,7 +879,7 @@ struct PlayerView: View {
         .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
     }
 
-    private var qualityPickerPanel: some View {
+    private var qualityPickerCard: some View {
         VStack(spacing: 0) {
             ForEach(Array(viewModel.availableVideoQualities.enumerated()), id: \.element) { index, quality in
                 Button {
@@ -744,6 +900,7 @@ struct PlayerView: View {
                     .padding(.vertical, 10)
                     .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 if index < viewModel.availableVideoQualities.count - 1 {
                     Divider().overlay(.white.opacity(0.15))
                 }
@@ -753,10 +910,6 @@ struct PlayerView: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .padding(.top, 56)
-        .padding(.trailing, 16 + iPhoneLandscapeHorizontalSafeArea)
-        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
     }
 }
 
@@ -894,9 +1047,16 @@ final class PlayerPictureInPictureController: NSObject, ObservableObject {
         isActive = false
     }
 
+    /// `configure` 在 `updateUIView` 里调用。值没变也赋值会在视图更新中发布变化，引发反复重绘。
     private func refreshPossibleState() {
-        isPossible = controller?.isPictureInPicturePossible == true
-        isActive = controller?.isPictureInPictureActive == true
+        let possible = controller?.isPictureInPicturePossible == true
+        let active = controller?.isPictureInPictureActive == true
+        if isPossible != possible {
+            isPossible = possible
+        }
+        if isActive != active {
+            isActive = active
+        }
     }
 }
 
@@ -1156,5 +1316,126 @@ struct ChapterListView: View {
     private func isCurrentChapter(_ chapter: Chapter) -> Bool {
         let current = viewModel.currentTime
         return current >= chapter.startTime.seconds && current < chapter.endTime.seconds
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func playerGlassCircle() -> some View {
+        if #available(iOS 26.0, *) {
+            self.contentShape(Circle())
+                .glassEffect(.clear, in: .circle)
+        } else {
+            self.contentShape(Circle())
+                .background {
+                    Circle().fill(.ultraThinMaterial).opacity(0.22)
+                }
+                .overlay {
+                    Circle().strokeBorder(.white.opacity(0.28), lineWidth: 1)
+                }
+        }
+    }
+
+    @ViewBuilder
+    func playerGlassCapsule() -> some View {
+        if #available(iOS 26.0, *) {
+            self.contentShape(Capsule())
+                .glassEffect(.clear, in: .capsule)
+        } else {
+            self.contentShape(Capsule())
+                .background {
+                    Capsule().fill(.ultraThinMaterial).opacity(0.22)
+                }
+                .overlay {
+                    Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 1)
+                }
+        }
+    }
+}
+
+private struct QualityButtonAnchorKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? = nil
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
+}
+
+private struct PlayerLoadingArc: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
+            let turns = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1)
+            Circle()
+                .trim(from: 0.08, to: 0.38)
+                .stroke(.white, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+                .frame(width: 36, height: 36)
+                .rotationEffect(.degrees(reduceMotion ? -90 : turns * 360 - 90))
+        }
+        .accessibilityLabel(L10n.tr("正在加载"))
+    }
+}
+
+private struct ScreenEdgeLoadingLight: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
+            let phase = reduceMotion ? 0.12 : Self.phase(at: timeline.date)
+            EdgeCometStroke(phase: phase, cornerRadius: Self.cornerRadius)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private static func phase(at date: Date) -> CGFloat {
+        let period: TimeInterval = 2
+        return CGFloat(date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period)
+    }
+
+    private static var cornerRadius: CGFloat {
+        UIDevice.current.userInterfaceIdiom == .pad ? 18 : 55
+    }
+}
+
+private struct EdgeCometStroke: View {
+    var phase: CGFloat
+    var cornerRadius: CGFloat
+
+    /// Shorter than the first bezel dash, fully inside the screen.
+    private let cometLength: CGFloat = 0.14
+    private let coreWidth: CGFloat = 3
+
+    var body: some View {
+        Canvas { context, size in
+            let inset = coreWidth / 2 + 3
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+            guard rect.width > 4, rect.height > 4 else { return }
+            let radius = min(cornerRadius, min(rect.width, rect.height) / 2)
+            let path = Path(roundedRect: rect, cornerRadius: radius, style: .continuous)
+            strokeComet(context: &context, path: path, lineWidth: 7, color: Color.white.opacity(0.55), blur: 1.2)
+            strokeComet(context: &context, path: path, lineWidth: coreWidth, color: .white, blur: 0)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func strokeComet(
+        context: inout GraphicsContext,
+        path: Path,
+        lineWidth: CGFloat,
+        color: Color,
+        blur: CGFloat
+    ) {
+        let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+        context.drawLayer { layer in
+            if blur > 0 {
+                layer.addFilter(.blur(radius: blur))
+            }
+            layer.stroke(path.trimmedPath(from: phase, to: min(phase + cometLength, 1)), with: .color(color), style: style)
+            if phase + cometLength > 1 {
+                layer.stroke(path.trimmedPath(from: 0, to: phase + cometLength - 1), with: .color(color), style: style)
+            }
+        }
     }
 }

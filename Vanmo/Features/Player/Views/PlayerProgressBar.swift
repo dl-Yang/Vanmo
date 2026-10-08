@@ -4,9 +4,8 @@ import VanmoCore
 
 struct PlayerProgressBar: View {
     let progress: Double
-    let bufferProgress: Double
-    let previewImage: UIImage?
-    let previewTimeText: String
+    let cacheStart: Double
+    let cacheEnd: Double
     @Binding var isSeeking: Bool
     let onScrub: (Double?) -> Void
     let onSeek: (Double) -> Void
@@ -15,9 +14,10 @@ struct PlayerProgressBar: View {
     @State private var pendingSeekProgress: Double?
     @State private var settleSeekTask: Task<Void, Never>?
     @State private var lastHapticStep: Int?
+    /// 系统取消手势（来电、控制中心）时不会调 `onEnded`，靠它把 `isSeeking` 复位。
+    @GestureState private var isDragging = false
 
     private let hapticStepCount = 20
-    private let previewWidth: CGFloat = 160
 
     private var displayProgress: Double {
         if isSeeking {
@@ -37,23 +37,6 @@ struct PlayerProgressBar: View {
                         .gesture(scrubGesture(in: geometry.size))
                 }
             }
-            .overlay(alignment: .bottomLeading) {
-                GeometryReader { geometry in
-                    if isSeeking {
-                        previewCard
-                            .offset(
-                                x: previewOffset(
-                                    in: geometry.size.width,
-                                    thumbX: geometry.size.width * displayProgress
-                                ),
-                                y: -28
-                            )
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                            .allowsHitTesting(false)
-                    }
-                }
-                .allowsHitTesting(false)
-            }
             .allowsHitTesting(true)
             .animation(.easeInOut(duration: 0.15), value: isSeeking)
         .onChange(of: progress) { _, newProgress in
@@ -63,70 +46,52 @@ struct PlayerProgressBar: View {
                 self.pendingSeekProgress = nil
             }
         }
+        .onChange(of: isDragging) { _, dragging in
+            guard !dragging else { return }
+            cancelScrubIfNeeded()
+        }
         .onDisappear {
             settleSeekTask?.cancel()
+            cancelScrubIfNeeded()
         }
     }
 
-    private var previewCard: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.white.opacity(0.08))
-                if let previewImage {
-                    Image(uiImage: previewImage)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Image(systemName: "film")
-                        .font(.title3)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-            }
-            .frame(width: previewWidth, height: 90)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-            Text(previewTimeText)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .monospacedDigit()
-                .foregroundStyle(.white)
-        }
-        .padding(6)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .frame(width: previewWidth + 12)
+    private func cancelScrubIfNeeded() {
+        guard isSeeking else { return }
+        isSeeking = false
+        lastHapticStep = nil
+        onScrub(nil)
     }
 
     private func track(in size: CGSize) -> some View {
         ZStack(alignment: .leading) {
-            Rectangle()
-                .fill(.white.opacity(0.2))
-
-            Rectangle()
+            Capsule()
                 .fill(.white.opacity(0.3))
-                .frame(width: size.width * bufferProgress)
 
-            Rectangle()
-                .fill(Color.vanmoPrimary)
-                .frame(width: size.width * displayProgress)
+            Capsule()
+                .fill(.white.opacity(0.55))
+                .frame(width: max(0, size.width * (cacheEnd - cacheStart)))
+                .offset(x: size.width * cacheStart)
 
-            Circle()
+            Capsule()
                 .fill(.white)
-                .frame(width: isSeeking ? 16 : 10, height: isSeeking ? 16 : 10)
-                .shadow(radius: 2)
-                .offset(x: size.width * displayProgress - (isSeeking ? 8 : 5))
+                .frame(width: size.width * displayProgress)
         }
-        .frame(height: isSeeking ? 6 : 3)
+        .frame(height: 6)
         .clipShape(Capsule())
     }
 
     private func scrubGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
+            .updating($isDragging) { _, state, _ in
+                state = true
+            }
             .onChanged { value in
                 settleSeekTask?.cancel()
                 pendingSeekProgress = nil
-                isSeeking = true
+                if !isSeeking {
+                    isSeeking = true
+                }
                 let fraction = max(0, min(1, value.location.x / size.width))
                 dragProgress = fraction
                 onScrub(fraction)
@@ -151,11 +116,6 @@ struct PlayerProgressBar: View {
             }
     }
 
-    private func previewOffset(in width: CGFloat, thumbX: CGFloat) -> CGFloat {
-        let cardWidth = previewWidth + 12
-        return max(0, min(width - cardWidth, thumbX - cardWidth / 2))
-    }
-
     private func triggerHapticIfNeeded(for fraction: Double) {
         let step = Int((fraction * Double(hapticStepCount)).rounded())
         guard step != lastHapticStep else { return }
@@ -167,10 +127,9 @@ struct PlayerProgressBar: View {
 #Preview {
     PlayerProgressBar(
         progress: 0.4,
-        bufferProgress: 0.7,
-        previewImage: nil,
-        previewTimeText: "12:34",
-        isSeeking: .constant(true),
+        cacheStart: 0.2,
+        cacheEnd: 0.7,
+        isSeeking: .constant(false),
         onScrub: { _ in },
         onSeek: { _ in }
     )

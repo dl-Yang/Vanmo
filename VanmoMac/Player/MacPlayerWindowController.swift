@@ -41,7 +41,10 @@ final class MacPlayerWindowController: NSWindowController, NSWindowDelegate {
         window.minSize = NSSize(width: 960, height: 540)
         window.isMovableByWindowBackground = true
         window.contentView = NSHostingView(rootView: playerView)
+        let frame = Self.initialContentRect(for: item)
+        window.setFrame(frame, display: false)
         window.setFrameAutosaveName("Vanmo.PlayerWindow")
+        window.setFrame(frame, display: false)
         window.collectionBehavior.insert(.fullScreenPrimary)
 
         super.init(window: window)

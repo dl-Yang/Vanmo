@@ -110,9 +110,14 @@ struct VanmoMacRootView: View {
             await downloadManager.restoreAndResume()
 #if DEBUG
             let statuses = downloadManager.tasks.map(\.status.rawValue).joined(separator: ",")
-            print("[Debug][Downloads] restore count=\(downloadManager.tasks.count) statuses=\(statuses)")
+            let restoreCount = downloadManager.tasks.count
+            VanmoLogger.library.info("[Debug][Downloads] restore count=\(restoreCount, privacy: .public) statuses=\(statuses, privacy: .public)")
             for task in downloadManager.tasks where task.status != .completed {
-                print("[Debug][Downloads] restore task=\(task.id.uuidString) status=\(task.status.rawValue) received=\(task.receivedBytes) total=\(task.totalBytes)")
+                let taskID = task.id.uuidString
+                let status = task.status.rawValue
+                let received = task.receivedBytes
+                let total = task.totalBytes
+                VanmoLogger.library.info("[Debug][Downloads] restore task=\(taskID, privacy: .public) status=\(status, privacy: .public) received=\(received, privacy: .public) total=\(total, privacy: .public)")
             }
 #endif
             await connectionsViewModel.attemptAutoReconnectIfNeeded()
@@ -128,10 +133,30 @@ struct VanmoMacRootView: View {
                 do {
                     let item = try DownloadHeroWalkFixtures.seedItem(kind: kind, in: modelContext)
                     appState.openDetail(item)
-                    print("[Debug][Downloads] hero walk presented kind=\(kind.rawValue) title=\(item.title)")
+                    let kindName = kind.rawValue
+                    VanmoLogger.library.info("[Debug][Downloads] hero walk presented kind=\(kindName, privacy: .public)")
                 } catch {
-                    print("[Debug][Downloads] hero walk seed failed")
+                    VanmoLogger.library.error("[Debug][Downloads] hero walk seed failed")
                 }
+            }
+            if let path = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAY_FILE"],
+               FileManager.default.fileExists(atPath: path) {
+                let url = URL(fileURLWithPath: path)
+                let descriptor = FetchDescriptor<MediaItem>()
+                let existing = try? modelContext.fetch(descriptor).first { $0.fileURL.path == url.path }
+                let item = existing ?? MediaItem(
+                    title: "Player Walk",
+                    fileURL: url,
+                    mediaType: .movie,
+                    duration: 3
+                )
+                if existing == nil {
+                    item.originalFileName = url.lastPathComponent
+                    modelContext.insert(item)
+                    try? modelContext.save()
+                }
+                appState.play(item)
+                VanmoLogger.player.info("[Debug][Player] debug play file opened")
             }
 #endif
         }
@@ -488,9 +513,10 @@ struct VanmoMacRootView: View {
                     connectionType: connection.type
                 )
                 try await downloadManager.enqueue(request)
-                print("[Debug][FTP] accept download enqueued")
+                VanmoLogger.library.info("[Debug][FTP] accept download enqueued")
             } catch {
-                print("[Debug][FTP] accept download failed \(error.localizedDescription)")
+                let message = error.localizedDescription
+                VanmoLogger.library.error("[Debug][FTP] accept download failed \(message, privacy: .public)")
             }
         }
         if actions.contains("delete") {

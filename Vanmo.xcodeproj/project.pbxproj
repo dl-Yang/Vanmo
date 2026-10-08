@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -242,7 +242,7 @@
 		2808E3F2654CF170151A05FD /* box.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = box.png; sourceTree = "<group>"; };
 		2CEC78F75E9E683980C34E79 /* MacDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDesignTokens.swift; sourceTree = "<group>"; };
 		2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaTitleLogoView.swift; sourceTree = "<group>"; };
-		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Vanmo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2F0583048E7F8AAC51FA8D37 /* MacScannedShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedShowDetailView.swift; sourceTree = "<group>"; };
 		38C765C23D38D32911EEDECB /* ScanSyncBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSyncBanner.swift; sourceTree = "<group>"; };
 		39710C411B7AC5591ECDE045 /* MacScannedLibraryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacScannedLibraryListView.swift; sourceTree = "<group>"; };
@@ -314,7 +314,7 @@
 		98F884249848ED7286C2E2C8 /* MacTrackSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacTrackSelectorView.swift; sourceTree = "<group>"; };
 		9A8FE79D92665FF658B801E1 /* MacDownloadHeroController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDownloadHeroController.swift; sourceTree = "<group>"; };
 		9B6219B4DB4376B9D457F04B /* URL+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+Extensions.swift"; sourceTree = "<group>"; };
-		9B7EE7D748A71B6BB9544AF3 /* VanmoDownloadWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = VanmoDownloadWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9B7EE7D748A71B6BB9544AF3 /* VanmoDownloadWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VanmoDownloadWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9C62E417F824B6FF71459817 /* localFolder.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = localFolder.png; sourceTree = "<group>"; };
 		9C6C9DB7C33B25EE254DD601 /* jellyfin.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = jellyfin.png; sourceTree = "<group>"; };
 		9D8461209C8EBA629A3ED361 /* MacMediaDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaDetailStore.swift; sourceTree = "<group>"; };
@@ -329,7 +329,7 @@
 		ABB1277459ADB58B16AE80D3 /* Vanmo-Mac-Cloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac-Cloud.entitlements"; sourceTree = "<group>"; };
 		ABF5F0C14AD796EE9479119E /* MacEmbyFolderBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacEmbyFolderBrowseView.swift; sourceTree = "<group>"; };
 		AD11C496362FE830670827E2 /* TimeInterval+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TimeInterval+Formatting.swift"; sourceTree = "<group>"; };
-		ADF90EC697DE5562B3A3B90F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		ADF90EC697DE5562B3A3B90F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B09C32D3BB0EC025D1769F53 /* baiduNetdisk.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = baiduNetdisk.png; sourceTree = "<group>"; };
 		B7719C17F340864CF4664CC1 /* PosterCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterCard.swift; sourceTree = "<group>"; };
 		B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingIndicatorView.swift; sourceTree = "<group>"; };
@@ -376,7 +376,7 @@
 		F0FEED6C64943C9903BD8BF9 /* googleDrive.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = googleDrive.png; sourceTree = "<group>"; };
 		F1FADA4CEAA0809689C8B825 /* FavoritesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesListView.swift; sourceTree = "<group>"; };
 		F3672B86EB9D1CDEA999C55B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		F3B5CE22DF92AFDBFF290E19 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F3B5CE22DF92AFDBFF290E19 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F43CA955F2A708A404798F61 /* VanmoDownloadWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VanmoDownloadWidget.swift; sourceTree = "<group>"; };
 		F4899D11636AAC1F440051DA /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -1161,15 +1161,12 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					0DF5C008C42D8CFE972C79FA = {
-						DevelopmentTeam = L775YJ7YS4;
 						ProvisioningStyle = Automatic;
 					};
 					0F6607F78A5C0B637140BEB4 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					2665CCBF2B3B9026EEF76906 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -1193,7 +1190,6 @@
 				2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				FA882A96481864BE9677FFD2 /* XCLocalSwiftPackageReference "Packages/VanmoCore" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1466,17 +1462,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac-Cloud.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = L775YJ7YS4;
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "VanmoMac/Resources/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;
@@ -1552,6 +1545,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",
@@ -1571,10 +1565,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1588,6 +1579,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"FFMPEG_ENABLED=1",
 					"$(inherited)",
@@ -1607,10 +1599,7 @@
 					"-framework",
 					CoreFoundation,
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
 				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
@@ -1622,9 +1611,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VanmoDownloadWidget/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vanmo.app.download-widget";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -1639,17 +1633,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac-Cloud.entitlements";
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = L775YJ7YS4;
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "VanmoMac/Resources/Info-Mac.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
-					"-DCLOUDKIT_SYNC_ENABLED",
-				);
+				OTHER_SWIFT_FLAGS = "-DFFMPEG_ENABLED -DCLOUDKIT_SYNC_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
 				SDKROOT = macosx;
 				VALIDATE_PRODUCT = NO;
@@ -1730,9 +1721,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				DEVELOPMENT_TEAM = HYGMY7H2C5;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = VanmoDownloadWidget/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.vanmo.app.download-widget";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
