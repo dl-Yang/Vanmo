@@ -52,9 +52,7 @@ struct PlayerView: View {
             videoLayer
 
             if let holdImage = viewModel.qualityHoldImage {
-                Image(uiImage: holdImage)
-                    .resizable()
-                    .scaledToFit()
+                QualityHoldFrame(image: holdImage, scaleMode: viewModel.config.scaleMode)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
             }
@@ -1083,6 +1081,34 @@ extension PlayerPictureInPictureController: AVPictureInPictureControllerDelegate
 
     func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         refreshPossibleState()
+    }
+}
+
+// MARK: - Quality Hold Frame
+
+/// Lays out like the video layers: full-screen bounds, centered, same gravity.
+private struct QualityHoldFrame: View {
+    let image: UIImage
+    let scaleMode: VideoScaleMode
+
+    var body: some View {
+        GeometryReader { proxy in
+            frameImage
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
+        }
+    }
+
+    @ViewBuilder
+    private var frameImage: some View {
+        switch scaleMode {
+        case .fit:
+            Image(uiImage: image).resizable().scaledToFit()
+        case .fill:
+            Image(uiImage: image).resizable().scaledToFill()
+        case .stretch:
+            Image(uiImage: image).resizable()
+        }
     }
 }
 

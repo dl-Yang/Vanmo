@@ -78,7 +78,7 @@ The default path targets an iOS device. Use `--simulator` for iOS Simulator and 
 
 ### iOS Visual Verification
 
-iOS UI evidence is visual. The repository has no UI-test target and no automated UI driver.
+iOS UI evidence is visual. The repository has no UI-test target and ships no UI driver.
 
 ```bash
 # Physical device: install and launch, then capture screenshots and a recording
@@ -93,6 +93,8 @@ xcrun simctl io booted recordVideo /tmp/vanmo-simulator.mp4
 Physical-device journeys require a connected and trusted iOS device plus valid signing. After `./run_device.sh` installs and launches Vanmo, the operator captures screenshots and a screen recording of the exact walk. Matching sanitized logs still come from Xcode Console or Console.app. Simulator frames do not replace device-only evidence.
 
 Simulator journeys are agent-operated. The agent boots and launches Vanmo with `./run_device.sh --simulator`, interacts with the Simulator, and captures screenshots or recordings through `simctl io`. `simctl` launch or terminate alone does not prove a user journey.
+
+For Simulator taps only, the agent can use Homebrew `idb` (`idb ui describe-all`, `idb ui tap`). `idb` is an external host tool, not a repository dependency, and must not drive physical-device evidence. In the landscape player as observed on iPhone 17 Pro, `describe-all` reports landscape frames, but `tap` takes portrait points: take the frame center, then tap at `x = portraitWidth - landscapeY`, `y = landscapeX` (`portraitWidth` is 402). Confirm the mapping on one known control first, because the other landscape orientation maps differently. Use `--duration 1.2` for a long press. Playing controls auto-hide after about 3 seconds, so pause or reveal the controls again before each tap.
 
 Keep screenshots, recordings, and console excerpts free of secrets before sharing them. Retain visual evidence with the governing plan or review notes.
 

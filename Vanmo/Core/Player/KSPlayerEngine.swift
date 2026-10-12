@@ -167,6 +167,11 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         return UIImage(cgImage: cgImage)
     }
 
+    /// The clock advances on audio before the first picture, so a cover must wait for this.
+    var hasRenderedVideoFrame: Bool {
+        player?.videoOutput?.pixelBuffer != nil
+    }
+
     private func cacheLivePreviewIfNeeded(at time: TimeInterval) {
         let bucket = Self.previewBucket(for: time)
         guard lastPreviewCacheBucket != bucket else { return }

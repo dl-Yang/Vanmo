@@ -105,6 +105,18 @@ public enum PlaybackVideoQuality: String, CaseIterable, Sendable {
         guard !requested.isAvailable(sourceHeight: sourceHeight) else { return requested }
         return .original
     }
+
+    /// Only a remote HLS playlist honors the cap; every other source, including a
+    /// locally generated disc playlist, plays the original bitstream.
+    public static func effective(
+        requested: PlaybackVideoQuality,
+        openedURL: URL
+    ) -> PlaybackVideoQuality {
+        guard requested != .original,
+              !openedURL.isFileURL,
+              openedURL.path.lowercased().contains(".m3u8") else { return .original }
+        return requested
+    }
 }
 
 public enum PlaybackPreferences {

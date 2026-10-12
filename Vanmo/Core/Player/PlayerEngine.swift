@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import CoreImage
 import UIKit
 import VanmoCore
 
@@ -341,6 +342,10 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private var playbackURL: URL?
     private var timeObserver: Any?
     private var legibleOutput: AVPlayerItemLegibleOutput?
+    private var frameOutput: AVPlayerItemVideoOutput?
+    private var lastFrameBuffer: CVPixelBuffer?
+    private static let frameContext = CIContext()
+    private static let frameMaxPixelWidth: CGFloat = 1920
     private var cancellables = Set<AnyCancellable>()
     private var previewGenerator: AVAssetImageGenerator?
     private var previewCache: [Int: UIImage] = [:]
@@ -427,6 +432,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         output.suppressesPlayerRendering = true
         playerItem.add(output)
         self.legibleOutput = output
+        attachFrameOutput(to: playerItem)
 
         let player = AVPlayer()
         player.allowsExternalPlayback = Self.supportsVideoAirPlay(for: cleanURL)
@@ -515,6 +521,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         output.suppressesPlayerRendering = true
         playerItem.add(output)
         legibleOutput = output
+        attachFrameOutput(to: playerItem)
         player.replaceCurrentItem(with: playerItem)
 
         let generator = AVAssetImageGenerator(asset: asset)
@@ -531,6 +538,43 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         }
         try await waitForReady(playerItem)
         await alignTracksIfNeeded()
+    }
+
+    /// The frame on screen, used to cover the surface while a reload opens the next source.
+    func currentFrameImage() -> UIImage? {
+        refreshLastFrame()
+        guard let buffer = lastFrameBuffer else { return nil }
+        let source = CIImage(cvPixelBuffer: buffer)
+        let scale = min(1, Self.frameMaxPixelWidth / max(source.extent.width, 1))
+        let image = source.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        guard let cgImage = Self.frameContext.createCGImage(image, from: image.extent) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+
+    /// External playback renders no local frames, so it counts as drawn.
+    var hasRenderedVideoFrame: Bool {
+        if player?.isExternalPlaybackActive == true { return true }
+        guard frameOutput != nil else { return true }
+        refreshLastFrame()
+        return lastFrameBuffer != nil
+    }
+
+    /// Native pixel format, so playback pays no per-frame conversion; only a capture converts.
+    private func attachFrameOutput(to item: AVPlayerItem) {
+        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
+        item.add(output)
+        frameOutput = output
+        lastFrameBuffer = nil
+    }
+
+    /// A stalled item can have no buffer for its current time, so the latest one is kept.
+    private func refreshLastFrame() {
+        guard let frameOutput, let playerItem else { return }
+        let time = playerItem.currentTime()
+        guard frameOutput.hasNewPixelBuffer(forItemTime: time),
+              let buffer = frameOutput.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: nil)
+        else { return }
+        lastFrameBuffer = buffer
     }
 
     func alignTracksIfNeeded() async {
@@ -562,6 +606,8 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         }
         timeObserver = nil
         legibleOutput = nil
+        frameOutput = nil
+        lastFrameBuffer = nil
         cancellables.removeAll()
         player?.pause()
         player?.replaceCurrentItem(with: nil)
@@ -698,6 +744,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             self?.currentTimeSubject.send(time)
+            self?.refreshLastFrame()
 #if DEBUG
             self?.logPerformanceSampleIfNeeded()
 #endif

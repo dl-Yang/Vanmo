@@ -100,6 +100,9 @@ final class PlayerViewModel: ObservableObject {
     private var programDuration: TimeInterval = 0
     @Published var qualityHoldImage: UIImage?
     private var clearQualityHoldOnFrame = false
+    private var qualityHoldOpenedAt: CFAbsoluteTime?
+    /// Audio-only media, an undecodable video track, or a flushed KSPlayer view never reports a frame.
+    private static let qualityHoldTimeout: CFAbsoluteTime = 3
     private var qualitySwitchTask: Task<Void, Never>?
     private var previewLaneURL: URL?
     private var previewLaneHeaders: [String: String] = [:]
@@ -161,6 +164,11 @@ final class PlayerViewModel: ObservableObject {
     var isPictureInPicturePossible: Bool {
         if avPlayer != nil { return true }
         return (engine as? KSPlayerEngine)?.isPictureInPicturePossible == true
+    }
+
+    private var engineHasRenderedVideoFrame: Bool {
+        if let ksEngine = engine as? KSPlayerEngine { return ksEngine.hasRenderedVideoFrame }
+        return (engine as? AVPlayerEngine)?.hasRenderedVideoFrame ?? true
     }
 
     var supportsVideoAirPlay: Bool {
@@ -232,9 +240,17 @@ final class PlayerViewModel: ObservableObject {
                 self.reconcileQualityClock(engineTime: time)
                 let absolute = time + self.playbackTimeOrigin
                 self.currentTime = absolute
-                if self.clearQualityHoldOnFrame, time > 0.2 {
-                    self.qualityHoldImage = nil
-                    self.clearQualityHoldOnFrame = false
+                if self.clearQualityHoldOnFrame, time > 0.2, let openedAt = self.qualityHoldOpenedAt {
+                    let rendered = self.engineHasRenderedVideoFrame
+                    let timedOut = CFAbsoluteTimeGetCurrent() - openedAt > Self.qualityHoldTimeout
+                    if rendered || timedOut {
+                        self.qualityHoldImage = nil
+                        self.clearQualityHoldOnFrame = false
+                        self.qualityHoldOpenedAt = nil
+#if DEBUG
+                        VanmoLogger.player.info("[Debug][Player] event=videoQualityHoldCleared engineTime=\(time, privacy: .public) rendered=\(rendered, privacy: .public)")
+#endif
+                    }
                 }
                 self.updateExternalSubtitle(at: absolute)
                 self.reportPlaybackTimeUpdate(at: absolute)
@@ -428,6 +444,7 @@ final class PlayerViewModel: ObservableObject {
         qualitySwitchTask?.cancel()
         qualitySwitchTask = nil
         qualityReloadID &+= 1
+        let loadReloadID = qualityReloadID
         mediaGeneration &+= 1
         seekRequestGeneration &+= 1
         didStopPlaybackResources = false
@@ -439,13 +456,10 @@ final class PlayerViewModel: ObservableObject {
         let playbackURL = await resolveDiscPlaybackURLIfNeeded(originalURL)
         directPlaybackURL = playbackURL
         let resolvedQuality = PlaybackVideoQuality.resolved(
-            requested: videoQuality,
+            requested: PlaybackPreferences.videoQuality,
             sourceHeight: item.videoHeight
         )
-        if resolvedQuality != videoQuality {
-            videoQuality = resolvedQuality
-            PlaybackPreferences.videoQuality = resolvedQuality
-        }
+        videoQuality = resolvedQuality
         let qualified = await resolvedPlaybackURL(
             direct: playbackURL,
             quality: videoQuality,
@@ -561,6 +575,9 @@ final class PlayerViewModel: ObservableObject {
             return
         }
         activePlaybackURL = openedURL
+        if qualityReloadID == loadReloadID {
+            syncDisplayedVideoQuality(requested: resolvedQuality)
+        }
         armQualityClockCorrection()
         VanmoLogger.player.info("[PlayerVM] engine.load() succeeded, state: \(String(describing: self.playbackState))")
         previewLaneHeaders = loadHeaders
@@ -584,25 +601,18 @@ final class PlayerViewModel: ObservableObject {
             guard generation == mediaGeneration else { return }
             await playbackSession?.started(position: reportPosition)
         }
-        scheduleExternalSubtitleDiscovery(
-            for: originalURL,
-            embeddedTracks: embeddedSubtitleTracks,
-            generation: generation
-        )
+        scheduleExternalSubtitleDiscovery(for: originalURL, generation: generation)
     }
 
-    private func scheduleExternalSubtitleDiscovery(
-        for videoURL: URL,
-        embeddedTracks: [SubtitleTrackInfo],
-        generation: UInt64
-    ) {
+    /// Keeps the embedded tracks current at completion; a quality reload may have replaced the engine.
+    private func scheduleExternalSubtitleDiscovery(for videoURL: URL, generation: UInt64) {
         subtitleDiscoveryTask = Task { [weak self] in
             guard let self else { return }
             let tracks = await discoverExternalSubtitleTracks(for: videoURL)
             guard !Task.isCancelled, generation == mediaGeneration else { return }
             guard !tracks.isEmpty else { return }
             externalSubtitleTracks = tracks
-            subtitleTracks = embeddedTracks + tracks
+            subtitleTracks = subtitleTracks.filter(\.isEmbedded) + tracks
             await applyPreferredSubtitleIfNeeded(generation: generation)
             guard !Task.isCancelled, generation == mediaGeneration else { return }
             VanmoLogger.subtitle.info(
@@ -621,6 +631,7 @@ final class PlayerViewModel: ObservableObject {
         programDuration = 0
         qualityHoldImage = nil
         clearQualityHoldOnFrame = false
+        qualityHoldOpenedAt = nil
         cacheStart = 0
         cacheEnd = 0
         showsFullLocalCache = false
@@ -909,10 +920,25 @@ final class PlayerViewModel: ObservableObject {
             guard !Task.isCancelled, reloadID == self.qualityReloadID else { return }
             if opened {
                 PlaybackPreferences.videoQuality = resolved
-            } else if self.videoQuality == resolved {
-                self.videoQuality = PlaybackPreferences.videoQuality
+                self.syncDisplayedVideoQuality(requested: resolved)
+            } else {
+                self.syncDisplayedVideoQuality(requested: PlaybackPreferences.videoQuality)
             }
         }
+    }
+
+    private func syncDisplayedVideoQuality(requested: PlaybackVideoQuality) {
+        guard let openedURL = activePlaybackURL else {
+            videoQuality = requested
+            return
+        }
+        let shown = PlaybackVideoQuality.effective(requested: requested, openedURL: openedURL)
+#if DEBUG
+        if shown != requested {
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityDisplay requested=\(requested.rawValue, privacy: .public) shown=\(shown.rawValue, privacy: .public) reason=originalBitstream")
+        }
+#endif
+        videoQuality = shown
     }
 
     private func resolvedPlaybackURL(
@@ -1044,36 +1070,64 @@ final class PlayerViewModel: ObservableObject {
         let startPosition: CMTime? = timeOrigin > 0 || time <= 0
             ? nil
             : CMTime(seconds: time, preferredTimescale: 600)
-        await reloadPlaybackSource(
+        let opened = await reloadPlaybackSource(
             url: target,
             startPosition: startPosition,
             timeOrigin: timeOrigin,
             generation: generation,
-            reloadID: reloadID
+            reloadID: reloadID,
+            holdsFrame: false
         )
+        if opened {
+            syncDisplayedVideoQuality(requested: videoQuality)
+        }
     }
 
+    /// `holdsFrame` covers a quality change with the last picture; a seek reopen shows the new position instead.
     private func reloadPlaybackSource(
         url: URL,
         startPosition: CMTime?,
         timeOrigin: TimeInterval,
         generation: UInt64,
-        reloadID: UInt64? = nil
+        reloadID: UInt64? = nil,
+        holdsFrame: Bool = true
     ) async -> Bool {
         guard generation == mediaGeneration else { return false }
         if let reloadID, reloadID != qualityReloadID || Task.isCancelled { return false }
         let previousURL = activePlaybackURL
         let previousOrigin = playbackTimeOrigin
         #if os(iOS)
-        if let ksEngine = engine as? KSPlayerEngine, let image = await ksEngine.currentThumbnail() {
-            qualityHoldImage = image
-            clearQualityHoldOnFrame = true
+        if holdsFrame {
+            let holdImage: UIImage?
+            if let ksEngine = engine as? KSPlayerEngine {
+                holdImage = await ksEngine.currentThumbnail()
+            } else {
+                holdImage = (engine as? AVPlayerEngine)?.currentFrameImage()
+            }
+            if let holdImage {
+                qualityHoldImage = holdImage
+                clearQualityHoldOnFrame = true
+            }
+#if DEBUG
+            let holdSource = engine is KSPlayerEngine ? "ks" : "av"
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityHoldFrame engine=\(holdSource, privacy: .public) captured=\(holdImage != nil, privacy: .public)")
+#endif
+        } else {
+            qualityHoldImage = nil
+            clearQualityHoldOnFrame = false
         }
         #endif
         let frozen = timeOrigin > 0.5 ? timeOrigin : max(startPosition?.seconds ?? currentTime, 0)
         qualityClockFrozenAt = frozen
         currentTime = frozen
         engine.pause()
+        qualityHoldOpenedAt = nil
+        if clearQualityHoldOnFrame {
+            // `openEngine` can stop the current layer synchronously; SwiftUI must draw the cover first.
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        guard generation == mediaGeneration, !Task.isCancelled else { return false }
+        if let reloadID, reloadID != qualityReloadID { return false }
 #if DEBUG
         VanmoLogger.player.info("[Debug][Player] event=videoQualityHold time=\(frozen, privacy: .public)")
 #endif
@@ -1085,6 +1139,7 @@ final class PlayerViewModel: ObservableObject {
             if let reloadID, reloadID != qualityReloadID { return false }
             beginQualityClock(origin: timeOrigin)
             qualityClockFrozenAt = nil
+            qualityHoldOpenedAt = CFAbsoluteTimeGetCurrent()
             activePlaybackURL = url
             armQualityClockCorrection()
             engine.playbackRate = config.playbackRate
@@ -1093,6 +1148,11 @@ final class PlayerViewModel: ObservableObject {
             let summary = PlaybackQualityStream.debugSummary(of: url)
             VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=opened \(summary, privacy: .public)")
 #endif
+            await reattachTracksAfterReload(
+                generation: generation,
+                reloadID: reloadID,
+                sameStreamLayout: !holdsFrame
+            )
             return true
         } catch {
             let stale = Task.isCancelled
@@ -1107,6 +1167,7 @@ final class PlayerViewModel: ObservableObject {
             }
             qualityHoldImage = nil
             clearQualityHoldOnFrame = false
+            qualityHoldOpenedAt = nil
             qualityClockFrozenAt = nil
             playbackTimeOrigin = previousOrigin
             qualityClockMode = previousOrigin > 0.5 ? .pending : .direct
@@ -1134,11 +1195,64 @@ final class PlayerViewModel: ObservableObject {
                 let summary = PlaybackQualityStream.debugSummary(of: previousURL)
                 VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=restored \(summary, privacy: .public)")
 #endif
+                await reattachTracksAfterReload(
+                    generation: generation,
+                    reloadID: reloadID,
+                    sameStreamLayout: true
+                )
             } catch {
                 VanmoLogger.player.error("[PlayerVM] videoQuality restore failed: \(error.localizedDescription)")
             }
             return false
         }
+    }
+
+    /// A reopened source has a new engine item, so its embedded and engine-rendered tracks start unselected.
+    /// Track indices only carry over when `sameStreamLayout` is true (a seek reopen of the same rendition).
+    private func reattachTracksAfterReload(
+        generation: UInt64,
+        reloadID: UInt64?,
+        sameStreamLayout: Bool
+    ) async {
+        let reloadEngine = engine
+        func isCurrent() -> Bool {
+            generation == mediaGeneration
+                && !Task.isCancelled
+                && reloadEngine === engine
+                && (reloadID.map { $0 == qualityReloadID } ?? true)
+        }
+        let audio = await reloadEngine.availableAudioTracks()
+        let embedded = await reloadEngine.availableSubtitleTracks()
+        guard isCurrent() else { return }
+        let previousAudio = config.selectedAudioTrack
+        let previousEmbedded = config.selectedSubtitleTrack.flatMap {
+            $0 < Self.externalSubtitleIDOffset ? $0 : nil
+        }
+        audioTracks = audio
+        subtitleTracks = embedded + externalSubtitleTracks
+        config.selectedAudioTrack = 0
+        if previousEmbedded != nil { config.selectedSubtitleTrack = nil }
+#if DEBUG
+        let engineName = engine is KSPlayerEngine ? "ks" : "av"
+        let externalCount = externalSubtitleTracks.count
+        VanmoLogger.player.info("[Debug][Player] event=videoQualityTracks engine=\(engineName, privacy: .public) embedded=\(embedded.count, privacy: .public) external=\(externalCount, privacy: .public) sameLayout=\(sameStreamLayout, privacy: .public)")
+#endif
+        if sameStreamLayout {
+            // 0 is the config default, not necessarily the item's default audio, so it is not reapplied.
+            if previousAudio != 0, audio.contains(where: { $0.id == previousAudio }) {
+                config.selectedAudioTrack = previousAudio
+                await reloadEngine.selectAudioTrack(index: previousAudio)
+                guard isCurrent() else { return }
+            }
+            if let previousEmbedded, embedded.contains(where: { $0.id == previousEmbedded }) {
+                config.selectedSubtitleTrack = previousEmbedded
+                await reloadEngine.selectSubtitleTrack(index: previousEmbedded)
+            }
+            return
+        }
+        // The external SRT overlay is drawn by the view model, so it survives the engine change.
+        guard activeExternalSubtitleID == nil else { return }
+        await applyPreferredSubtitleIfNeeded(generation: generation)
     }
 
     private func beginQualityClock(origin: TimeInterval) {

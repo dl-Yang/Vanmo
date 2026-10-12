@@ -2,7 +2,7 @@
 
 **Product area:** Vanmo iOS full-screen player
 
-**Status:** In progress
+**Status:** Completed
 
 ## Seek Preview
 
@@ -20,7 +20,7 @@ KSPlayer on iOS does not pin its display link to the source frame rate, so idle 
 
 ## Video Quality
 
-The player top bar uses a glass circle in place of share. The circle shows the current quality as 360, 480, 720, HD, or 原画, and opens 360p, 480p, 720p, 1080p, and Original. On Emby and Jellyfin, a lower choice asks PlaybackInfo for a transcoded HLS playlist at that height and bitrate, plays it with AVPlayer, and resumes from the current position. Plex requests a transcoded HLS playlist. Original keeps the direct file URL. If the transcode URL fails to open, playback uses the direct file. An HLS item already playing on AVPlayer selects the matching rendition with `preferredMaximumResolution` and `preferredPeakBitRate`. Local files and SMB, FTP, and SFTP keep playing the original bitstream. A source shorter than the selected height falls back to Original. There is no AI enhancement control.
+The player top bar uses a glass circle in place of share. The circle shows the current quality as 360, 480, 720, HD, or 原画, and opens 360p, 480p, 720p, 1080p, and Original. On Emby and Jellyfin, a lower choice asks PlaybackInfo for a transcoded HLS playlist at that height and bitrate, plays it with AVPlayer, and resumes from the current position. Plex requests a transcoded HLS playlist. Original keeps the direct file URL. If the transcode URL fails to open, playback uses the direct file. While a quality change reopens the source, the last picture stays frozen on screen until the new source shows its first frame, or for at most 3 seconds after it opens. After the switch, the player restores the saved subtitle choice when it names a track on the new source, or the preferred-language match when none is saved. An HLS item already playing on AVPlayer selects the matching rendition with `preferredMaximumResolution` and `preferredPeakBitRate`. Local files and SMB, FTP, and SFTP keep playing the original bitstream. On those sources, and when a transcode falls back to the direct file, the circle shows 原画 while the saved choice is kept for the next media-server item. A source shorter than the selected height plays Original without changing the saved choice. There is no AI enhancement control.
 
 ## Skip Intro
 

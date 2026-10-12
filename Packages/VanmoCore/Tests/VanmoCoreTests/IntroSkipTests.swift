@@ -115,6 +115,23 @@ final class PlaybackVideoQualityTests: XCTestCase {
         XCTAssertEqual(PlaybackVideoQuality.p360.preferredPeakBitRate, 1_000_000)
         XCTAssertNil(PlaybackVideoQuality.original.preferredPeakBitRate)
     }
+
+    func testEffectiveQualityReflectsOpenedStream() throws {
+        let local = URL(fileURLWithPath: "/tmp/clip.mov")
+        let discPlaylist = URL(fileURLWithPath: "/tmp/BDMV/00001.m3u8")
+        let smb = try XCTUnwrap(URL(string: "smb://nas.local/share/movie.mkv"))
+        let proxy = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/stream/ABCD"))
+        let embyDirect = try XCTUnwrap(URL(string: "https://emby.example/emby/Videos/1/stream?static=true"))
+        let embyHLS = try XCTUnwrap(URL(string: "https://emby.example/emby/videos/1/master.m3u8?MaxHeight=360"))
+        let plexHLS = try XCTUnwrap(URL(string: "https://plex.example/video/:/transcode/universal/start.m3u8?x=1"))
+
+        for direct in [local, discPlaylist, smb, proxy, embyDirect] {
+            XCTAssertEqual(PlaybackVideoQuality.effective(requested: .p360, openedURL: direct), .original)
+        }
+        XCTAssertEqual(PlaybackVideoQuality.effective(requested: .p360, openedURL: embyHLS), .p360)
+        XCTAssertEqual(PlaybackVideoQuality.effective(requested: .p720, openedURL: plexHLS), .p720)
+        XCTAssertEqual(PlaybackVideoQuality.effective(requested: .original, openedURL: embyHLS), .original)
+    }
 }
 
 final class PlaybackQualityStreamTests: XCTestCase {
