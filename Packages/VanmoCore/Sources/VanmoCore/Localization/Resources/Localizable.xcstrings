@@ -1249,6 +1249,22 @@
         }
       }
     },
+    "倍速" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "倍速"
+          }
+        }
+      }
+    },
     "元数据" : {
       "localizations" : {
         "en" : {
@@ -3469,6 +3485,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "德国"
+          }
+        }
+      }
+    },
+    "快进" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip forward"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快进"
+          }
+        }
+      }
+    },
+    "快退" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip back"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快退"
           }
         }
       }
@@ -6366,6 +6414,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "编辑连接"
+          }
+        }
+      }
+    },
+    "缩放" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scale"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩放"
           }
         }
       }

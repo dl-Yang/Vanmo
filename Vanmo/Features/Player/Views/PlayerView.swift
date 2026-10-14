@@ -817,7 +817,7 @@ struct PlayerView: View {
         HStack(spacing: 6) {
             Image(systemName: "forward.fill")
                 .font(.subheadline)
-            Text("\(PlayerConfig.maximumRate, specifier: "%.1f")x 倍速播放中")
+            Text(L10n.tr("%@x 倍速播放中", String(format: "%.1f", PlayerConfig.maximumRate)))
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .monospacedDigit()

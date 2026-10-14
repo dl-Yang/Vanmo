@@ -89,6 +89,10 @@ final class AppLanguageTests: XCTestCase {
         XCTAssertEqual(L10nTable.english["设置"], "Settings")
         XCTAssertEqual(L10nTable.english["首页"], "Home")
         XCTAssertEqual(L10nTable.english["播放"], "Play")
+        XCTAssertEqual(L10nTable.english["倍速"], "Speed")
+        XCTAssertEqual(L10nTable.english["快进"], "Skip forward")
+        XCTAssertEqual(L10nTable.english["快退"], "Skip back")
+        XCTAssertEqual(L10nTable.english["缩放"], "Scale")
         XCTAssertEqual(L10nTable.english["语言将在下次启动后生效"], "The language will apply after you restart the app")
     }
 }
