@@ -437,6 +437,19 @@ final class VideoThumbnailCacheTests: XCTestCase {
         XCTAssertFalse(LibavformatOpenGate.needsExclusiveOpen(URL(fileURLWithPath: "/tmp/a.mp4")))
     }
 
+    func testLibavformatGateHoldReleasesOnlyMatchingHolder() {
+        let hold = LibavformatGateHold()
+        let superseded = hold.mark()
+
+        XCTAssertTrue(hold.consume(), "a newer load releases the current holder")
+        let current = hold.mark()
+
+        XCTAssertFalse(hold.consume(superseded), "a superseded load must not release the newer hold")
+        XCTAssertTrue(hold.consume(current))
+        XCTAssertFalse(hold.consume(), "a hold is released once")
+        XCTAssertFalse(hold.consume(current))
+    }
+
     func testLibavformatGateExclusiveDoesNotOverlap() async {
         let gate = LibavformatOpenGate()
         let probe = OverlapProbe()

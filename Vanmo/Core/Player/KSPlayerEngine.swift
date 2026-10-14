@@ -50,8 +50,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private var lastPreviewCacheBucket: Int?
     private let previewSerializer = SeekPreviewSerializer()
     private var appliedVideoQuality = PlaybackPreferences.videoQuality
-    private let libavformatGateLock = NSLock()
-    private var holdsLibavformatGate = false
+    private let libavformatGateHold = LibavformatGateHold()
     private let seekGenerationLock = NSLock()
     private var seekGeneration: UInt64 = 0
     private var activeSeekGate: PlaybackSeekCompletionGate?
@@ -356,11 +355,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         VanmoLogger.player.info("[Debug][Player] event=ksCreate previousAudio=\(previousAudio, privacy: .public) audioOutput=AudioRendererPlayer preferredFrame=\(preferredFrame, privacy: .public) thermal=\(thermal, privacy: .public) lowPower=\(lowPower, privacy: .public) url=\(url.safePlaybackLogDescription, privacy: .public)")
 #endif
 
-        var acquiredGate = false
+        var gateHold: UInt64?
         if LibavformatOpenGate.needsExclusiveOpen(url) {
             await LibavformatOpenGate.shared.acquire()
-            markLibavformatGateHeld()
-            acquiredGate = true
+            gateHold = markLibavformatGateHeld()
         }
 
         // 挂起期间若有更新的 load 或 stop，epoch 已变：不再创建播放器，避免覆盖新播放器。
@@ -380,8 +378,9 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
             return player
         }
         guard let mePlayer = created else {
-            if acquiredGate {
-                await releaseLibavformatGateIfHeld()
+            // 这次从未打开协议上下文，不需要等 close drain。
+            if let gateHold, consumeLibavformatGateHold(gateHold) {
+                await LibavformatOpenGate.shared.release()
             }
             throw CancellationError()
         }
@@ -553,18 +552,12 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         return seekGeneration == generation
     }
 
-    private func markLibavformatGateHeld() {
-        libavformatGateLock.lock()
-        holdsLibavformatGate = true
-        libavformatGateLock.unlock()
+    private func markLibavformatGateHeld() -> UInt64 {
+        libavformatGateHold.mark()
     }
 
-    private func consumeLibavformatGateHold() -> Bool {
-        libavformatGateLock.lock()
-        defer { libavformatGateLock.unlock() }
-        guard holdsLibavformatGate else { return false }
-        holdsLibavformatGate = false
-        return true
+    private func consumeLibavformatGateHold(_ hold: UInt64? = nil) -> Bool {
+        libavformatGateHold.consume(hold)
     }
 
     private func releaseLibavformatGateIfHeld() async {
