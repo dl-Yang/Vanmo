@@ -47,7 +47,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private var previewGenerator: AVAssetImageGenerator?
     private var previewCache: [Int: UIImage] = [:]
     private var previewCacheOrder: [Int] = []
-    private var lastPreviewCacheBucket: Int?
     private let previewSerializer = SeekPreviewSerializer()
     private var appliedVideoQuality = PlaybackPreferences.videoQuality
     private let libavformatGateHold = LibavformatGateHold()
@@ -171,29 +170,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     /// The clock advances on audio before the first picture, so a cover must wait for this.
     var hasRenderedVideoFrame: Bool {
         player?.videoOutput?.pixelBuffer != nil
-    }
-
-    private func cacheLivePreviewIfNeeded(at time: TimeInterval) {
-        let bucket = Self.previewBucket(for: time)
-        guard lastPreviewCacheBucket != bucket else { return }
-        lastPreviewCacheBucket = bucket
-        Task { @MainActor [weak self] in
-            guard let self, let cgImage = await self.player?.thumbnailImageAtCurrentTime() else { return }
-            self.storePreview(Self.scaledPreview(cgImage, maxPixelSize: 240), bucket: bucket)
-        }
-    }
-
-    private static func scaledPreview(_ image: CGImage, maxPixelSize: Int) -> UIImage {
-        let width = image.width
-        let height = image.height
-        let longest = max(width, height)
-        guard longest > maxPixelSize else { return UIImage(cgImage: image) }
-        let scale = CGFloat(maxPixelSize) / CGFloat(longest)
-        let size = CGSize(width: CGFloat(width) * scale, height: CGFloat(height) * scale)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { _ in
-            UIImage(cgImage: image).draw(in: CGRect(origin: .zero, size: size))
-        }
     }
 
     private func nearestCachedPreview(at time: TimeInterval) -> UIImage? {
@@ -372,7 +348,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
             self.playbackHeaders = headers
             self.previewCache.removeAll()
             self.previewCacheOrder.removeAll()
-            self.lastPreviewCacheBucket = nil
             self.preparePreviewGeneratorIfNeeded()
             self.refreshPictureInPictureController(for: player)
             player.prepareToPlay()
@@ -506,7 +481,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         previewGeneratorURL = nil
         previewCache.removeAll()
         previewCacheOrder.removeAll()
-        lastPreviewCacheBucket = nil
         selectedSubtitleSearchable = nil
         externalRichSubtitle = nil
         externalRichSubtitleDelay = 0
@@ -942,7 +916,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
             guard time.isFinite, !time.isNaN else { return }
             self.currentTimeSubject.send(CMTime(seconds: time, preferredTimescale: 600))
             self.updateSubtitleText(at: time)
-            self.cacheLivePreviewIfNeeded(at: time)
 #if DEBUG
             self.logPerformanceSampleIfNeeded(player: player)
 #endif
