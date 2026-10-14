@@ -54,6 +54,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private var holdsLibavformatGate = false
     private let seekGenerationLock = NSLock()
     private var seekGeneration: UInt64 = 0
+    private var activeSeekGate: PlaybackSeekCompletionGate?
     private var timeUpdateTimer: Timer?
     private var shouldResumeAfterBuffering = false
     private var lastPlayableTime: CFAbsoluteTime = 0
@@ -290,7 +291,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
 
     func load(url: URL, startPosition: CMTime?, headers: [String: String]) async throws {
         VanmoLogger.player.info("[KSEngine] load() called, url: \(url.safePlaybackLogDescription)")
-        await MainActor.run { stopPlaybackResources() }
+        let loadEpoch = await MainActor.run {
+            stopPlaybackResources()
+            return currentReadyEpoch()
+        }
         await releaseLibavformatGateIfHeld()
 #if DEBUG
         resetPerformanceDiagnostics()
@@ -311,13 +315,16 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
                 startPosition: startPosition,
                 hardwareDecode: hardwareDecode,
                 headers: headers,
-                quality: appliedVideoQuality
+                quality: appliedVideoQuality,
+                epoch: loadEpoch
             )
+        } catch is CancellationError {
+            // 发起 stop 的一方已经拆掉播放器并处理闸门；这里再清理会误伤下一次 load。
+            throw CancellationError()
         } catch {
             await MainActor.run {
                 stopPlaybackResources()
             }
-            readyContinuation = nil
             await releaseLibavformatGateIfHeld()
             throw error
         }
@@ -328,7 +335,8 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         startPosition: CMTime?,
         hardwareDecode: Bool,
         headers: [String: String],
-        quality: PlaybackVideoQuality
+        quality: PlaybackVideoQuality,
+        epoch: UInt64
     ) async throws {
         let options = makeOptions(
             url: url,
@@ -348,12 +356,16 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         VanmoLogger.player.info("[Debug][Player] event=ksCreate previousAudio=\(previousAudio, privacy: .public) audioOutput=AudioRendererPlayer preferredFrame=\(preferredFrame, privacy: .public) thermal=\(thermal, privacy: .public) lowPower=\(lowPower, privacy: .public) url=\(url.safePlaybackLogDescription, privacy: .public)")
 #endif
 
+        var acquiredGate = false
         if LibavformatOpenGate.needsExclusiveOpen(url) {
             await LibavformatOpenGate.shared.acquire()
             markLibavformatGateHeld()
+            acquiredGate = true
         }
 
-        let mePlayer = await MainActor.run {
+        // 挂起期间若有更新的 load 或 stop，epoch 已变：不再创建播放器，避免覆盖新播放器。
+        let created: KSMEPlayer? = await MainActor.run {
+            guard self.currentReadyEpoch() == epoch else { return nil }
             let player = KSMEPlayer(url: url, options: options)
             player.delegate = self
             self.player = player
@@ -367,8 +379,14 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
             player.prepareToPlay()
             return player
         }
+        guard let mePlayer = created else {
+            if acquiredGate {
+                await releaseLibavformatGateIfHeld()
+            }
+            throw CancellationError()
+        }
 
-        try await waitForReady()
+        try await waitForReady(epoch: epoch)
 
         let duration = mePlayer.duration
         if duration > 0 {
@@ -416,6 +434,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let gate = PlaybackSeekCompletionGate(continuation)
+            guard attachSeekGate(gate, generation: generation) else {
+                gate.resume()
+                return
+            }
             player.seek(time: seconds) { _ in
                 gate.resume()
             }
@@ -427,6 +449,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
             }
             gate.installTimeout(timeout)
         }
+        detachSeekGate(generation: generation)
         guard isCurrentSeek(generation) else { return }
         currentTimeSubject.send(time)
 #if DEBUG
@@ -452,6 +475,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
 
     private func stopPlaybackResources() {
         invalidateSeeks()
+        cancelReadyWait()
         stopTimeUpdateTimer()
         if #available(iOS 15.0, tvOS 15.0, *) {
             let controllers = retainedActivePictureInPictureControllers
@@ -490,13 +514,36 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         seekGenerationLock.lock()
         seekGeneration &+= 1
         let generation = seekGeneration
+        let supersededGate = activeSeekGate
+        activeSeekGate = nil
         seekGenerationLock.unlock()
+        supersededGate?.resume()
         return generation
     }
 
+    /// 停止或换片时立即放行正在等待回调的 seek，不再等 3 秒超时。
     private func invalidateSeeks() {
         seekGenerationLock.lock()
         seekGeneration &+= 1
+        let pendingGate = activeSeekGate
+        activeSeekGate = nil
+        seekGenerationLock.unlock()
+        pendingGate?.resume()
+    }
+
+    private func attachSeekGate(_ gate: PlaybackSeekCompletionGate, generation: UInt64) -> Bool {
+        seekGenerationLock.lock()
+        defer { seekGenerationLock.unlock() }
+        guard seekGeneration == generation else { return false }
+        activeSeekGate = gate
+        return true
+    }
+
+    private func detachSeekGate(generation: UInt64) {
+        seekGenerationLock.lock()
+        if seekGeneration == generation {
+            activeSeekGate = nil
+        }
         seekGenerationLock.unlock()
     }
 
@@ -820,12 +867,47 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
 
     // MARK: - Private
 
+    private let readyLock = NSLock()
     private var readyContinuation: CheckedContinuation<Void, Error>?
+    private var readyEpoch: UInt64 = 0
 
-    private func waitForReady() async throws {
+    private func currentReadyEpoch() -> UInt64 {
+        readyLock.lock()
+        defer { readyLock.unlock() }
+        return readyEpoch
+    }
+
+    /// 播放器在等待就绪前已被 stop 时立即取消，避免 continuation 永久挂起。
+    private func waitForReady(epoch: UInt64) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            self.readyContinuation = continuation
+            readyLock.lock()
+            guard readyEpoch == epoch else {
+                readyLock.unlock()
+                continuation.resume(throwing: CancellationError())
+                return
+            }
+            let replaced = readyContinuation
+            readyContinuation = continuation
+            readyLock.unlock()
+            replaced?.resume(throwing: CancellationError())
         }
+    }
+
+    private func takeReadyContinuation() -> CheckedContinuation<Void, Error>? {
+        readyLock.lock()
+        defer { readyLock.unlock() }
+        let continuation = readyContinuation
+        readyContinuation = nil
+        return continuation
+    }
+
+    private func cancelReadyWait() {
+        readyLock.lock()
+        readyEpoch &+= 1
+        let continuation = readyContinuation
+        readyContinuation = nil
+        readyLock.unlock()
+        continuation?.resume(throwing: CancellationError())
     }
 
     private func startTimeUpdateTimer() {
@@ -857,7 +939,15 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
 
     private func logPerformanceSampleIfNeeded(player: KSMEPlayer) {
         let now = CFAbsoluteTimeGetCurrent()
-        guard now - performanceLastSampleAt >= 5, let info = player.dynamicInfo else { return }
+        guard let info = player.dynamicInfo else { return }
+        if !performanceDidLogFirstFrame, info.displayFPS >= 1 {
+            performanceDidLogFirstFrame = true
+            let elapsedMs = performanceLoadStartedAt.map {
+                Int((now - $0) * 1_000)
+            } ?? -1
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+        }
+        guard now - performanceLastSampleAt >= 5 else { return }
         performanceLastSampleAt = now
 
         let droppedFrames = info.droppedVideoFrameCount + info.droppedVideoPacketCount
@@ -869,14 +959,6 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         let bytesRead = info.bytesRead
         let bytesDelta = max(bytesRead - performanceLastBytesRead, 0)
         performanceLastBytesRead = bytesRead
-
-        if !performanceDidLogFirstFrame, info.displayFPS >= 1 {
-            performanceDidLogFirstFrame = true
-            let elapsedMs = performanceLoadStartedAt.map {
-                Int((now - $0) * 1_000)
-            } ?? -1
-            VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
-        }
 
         let thermalState = ProcessInfo.processInfo.thermalState
         if thermalState != performanceThermalState {
@@ -1059,8 +1141,7 @@ extension KSPlayerEngine: MediaPlayerDelegate {
         if dur > 0 {
             durationSubject.send(CMTime(seconds: dur, preferredTimescale: 600))
         }
-        readyContinuation?.resume()
-        readyContinuation = nil
+        takeReadyContinuation()?.resume()
     }
 
     func changeLoadState(player: some MediaPlayerProtocol) {
@@ -1119,8 +1200,7 @@ extension KSPlayerEngine: MediaPlayerDelegate {
         if let error {
             VanmoLogger.player.error("[KSEngine] finished with error: \(error.localizedDescription)")
             stateSubject.send(.error(error.localizedDescription))
-            readyContinuation?.resume(throwing: error)
-            readyContinuation = nil
+            takeReadyContinuation()?.resume(throwing: error)
         } else {
             VanmoLogger.player.info("[KSEngine] finished playback")
             stateSubject.send(.ended)

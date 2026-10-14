@@ -170,7 +170,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
             url = components.url!
         }
 
-        VanmoLogger.network.info("[\(self.type.displayName)] Listing: \(url.absoluteString)")
+        VanmoLogger.network.info("[\(self.type.displayName)] Listing: \(url.safePlaybackLogDescription)")
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
@@ -185,7 +185,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
 
         return result.items.map { item in
             let isFolder = item.isFolder ?? (item.type == "Folder" || item.type == "CollectionFolder" || item.type == "UserView")
-            let fileType: RemoteFileType = isFolder ? .directory : RemoteFileType.from(filename: item.name)
+            let fileType = Self.remoteFileType(itemType: item.type, isFolder: isFolder, path: item.path, name: item.name)
             return RemoteFile(
                 name: item.name,
                 path: item.id,
@@ -195,6 +195,14 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
                 type: fileType
             )
         }
+    }
+
+    /// Emby `Name` 是片名而非文件名，不能单靠扩展名判断是否可播放。
+    static func remoteFileType(itemType: String, isFolder: Bool, path: String?, name: String) -> RemoteFileType {
+        if isFolder { return .directory }
+        if ["Movie", "Episode", "Video", "MusicVideo", "Trailer"].contains(itemType) { return .video }
+        if let path, !path.isEmpty { return RemoteFileType.from(filename: path) }
+        return RemoteFileType.from(filename: name)
     }
 
     public func streamURL(for file: RemoteFile) async throws -> URL {

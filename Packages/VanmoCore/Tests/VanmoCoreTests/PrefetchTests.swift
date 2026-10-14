@@ -391,6 +391,41 @@ final class PrefetchTests: XCTestCase {
         XCTAssertTrue(isClosedAfterCleanup)
     }
 
+    func testSessionCleanupStopsWaitingForAHungSourceClose() async throws {
+        let closeGate = TestAsyncGate()
+        let source = FakePrefetchByteSource(
+            totalSize: 1,
+            pipelineDepth: 1,
+            closeGate: closeGate
+        )
+        let session = try PrefetchSession(
+            token: "cleanup-hung-\(UUID().uuidString)",
+            source: source,
+            cleanupDrainTimeout: .milliseconds(100)
+        )
+
+        let startedAt = DispatchTime.now().uptimeNanoseconds
+        await session.cleanup()
+        let elapsedMs = (DispatchTime.now().uptimeNanoseconds - startedAt) / 1_000_000
+
+        XCTAssertLessThan(elapsedMs, 1_000)
+        let closeStarted = await source.closeStarted
+        let isClosed = await source.isClosed
+        XCTAssertTrue(closeStarted)
+        XCTAssertFalse(isClosed)
+
+        await session.cleanup()
+        do {
+            _ = try await session.makeResponse(rangeHeader: "bytes=0-0")
+            XCTFail("Expected a timed-out cleanup to leave the session closed")
+        } catch is CancellationError {
+            // Expected.
+        }
+
+        await closeGate.open()
+        try await waitUntil { await source.isClosed }
+    }
+
     func testSessionCleanupRejectsLateProbeBodyAndDownloadWork() async throws {
         let probeGate = TestAsyncGate()
         let closeGate = TestAsyncGate()

@@ -75,6 +75,8 @@ final class MacPlayerViewModel: ObservableObject {
     private var avPerformanceBufferingStartedAt: CFAbsoluteTime?
     private var avPerformanceBufferingCount = 0
     private var avPerformanceLastSampleAt: CFAbsoluteTime = 0
+    private var avPerformanceFirstObservedTime: Double?
+    private var avPerformanceDidLogFirstFrame = false
 #endif
 
     private static let externalSubtitleIDOffset = 10_000
@@ -132,6 +134,10 @@ final class MacPlayerViewModel: ObservableObject {
     func cleanup() {
         guard !didCleanup else { return }
         didCleanup = true
+#if DEBUG
+        let hasPrefetch = prefetchRegistration != nil
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=cleanup platform=macos engine=\(self.usesKSPlayer ? "ks" : "av", privacy: .public) prefetch=\(hasPrefetch, privacy: .public)")
+#endif
         subtitleDiscoveryTask?.cancel()
         subtitleDiscoveryTask = nil
         externalSubtitleCueTask?.cancel()
@@ -435,6 +441,8 @@ final class MacPlayerViewModel: ObservableObject {
 
         do {
             try await loadAndPlayCurrentItem()
+        } catch is CancellationError {
+            return
         } catch let error as MacPlayerPlaybackError {
             VanmoLogger.player.error("[MacPlayerVM] episode switch failed: \(error.localizedDescription)")
             alertMessage = error.localizedDescription
@@ -464,12 +472,15 @@ final class MacPlayerViewModel: ObservableObject {
 
         await unregisterPrefetchIfNeeded()
         try throwIfInactive()
+        guard generation == mediaGeneration else { return }
 
         let resolvedURL = try await resolveSourcePlaybackURLIfNeeded(item.fileURL)
         try throwIfInactive()
+        guard generation == mediaGeneration else { return }
 
         let originalURL = await resolveCloudDriveStreamURLIfNeeded(resolvedURL)
         try throwIfInactive()
+        guard generation == mediaGeneration else { return }
 
         let engineKind = MacPlayerEngineFactory.engineKind(for: originalURL)
         switch engineKind {
@@ -489,6 +500,8 @@ final class MacPlayerViewModel: ObservableObject {
         avPerformanceBufferingStartedAt = nil
         avPerformanceBufferingCount = 0
         avPerformanceLastSampleAt = 0
+        avPerformanceFirstObservedTime = nil
+        avPerformanceDidLogFirstFrame = false
 #endif
 
         let loadURL: URL
@@ -641,6 +654,8 @@ final class MacPlayerViewModel: ObservableObject {
         } else {
             headers = await headerProvider?() ?? [:]
         }
+        try throwIfInactive()
+        guard generation == mediaGeneration else { return }
 
         let engine = MacKSPlayerEngine()
         ksEngine = engine
@@ -657,6 +672,7 @@ final class MacPlayerViewModel: ObservableObject {
             try await engine.load(url: loadURL, headers: headers, startPosition: startTime)
         } catch {
             guard generation == mediaGeneration else { return }
+            if error is CancellationError { throw error }
             throw MacPlayerPlaybackError.ffmpegLoadFailed(error.localizedDescription)
         }
 
@@ -1031,14 +1047,25 @@ final class MacPlayerViewModel: ObservableObject {
             self.reportPlaybackTimeUpdate(at: time.seconds)
             self.notePrefetchPlayheadIfNeeded(time: time.seconds)
 #if DEBUG
-            self.logAVPerformanceSampleIfNeeded()
+            self.logAVPerformanceSampleIfNeeded(time: time.seconds)
 #endif
         }
     }
 
 #if DEBUG
-    private func logAVPerformanceSampleIfNeeded() {
+    private func logAVPerformanceSampleIfNeeded(time: Double) {
         let now = CFAbsoluteTimeGetCurrent()
+        if !avPerformanceDidLogFirstFrame, time.isFinite {
+            if let firstTime = avPerformanceFirstObservedTime {
+                if time - firstTime > 0.1, player.timeControlStatus == .playing {
+                    avPerformanceDidLogFirstFrame = true
+                    let elapsedMs = avPerformanceLoadStartedAt.map { Int((now - $0) * 1_000) } ?? -1
+                    VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=macos engine=av elapsedMs=\(elapsedMs, privacy: .public)")
+                }
+            } else {
+                avPerformanceFirstObservedTime = time
+            }
+        }
         guard now - avPerformanceLastSampleAt >= 5 else { return }
         avPerformanceLastSampleAt = now
         let bufferingCount = avPerformanceBufferingCount

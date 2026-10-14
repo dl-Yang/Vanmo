@@ -131,6 +131,11 @@ struct MacPlayerView: View {
                     connectionsViewModel: connectionsViewModel
                 )
             }
+#if DEBUG
+            .task {
+                await runDebugPlayerScriptIfNeeded()
+            }
+#endif
             .onDisappear {
                 viewModel.cleanup()
                 appState.unregisterActivePlayer()
@@ -218,6 +223,35 @@ struct MacPlayerView: View {
         reloadLibrary()
         appState.closePlayer()
     }
+
+#if DEBUG
+    /// `VANMO_DEBUG_PLAYER_SCRIPT=seek:0.6,seek:0.2,pause,resume,wait:10,close`：首次进入 playing 后每步间隔 4 秒执行。
+    /// `close` 走窗口 `performClose`，与点击红色关闭按钮的收尾路径一致。
+    private func runDebugPlayerScriptIfNeeded() async {
+        guard let script = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAYER_SCRIPT"] else { return }
+        let steps = script.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        while viewModel.playbackState != .playing || viewModel.duration <= 0 {
+            guard !Task.isCancelled else { return }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        for step in steps {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            let time = Int(viewModel.currentTime)
+            VanmoLogger.player.info("[Debug][PlayerScript] step=\(step, privacy: .public) timeSec=\(time, privacy: .public)")
+            if step == "pause" || step == "resume" {
+                viewModel.togglePlayPause()
+            } else if step == "close" {
+                NSApp.windows.first { $0.windowController is MacPlayerWindowController }?.performClose(nil)
+                return
+            } else if step.hasPrefix("seek:"), let progress = Double(step.dropFirst(5)) {
+                viewModel.seek(to: progress)
+            } else if step.hasPrefix("wait:"), let seconds = Double(step.dropFirst(5)) {
+                try? await Task.sleep(for: .seconds(seconds))
+            }
+        }
+    }
+#endif
 
     private func reloadLibrary() {
         libraryViewModel.reload(

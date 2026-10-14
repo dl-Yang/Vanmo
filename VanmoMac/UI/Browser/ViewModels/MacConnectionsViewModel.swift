@@ -685,7 +685,9 @@ final class MacConnectionsViewModel: ObservableObject {
     }
 
     func thumbnailURL(for file: RemoteFile) async -> URL? {
-        guard file.isVideo, let connection = selectedConnection else { return nil }
+        // Emby/Jellyfin 条目指向服务器原始流（常为 4K remux），不做本地抽帧。
+        guard file.isVideo, let connection = selectedConnection,
+              connection.type != .emby, connection.type != .jellyfin else { return nil }
         let cacheKey = VideoThumbnailCacheKey.make(
             connectionId: connection.id,
             path: file.path,
@@ -1091,7 +1093,8 @@ final class MacConnectionsViewModel: ObservableObject {
             pendingMissingCredentialConnection = connection
         }
         #if DEBUG
-        print("[Debug][CloudKit] missingCredential type=\(connection.type.rawValue) presentEditor=\(presentEditor)")
+        let connectionType = connection.type.rawValue
+        VanmoLogger.storage.info("[Debug][CloudKit] missingCredential type=\(connectionType, privacy: .public) presentEditor=\(presentEditor, privacy: .public)")
         #endif
         return true
     }
@@ -1123,14 +1126,17 @@ final class MacConnectionsViewModel: ObservableObject {
         for connection in newcomers {
             if !savedConnections.contains(where: { $0.id == connection.id }) {
                 #if DEBUG
-                print("[Debug][CloudKit] skipDuplicate type=\(connection.type.rawValue)")
+                let connectionType = connection.type.rawValue
+                VanmoLogger.storage.info("[Debug][CloudKit] skipDuplicate type=\(connectionType, privacy: .public)")
                 #endif
                 continue
             }
 
             CloudSyncedConnectionActivation.markProcessed([connection.id])
             #if DEBUG
-            print("[Debug][CloudKit] activate type=\(connection.type.rawValue) missingCredential=\(CloudSyncedConnectionActivation.needsLocalCredential(connection))")
+            let connectionType = connection.type.rawValue
+            let missingCredential = CloudSyncedConnectionActivation.needsLocalCredential(connection)
+            VanmoLogger.storage.info("[Debug][CloudKit] activate type=\(connectionType, privacy: .public) missingCredential=\(missingCredential, privacy: .public)")
             #endif
 
             if connection.type == .localFolder {

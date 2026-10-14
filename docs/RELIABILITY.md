@@ -128,7 +128,12 @@ VANMO_NATIVE_VIDEO_ENGINE=av
 
 # Compare localhost HTTP prefetch pipelines without changing the Release default.
 VANMO_PREFETCH_PIPELINE_DEPTH=4 # or 8 / 16
+
+# Repeatable lifecycle run: steps start 4 s apart after the first `playing` state.
+VANMO_DEBUG_PLAYER_SCRIPT=seek:0.6,seek:0.2,pause,resume,wait:3,close
 ```
+
+Pass `-playback.resumePlayback '<false/>'` as a launch argument so cold starts begin at 0. The string `NO` does not disable resume on macOS. iOS `VANMO_DEBUG_PLAY_FILE` accepts a Documents-relative path, and the iOS Files and macOS acceptance hooks accept `VANMO_DEBUG_OPEN_PATH` and `VANMO_DEBUG_PLAY_NAME`. KSPlayer and AVFoundation `firstFrame` use different signals and are not directly comparable. The 2026-10-12 matrix is recorded in [`exec-plans/completed/2026-09-21-playback-performance.md`](exec-plans/completed/2026-09-21-playback-performance.md).
 
 The default native-container policy still prefers KSPlayer for MP4/MOV/M4V, and the default HTTP prefetch depth remains 16 until same-source device evidence supports a lower value. SMB, FTP, and SFTP byte sources use a single in-flight chunk because their source actors serialize reads.
 

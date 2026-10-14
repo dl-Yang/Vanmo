@@ -13,7 +13,7 @@ settings:
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "4"
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: HYGMY7H2C5
     CODE_SIGN_STYLE: Automatic
     INFOPLIST_FILE: Vanmo/Resources/Info.plist
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -179,13 +179,11 @@ targets:
       configs:
         Debug:
           CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac-Cloud.entitlements
-          DEVELOPMENT_TEAM: L775YJ7YS4
           OTHER_SWIFT_FLAGS:
             - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"
         Release:
           CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac-Cloud.entitlements
-          DEVELOPMENT_TEAM: L775YJ7YS4
           OTHER_SWIFT_FLAGS:
             - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"

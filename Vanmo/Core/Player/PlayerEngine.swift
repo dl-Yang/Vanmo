@@ -365,6 +365,8 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private var performanceBufferingCount = 0
     private var performanceLastSampleAt: CFAbsoluteTime = 0
     private var performanceThermalState = ProcessInfo.processInfo.thermalState
+    private var performanceFirstObservedTime: Double?
+    private var performanceDidLogFirstFrame = false
 #endif
 
     var statePublisher: AnyPublisher<PlaybackState, Never> { stateSubject.eraseToAnyPublisher() }
@@ -407,6 +409,8 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         performanceBufferingCount = 0
         performanceLastSampleAt = 0
         performanceThermalState = ProcessInfo.processInfo.thermalState
+        performanceFirstObservedTime = nil
+        performanceDidLogFirstFrame = false
 #endif
         stateSubject.send(.loading)
 
@@ -746,7 +750,7 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
             self?.currentTimeSubject.send(time)
             self?.refreshLastFrame()
 #if DEBUG
-            self?.logPerformanceSampleIfNeeded()
+            self?.logPerformanceSampleIfNeeded(time: time.seconds)
 #endif
         }
 
@@ -842,8 +846,19 @@ final class AVPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     }
 
 #if DEBUG
-    private func logPerformanceSampleIfNeeded() {
+    private func logPerformanceSampleIfNeeded(time: Double) {
         let now = CFAbsoluteTimeGetCurrent()
+        if !performanceDidLogFirstFrame, time.isFinite {
+            if let firstTime = performanceFirstObservedTime {
+                if time - firstTime > 0.1, player?.timeControlStatus == .playing {
+                    performanceDidLogFirstFrame = true
+                    let elapsedMs = performanceLoadStartedAt.map { Int((now - $0) * 1_000) } ?? -1
+                    VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=ios engine=av elapsedMs=\(elapsedMs, privacy: .public)")
+                }
+            } else {
+                performanceFirstObservedTime = time
+            }
+        }
         guard now - performanceLastSampleAt >= 5 else { return }
         performanceLastSampleAt = now
 

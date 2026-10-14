@@ -29,6 +29,7 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
 
     private var player: KSMEPlayer?
     private var seekGeneration: UInt64 = 0
+    private var activeSeekGate: PlaybackSeekCompletionGate?
     private var timeUpdateTimer: Timer?
     private var shouldResumeAfterBuffering = false
     private var lastPlayableTime: CFAbsoluteTime = 0
@@ -81,6 +82,9 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
                 startPosition: startPosition,
                 hardwareDecode: hardwareDecode
             )
+        } catch is CancellationError {
+            // stop() 已经拆掉播放器；再 stop 会向新一轮观察者推送 idle。
+            throw CancellationError()
         } catch {
             stop()
             readyContinuation = nil
@@ -104,7 +108,7 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
 
         let wasPlaying = state == .playing || state == .buffering
         shouldResumeAfterBuffering = wasPlaying
-        seekGeneration &+= 1
+        invalidateSeeks()
         let generation = seekGeneration
 #if DEBUG
         let startedAt = CFAbsoluteTimeGetCurrent()
@@ -112,6 +116,7 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let gate = PlaybackSeekCompletionGate(continuation)
+            activeSeekGate = gate
             player.seek(time: seconds) { _ in
                 gate.resume()
             }
@@ -124,6 +129,7 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
             gate.installTimeout(timeout)
         }
         guard seekGeneration == generation else { return }
+        activeSeekGate = nil
         currentTimeSubject.send(time)
 #if DEBUG
         let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
@@ -137,7 +143,10 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
     }
 
     func stop() {
-        seekGeneration &+= 1
+        invalidateSeeks()
+        let pendingReady = readyContinuation
+        readyContinuation = nil
+        pendingReady?.resume(throwing: CancellationError())
         timeUpdateTimer?.invalidate()
         timeUpdateTimer = nil
         player?.shutdown()
@@ -149,6 +158,14 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
         durationSubject.send(.zero)
         bufferProgressSubject.send(0)
         subtitleTextSubject.send(nil)
+    }
+
+    /// 新 seek、停止或换片时立即放行上一次等待回调的 seek，不再等 3 秒超时。
+    private func invalidateSeeks() {
+        seekGeneration &+= 1
+        let pendingGate = activeSeekGate
+        activeSeekGate = nil
+        pendingGate?.resume()
     }
 
     func setVolume(_ value: Float) {
@@ -320,7 +337,15 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
 
     private func logPerformanceSampleIfNeeded(player: KSMEPlayer) {
         let now = CFAbsoluteTimeGetCurrent()
-        guard now - performanceLastSampleAt >= 5, let info = player.dynamicInfo else { return }
+        guard let info = player.dynamicInfo else { return }
+        if !performanceDidLogFirstFrame, info.displayFPS >= 1 {
+            performanceDidLogFirstFrame = true
+            let elapsedMs = performanceLoadStartedAt.map {
+                Int((now - $0) * 1_000)
+            } ?? -1
+            VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=macos engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
+        }
+        guard now - performanceLastSampleAt >= 5 else { return }
         performanceLastSampleAt = now
 
         let droppedFrames = info.droppedVideoFrameCount + info.droppedVideoPacketCount
@@ -332,14 +357,6 @@ final class MacKSPlayerEngine: NSObject, ObservableObject {
         let bytesRead = info.bytesRead
         let bytesDelta = max(bytesRead - performanceLastBytesRead, 0)
         performanceLastBytesRead = bytesRead
-
-        if !performanceDidLogFirstFrame, info.displayFPS >= 1 {
-            performanceDidLogFirstFrame = true
-            let elapsedMs = performanceLoadStartedAt.map {
-                Int((now - $0) * 1_000)
-            } ?? -1
-            VanmoLogger.player.info("[Debug][PlaybackPerf] event=firstFrame platform=macos engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
-        }
 
         let fps = String(format: "%.2f", info.displayFPS)
         let avSyncMs = Int(info.audioVideoSyncDiff * 1_000)

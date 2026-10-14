@@ -1,6 +1,8 @@
 # Playback Performance
 
-**Status:** Active
+**Status:** Completed
+
+**Current acceptance status:** Completed. Some gaps are recorded below. The 2026-10-12 matrix in [`../exec-plans/completed/2026-09-21-playback-performance.md`](../exec-plans/completed/2026-09-21-playback-performance.md) covers, on iPhone 17 Pro and an M2 Mac, local H.264 and HEVC 10-bit, iOS direct SMB, macOS SMB prefetch, and iOS Emby HLS: cold starts, 15-minute runs, scripted seeks, pause/resume, close cleanup, iOS PiP, and macOS window close. KSPlayer's 15-minute local and SMB runs averaged 29.4–30.0 fps on 30 fps sources with no rebuffer, and their thermal state stayed at 1 or below. The HLS 15-minute run rebuffered because the external server's transcode throughput was too low; it is not a standard-network baseline. Emby progressive streams played through HTTP prefetch (`source=http`, depth 16) on both platforms, and Emby item switches on both platforms unregistered the old prefetch session, registered the next one, and cleaned up on close. On iOS the episode selector is reachable only from a long-press menu. Not measured: WebDAV, HTTP depth A/B, multichannel audio, Instruments energy, CPU, network, and allocations, and macOS HLS, which is not applicable. These gaps are listed in the tech-debt tracker.
 
 ## Objective
 
@@ -26,6 +28,7 @@ Each record identifies only the source category, codec, resolution, nominal fram
 4. Remote subtitle discovery does not block the first playable frame. Results from an old media generation cannot overwrite the current item.
 5. Closing or switching playback releases the active engine, prefetch session, temporary session cache, subtitle work, and media-server reporting path.
 6. iOS Picture in Picture and macOS independent-window playback preserve their existing lifecycle behavior.
+7. Closing playback saves the current position once. Stopping the engine must not overwrite it with 0.
 
 ## Measurement and Acceptance
 

@@ -163,6 +163,9 @@ struct PlayerView: View {
 #endif
         }
         .task { await viewModel.onAppear(modelContext: modelContext) }
+#if DEBUG
+        .task { await runDebugPlayerScriptIfNeeded() }
+#endif
         .onDisappear {
             let keepPlaybackActive = !isClosingPlayer
                 && (
@@ -529,6 +532,35 @@ struct PlayerView: View {
             showScaleModePicker = false
         }
     }
+
+#if DEBUG
+    /// `VANMO_DEBUG_PLAYER_SCRIPT=seek:0.6,seek:0.2,pause,resume,wait:10,close`：首次进入 playing 后每步间隔 4 秒执行。
+    /// `close` 走与关闭按钮相同的 `closePlayer()`。
+    private func runDebugPlayerScriptIfNeeded() async {
+        guard let script = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAYER_SCRIPT"] else { return }
+        let steps = script.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        while viewModel.playbackState != .playing || viewModel.duration <= 0 {
+            guard !Task.isCancelled else { return }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        for step in steps {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            let time = Int(viewModel.currentTime)
+            VanmoLogger.player.info("[Debug][PlayerScript] step=\(step, privacy: .public) timeSec=\(time, privacy: .public)")
+            if step == "pause" || step == "resume" {
+                viewModel.togglePlayPause()
+            } else if step == "close" {
+                closePlayer()
+                return
+            } else if step.hasPrefix("seek:"), let progress = Double(step.dropFirst(5)) {
+                viewModel.seek(to: viewModel.duration * min(max(progress, 0), 1))
+            } else if step.hasPrefix("wait:"), let seconds = Double(step.dropFirst(5)) {
+                try? await Task.sleep(for: .seconds(seconds))
+            }
+        }
+    }
+#endif
 
     private func closePlayer() {
         guard !isClosingPlayer else { return }

@@ -7,6 +7,7 @@ public final class PrefetchSession: @unchecked Sendable {
     private let cache: RangeCache
     private let source: any PrefetchByteSource
     private let chunkSize: Int
+    private let cleanupDrainTimeout: Duration
 
     private enum Lifecycle {
         case open
@@ -87,11 +88,16 @@ public final class PrefetchSession: @unchecked Sendable {
         try self.init(token: token, source: source)
     }
 
-    init(token: String, source: any PrefetchByteSource) throws {
+    init(
+        token: String,
+        source: any PrefetchByteSource,
+        cleanupDrainTimeout: Duration = PrefetchConfig.cleanupDrainTimeout
+    ) throws {
         self.token = token
         self.cache = try RangeCache(sessionId: token)
         self.source = source
         self.chunkSize = PrefetchConfig.chunkSize
+        self.cleanupDrainTimeout = cleanupDrainTimeout
     }
 
     public func cleanup() async {
@@ -117,17 +123,44 @@ public final class PrefetchSession: @unchecked Sendable {
         probeTask?.cancel()
         aheadTask?.cancel()
 
-        await source.close()
-        for task in activeTasks {
-            await task.value
+        let source = source
+        let drained = await Self.runBounded(timeout: cleanupDrainTimeout) {
+            await source.close()
+            for task in activeTasks {
+                await task.value
+            }
+            for task in downloadTasks {
+                _ = try? await task.value
+            }
+            _ = try? await probeTask?.value
+            await aheadTask?.value
         }
-        for task in downloadTasks {
-            _ = try? await task.value
+        if !drained {
+            let token = token
+            VanmoLogger.prefetch.error("[Prefetch] cleanup drain timed out token=\(token.prefix(8), privacy: .public); source close continues in background")
         }
-        _ = try? await probeTask?.value
-        await aheadTask?.value
         cache.removeAll()
         finishCleanup()
+    }
+
+    /// 串行片源的 close 或读取可能不响应取消。超时后照常收尾，
+    /// 关闭中的生命周期会拒绝迟到的缓存写入。
+    private static func runBounded(
+        timeout: Duration,
+        _ work: @escaping @Sendable () async -> Void
+    ) async -> Bool {
+        let race = BoundedWaitRace()
+        return await withCheckedContinuation { continuation in
+            race.install(continuation)
+            Task {
+                await work()
+                race.finish(true)
+            }
+            race.installTimer(Task {
+                try? await Task.sleep(for: timeout)
+                race.finish(false)
+            })
+        }
     }
 
     private func beginCleanup() -> CleanupAction {
@@ -775,4 +808,45 @@ public final class PrefetchSession: @unchecked Sendable {
         VanmoLogger.prefetch.info("[Debug][PlaybackPerf] event=prefetchResponseSummary windowMs=\(windowMs, privacy: .public) responses=\(summary.0, privacy: .public) bytes=\(summary.1, privacy: .public) elapsedMs=\(summary.2, privacy: .public) depth=\(pipelineDepth, privacy: .public) cacheHits=\(summary.3, privacy: .public) fetches=\(summary.4, privacy: .public)")
     }
 #endif
+}
+
+private final class BoundedWaitRace: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var timer: Task<Void, Never>?
+    private var result: Bool?
+
+    func install(_ continuation: CheckedContinuation<Bool, Never>) {
+        lock.lock()
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func installTimer(_ task: Task<Void, Never>) {
+        lock.lock()
+        let isFinished = result != nil
+        if !isFinished {
+            timer = task
+        }
+        lock.unlock()
+        if isFinished {
+            task.cancel()
+        }
+    }
+
+    func finish(_ value: Bool) {
+        lock.lock()
+        guard result == nil else {
+            lock.unlock()
+            return
+        }
+        result = value
+        let continuation = continuation
+        self.continuation = nil
+        let timer = timer
+        self.timer = nil
+        lock.unlock()
+        timer?.cancel()
+        continuation?.resume(returning: value)
+    }
 }

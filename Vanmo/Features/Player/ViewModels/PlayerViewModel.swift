@@ -302,7 +302,14 @@ final class PlayerViewModel: ObservableObject {
     }
 
     private func useEngine(for url: URL) {
-        let needsAV = url.path.lowercased().contains(".m3u8")
+        var needsAV = url.path.lowercased().contains(".m3u8")
+#if DEBUG
+        if PlaybackPreferences.debugNativeVideoEngine == .avFoundation,
+           SupportedFormat.detect(from: url) == .native,
+           MediaFormatProbe.nativeVideoExtensions.contains(url.pathExtension.lowercased()) {
+            needsAV = true
+        }
+#endif
         if needsAV == (engine is AVPlayerEngine) { return }
         engine.stop()
         engineCancellables.removeAll()
@@ -378,6 +385,8 @@ final class PlayerViewModel: ObservableObject {
     }
 
     func onDisappear(keepingPlaybackActive: Bool = false) {
+        // closePlayback() already saved progress; the engine reports 0 after stop.
+        guard !didStopPlaybackResources else { return }
         VanmoLogger.player.info("[PlayerVM] onDisappear, saving progress at \(self.currentTime)s")
         saveProgress()
         guard !keepingPlaybackActive else {
@@ -390,6 +399,11 @@ final class PlayerViewModel: ObservableObject {
     private func stopPlaybackResources(force: Bool = false) {
         guard force || !didStopPlaybackResources else { return }
         didStopPlaybackResources = true
+#if DEBUG
+        let engineName = engine is KSPlayerEngine ? "ks" : "av"
+        let hasPrefetch = prefetchToken != nil
+        VanmoLogger.player.info("[Debug][PlaybackPerf] event=cleanup platform=ios engine=\(engineName, privacy: .public) prefetch=\(hasPrefetch, privacy: .public)")
+#endif
         subtitleDiscoveryTask?.cancel()
         subtitleDiscoveryTask = nil
         externalSubtitleCueTask?.cancel()
@@ -450,10 +464,12 @@ final class PlayerViewModel: ObservableObject {
         didStopPlaybackResources = false
         let generation = mediaGeneration
         try await unregisterPrefetchIfNeeded()
+        guard generation == mediaGeneration else { return }
         resetPlaybackMetadata()
 
         let originalURL = await resolveCloudDriveStreamURLIfNeeded(item.fileURL)
         let playbackURL = await resolveDiscPlaybackURLIfNeeded(originalURL)
+        guard generation == mediaGeneration else { return }
         directPlaybackURL = playbackURL
         let resolvedQuality = PlaybackVideoQuality.resolved(
             requested: PlaybackPreferences.videoQuality,
@@ -465,6 +481,7 @@ final class PlayerViewModel: ObservableObject {
             quality: videoQuality,
             startTime: item.lastPlaybackPosition
         )
+        guard generation == mediaGeneration else { return }
         beginQualityClock(origin: qualified.timeOrigin)
         if item.duration > 1 {
             programDuration = item.duration
@@ -534,6 +551,7 @@ final class PlayerViewModel: ObservableObject {
             : CMTime(seconds: item.lastPlaybackPosition, preferredTimescale: 600)
         let primeTime = playbackTimeOrigin > 1 ? playbackTimeOrigin : (startPosition?.seconds ?? 0)
         await HlsTranscodePrimer.prime(playlistURL: loadURL, startTime: primeTime)
+        guard generation == mediaGeneration else { return }
         useEngine(for: loadURL)
         VanmoLogger.player.info("[PlayerVM] calling engine.load(), startPosition: \(startPosition?.seconds ?? 0)s url=\(loadURL.safePlaybackLogDescription, privacy: .public)")
 #if DEBUG
@@ -545,6 +563,7 @@ final class PlayerViewModel: ObservableObject {
             try await loadEngine(url: loadURL, startPosition: startPosition, headers: loadHeaders)
         } catch {
             guard generation == mediaGeneration else { return }
+            if error is CancellationError { throw error }
             guard loadURL != playbackURL else { throw error }
             VanmoLogger.player.error("[PlayerVM] transcode open failed, falling back to direct url=\(playbackURL.safePlaybackLogDescription, privacy: .public)")
 #if DEBUG
@@ -564,6 +583,7 @@ final class PlayerViewModel: ObservableObject {
             } else {
                 fallbackURL = try await registerPrefetchReplacingCurrent(playbackURL)
             }
+            guard generation == mediaGeneration else { return }
             useEngine(for: fallbackURL)
             let fallbackHeaders = PrefetchConfig.isProxyURL(fallbackURL) ? [:] : loadHeaders
             try await loadEngine(url: fallbackURL, startPosition: fallbackStart, headers: fallbackHeaders)
@@ -1155,6 +1175,8 @@ final class PlayerViewModel: ObservableObject {
             )
             return true
         } catch {
+            // 引擎被外部 stop 取消了就绪等待：拆除方负责后续，不能再回滚重开。
+            if error is CancellationError, !Task.isCancelled { return false }
             let stale = Task.isCancelled
                 || generation != mediaGeneration
                 || (reloadID.map { $0 != qualityReloadID } ?? false)
@@ -1951,10 +1973,15 @@ final class PlayerViewModel: ObservableObject {
         currentEpisodeID = episode.id
         didReportWatchedToServer = false
         showEpisodeSelector = false
+        #if DEBUG
+        VanmoLogger.player.info("[Debug][PlayerVM] event=episodeSwitch from=\(stopPosition, privacy: .public)s")
+        #endif
 
         do {
             try await loadAndPlayCurrentItem()
             showControlsBriefly()
+        } catch is CancellationError {
+            return
         } catch {
             VanmoLogger.player.error("[PlayerVM] episode switch failed: \(error.localizedDescription)")
             playbackState = .error(error.localizedDescription)
@@ -1963,6 +1990,9 @@ final class PlayerViewModel: ObservableObject {
 
     private func loadEpisodesIfNeeded(modelContext: ModelContext?) async {
         guard isEpisodeSelectableItem else {
+            #if DEBUG
+            VanmoLogger.player.info("[Debug][PlayerVM] event=episodesSkipped mediaType=\(self.item.mediaType.rawValue, privacy: .public)")
+            #endif
             episodeGroups = []
             selectedEpisodeSeason = nil
             currentEpisodeID = nil
@@ -1977,6 +2007,11 @@ final class PlayerViewModel: ObservableObject {
         episodeGroups = groupedEpisodes(from: episodes)
         selectedEpisodeSeason = item.seasonNumber ?? episodeGroups.first?.seasonNumber
         currentEpisodeID = episodes.first { matchesCurrentItem($0) }?.id
+        #if DEBUG
+        let episodeCount = episodes.count
+        let seasonCount = episodeGroups.count
+        VanmoLogger.player.info("[Debug][PlayerVM] event=episodesLoaded count=\(episodeCount, privacy: .public) seasons=\(seasonCount, privacy: .public)")
+        #endif
     }
 
     private var isEpisodeSelectableItem: Bool {
@@ -2546,6 +2581,8 @@ final class PlayerViewModel: ObservableObject {
                 guard let self, self.item.isLiveStream else { return }
                 do {
                     try await self.loadAndPlayCurrentItem()
+                } catch is CancellationError {
+                    return
                 } catch {
                     self.playbackState = .error(error.localizedDescription)
                 }

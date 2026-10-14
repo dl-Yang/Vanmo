@@ -484,10 +484,19 @@ struct VanmoMacRootView: View {
             VanmoLogger.library.info("[Debug][LibraryScan] accept connect done control=\(String(describing: connectionsViewModel.scanCoordinator.controlState), privacy: .public)")
         }
         await connectionsViewModel.selectConnection(connection, promptForMissingCredential: false)
-        var video = connectionsViewModel.files.first(where: \.isVideo)
-        if video == nil, let folder = connectionsViewModel.files.first(where: \.isDirectory) {
+        let openPath = (env["VANMO_DEBUG_OPEN_PATH"] ?? "").split(separator: "/").map(String.init)
+        for component in openPath {
+            guard let folder = connectionsViewModel.files.first(where: { $0.isDirectory && $0.name == component }) else {
+                VanmoLogger.library.info("[Debug][LibraryScan] accept missing folder=\(component, privacy: .public)")
+                return
+            }
             await connectionsViewModel.openDirectory(folder)
-            video = connectionsViewModel.files.first(where: \.isVideo)
+        }
+        let playName = env["VANMO_DEBUG_PLAY_NAME"]
+        var video = connectionsViewModel.files.first { $0.isVideo && (playName == nil || $0.name == playName) }
+        if video == nil, openPath.isEmpty, let folder = connectionsViewModel.files.first(where: \.isDirectory) {
+            await connectionsViewModel.openDirectory(folder)
+            video = connectionsViewModel.files.first { $0.isVideo && (playName == nil || $0.name == playName) }
         }
         VanmoLogger.library.info("[Debug][LibraryScan] accept listed=\(connectionsViewModel.files.count) hasVideo=\(video != nil)")
         if actions.contains("cancel") {

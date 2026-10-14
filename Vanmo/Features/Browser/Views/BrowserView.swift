@@ -12,6 +12,10 @@ struct ConnectionsView: View {
     /// 非 nil = 进入该连接的文件 / 文件夹浏览页（Files-Folders(-Videos)-Light）。
     @State private var enteredConnectionID: UUID?
     @State private var editingConnection: SavedConnection?
+#if DEBUG
+    /// 关闭播放器后 `.task` 会重跑；调试验收每个进程只触发一次。
+    private static var didRunDebugSourceAcceptance = false
+#endif
 
     var body: some View {
         ZStack {
@@ -318,42 +322,65 @@ struct ConnectionsView: View {
 #if DEBUG
     private func runDebugSourceAcceptanceIfNeeded() async {
         let env = ProcessInfo.processInfo.environment
-        guard let name = env["VANMO_DEBUG_OPEN_CONNECTION"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard !Self.didRunDebugSourceAcceptance,
+              let name = env["VANMO_DEBUG_OPEN_CONNECTION"]?.trimmingCharacters(in: .whitespacesAndNewlines),
               !name.isEmpty else { return }
+        Self.didRunDebugSourceAcceptance = true
         guard let connection = viewModel.savedConnections.first(where: {
             $0.name.caseInsensitiveCompare(name) == .orderedSame
         }) else {
-            print("[Debug][FTP] accept missing connection name=\(name)")
+            VanmoLogger.library.info("[Debug][LibraryScan] accept missing connection name=\(name, privacy: .public)")
             return
         }
         enter(connection)
         try? await Task.sleep(nanoseconds: 1_500_000_000)
-        var video = viewModel.files.first(where: \.isVideo)
-        if video == nil, let folder = viewModel.files.first(where: \.isDirectory) {
+        for _ in 0..<20 where viewModel.files.isEmpty {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        let openPath = (env["VANMO_DEBUG_OPEN_PATH"] ?? "").split(separator: "/").map(String.init)
+        for component in openPath {
+            guard let folder = viewModel.files.first(where: { $0.isDirectory && $0.name == component }) else {
+                let listedCount = viewModel.files.count
+                VanmoLogger.library.info("[Debug][LibraryScan] accept missing folder=\(component, privacy: .public) listed=\(listedCount, privacy: .public)")
+                return
+            }
             await viewModel.openDirectory(folder)
-            video = viewModel.files.first(where: \.isVideo)
+        }
+        let playName = env["VANMO_DEBUG_PLAY_NAME"]
+        var video = viewModel.files.first { $0.isVideo && (playName == nil || $0.name == playName) }
+        var descended = 0
+        while video == nil, openPath.isEmpty, descended < 4,
+              let folder = viewModel.files.first(where: \.isDirectory) {
+            await viewModel.openDirectory(folder)
+            video = viewModel.files.first { $0.isVideo && (playName == nil || $0.name == playName) }
+            descended += 1
         }
         let actions = Set(
             (env["VANMO_DEBUG_ACCEPT_ACTIONS"] ?? "")
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         )
-        print("[Debug][FTP] accept listed=\(viewModel.files.count) hasVideo=\(video != nil) actions=\(actions.sorted().joined(separator: ","))")
+        let listedCount = viewModel.files.count
+        let actionList = actions.sorted().joined(separator: ",")
+        VanmoLogger.library.info("[Debug][LibraryScan] accept listed=\(listedCount, privacy: .public) hasVideo=\(video != nil, privacy: .public) actions=\(actionList, privacy: .public)")
         if actions.contains("connect") {
             _ = await viewModel.connectAndScan(connection, showErrorAlert: false)
-            print("[Debug][LibraryScan] accept connect done control=\(String(describing: viewModel.scanCoordinator.controlState))")
+            let control = String(describing: viewModel.scanCoordinator.controlState)
+            VanmoLogger.library.info("[Debug][LibraryScan] accept connect done control=\(control, privacy: .public)")
         }
         if actions.contains("cancel") {
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 viewModel.cancelScan()
-                print("[Debug][LibraryScan] accept cancel requested")
+                VanmoLogger.library.info("[Debug][LibraryScan] accept cancel requested")
             }
             _ = await viewModel.scanCurrentDirectory()
-            print("[Debug][LibraryScan] accept cancel finished control=\(String(describing: viewModel.scanCoordinator.controlState))")
+            let control = String(describing: viewModel.scanCoordinator.controlState)
+            VanmoLogger.library.info("[Debug][LibraryScan] accept cancel finished control=\(control, privacy: .public)")
         } else if actions.contains("scan") {
             _ = await viewModel.scanCurrentDirectory()
-            print("[Debug][LibraryScan] accept scan done control=\(String(describing: viewModel.scanCoordinator.controlState))")
+            let control = String(describing: viewModel.scanCoordinator.controlState)
+            VanmoLogger.library.info("[Debug][LibraryScan] accept scan done control=\(control, privacy: .public)")
         }
         if actions.contains("play"), let video {
             await play(video)
@@ -363,7 +390,7 @@ struct ConnectionsView: View {
         }
         if actions.contains("delete") {
             viewModel.deleteConnection(connection)
-            print("[Debug][LibraryScan] accept delete requested")
+            VanmoLogger.library.info("[Debug][LibraryScan] accept delete requested")
         }
     }
 #endif
@@ -464,12 +491,15 @@ struct ConnectionsView: View {
             )
             try await downloadManager.enqueue(request)
 #if DEBUG
-            print("[Debug][Downloads] enqueued source=browser connection=\(connection.type.rawValue)")
+            let connectionType = connection.type.rawValue
+            VanmoLogger.library.info("[Debug][Downloads] enqueued source=browser connection=\(connectionType, privacy: .public)")
 #endif
         } catch {
 #if DEBUG
             let nsError = error as NSError
-            print("[Debug][Downloads] enqueue failed source=browser domain=\(nsError.domain) code=\(nsError.code)")
+            let domain = nsError.domain
+            let code = nsError.code
+            VanmoLogger.library.error("[Debug][Downloads] enqueue failed source=browser domain=\(domain, privacy: .public) code=\(code, privacy: .public)")
 #endif
             viewModel.errorMessage = error.localizedDescription
             viewModel.showError = true

@@ -9,6 +9,10 @@ struct ContentView: View {
     @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
     @ObservedObject private var islandHandoff = DownloadIslandHandoff.shared
+#if DEBUG
+    /// 关闭播放器后 `.task` 会随根视图重新出现而重跑；调试起播每个进程只触发一次。
+    private static var didOpenDebugPlayFile = false
+#endif
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -138,9 +142,11 @@ struct ContentView: View {
                     VanmoLogger.library.error("[Debug][Downloads] hero walk seed failed")
                 }
             }
-            if let path = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAY_FILE"],
-               FileManager.default.fileExists(atPath: path) {
-                let url = URL(fileURLWithPath: path)
+            let debugPlayURL = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAY_FILE"].map { path in
+                path.hasPrefix("/") ? URL(fileURLWithPath: path) : URL.documentsDirectory.appending(path: path)
+            }
+            if !Self.didOpenDebugPlayFile, let url = debugPlayURL, FileManager.default.fileExists(atPath: url.path) {
+                Self.didOpenDebugPlayFile = true
                 let descriptor = FetchDescriptor<MediaItem>()
                 let existing = try? modelContext.fetch(descriptor).first { $0.fileURL.path == url.path }
                 let item = existing ?? MediaItem(

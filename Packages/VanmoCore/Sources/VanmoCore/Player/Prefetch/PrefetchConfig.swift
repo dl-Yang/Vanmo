@@ -29,6 +29,9 @@ public enum PrefetchConfig {
         return maxConcurrentFetches
     }
 
+    /// 会话清理时等待片源关闭和在途读取的上限。SMB/FTP/SFTP 断连可能不响应取消。
+    public static let cleanupDrainTimeout: Duration = .seconds(3)
+
     /// 从当前播放点向后预缓存的时间目标。
     public static let aheadTargetSeconds: TimeInterval = 180
 
