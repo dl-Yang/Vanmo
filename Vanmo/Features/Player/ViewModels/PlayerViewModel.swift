@@ -2490,9 +2490,14 @@ final class PlayerViewModel: ObservableObject {
         showControlsBriefly()
     }
 
-    /// KSPlayer 拖动预览走 `scrubPreviewLane`，从不读引擎的预览缓存。
+    /// KSPlayer 拖动预览走 `scrubPreviewLane`，从不读引擎的预览缓存。AVPlayer 播 HLS 转码时也走它：
+    /// `AVAssetImageGenerator` 取不到 HLS 的帧，预览路读的是原始源，与播放引擎无关。
     private var usesScrubPreviewLane: Bool {
-        engine is KSPlayerEngine && previewLaneURL != nil
+        guard let previewLaneURL else { return false }
+        if engine is KSPlayerEngine { return true }
+        // 源本身就是播放列表时，第二路 KSPlayer 打开它会在服务端再起一路转码。
+        guard !Self.isTranscodePlaylist(previewLaneURL) else { return false }
+        return activePlaybackURL.map(Self.isTranscodePlaylist) ?? false
     }
 
     private func requestSeekPreview(at time: TimeInterval) {

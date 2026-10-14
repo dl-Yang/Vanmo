@@ -12,6 +12,7 @@ final class ScrubPreviewLane {
     private var delegate: PreviewLaneDelegate?
     private var proxyToken: String?
     private var sharedProxyURL: URL?
+    private var openedSharedProxyURL: URL?
     private var latestTime: TimeInterval?
     private var captureTask: Task<Void, Never>?
     private var openTask: Task<Void, Never>?
@@ -32,6 +33,19 @@ final class ScrubPreviewLane {
         sharedProxyURL: URL? = nil
     ) {
         isClosed = false
+        if let openedSharedProxyURL, openedSharedProxyURL != sharedProxyURL {
+            // 播放端换源（如切到 HLS 转码）会注销共享的预取 token，继续读它只会拿不到帧。
+#if DEBUG
+            VanmoLogger.player.info("[Debug][Player] event=previewLaneReset reason=sharedProxyChanged")
+#endif
+            resetPlayer()
+        } else if proxyToken != nil, let sharedProxyURL, PrefetchConfig.isProxyURL(sharedProxyURL) {
+            // 播放端重新有了预取会话，就不再另开一路上游。
+#if DEBUG
+            VanmoLogger.player.info("[Debug][Player] event=previewLaneReset reason=sharedProxyAvailable")
+#endif
+            resetPlayer()
+        }
         latestTime = time
         sourceURL = originalURL
         sourceHeaders = headers
@@ -47,17 +61,21 @@ final class ScrubPreviewLane {
         openTask = nil
         captureTask?.cancel()
         captureTask = nil
+#if DEBUG
+        VanmoLogger.player.info("[Debug][Player] event=previewLaneClose hadProxy=\(self.proxyToken != nil, privacy: .public)")
+#endif
+        resetPlayer()
+        onFrame = nil
+    }
+
+    private func resetPlayer() {
         isReady = false
         player?.shutdown()
         player = nil
         delegate = nil
-        onFrame = nil
-        let token = proxyToken
-        proxyToken = nil
-#if DEBUG
-        VanmoLogger.player.info("[Debug][Player] event=previewLaneClose hadProxy=\(token != nil, privacy: .public)")
-#endif
-        if let token {
+        openedSharedProxyURL = nil
+        if let token = proxyToken {
+            proxyToken = nil
             Task {
                 await PrefetchProxy.shared.unregister(token: token)
             }
@@ -83,6 +101,7 @@ final class ScrubPreviewLane {
             return
         }
         proxyToken = resolved.token
+        openedSharedProxyURL = resolved.token == nil && PrefetchConfig.isProxyURL(resolved.url) ? resolved.url : nil
         let options = KSOptions()
         options.isAccurateSeek = false
         options.isSecondOpen = !PrefetchConfig.shouldDisableSecondOpen(for: resolved.url)
@@ -109,7 +128,7 @@ final class ScrubPreviewLane {
 #endif
         previewPlayer.prepareToPlay()
         let opened = await readyDelegate.waitForReady()
-        guard opened, !isClosed else { return }
+        guard opened, !isClosed, player === previewPlayer else { return }
         isReady = true
         previewPlayer.play()
     }
