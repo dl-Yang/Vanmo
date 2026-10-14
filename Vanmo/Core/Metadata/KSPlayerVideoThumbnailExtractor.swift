@@ -12,11 +12,12 @@ struct KSPlayerVideoThumbnailExtractor: VideoThumbnailExtracting, Sendable {
         do {
             let data: Data
             if LibavformatOpenGate.needsExclusiveOpen(url) {
-                data = try await LibavformatOpenGate.shared.exclusive {
-                    try await self.extractOnce(url: url, maxPixelSize: maxPixelSize, timeout: timeout)
+                let close = LibavformatProtocolClose()
+                data = try await LibavformatOpenGate.shared.exclusive(awaitingClose: close) {
+                    try await self.extractOnce(url: url, maxPixelSize: maxPixelSize, timeout: timeout, close: close)
                 }
             } else {
-                data = try await extractOnce(url: url, maxPixelSize: maxPixelSize, timeout: timeout)
+                data = try await extractOnce(url: url, maxPixelSize: maxPixelSize, timeout: timeout, close: nil)
             }
             logResult(url: url, started: started, error: nil)
             return data
@@ -26,14 +27,20 @@ struct KSPlayerVideoThumbnailExtractor: VideoThumbnailExtracting, Sendable {
         }
     }
 
-    private func extractOnce(url: URL, maxPixelSize: Int, timeout: TimeInterval) async throws -> Data {
+    private func extractOnce(
+        url: URL,
+        maxPixelSize: Int,
+        timeout: TimeInterval,
+        close: LibavformatProtocolClose?
+    ) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 do {
                     let data = try await Self.extractOnMainActor(
                         url: url,
                         maxPixelSize: maxPixelSize,
-                        timeout: timeout
+                        timeout: timeout,
+                        close: close
                     )
                     continuation.resume(returning: data)
                 } catch {
@@ -47,7 +54,8 @@ struct KSPlayerVideoThumbnailExtractor: VideoThumbnailExtracting, Sendable {
     private static func extractOnMainActor(
         url: URL,
         maxPixelSize: Int,
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        close: LibavformatProtocolClose?
     ) async throws -> Data {
         let playbackURL = url.isFileURL ? URL(fileURLWithPath: url.path, isDirectory: false) : url
         let options = KSOptions()
@@ -63,7 +71,11 @@ struct KSPlayerVideoThumbnailExtractor: VideoThumbnailExtracting, Sendable {
         player.delegate = delegate
         player.isMuted = true
         player.prepareToPlay()
-        defer { player.shutdown() }
+        defer {
+            if let isClosed = player.shutdownObservingProtocolClose() {
+                close?.track(isClosed)
+            }
+        }
 
         let started = Date()
         try await delegate.waitForReady()

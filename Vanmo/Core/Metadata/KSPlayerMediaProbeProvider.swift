@@ -5,18 +5,23 @@ import VanmoCore
 final class KSPlayerMediaProbeProvider: MediaProbeProviding, @unchecked Sendable {
     func probe(url: URL, timeout: TimeInterval) async throws -> MediaProbeResult {
         if LibavformatOpenGate.needsExclusiveOpen(url) {
-            return try await LibavformatOpenGate.shared.exclusive {
-                try await self.probeOnce(url: url, timeout: timeout)
+            let close = LibavformatProtocolClose()
+            return try await LibavformatOpenGate.shared.exclusive(awaitingClose: close) {
+                try await self.probeOnce(url: url, timeout: timeout, close: close)
             }
         }
-        return try await probeOnce(url: url, timeout: timeout)
+        return try await probeOnce(url: url, timeout: timeout, close: nil)
     }
 
-    private func probeOnce(url: URL, timeout: TimeInterval) async throws -> MediaProbeResult {
+    private func probeOnce(
+        url: URL,
+        timeout: TimeInterval,
+        close: LibavformatProtocolClose?
+    ) async throws -> MediaProbeResult {
         try await withCheckedThrowingContinuation { continuation in
             Task { @MainActor in
                 do {
-                    let result = try await Self.probeOnMainActor(url: url, timeout: timeout)
+                    let result = try await Self.probeOnMainActor(url: url, timeout: timeout, close: close)
                     continuation.resume(returning: result)
                 } catch {
                     continuation.resume(throwing: error)
@@ -26,7 +31,11 @@ final class KSPlayerMediaProbeProvider: MediaProbeProviding, @unchecked Sendable
     }
 
     @MainActor
-    private static func probeOnMainActor(url: URL, timeout: TimeInterval) async throws -> MediaProbeResult {
+    private static func probeOnMainActor(
+        url: URL,
+        timeout: TimeInterval,
+        close: LibavformatProtocolClose?
+    ) async throws -> MediaProbeResult {
         let playbackURL = url.isFileURL ? URL(fileURLWithPath: url.path, isDirectory: false) : url
         let options = KSOptions()
         options.isSecondOpen = true
@@ -43,11 +52,17 @@ final class KSPlayerMediaProbeProvider: MediaProbeProviding, @unchecked Sendable
         do {
             try await delegate.waitForReady()
         } catch {
-            player.shutdown()
+            if let isClosed = player.shutdownObservingProtocolClose() {
+                close?.track(isClosed)
+            }
             throw error
         }
 
-        defer { player.shutdown() }
+        defer {
+            if let isClosed = player.shutdownObservingProtocolClose() {
+                close?.track(isClosed)
+            }
+        }
 
         let duration = player.duration
         let container = playbackURL.pathExtension.lowercased()

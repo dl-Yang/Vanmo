@@ -262,6 +262,16 @@ final class ScannedShowGroupingTests: XCTestCase {
     }
 }
 
+private final class LockedFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored = false
+
+    var value: Bool {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
+    }
+}
+
 private actor OverlapProbe {
     private var current = 0
     private(set) var maxSeen = 0
@@ -448,6 +458,78 @@ final class VideoThumbnailCacheTests: XCTestCase {
         XCTAssertTrue(hold.consume(current))
         XCTAssertFalse(hold.consume(), "a hold is released once")
         XCTAssertFalse(hold.consume(current))
+    }
+
+    func testLibavformatGateWaitsForProtocolCloseBeforeRelease() async {
+        let gate = LibavformatOpenGate()
+        let closed = LockedFlag()
+        let reacquired = LockedFlag()
+        await gate.acquire()
+
+        let release = Task { await gate.releaseAfterProtocolClose({ closed.value }) }
+        let next = Task {
+            await gate.acquire()
+            reacquired.value = true
+        }
+
+        try? await Task.sleep(nanoseconds: 700_000_000)
+        XCTAssertFalse(reacquired.value, "the next open must wait past the drain while the close is still running")
+
+        closed.value = true
+        await release.value
+        await next.value
+        XCTAssertTrue(reacquired.value)
+    }
+
+    func testLibavformatGateExclusiveWaitsForCloseTrackedByWork() async {
+        let gate = LibavformatOpenGate()
+        let close = LibavformatProtocolClose()
+        let closed = LockedFlag()
+        let reacquired = LockedFlag()
+
+        let thumbnail = Task {
+            await gate.exclusive(awaitingClose: close) {
+                close.track { closed.value }
+            }
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        let next = Task {
+            await gate.acquire()
+            reacquired.value = true
+        }
+
+        try? await Task.sleep(nanoseconds: 700_000_000)
+        XCTAssertFalse(reacquired.value, "the next open must wait for the close tracked inside the work")
+
+        closed.value = true
+        await thumbnail.value
+        await next.value
+        XCTAssertTrue(reacquired.value)
+    }
+
+    func testLibavformatProtocolCloseWaitTimesOut() async {
+        let closed = await LibavformatOpenGate.waitForProtocolClose({ false }, timeoutNanoseconds: 100_000_000)
+        XCTAssertFalse(closed)
+        let untracked = await LibavformatOpenGate.waitForProtocolClose(nil)
+        XCTAssertTrue(untracked)
+    }
+
+    func testLibavformatProtocolCloseTrackerHandsOffOnce() {
+        let close = LibavformatProtocolClose()
+        close.track { true }
+        XCTAssertEqual(close.take()?(), true)
+        XCTAssertNil(close.take())
+    }
+
+    func testLibavformatProtocolCloseDrainIgnoresCallerCancellation() async {
+        let drain = Task { () -> TimeInterval in
+            let started = Date()
+            await LibavformatOpenGate.waitForProtocolCloseDrain()
+            return Date().timeIntervalSince(started)
+        }
+        drain.cancel()
+        let elapsed = await drain.value
+        XCTAssertGreaterThan(elapsed, 0.3)
     }
 
     func testLibavformatGateExclusiveDoesNotOverlap() async {

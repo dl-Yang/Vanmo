@@ -50,6 +50,7 @@
 		3EFA715844D71EB6643A63B4 /* MacPlayerEngineFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016853DC64C190C2D1534598 /* MacPlayerEngineFactory.swift */; };
 		3F7A21A58B8FB7218A28229C /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 7224CE03286D3158795CD36F /* Kingfisher */; };
 		40B23352EAEA2801537E0094 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EA488509E18DC2C884AAA5 /* LoadingView.swift */; };
+		40C1F87702EB1B003170ECF9 /* KSMEPlayer+ProtocolClose.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E4663F54EB9631C6E01D35 /* KSMEPlayer+ProtocolClose.swift */; };
 		41E4DED1170C0C52F9FE107D /* fnos.png in Resources */ = {isa = PBXBuildFile; fileRef = EEC7D8C959C3FA07E45E3754 /* fnos.png */; };
 		45003B26F5BA4EFA4AF8A063 /* MacTrackSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F884249848ED7286C2E2C8 /* MacTrackSelectorView.swift */; };
 		466EDFD4700B246CBA657BDD /* MacSettingsWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C304ACAE13AD2BF266BE9E /* MacSettingsWindowView.swift */; };
@@ -301,6 +302,7 @@
 		86786584DACF6F5FC223B219 /* KSPlayerMediaProbeProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerMediaProbeProvider.swift; sourceTree = "<group>"; };
 		86D3F3AD3CCD5F63E8C40925 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		86E5C58E34AA9D39FABA7633 /* KSPlayerVideoThumbnailExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerVideoThumbnailExtractor.swift; sourceTree = "<group>"; };
+		87E4663F54EB9631C6E01D35 /* KSMEPlayer+ProtocolClose.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KSMEPlayer+ProtocolClose.swift"; sourceTree = "<group>"; };
 		8975545DA300E57FD1C133D1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		898928A3506370EB7FCD0FF8 /* PlatformCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformCompatibility.swift; sourceTree = "<group>"; };
 		8A20D39765496E942D610EFB /* MacSettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSettingsViewModel.swift; sourceTree = "<group>"; };
@@ -479,6 +481,7 @@
 			isa = PBXGroup;
 			children = (
 				F0EA203580AFD8F087E351ED /* HlsSegmentFixServer.swift */,
+				87E4663F54EB9631C6E01D35 /* KSMEPlayer+ProtocolClose.swift */,
 				781055690453E6D2950A0933 /* KSPlayerEngine.swift */,
 				46008C0FE585AFB0989543DB /* PlayerEngine.swift */,
 				4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */,
@@ -1397,6 +1400,7 @@
 				F683C0D5E707E8124B32319D /* HlsSegmentFixServer.swift in Sources */,
 				9B36E76D665241913F0EAE3A /* HomeCollectionCache.swift in Sources */,
 				DB26E3C4BEC970BA23430A51 /* Int64+FileSize.swift in Sources */,
+				40C1F87702EB1B003170ECF9 /* KSMEPlayer+ProtocolClose.swift in Sources */,
 				E27647CBF81A4FD67C50E33E /* KSPlayerEngine.swift in Sources */,
 				D442E93B0F496CD0726CDA47 /* KSPlayerMediaProbeProvider.swift in Sources */,
 				EC1C047F64854D6079D1CA53 /* KSPlayerVideoThumbnailExtractor.swift in Sources */,

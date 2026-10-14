@@ -51,6 +51,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
     private let previewSerializer = SeekPreviewSerializer()
     private var appliedVideoQuality = PlaybackPreferences.videoQuality
     private let libavformatGateHold = LibavformatGateHold()
+    private let protocolClose = LibavformatProtocolClose()
     private let seekGenerationLock = NSLock()
     private var seekGeneration: UInt64 = 0
     private var activeSeekGate: PlaybackSeekCompletionGate?
@@ -274,10 +275,10 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
 
     deinit {
         stopTimeUpdateTimer()
-        player?.shutdown()
+        let isClosed = player?.shutdownObservingProtocolClose() ?? protocolClose.take()
         if consumeLibavformatGateHold() {
             Task {
-                await LibavformatOpenGate.shared.releaseAfterProtocolCloseDrain()
+                await LibavformatOpenGate.shared.releaseAfterProtocolClose(isClosed)
             }
         }
     }
@@ -466,8 +467,9 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         VanmoLogger.player.info("[KSEngine] stop()")
         stopPlaybackResources()
         if consumeLibavformatGateHold() {
+            let isClosed = protocolClose.take()
             Task {
-                await LibavformatOpenGate.shared.releaseAfterProtocolCloseDrain()
+                await LibavformatOpenGate.shared.releaseAfterProtocolClose(isClosed)
             }
         }
     }
@@ -488,7 +490,9 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         configuredPictureInPictureController = nil
         retainedActivePictureInPictureControllers.removeAll()
         pictureInPictureActiveSubject.send(false)
-        player?.shutdown()
+        if let isClosed = player?.shutdownObservingProtocolClose() {
+            protocolClose.track(isClosed)
+        }
         player = nil
         playbackURL = nil
         playbackHeaders = [:]
@@ -562,7 +566,7 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
 
     private func releaseLibavformatGateIfHeld() async {
         guard consumeLibavformatGateHold() else { return }
-        await LibavformatOpenGate.shared.releaseAfterProtocolCloseDrain()
+        await LibavformatOpenGate.shared.releaseAfterProtocolClose(protocolClose.take())
     }
 
     // MARK: - Track Selection
