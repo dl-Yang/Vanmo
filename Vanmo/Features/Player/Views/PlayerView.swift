@@ -656,30 +656,7 @@ struct PlayerView: View {
                         .accessibilityLabel(L10n.tr("跳过片头"))
                     }
                     Spacer()
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 20) {
-                            glassCircleButton("text.bubble", label: L10n.tr("字幕"), diameter: 48) {
-                                viewModel.showSubtitleSelector = true
-                            }
-                            glassCircleButton("waveform", label: L10n.tr("音轨"), diameter: 48) {
-                                viewModel.showAudioSelector = true
-                            }
-                            glassCircleButton("arrow.triangle.2.circlepath", label: L10n.tr("缩放"), diameter: 48) {
-                                viewModel.cycleScaleMode()
-                            }
-                        }
-                        HStack(spacing: 8) {
-                            glassCircleButton("text.bubble", label: L10n.tr("字幕"), diameter: 44) {
-                                viewModel.showSubtitleSelector = true
-                            }
-                            glassCircleButton("waveform", label: L10n.tr("音轨"), diameter: 44) {
-                                viewModel.showAudioSelector = true
-                            }
-                            glassCircleButton("arrow.triangle.2.circlepath", label: L10n.tr("缩放"), diameter: 44) {
-                                viewModel.cycleScaleMode()
-                            }
-                        }
-                    }
+                    mediaActionCapsule
                 }
 
                 PlayerProgressBar(
@@ -698,18 +675,41 @@ struct PlayerView: View {
         }
     }
 
-    private func glassCircleButton(
+    /// Figma `619:2`：右下角胶囊组，「选集」只在有剧集时出现在最左侧。
+    private var mediaActionCapsule: some View {
+        HStack(spacing: 0) {
+            if viewModel.canSelectEpisode {
+                capsuleActionButton("rectangle.stack", label: L10n.tr("选集")) {
+                    viewModel.showEpisodeSelector = true
+                }
+                .accessibilityIdentifier("player.episodes")
+            }
+            capsuleActionButton("text.bubble", label: L10n.tr("字幕")) {
+                viewModel.showSubtitleSelector = true
+            }
+            capsuleActionButton("waveform", label: L10n.tr("音轨")) {
+                viewModel.showAudioSelector = true
+            }
+            capsuleActionButton("arrow.triangle.2.circlepath", label: L10n.tr("缩放")) {
+                viewModel.cycleScaleMode()
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 48)
+        .playerGlassCapsule()
+    }
+
+    private func capsuleActionButton(
         _ systemName: String,
         label: String,
-        diameter: CGFloat,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: diameter, height: diameter)
-                .playerGlassCircle()
+                .frame(width: 44, height: 48)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
