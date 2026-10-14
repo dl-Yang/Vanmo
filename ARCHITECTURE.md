@@ -184,7 +184,7 @@ When the app enters the foreground, it resumes downloads, performs synchronizati
   - `ConnectionsViewModel` manages connection CRUD, Keychain credentials, OAuth, local bookmarks, directory browsing, scanning, and media-server synchronization.
   - `ScanCoordinator` publishes scan progress and pause, resume, and cancellation controls.
 - `Features/Player`
-  - `PlayerViewModel` orchestrates playback URL resolution, prefetching, dual engines, subtitles, chapters, episode switching, progress persistence, and Emby playback reporting.
+  - `PlayerViewModel` orchestrates playback URL resolution, prefetching, dual engines, subtitles, chapters, episode switching, progress persistence, and Emby playback reporting. On iOS it also publishes the title, artwork, elapsed time, and rate to `MPNowPlayingInfoCenter`, and handles lock-screen and Control Center play, pause, 10-second skip, and scrub commands until playback stops.
 - `Features/Search`
   - `SearchViewModel` searches both the local SwiftData library and remote connections.
   - Remote searches are limited to four concurrent sources. Media servers use server-side search when available; file services use bounded recursive search.

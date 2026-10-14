@@ -38,6 +38,10 @@ The chapter sheet is always available and includes the mark action even when no 
 
 The bottom-right media capsule holds subtitle, audio track, and scale buttons. When the current item belongs to a series with at least one loaded episode group, an episode button (`rectangle.stack`, 选集) appears at the left of that capsule and opens the episode sheet. Episodes come from the local library when it has more than one, otherwise from Emby/Jellyfin or Plex by `seriesId`. Items opened from the Files tab carry no series metadata, so they do not show the button. The long-press menu on the top-left button group keeps the same 选集 entry.
 
+## Now Playing
+
+While a video is open, the system Now Playing card shows the item title, poster when it loads, elapsed time, and duration. Play, pause, a 10-second skip, and a position scrub from the lock screen, Control Center, or headphones control playback. Live streams show as live and do not offer skip or scrub. Closing the player clears the card.
+
 ## AirPlay
 
 The top bar includes a system AirPlay route picker. HTTP(S) progressive MP4/MOV/M4V and HLS on the AVFoundation path can use video AirPlay. KSPlayer formats such as MKV, SMB, FTP, and SFTP cannot send decoded video to Apple TV; selecting an AirPlay route shows that video AirPlay is unavailable and that system screen mirroring remains possible. Chromecast and DLNA are out of scope.

@@ -81,6 +81,7 @@
 		6C559DE8C613197CDED94D0C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FAE01D009AD30867E0E07D15 /* Assets.xcassets */; };
 		6E784F486580B35270057863 /* MacLibrarySort.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72AD8C87B76D5E9531E0DC0C /* MacLibrarySort.swift */; };
 		6F994896E9F4472385DB92DD /* MacMediaItemContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 120E300378E53BD1C48BE3F7 /* MacMediaItemContextMenu.swift */; };
+		6FC2C777D8BDFF7C9D2861F0 /* NowPlayingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15BA7E8A2DD03669E6A717AC /* NowPlayingController.swift */; };
 		7038D49643F687BBCEE82F9B /* DownloadLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B470B000193E321F251817 /* DownloadLiveActivityIntents.swift */; };
 		7138EDE575639610A7BDB133 /* MacScannedShowDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0583048E7F8AAC51FA8D37 /* MacScannedShowDetailView.swift */; };
 		727109E7EF5C00486792D48D /* MacFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B6D501200FC787903490FCA /* MacFormatters.swift */; };
@@ -222,6 +223,7 @@
 		120E300378E53BD1C48BE3F7 /* MacMediaItemContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaItemContextMenu.swift; sourceTree = "<group>"; };
 		139F05B251538C1EF8D62D68 /* MacVibrancyBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacVibrancyBackground.swift; sourceTree = "<group>"; };
 		149F2A81004A791E14F857A2 /* MacDownloadHeroOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDownloadHeroOverlay.swift; sourceTree = "<group>"; };
+		15BA7E8A2DD03669E6A717AC /* NowPlayingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingController.swift; sourceTree = "<group>"; };
 		162372EE7823659FFCD1E918 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		18EA22E1240358F4E17759AC /* Vanmo.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Vanmo.entitlements; sourceTree = "<group>"; };
 		1A15784CA3D10BE58DA67E69 /* BackdropHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackdropHeader.swift; sourceTree = "<group>"; };
@@ -483,6 +485,7 @@
 				F0EA203580AFD8F087E351ED /* HlsSegmentFixServer.swift */,
 				87E4663F54EB9631C6E01D35 /* KSMEPlayer+ProtocolClose.swift */,
 				781055690453E6D2950A0933 /* KSPlayerEngine.swift */,
+				15BA7E8A2DD03669E6A717AC /* NowPlayingController.swift */,
 				46008C0FE585AFB0989543DB /* PlayerEngine.swift */,
 				4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */,
 				CF351F2AF61293E876B9506A /* PlayerState.swift */,
@@ -1413,6 +1416,7 @@
 				96980FF8C625A4CA15A5C525 /* MediaDetailView.swift in Sources */,
 				C0B026066326C5E594DF0C93 /* MediaListRow.swift in Sources */,
 				C13744D4912C5B8AE9639D8E /* MediaTitleLogoView.swift in Sources */,
+				6FC2C777D8BDFF7C9D2861F0 /* NowPlayingController.swift in Sources */,
 				18C063410011D1BAE4E03928 /* OAuthPresentationContextProvider+UIKit.swift in Sources */,
 				48904BCF759FB450DC9B92AC /* PlatformCompatibility.swift in Sources */,
 				82345C9CA31F050453C59FB0 /* PlayerEngine.swift in Sources */,

@@ -114,6 +114,11 @@ final class PlayerViewModel: ObservableObject {
     private var didReportWatchedToServer = false
     #if os(iOS)
     private let rateBoostHaptic = UIImpactFeedbackGenerator(style: .medium)
+    private let nowPlaying = NowPlayingController()
+    private var lastNowPlayingPublish: CFAbsoluteTime = 0
+    /// seek 完成前锁屏进度保持在目标时间，避免被引擎的旧时间盖回去。
+    private var nowPlayingHeldElapsed: TimeInterval?
+    private var nowPlayingHoldUntil: CFAbsoluteTime = 0
     #endif
 
     private static let externalSubtitleIDOffset = 10_000
@@ -232,6 +237,7 @@ final class PlayerViewModel: ObservableObject {
                 VanmoLogger.player.info("[PlayerVM] state changed: \(String(describing: state))")
                 self?.playbackState = state
                 self?.handleLiveStreamStateIfNeeded(state)
+                self?.publishNowPlaying(force: true)
             }
             .store(in: &engineCancellables)
 
@@ -261,6 +267,10 @@ final class PlayerViewModel: ObservableObject {
                     }
                 }
                 self.updateExternalSubtitle(at: absolute)
+                if let held = self.nowPlayingHeldElapsed, abs(absolute - held) < 1.5 {
+                    self.nowPlayingHeldElapsed = nil
+                }
+                self.publishNowPlaying(force: false)
                 self.reportPlaybackTimeUpdate(at: absolute)
                 self.notePrefetchPlayheadIfNeeded(time: absolute)
             }
@@ -280,6 +290,7 @@ final class PlayerViewModel: ObservableObject {
                 if dur > self.programDuration {
                     self.programDuration = dur
                 }
+                self.publishNowPlaying(force: true)
                 self.startSeekPreviewWarmupIfNeeded()
                 self.notePrefetchPlayheadIfNeeded(time: self.currentTime, force: true)
             }
@@ -440,6 +451,7 @@ final class PlayerViewModel: ObservableObject {
             await session?.stopped(position: stopPosition)
         }
         engine.stop()
+        nowPlaying.stop()
         if let token = prefetchToken {
             prefetchToken = nil
             prefetchProxyURL = nil
@@ -620,6 +632,7 @@ final class PlayerViewModel: ObservableObject {
         guard generation == mediaGeneration else { return }
         VanmoLogger.player.info("[PlayerVM] calling engine.play()")
         engine.play()
+        startNowPlaying()
         VanmoLogger.player.info("[PlayerVM] engine.play() called, state: \(String(describing: self.playbackState))")
         VanmoLogger.player.info("[PlayerVM] audio tracks: \(self.audioTracks.count), subtitle tracks: \(self.subtitleTracks.count)")
         await updateDynamicRangeIfNeeded(for: originalURL)
@@ -852,6 +865,9 @@ final class PlayerViewModel: ObservableObject {
     func seek(to time: TimeInterval) {
         let limit = programDuration > 0 ? programDuration : duration
         let clampedTime = max(0, min(time, limit > 0 ? limit : time))
+        nowPlayingHeldElapsed = clampedTime
+        nowPlayingHoldUntil = CFAbsoluteTimeGetCurrent() + 3
+        publishNowPlaying(force: true)
         seekRequestGeneration &+= 1
         let seekGeneration = seekRequestGeneration
         let itemGeneration = mediaGeneration
@@ -859,6 +875,7 @@ final class PlayerViewModel: ObservableObject {
             let from = currentTime
             qualityClockFrozenAt = clampedTime
             currentTime = clampedTime
+            publishNowPlaying(force: true)
             qualityReloadID &+= 1
             let reloadID = qualityReloadID
             qualitySwitchTask?.cancel()
@@ -892,6 +909,7 @@ final class PlayerViewModel: ObservableObject {
                 event: .seek,
                 force: true
             )
+            publishNowPlaying(force: true)
         }
     }
 
@@ -913,6 +931,54 @@ final class PlayerViewModel: ObservableObject {
         let clampedRate = PlayerConfig.clampedRate(rate)
         config.playbackRate = clampedRate
         engine.playbackRate = clampedRate
+        publishNowPlaying(force: true)
+    }
+
+    private func startNowPlaying() {
+        #if os(iOS)
+        nowPlaying.onPlay = { [weak self] in
+            guard let self, self.playbackState != .playing else { return }
+            self.togglePlayPause()
+        }
+        nowPlaying.onPause = { [weak self] in
+            guard let self, self.playbackState == .playing else { return }
+            self.togglePlayPause()
+        }
+        nowPlaying.onSkip = { [weak self] interval in
+            guard let self else { return }
+            if interval >= 0 {
+                self.skipForward(interval)
+            } else {
+                self.skipBackward(-interval)
+            }
+        }
+        nowPlaying.onSeek = { [weak self] time in
+            self?.seek(to: time)
+        }
+        nowPlaying.start(title: item.title, isLive: item.isLiveStream)
+        nowPlaying.setArtwork(from: item.posterURL)
+        publishNowPlaying(force: true)
+        #endif
+    }
+
+    private func publishNowPlaying(force: Bool) {
+        #if os(iOS)
+        let now = CFAbsoluteTimeGetCurrent()
+        if !force, now - lastNowPlayingPublish < 1 { return }
+        lastNowPlayingPublish = now
+        let rate: Float = playbackState == .playing ? config.playbackRate : 0
+        let shownDuration = programDuration > 0 ? programDuration : duration
+        let elapsed: TimeInterval
+        if let held = nowPlayingHeldElapsed, now < nowPlayingHoldUntil {
+            elapsed = held
+        } else {
+            nowPlayingHeldElapsed = nil
+            elapsed = currentTime
+        }
+        nowPlaying.update(elapsed: elapsed, duration: shownDuration, rate: rate)
+        #else
+        _ = force
+        #endif
     }
 
     func setScaleMode(_ mode: VideoScaleMode) {
