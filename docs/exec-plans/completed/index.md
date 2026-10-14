@@ -4,6 +4,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
+- [`2026-10-14-smb-bonjour-connect.md`](2026-10-14-smb-bonjour-connect.md) — **Completed.** SMB login tries the address immediately and looks up the Bonjour name only after that fails. This removes a 2-second wait from the success path that matched the macOS SMB startup time. Package tests passed. The Mac share was not timed again.
 - [`2026-10-14-ios-live-preview-cache.md`](2026-10-14-ios-live-preview-cache.md) — **Completed.** iOS KSPlayer no longer snapshots the playing frame into the seek-preview cache on its time timer. Preview-lane scrubbing never read that cache. On-demand preview generation remains.
 - [`2026-10-14-ios-now-playing.md`](2026-10-14-ios-now-playing.md) — **Completed.** iOS playback now fills the system Now Playing card and accepts lock-screen and Control Center play, pause, and skip. An iPhone walk confirmed the title, those controls, and that closing the player clears the card.
 - [`2026-10-14-player-label-localization.md`](2026-10-14-player-label-localization.md) — **Completed.** English iOS player controls now use Skip back, Skip forward, Scale, and Speed. Confirmed with `AppLanguageTests`, both app builds, and an English Simulator `idb ui describe-all` that reported the first three labels and no remaining Chinese for those controls.

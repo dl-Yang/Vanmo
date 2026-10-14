@@ -33,19 +33,46 @@ public final class SMBService: RemoteFileService {
         }
 
         let password = SMBConnectionEndpoint.emptyToNil(config.password)
-        let hosts = await SMBConnectionEndpoint.resolvedConnectionHosts(for: parsed.host)
         let dialectSets: [[Negotiate.Dialects]] = [
             [.smb202, .smb210],
             [.smb202, .smb210, .smb300, .smb302],
             [.smb202, .smb210, .smb300, .smb302, .smb311],
         ]
 
-        debugLog(
-            "connect host=\(parsed.host) port=\(parsed.port) share=\(parsed.share ?? "-") user=\(parsed.username ?? "guest") domain=\(parsed.domain ?? "-") hosts=\(hosts.joined(separator: ","))"
-        )
-
+        // Bonjour 要等满超时才返回。IP 能登录时不必先等它；登录失败再补 hostname.local。
         var lastError: Error = NetworkError.connectionFailed("SMB 登录失败")
         var sawGuestSession = false
+        let directHosts = SMBConnectionEndpoint.connectionHosts(for: parsed.host)
+        debugLog(
+            "connect host=\(parsed.host) port=\(parsed.port) share=\(parsed.share ?? "-") user=\(parsed.username ?? "guest") domain=\(parsed.domain ?? "-") hosts=\(directHosts.joined(separator: ","))"
+        )
+        if await login(hosts: directHosts, parsed: parsed, config: config, password: password, dialectSets: dialectSets, lastError: &lastError, sawGuestSession: &sawGuestSession) {
+            return
+        }
+        if SMBConnectionEndpoint.isIPv4(parsed.host),
+           let bonjour = await SMBBonjourHostLookup.hostname(matchingIPv4: parsed.host),
+           !directHosts.contains(bonjour) {
+            debugLog("connect bonjour fallback host=\(bonjour)")
+            if await login(hosts: [bonjour], parsed: parsed, config: config, password: password, dialectSets: dialectSets, lastError: &lastError, sawGuestSession: &sawGuestSession) {
+                return
+            }
+        }
+
+        if sawGuestSession, parsed.share != nil {
+            throw guestOrShareError(share: parsed.share ?? "", sawGuest: true)
+        }
+        throw mapError(lastError, fallback: "SMB 登录失败")
+    }
+
+    private func login(
+        hosts: [String],
+        parsed: SMBConnectionEndpoint,
+        config: ConnectionConfig,
+        password: String?,
+        dialectSets: [[Negotiate.Dialects]],
+        lastError: inout Error,
+        sawGuestSession: inout Bool
+    ) async -> Bool {
         for host in hosts {
             let endpoint = parsed.replacingHost(host)
             for dialects in dialectSets {
@@ -69,7 +96,7 @@ public final class SMBService: RemoteFileService {
                     self.endpoint = endpoint
                     self.isConnected = true
                     VanmoLogger.network.info("SMB connected to \(endpoint.host):\(endpoint.port) as \(endpoint.username ?? "anonymous")")
-                    return
+                    return true
                 } catch {
                     lastError = error
                     debugLog("login attempt failed host=\(host) dialects=\(dialectLabel(dialects)) status=\(error.localizedDescription)")
@@ -77,11 +104,7 @@ public final class SMBService: RemoteFileService {
                 }
             }
         }
-
-        if sawGuestSession, parsed.share != nil {
-            throw guestOrShareError(share: parsed.share ?? "", sawGuest: true)
-        }
-        throw mapError(lastError, fallback: "SMB 登录失败")
+        return false
     }
 
     public func disconnect() async {
@@ -470,7 +493,7 @@ public final class SMBService: RemoteFileService {
 
     private func debugLog(_ message: String) {
         #if DEBUG
-        print("[Debug][SMB] \(message)")
+        VanmoLogger.network.debug("[Debug][SMB] \(message, privacy: .public)")
         #endif
     }
 }
