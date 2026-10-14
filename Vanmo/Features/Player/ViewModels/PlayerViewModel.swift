@@ -101,6 +101,8 @@ final class PlayerViewModel: ObservableObject {
     @Published var qualityHoldImage: UIImage?
     private var clearQualityHoldOnFrame = false
     private var qualityHoldOpenedAt: CFAbsoluteTime?
+    /// 被取代的 reload 不会自己收尾；记下它已对引擎做了什么，由最新请求失败时恢复。
+    private var qualityReloadEngineEffect: QualityReloadEngineEffect = .none
     /// Audio-only media, an undecodable video track, or a flushed KSPlayer view never reports a frame.
     private static let qualityHoldTimeout: CFAbsoluteTime = 3
     private var qualitySwitchTask: Task<Void, Never>?
@@ -121,6 +123,12 @@ final class PlayerViewModel: ObservableObject {
         case pending
         case relative
         case absolute
+    }
+
+    private enum QualityReloadEngineEffect {
+        case none
+        case paused
+        case replaced
     }
 
     var canSelectEpisode: Bool {
@@ -652,6 +660,7 @@ final class PlayerViewModel: ObservableObject {
         qualityHoldImage = nil
         clearQualityHoldOnFrame = false
         qualityHoldOpenedAt = nil
+        qualityReloadEngineEffect = .none
         cacheStart = 0
         cacheEnd = 0
         showsFullLocalCache = false
@@ -853,11 +862,14 @@ final class PlayerViewModel: ObservableObject {
                 VanmoLogger.player.info("[Debug][Player] event=videoQualitySeek mode=reopen time=\(clampedTime, privacy: .public) from=\(from, privacy: .public) hold=\(clampedTime, privacy: .public)")
 #endif
                 guard !Task.isCancelled, reloadID == self.qualityReloadID else { return }
-                await self.reopenTranscodedPlayback(
+                let opened = await self.reopenTranscodedPlayback(
                     at: clampedTime,
                     generation: itemGeneration,
                     reloadID: reloadID
                 )
+                if !opened {
+                    await self.recoverAbandonedQualityReload(generation: itemGeneration, reloadID: reloadID)
+                }
             }
             return
         }
@@ -942,6 +954,7 @@ final class PlayerViewModel: ObservableObject {
                 PlaybackPreferences.videoQuality = resolved
                 self.syncDisplayedVideoQuality(requested: resolved)
             } else {
+                await self.recoverAbandonedQualityReload(generation: generation, reloadID: reloadID)
                 self.syncDisplayedVideoQuality(requested: PlaybackPreferences.videoQuality)
             }
         }
@@ -1055,7 +1068,7 @@ final class PlayerViewModel: ObservableObject {
     /// 清晰度切换若已停下正在读预取的播放器、但新地址没有打开，就用仍在的会话把原画接回来。
     private func resumeDetachedProxyIfNeeded() async {
         guard let proxy = prefetchProxyURL, prefetchToken != nil else { return }
-        guard playbackState != .playing else { return }
+        guard engine.state != .playing else { return }
         let resumeTime = currentTime > 1 ? currentTime : pendingPrefetchStart
         let start = (resumeTime ?? 0) > 1
             ? CMTime(seconds: resumeTime ?? 0, preferredTimescale: 600)
@@ -1063,6 +1076,7 @@ final class PlayerViewModel: ObservableObject {
         do {
             try await loadEngine(url: proxy, startPosition: start, headers: [:])
             engine.play()
+            qualityReloadEngineEffect = .none
         } catch {
             VanmoLogger.player.error("[PlayerVM] videoQuality resume proxy failed: \(error.localizedDescription)")
         }
@@ -1080,10 +1094,10 @@ final class PlayerViewModel: ObservableObject {
         at time: TimeInterval,
         generation: UInt64,
         reloadID: UInt64
-    ) async {
+    ) async -> Bool {
         guard generation == mediaGeneration,
               let direct = directPlaybackURL,
-              let connectionType = currentMediaServerType() else { return }
+              currentMediaServerType() != nil else { return false }
         let resolved = await resolvedPlaybackURL(direct: direct, quality: videoQuality, startTime: time)
         let target = resolved.url
         let timeOrigin = resolved.timeOrigin
@@ -1101,6 +1115,7 @@ final class PlayerViewModel: ObservableObject {
         if opened {
             syncDisplayedVideoQuality(requested: videoQuality)
         }
+        return opened
     }
 
     /// `holdsFrame` covers a quality change with the last picture; a seek reopen shows the new position instead.
@@ -1141,6 +1156,7 @@ final class PlayerViewModel: ObservableObject {
         qualityClockFrozenAt = frozen
         currentTime = frozen
         engine.pause()
+        qualityReloadEngineEffect = .paused
         qualityHoldOpenedAt = nil
         if clearQualityHoldOnFrame {
             // `openEngine` can stop the current layer synchronously; SwiftUI must draw the cover first.
@@ -1154,9 +1170,11 @@ final class PlayerViewModel: ObservableObject {
         VanmoLogger.player.info("[PlayerVM] videoQuality reload url=\(url.safePlaybackLogDescription, privacy: .public) origin=\(timeOrigin, privacy: .public)")
         let mediaTime = timeOrigin > 1 ? timeOrigin : max(0, startPosition?.seconds ?? 0)
         do {
+            qualityReloadEngineEffect = .replaced
             try await openEngine(url: url, startPosition: startPosition, mediaTime: mediaTime)
             guard generation == mediaGeneration, !Task.isCancelled else { return false }
             if let reloadID, reloadID != qualityReloadID { return false }
+            qualityReloadEngineEffect = .none
             beginQualityClock(origin: timeOrigin)
             qualityClockFrozenAt = nil
             qualityHoldOpenedAt = CFAbsoluteTimeGetCurrent()
@@ -1187,10 +1205,7 @@ final class PlayerViewModel: ObservableObject {
                 }
                 return false
             }
-            qualityHoldImage = nil
-            clearQualityHoldOnFrame = false
-            qualityHoldOpenedAt = nil
-            qualityClockFrozenAt = nil
+            clearQualityHold()
             playbackTimeOrigin = previousOrigin
             qualityClockMode = previousOrigin > 0.5 ? .pending : .direct
             VanmoLogger.player.error("[PlayerVM] videoQuality reload failed: \(error.localizedDescription)")
@@ -1200,32 +1215,88 @@ final class PlayerViewModel: ObservableObject {
             await Self.logQualityResponse(url)
 #endif
             guard let previousURL, previousURL != url else { return false }
-            let restoreURL = PrefetchConfig.isProxyURL(previousURL) && prefetchToken == nil
-                ? (directPlaybackURL ?? previousURL)
-                : previousURL
-            let restoreStart: CMTime? = previousOrigin > 0
-                ? nil
-                : CMTime(seconds: max(0, currentTime), preferredTimescale: 600)
-            let restoreTime = previousOrigin > 1 ? previousOrigin : max(0, currentTime)
-            do {
-                try await openEngine(url: restoreURL, startPosition: restoreStart, mediaTime: restoreTime)
-                activePlaybackURL = restoreURL
-                armQualityClockCorrection()
-                engine.playbackRate = config.playbackRate
-                engine.play()
-#if DEBUG
-                let summary = PlaybackQualityStream.debugSummary(of: previousURL)
-                VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=restored \(summary, privacy: .public)")
-#endif
-                await reattachTracksAfterReload(
-                    generation: generation,
-                    reloadID: reloadID,
-                    sameStreamLayout: true
-                )
-            } catch {
-                VanmoLogger.player.error("[PlayerVM] videoQuality restore failed: \(error.localizedDescription)")
-            }
+            await restorePlayback(
+                previousURL,
+                origin: previousOrigin,
+                generation: generation,
+                reloadID: reloadID
+            )
             return false
+        }
+    }
+
+    private func clearQualityHold() {
+        qualityHoldImage = nil
+        clearQualityHoldOnFrame = false
+        qualityHoldOpenedAt = nil
+        qualityClockFrozenAt = nil
+        qualityReloadEngineEffect = .none
+    }
+
+    private func restorePlayback(
+        _ previousURL: URL,
+        origin previousOrigin: TimeInterval,
+        generation: UInt64,
+        reloadID: UInt64?
+    ) async {
+        let restoreURL = PrefetchConfig.isProxyURL(previousURL) && prefetchToken == nil
+            ? (directPlaybackURL ?? previousURL)
+            : previousURL
+        let restoreStart: CMTime? = previousOrigin > 0
+            ? nil
+            : CMTime(seconds: max(0, currentTime), preferredTimescale: 600)
+        let restoreTime = previousOrigin > 1 ? previousOrigin : max(0, currentTime)
+        do {
+            qualityReloadEngineEffect = .replaced
+            try await openEngine(url: restoreURL, startPosition: restoreStart, mediaTime: restoreTime)
+            qualityReloadEngineEffect = .none
+            activePlaybackURL = restoreURL
+            armQualityClockCorrection()
+            engine.playbackRate = config.playbackRate
+            engine.play()
+#if DEBUG
+            let summary = PlaybackQualityStream.debugSummary(of: previousURL)
+            VanmoLogger.player.info("[Debug][Player] event=videoQualityResult result=restored \(summary, privacy: .public)")
+#endif
+            await reattachTracksAfterReload(
+                generation: generation,
+                reloadID: reloadID,
+                sameStreamLayout: true
+            )
+        } catch {
+            // 被更新请求取代时保留 `.replaced` 交给它收尾；否则已经没有可恢复的来源，不再重试。
+            if !Task.isCancelled, reloadID.map({ $0 == qualityReloadID }) ?? true {
+                qualityReloadEngineEffect = .none
+            }
+            VanmoLogger.player.error("[PlayerVM] videoQuality restore failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// 最新的清晰度或 seek 重开请求没有打开新地址就结束时，被它取代的旧 reload 留下的冻结时钟、
+    /// 遮罩和暂停或换掉的引擎没人收尾；按旧 reload 做到哪一步来恢复当前地址。
+    private func recoverAbandonedQualityReload(generation: UInt64, reloadID: UInt64) async {
+        guard generation == mediaGeneration, reloadID == qualityReloadID, !Task.isCancelled else { return }
+        let effect = qualityReloadEngineEffect
+        // 只剩成功 reload 等首帧的遮罩时交给帧回调清除。
+        guard effect != .none || qualityClockFrozenAt != nil else { return }
+#if DEBUG
+        VanmoLogger.player.info("[Debug][Player] event=videoQualityRecover effect=\(String(describing: effect), privacy: .public)")
+#endif
+        clearQualityHold()
+        switch effect {
+        case .none:
+            break
+        case .paused:
+            engine.play()
+        case .replaced:
+            guard engine.state != .playing, let activePlaybackURL else { return }
+            qualityClockMode = playbackTimeOrigin > 0.5 ? .pending : .direct
+            await restorePlayback(
+                activePlaybackURL,
+                origin: playbackTimeOrigin,
+                generation: generation,
+                reloadID: reloadID
+            )
         }
     }
 
