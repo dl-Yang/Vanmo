@@ -633,7 +633,8 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         itemId: String,
         mediaSourceId: String? = nil,
         positionTicks: Int64,
-        playSessionId: String
+        playSessionId: String,
+        isTranscoding: Bool = false
     ) async throws {
         try await postPlaybackCheckIn(
             path: "\(apiPrefix)Sessions/Playing",
@@ -642,6 +643,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
                 mediaSourceId: mediaSourceId,
                 positionTicks: positionTicks,
                 playSessionId: playSessionId,
+                isTranscoding: isTranscoding,
                 isPaused: false,
                 eventName: nil
             ),
@@ -649,14 +651,15 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         )
     }
 
-    /// 上报播放进度。
+    /// 上报播放进度；转码会话的进度同时为服务端转码任务续期。
     public func reportPlaybackProgress(
         itemId: String,
         mediaSourceId: String? = nil,
         positionTicks: Int64,
         isPaused: Bool,
         eventName: String,
-        playSessionId: String
+        playSessionId: String,
+        isTranscoding: Bool = false
     ) async throws {
         try await postPlaybackCheckIn(
             path: "\(apiPrefix)Sessions/Playing/Progress",
@@ -665,6 +668,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
                 mediaSourceId: mediaSourceId,
                 positionTicks: positionTicks,
                 playSessionId: playSessionId,
+                isTranscoding: isTranscoding,
                 isPaused: isPaused,
                 eventName: eventName
             ),
@@ -672,12 +676,13 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         )
     }
 
-    /// 上报播放结束。
+    /// 上报播放结束；服务端按 DeviceId + PlaySessionId 结束对应的转码任务。
     public func reportPlaybackStopped(
         itemId: String,
         mediaSourceId: String? = nil,
         positionTicks: Int64,
-        playSessionId: String
+        playSessionId: String,
+        isTranscoding: Bool = false
     ) async throws {
         try await postPlaybackCheckIn(
             path: "\(apiPrefix)Sessions/Playing/Stopped",
@@ -686,11 +691,42 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
                 mediaSourceId: mediaSourceId,
                 positionTicks: positionTicks,
                 playSessionId: playSessionId,
+                isTranscoding: isTranscoding,
                 isPaused: false,
                 eventName: nil
             ),
             context: "report playback stopped"
         )
+    }
+
+    /// 结束本设备某个 PlaySessionId 下仍在运行的转码任务（换清晰度时丢弃的旧转码）。
+    public func stopActiveEncodings(playSessionId: String) async throws {
+        guard isConnected, let config, let token = accessToken else {
+            throw NetworkError.notConnected
+        }
+
+        let base = baseURL(for: config)
+        var components = URLComponents(
+            url: base.appendingPathComponent("\(apiPrefix)Videos/ActiveEncodings"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "DeviceId", value: PlatformDeviceInfo.deviceIdentifier),
+            URLQueryItem(name: "PlaySessionId", value: playSessionId),
+            URLQueryItem(name: "api_key", value: token),
+        ]
+
+        guard let url = components.url else {
+            throw NetworkError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = 15
+        addAuth(to: &request)
+
+        let (data, response) = try await session.data(for: request)
+        try validateEmbyResponse(response, body: data, context: "stop active encodings")
     }
 
     /// 标记条目已看 / 未看。
@@ -729,6 +765,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
         mediaSourceId: String?,
         positionTicks: Int64,
         playSessionId: String,
+        isTranscoding: Bool,
         isPaused: Bool,
         eventName: String?
     ) -> [String: Any] {
@@ -738,7 +775,7 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
             "PositionTicks": positionTicks,
             "PlaySessionId": playSessionId,
             "CanSeek": true,
-            "PlayMethod": "DirectPlay",
+            "PlayMethod": isTranscoding ? "Transcode" : "DirectPlay",
             "IsPaused": isPaused,
         ]
         if let eventName {

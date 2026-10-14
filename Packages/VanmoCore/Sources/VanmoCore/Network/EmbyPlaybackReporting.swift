@@ -38,7 +38,10 @@ public final class EmbyPlaybackSession {
 
     private let itemId: String?
     private let connection: MediaServerConnectionSnapshot?
-    private let playSessionId: String
+    private let reporterPlaySessionId: String
+    /// 播放转码 HLS 时换成转码地址里的 PlaySessionId，服务端靠它续期和结束转码任务。
+    private(set) var playSessionId: String
+    private(set) var unsettledTranscodeIds: Set<String> = []
     private let progressInterval: TimeInterval
 
     private var phase: Phase = .idle
@@ -54,7 +57,9 @@ public final class EmbyPlaybackSession {
     ) {
         self.itemId = item.serverId
         self.connection = connection
-        self.playSessionId = UUID().uuidString
+        let reporterPlaySessionId = UUID().uuidString
+        self.reporterPlaySessionId = reporterPlaySessionId
+        self.playSessionId = reporterPlaySessionId
         self.progressInterval = progressInterval
 
         if item.isLiveStream {
@@ -77,7 +82,8 @@ public final class EmbyPlaybackSession {
             try await service.reportPlaybackStarted(
                 itemId: itemId,
                 positionTicks: EmbyService.positionTicks(fromSeconds: position),
-                playSessionId: playSessionId
+                playSessionId: playSessionId,
+                isTranscoding: isTranscoding
             )
             guard phase == .starting else { return }
             phase = .started
@@ -116,7 +122,8 @@ public final class EmbyPlaybackSession {
                 positionTicks: EmbyService.positionTicks(fromSeconds: position),
                 isPaused: isPaused,
                 eventName: event.apiValue,
-                playSessionId: playSessionId
+                playSessionId: playSessionId,
+                isTranscoding: isTranscoding
             )
         } catch {
             VanmoLogger.network.error(
@@ -131,7 +138,12 @@ public final class EmbyPlaybackSession {
             await tearDownService()
             return
         }
+        let unsettled = takeUnsettledTranscodes()
         guard phase == .started || phase == .starting else {
+            // 没有 Started 时服务端不会处理 Stopped，转码只能显式结束。
+            for id in unsettled + (isTranscoding ? [playSessionId] : []) {
+                await stopTranscode(playSessionId: id)
+            }
             phase = .stopped
             await tearDownService()
             return
@@ -142,14 +154,82 @@ public final class EmbyPlaybackSession {
             try await service.reportPlaybackStopped(
                 itemId: itemId,
                 positionTicks: EmbyService.positionTicks(fromSeconds: position),
-                playSessionId: playSessionId
+                playSessionId: playSessionId,
+                isTranscoding: isTranscoding
             )
         } catch {
             VanmoLogger.network.error(
                 "[EmbyPlayback] stopped failed: \(error.localizedDescription)"
             )
         }
+        for id in unsettled {
+            await stopTranscode(playSessionId: id)
+        }
         await tearDownService()
+    }
+
+    /// 引擎换上新的当前地址后调用：转码流改用服务端的 PlaySessionId，并结束其余已请求的转码。
+    public func playbackURLDidChange(_ url: URL?) {
+        guard isEnabled, phase != .stopped else { return }
+        let abandoned = adoptPlaySession(from: url)
+        guard !abandoned.isEmpty else { return }
+        Task {
+            for id in abandoned {
+                await stopTranscode(playSessionId: id)
+            }
+        }
+    }
+
+    /// 已请求、但还不确定会不会播放的转码（被取代或打开失败的切换）。
+    /// 引擎可能仍在播它或稍后恢复它，所以等下一次 `playbackURLDidChange` 或 `stopped` 再结束。
+    public func trackUnsettledTranscode(_ url: URL) {
+        guard isEnabled, phase != .stopped else { return }
+        noteUnsettledTranscode(url)
+    }
+
+    func noteUnsettledTranscode(_ url: URL) {
+        guard let id = EmbyTranscodeClient.playSessionID(in: url), id != playSessionId else { return }
+        unsettledTranscodeIds.insert(id)
+    }
+
+    /// 返回需要结束的转码 PlaySessionId：被替换的当前转码和所有未定的转码。
+    func adoptPlaySession(from url: URL?) -> [String] {
+        let next = url.flatMap(EmbyTranscodeClient.playSessionID(in:)) ?? reporterPlaySessionId
+        var abandoned = takeUnsettledTranscodes().filter { $0 != next }
+        if next != playSessionId {
+            if isTranscoding {
+                abandoned.append(playSessionId)
+            }
+            playSessionId = next
+#if DEBUG
+            VanmoLogger.network.info("[Debug][EmbyPlayback] event=playSessionChange transcoding=\(self.isTranscoding, privacy: .public)")
+#endif
+        }
+        return abandoned
+    }
+
+    private func takeUnsettledTranscodes() -> [String] {
+        let ids = unsettledTranscodeIds.sorted()
+        unsettledTranscodeIds.removeAll()
+        return ids
+    }
+
+    var isTranscoding: Bool {
+        playSessionId != reporterPlaySessionId
+    }
+
+    private func stopTranscode(playSessionId: String) async {
+        do {
+            let service = try await ensureService()
+            try await service.stopActiveEncodings(playSessionId: playSessionId)
+#if DEBUG
+            VanmoLogger.network.info("[Debug][EmbyPlayback] event=stopActiveEncodings result=ok")
+#endif
+        } catch {
+            VanmoLogger.network.error(
+                "[EmbyPlayback] stop active encodings failed: \(error.localizedDescription)"
+            )
+        }
     }
 
     private func shouldSendThrottledProgress() -> Bool {

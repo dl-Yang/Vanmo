@@ -442,7 +442,7 @@ Interface-language settings on both apps expose the three options and remind the
 
 - Catalog URL resolution and prefetch registration. A prefetch session keeps concurrent range readers. After the playhead is reported, it fills forward until 180 seconds or 256 MiB, then drops fully written chunks farthest from the playhead. The progress-bar gray span is that contiguous cached range mapped across the file. KSPlayer buffering percentage is not drawn on the timeline. AVFoundation still publishes `loadedTimeRanges` when there is no prefetch session. Local files show the full duration as already local. Progressive Emby, Jellyfin, and Plex file URLs register the same localhost prefetch proxy as FTP and SFTP. Their HLS transcode playlists stay direct. Baidu official links still bypass the proxy.
 - Resume position, progress persistence, completion state, and CloudKit change markers.
-- Emby/Jellyfin playback reporting.
+- Emby/Jellyfin playback reporting. While a transcode playlist plays, start, progress, and stop reports carry that playlist's server-assigned `PlaySessionId` with `PlayMethod=Transcode`, so progress keeps the server's transcode job alive and stop ends it. Transcodes that a quality change replaced, superseded, or failed to open are ended with `DELETE Videos/ActiveEncodings` on the next adopted URL or on stop.
 - External and online subtitles with preference restoration.
 - Remote external-subtitle listing and download starts after playback and is generation-guarded, so it cannot delay first play or write stale tracks after an episode switch.
 - Episode lists and episode switching.

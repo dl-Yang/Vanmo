@@ -567,12 +567,14 @@ final class PlayerViewModel: ObservableObject {
         VanmoLogger.player.info("[Debug][Player] event=videoQualityOpen quality=\(self.videoQuality.rawValue, privacy: .public) \(openSummary, privacy: .public)")
 #endif
         var openedURL = loadURL
+        var failedTranscodeURL: URL?
         do {
             try await loadEngine(url: loadURL, startPosition: startPosition, headers: loadHeaders)
         } catch {
             guard generation == mediaGeneration else { return }
             if error is CancellationError { throw error }
             guard loadURL != playbackURL else { throw error }
+            failedTranscodeURL = loadURL
             VanmoLogger.player.error("[PlayerVM] transcode open failed, falling back to direct url=\(playbackURL.safePlaybackLogDescription, privacy: .public)")
 #if DEBUG
             let nsError = error as NSError
@@ -624,6 +626,10 @@ final class PlayerViewModel: ObservableObject {
         guard generation == mediaGeneration else { return }
         loadChapters()
         preparePlaybackSession()
+        if let failedTranscodeURL {
+            playbackSession?.trackUnsettledTranscode(failedTranscodeURL)
+        }
+        playbackSession?.playbackURLDidChange(activePlaybackURL)
         let reportPosition = startPosition?.seconds ?? currentTime
         Task {
             guard generation == mediaGeneration else { return }
@@ -1169,6 +1175,11 @@ final class PlayerViewModel: ObservableObject {
 #endif
         VanmoLogger.player.info("[PlayerVM] videoQuality reload url=\(url.safePlaybackLogDescription, privacy: .public) origin=\(timeOrigin, privacy: .public)")
         let mediaTime = timeOrigin > 1 ? timeOrigin : max(0, startPosition?.seconds ?? 0)
+        let reportingSession = playbackSession
+        var reportedURL = false
+        defer {
+            if !reportedURL { reportingSession?.trackUnsettledTranscode(url) }
+        }
         do {
             qualityReloadEngineEffect = .replaced
             try await openEngine(url: url, startPosition: startPosition, mediaTime: mediaTime)
@@ -1179,6 +1190,8 @@ final class PlayerViewModel: ObservableObject {
             qualityClockFrozenAt = nil
             qualityHoldOpenedAt = CFAbsoluteTimeGetCurrent()
             activePlaybackURL = url
+            playbackSession?.playbackURLDidChange(url)
+            reportedURL = true
             armQualityClockCorrection()
             engine.playbackRate = config.playbackRate
             engine.play()
@@ -1215,6 +1228,8 @@ final class PlayerViewModel: ObservableObject {
             await Self.logQualityResponse(url)
 #endif
             guard let previousURL, previousURL != url else { return false }
+            reportingSession?.trackUnsettledTranscode(url)
+            reportedURL = true
             await restorePlayback(
                 previousURL,
                 origin: previousOrigin,
@@ -1251,6 +1266,7 @@ final class PlayerViewModel: ObservableObject {
             try await openEngine(url: restoreURL, startPosition: restoreStart, mediaTime: restoreTime)
             qualityReloadEngineEffect = .none
             activePlaybackURL = restoreURL
+            playbackSession?.playbackURLDidChange(restoreURL)
             armQualityClockCorrection()
             engine.playbackRate = config.playbackRate
             engine.play()

@@ -165,6 +165,17 @@ public enum EmbyTranscodeClient {
         }
     }
 
+    /// 转码 HLS 地址里服务端分配的 `PlaySessionId`；非 m3u8 地址返回 nil。
+    public static func playSessionID(in url: URL) -> String? {
+        guard url.path.lowercased().hasSuffix(".m3u8"),
+              let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name.caseInsensitiveCompare("PlaySessionId") == .orderedSame })?.value,
+              !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
     /// Jellyfin `DynamicHlsController` 把缺省的 `breakOnNonKeyFrames` 和 `copyTimestamps` 都当成 false。
     /// iOS 官方设备配置只打开 `BreakOnNonKeyFrames`，并把 `MinSegments` 设为 2。
     /// `CopyTimestamps=true` 会加上 `-copyts -start_at_zero`，关键帧早于音频时画面会超前。
