@@ -452,6 +452,11 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         detachSeekGate(generation: generation)
         guard isCurrentSeek(generation) else { return }
         currentTimeSubject.send(time)
+        if !resume {
+            Task { @MainActor [weak self] in
+                await self?.showFirstFrameAfterPausedSeek(player, generation: generation)
+            }
+        }
 #if DEBUG
         let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
         VanmoLogger.player.info("[Debug][PlaybackPerf] event=seekEnd platform=ios engine=ks elapsedMs=\(elapsedMs, privacy: .public)")
@@ -511,6 +516,28 @@ final class KSPlayerEngine: NSObject, PlayerEngine, SeekPreviewProviding, VideoQ
         durationSubject.send(.zero)
         cacheSpanSubject.send(.empty)
         subtitleContentSubject.send(nil)
+    }
+
+    /// 暂停时 display link 停着，seek 之后画面会停在旧帧，直到再次播放；手动取一帧显示。
+    /// 远程源解到目标帧可能要几秒，期间可能短暂进入 buffering，所以继续等待。
+    @MainActor
+    private func showFirstFrameAfterPausedSeek(_ player: KSMEPlayer, generation: UInt64) async {
+        let staleFrame = player.videoOutput?.pixelBuffer
+        for attempt in 0..<125 {
+            guard isCurrentSeek(generation), self.player === player,
+                  state == .paused || state == .buffering else { return }
+            player.videoOutput?.readNextFrame()
+            if let shown = player.videoOutput?.pixelBuffer, shown !== staleFrame {
+#if DEBUG
+                VanmoLogger.player.info("[Debug][Player] event=pausedSeekFrame attempts=\(attempt + 1, privacy: .public)")
+#endif
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(40))
+        }
+#if DEBUG
+        VanmoLogger.player.info("[Debug][Player] event=pausedSeekFrame attempts=timeout")
+#endif
     }
 
     private func beginSeek() -> UInt64 {

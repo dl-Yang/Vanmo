@@ -12,6 +12,8 @@ KSPlayer scrubbing keeps the playing picture running. The first drag starts a se
 
 The progress-bar gray span is locally cached media, not a loading percentage. Loading chrome appears for every playback state other than playing and paused, including idle, loading, and buffering, and also while playback reports playing but the playhead has not moved for about 1.2 seconds. The center play button becomes a spinning arc, and a white dash travels along the inside of the screen edge above the controls. The dash stays visible when the controls are hidden and disappears when playback or pause resumes. The played portion of the track is white. iPhone playback is presented after the scene is landscape.
 
+A seek while paused, including Skip Intro and the 10-second buttons, stays paused and shows the frame at the new position once it decodes (verified on a local file; remote sources not yet walked).
+
 Preview generation must not open a second libavformat context for SMB, FTP, or SFTP while that file is already playing.
 
 While the user is scrubbing, the bottom current-time label follows the target time. Controls do not auto-hide or toggle away while the progress bar is held, so releasing it seeks to the target. (macOS: dragging the progress bar or the volume slider does not move the player window.)
