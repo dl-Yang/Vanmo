@@ -15,7 +15,6 @@ Stop a successful SMB login from waiting out the Bonjour lookup. macOS prefetch 
 
 ## Out of Scope
 
-- A new timing run on the Mac file-sharing share. That re-measure stays in the tech-debt tracker.
 - iOS direct `smb://` playback, which uses libsmbclient rather than `SMBService`
 
 ## Verification
