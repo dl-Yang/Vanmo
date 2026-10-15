@@ -136,6 +136,37 @@ public enum HlsTranscodePrimer {
         }
     }
 
+    /// `Content-Range: bytes 0-0/12345` 里的总长度。`*` 或不完整的头返回 nil。
+    static func contentRangeTotal(_ header: String?) -> Int? {
+        guard let header, let slash = header.lastIndex(of: "/") else { return nil }
+        let total = header[header.index(after: slash)...].trimmingCharacters(in: .whitespaces)
+        guard total != "*" else { return nil }
+        return Int(total)
+    }
+
+    private static func probedSegmentByteCount(at url: URL) async -> Int? {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("bytes=0-0", forHTTPHeaderField: "Range")
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+        do {
+            let (bytes, response) = try await session.bytes(for: request)
+            bytes.task.cancel()
+            guard let http = response as? HTTPURLResponse else { return nil }
+            if http.statusCode == 206 {
+                return contentRangeTotal(http.value(forHTTPHeaderField: "Content-Range"))
+            }
+            if http.statusCode == 200, let length = http.value(forHTTPHeaderField: "Content-Length"), let total = Int(length) {
+                return total
+            }
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
     private static func download(_ target: SegmentTarget) async -> Data? {
         var previousCount = -1
         var previousLead: MpegTsTiming.StreamTiming?
@@ -169,6 +200,13 @@ public enum HlsTranscodePrimer {
                 previousCount = data.count
                 previousLead = timing
                 try? await Task.sleep(nanoseconds: 400_000_000)
+                // 文件已经写完时，再下整段只为确认大小没变。1 字节 Range 能读到总长度。
+                if let total = await Self.probedSegmentByteCount(at: target.url), total == data.count {
+#if DEBUG
+                    VanmoLogger.player.info("[Debug][Player] event=videoQualityPrime stage=sizeProbe total=\(total, privacy: .public) segmentStart=\(target.start, privacy: .public)")
+#endif
+                    return data
+                }
             } catch {
 #if DEBUG
                 let nsError = error as NSError

@@ -4,6 +4,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
+- [`2026-10-15-hls-prime-size-probe.md`](2026-10-15-hls-prime-size-probe.md) — **Completed.** The HLS quality primer confirms a finished segment with a size probe instead of downloading it again. An iPhone 360p switch stayed in lip sync and logged `sizeProbe` with no second full download.
 - [`2026-10-15-prefetch-lookbehind.md`](2026-10-15-prefetch-lookbehind.md) — **Completed.** Prefetch now fills about 15 seconds or 8 MiB before the playhead so a resume keyframe is local before the forward fill. iPhone resumes of the same Emby item then dropped the gap after `ready` from about 6 seconds to about 2 seconds, with one lookbehind fill per open.
 - [`2026-10-15-vanmo-logger-migration.md`](2026-10-15-vanmo-logger-migration.md) — **Completed.** Remaining debug `print` calls now use `VanmoLogger`. The only `print` left in Swift is the CloudKit model report inside `ModelContainerFactoryTests`.
 - [`2026-10-14-smb-bonjour-connect.md`](2026-10-14-smb-bonjour-connect.md) — **Completed.** SMB login tries the address immediately and looks up the Bonjour name only after that fails. This removes a 2-second wait from the success path that matched the macOS SMB startup time. Package tests passed. The Mac share was not timed again.

@@ -312,6 +312,14 @@ final class PlaybackQualityStreamTests: XCTestCase {
         XCTAssertFalse(HlsTranscodePrimer.shouldPrime(playlistURL: playlist, startTime: 0))
     }
 
+    func testContentRangeTotalReadsTheSizeAfterTheSlash() {
+        XCTAssertEqual(HlsTranscodePrimer.contentRangeTotal("bytes 0-0/487672"), 487672)
+        XCTAssertEqual(HlsTranscodePrimer.contentRangeTotal("bytes */1899552"), 1_899_552)
+        XCTAssertNil(HlsTranscodePrimer.contentRangeTotal("bytes */*"))
+        XCTAssertNil(HlsTranscodePrimer.contentRangeTotal("bytes 0-0/*"))
+        XCTAssertNil(HlsTranscodePrimer.contentRangeTotal(nil))
+    }
+
     func testMpegTsVideoLeadWhenAudioTimestampIsLater() throws {
         let data = Self.tsPacket(streamID: 0xE0, pid: 0x0100, pts: [0x21, 0x00, 0x01, 0x00, 0x01])
             + Self.tsPacket(streamID: 0xC0, pid: 0x0101, pts: [0x21, 0x00, 0x03, 0x19, 0x41])
