@@ -158,6 +158,21 @@ struct VanmoMacRootView: View {
                 appState.play(item)
                 VanmoLogger.player.info("[Debug][Player] debug play file opened")
             }
+            if let raw = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAY_URL"],
+               let url = URL(string: raw), url.scheme != nil {
+                let item = MediaItem(
+                    title: "Player Walk",
+                    fileURL: url,
+                    mediaType: .movie,
+                    duration: 3
+                )
+                item.originalFileName = url.lastPathComponent
+                modelContext.insert(item)
+                try? modelContext.save()
+                appState.play(item)
+                let scheme = url.scheme ?? ""
+                VanmoLogger.player.info("[Debug][Player] debug play url opened scheme=\(scheme, privacy: .public)")
+            }
 #endif
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -490,12 +505,12 @@ struct VanmoMacRootView: View {
                 VanmoLogger.library.info("[Debug][LibraryScan] accept missing folder=\(component, privacy: .public)")
                 return
             }
-            await connectionsViewModel.openDirectory(folder)
+            await connectionsViewModel.navigateToDirectory(folder.path)
         }
         let playName = env["VANMO_DEBUG_PLAY_NAME"]
         var video = connectionsViewModel.files.first { $0.isVideo && (playName == nil || $0.name == playName) }
         if video == nil, openPath.isEmpty, let folder = connectionsViewModel.files.first(where: \.isDirectory) {
-            await connectionsViewModel.openDirectory(folder)
+            await connectionsViewModel.navigateToDirectory(folder.path)
             video = connectionsViewModel.files.first { $0.isVideo && (playName == nil || $0.name == playName) }
         }
         VanmoLogger.library.info("[Debug][LibraryScan] accept listed=\(connectionsViewModel.files.count) hasVideo=\(video != nil)")
