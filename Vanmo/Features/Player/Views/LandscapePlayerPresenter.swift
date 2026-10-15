@@ -192,7 +192,7 @@ struct LandscapePlayerPresenter: UIViewControllerRepresentable {
                     .iOS(interfaceOrientations: .landscape)
                 ) { [weak self] error in
 #if DEBUG
-                    print("[Debug][Player] landscape request failed: \(error.localizedDescription)")
+                    VanmoLogger.player.info("[Debug][Player] landscape request failed: \(error.localizedDescription, privacy: .public)")
 #endif
                     Task { @MainActor in
                         self?.finishOrientationChange(generation: generation)
@@ -239,7 +239,7 @@ struct LandscapePlayerPresenter: UIViewControllerRepresentable {
                     .iOS(interfaceOrientations: .portrait)
                 ) { [weak self] error in
 #if DEBUG
-                    print("[Debug][Player] portrait request failed: \(error.localizedDescription)")
+                    VanmoLogger.player.info("[Debug][Player] portrait request failed: \(error.localizedDescription, privacy: .public)")
 #endif
                     Task { @MainActor in
                         self?.finishOrientationChange(generation: generation)

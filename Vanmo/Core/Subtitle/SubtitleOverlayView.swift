@@ -131,10 +131,7 @@ private struct ImageSubtitleView: View {
         }
         .onChange(of: targetScale, initial: true) { _, scale in
 #if DEBUG
-            print(
-                "[Debug][Subtitle] imageScale=\(scale) "
-                    + "width=\(Int(uiImage.size.width)) height=\(Int(uiImage.size.height))"
-            )
+            VanmoLogger.subtitle.info("[Debug][Subtitle] imageScale=\(scale, privacy: .public) width=\(Int(uiImage.size.width), privacy: .public) height=\(Int(uiImage.size.height), privacy: .public)")
 #endif
         }
     }

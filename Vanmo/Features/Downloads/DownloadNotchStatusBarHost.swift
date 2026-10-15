@@ -191,7 +191,7 @@ struct DownloadNotchStatusBarHost: View {
             }
             playAppear()
 #if DEBUG
-            print("[Debug][Downloads] notch land status bar")
+            VanmoLogger.storage.info("[Debug][Downloads] notch land status bar")
 #endif
             return
         }
@@ -235,7 +235,7 @@ struct DownloadNotchStatusBarHost: View {
     private func resumeDownload(_ chrome: DownloadIslandChrome) {
         guard let id = chrome.taskID, chrome.isPaused, !chrome.isCompleted else { return }
 #if DEBUG
-        print("[Debug][Downloads] notch status resume task=\(id.uuidString)")
+        VanmoLogger.storage.info("[Debug][Downloads] notch status resume task=\(id.uuidString, privacy: .public)")
 #endif
         Task { await DownloadManager.shared.resume(id) }
     }

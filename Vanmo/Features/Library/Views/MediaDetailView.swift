@@ -733,12 +733,12 @@ struct MediaDetailView: View {
                         posterURL: request.postUrl ?? item.posterURL
                     )
 #if DEBUG
-                    print("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue) connection=\(request.connectionType?.rawValue ?? "none")")
+                    VanmoLogger.library.info("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue, privacy: .public) connection=\(request.connectionType?.rawValue ?? "none", privacy: .public)")
 #endif
                 } catch {
 #if DEBUG
                     let nsError = error as NSError
-                    print("[Debug][Downloads] enqueue failed source=detail domain=\(nsError.domain) code=\(nsError.code)")
+                    VanmoLogger.library.info("[Debug][Downloads] enqueue failed source=detail domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
 #endif
                     downloadErrorMessage = error.localizedDescription
                 }
@@ -779,14 +779,14 @@ struct MediaDetailView: View {
                     )
                 }
 #if DEBUG
-                print("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count) connection=\(connectionType?.rawValue ?? "none")")
+                VanmoLogger.library.info("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count, privacy: .public) connection=\(connectionType?.rawValue ?? "none", privacy: .public)")
 #endif
                 isDownloadPickerPresented = false
                 selectedDownloadEpisodes.removeAll()
             } catch {
 #if DEBUG
                 let nsError = error as NSError
-                print("[Debug][Downloads] enqueue failed source=detail-episodes domain=\(nsError.domain) code=\(nsError.code)")
+                VanmoLogger.library.info("[Debug][Downloads] enqueue failed source=detail-episodes domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
 #endif
                 downloadErrorMessage = error.localizedDescription
             }
@@ -1257,7 +1257,7 @@ final class MediaDetailStore: ObservableObject {
         resetEpisodePagingState()
         content = baseContent(for: item)
         #if DEBUG
-        print("[Debug][Detail] load type=\(item.mediaType.rawValue) title=\(item.title)")
+        VanmoLogger.library.info("[Debug][Detail] load type=\(item.mediaType.rawValue, privacy: .public) title=\(item.title, privacy: .private)")
         #endif
         videoWidth = item.videoWidth
         videoHeight = item.videoHeight
@@ -1451,7 +1451,7 @@ final class MediaDetailStore: ObservableObject {
             ($0.videoWidth ?? 0) > 0 || ($0.videoHeight ?? 0) > 0
         }
         #if DEBUG
-        print("[Debug][Detail] tvTags episodes=\(episodes.count) width=\(match?.videoWidth ?? 0) height=\(match?.videoHeight ?? 0) files=\(names.isEmpty ? "none" : "yes")")
+        VanmoLogger.library.info("[Debug][Detail] tvTags episodes=\(episodes.count, privacy: .public) width=\(match?.videoWidth ?? 0, privacy: .public) height=\(match?.videoHeight ?? 0, privacy: .public) files=\(names.isEmpty ? "none" : "yes", privacy: .public)")
         #endif
         guard let match else { return }
 

@@ -243,7 +243,7 @@ struct DownloadManagementView: View {
     private func play(_ task: DownloadTaskSnapshot) {
         guard task.status == .completed else {
 #if DEBUG
-            print("[Debug][Downloads] play skipped task=\(task.id.uuidString) reason=status status=\(task.status.rawValue)")
+            VanmoLogger.storage.info("[Debug][Downloads] play skipped task=\(task.id.uuidString, privacy: .public) reason=status status=\(task.status.rawValue, privacy: .public)")
 #endif
             return
         }
@@ -252,19 +252,19 @@ struct DownloadManagementView: View {
             resolvedURL = try downloadManager.completedFileURL(for: task.id)
         } catch {
 #if DEBUG
-            print("[Debug][Downloads] play skipped task=\(task.id.uuidString) reason=resolve error=\(error.localizedDescription)")
+            VanmoLogger.storage.info("[Debug][Downloads] play skipped task=\(task.id.uuidString, privacy: .public) reason=resolve error=\(error.localizedDescription, privacy: .public)")
 #endif
             return
         }
         guard FileManager.default.fileExists(atPath: resolvedURL.path) else {
 #if DEBUG
-            print("[Debug][Downloads] play skipped task=\(task.id.uuidString) reason=missing-file ext=\(resolvedURL.pathExtension.lowercased())")
+            VanmoLogger.storage.info("[Debug][Downloads] play skipped task=\(task.id.uuidString, privacy: .public) reason=missing-file ext=\(resolvedURL.pathExtension.lowercased(), privacy: .public)")
 #endif
             return
         }
         let url = resolvedURL
 #if DEBUG
-        print("[Debug][Downloads] play completed task=\(task.id.uuidString) ext=\(url.pathExtension.lowercased())")
+        VanmoLogger.storage.info("[Debug][Downloads] play completed task=\(task.id.uuidString, privacy: .public) ext=\(url.pathExtension.lowercased(), privacy: .public)")
 #endif
         let fileURL = URL(fileURLWithPath: url.path, isDirectory: false)
         let item = MediaItem(
@@ -282,7 +282,7 @@ struct DownloadManagementView: View {
         item.originalFileName = task.request.fileName
         appState.play(item)
 #if DEBUG
-        print("[Debug][Downloads] present player mediaType=\(item.mediaType.rawValue) ext=\(fileURL.pathExtension.lowercased())")
+        VanmoLogger.storage.info("[Debug][Downloads] present player mediaType=\(item.mediaType.rawValue, privacy: .public) ext=\(fileURL.pathExtension.lowercased(), privacy: .public)")
 #endif
     }
 
@@ -290,7 +290,7 @@ struct DownloadManagementView: View {
         let stored = storedMediaItem(for: request)
         let item = stored ?? makeDownloadDetailFallback(for: request)
 #if DEBUG
-        print("[Debug][Downloads] open detail mediaType=\(item.mediaType.rawValue) resolved=\(stored == nil ? "fallback" : "stored")")
+        VanmoLogger.storage.info("[Debug][Downloads] open detail mediaType=\(item.mediaType.rawValue, privacy: .public) resolved=\(stored == nil ? "fallback" : "stored", privacy: .public)")
 #endif
         presentedSurface = .detail(item)
     }
@@ -298,14 +298,14 @@ struct DownloadManagementView: View {
     private func logTaskSnapshots(reason: String) {
 #if DEBUG
         let tasks = downloadManager.tasks
-        print("[Debug][Downloads] \(reason) count=\(tasks.count)")
+        VanmoLogger.storage.info("[Debug][Downloads] \(reason, privacy: .public) count=\(tasks.count, privacy: .public)")
         for task in tasks {
             let percent = task.totalBytes > 0 ? Int(task.progress * 100) : -1
             let bucket = percent < 0 ? -1 : (percent / 10) * 10
             let signature = "\(task.status.rawValue)|\(bucket)"
             guard lastLoggedTaskSignatures[task.id] != signature else { continue }
             lastLoggedTaskSignatures[task.id] = signature
-            print("[Debug][Downloads] task=\(task.id.uuidString) status=\(task.status.rawValue) progress=\(percent) received=\(task.receivedBytes) total=\(task.totalBytes) type=\(task.request.connectionType?.rawValue ?? "none") media=\(task.request.mediaType.rawValue)")
+            VanmoLogger.storage.info("[Debug][Downloads] task=\(task.id.uuidString, privacy: .public) status=\(task.status.rawValue, privacy: .public) progress=\(percent, privacy: .public) received=\(task.receivedBytes, privacy: .public) total=\(task.totalBytes, privacy: .public) type=\(task.request.connectionType?.rawValue ?? "none", privacy: .public) media=\(task.request.mediaType.rawValue, privacy: .public)")
         }
 #endif
     }
@@ -573,7 +573,7 @@ private struct DownloadCircularActionButton: View {
 
     private func performAction() {
 #if DEBUG
-        print("[Debug][Downloads] action status=\(task.status.rawValue) task=\(task.id.uuidString)")
+        VanmoLogger.storage.info("[Debug][Downloads] action status=\(task.status.rawValue, privacy: .public) task=\(task.id.uuidString, privacy: .public)")
 #endif
         switch task.status {
         case .queued, .downloading:

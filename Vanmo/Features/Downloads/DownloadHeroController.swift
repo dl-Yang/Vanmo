@@ -1,3 +1,4 @@
+import VanmoCore
 import SwiftUI
 
 @MainActor
@@ -54,7 +55,7 @@ final class DownloadHeroController: ObservableObject {
             let start = self.sourceFrame
             let dest = self.resolvedDestination
 #if DEBUG
-            print("[Debug][Downloads] hero dest=\(Int(dest.width))x\(Int(dest.height)) y=\(Int(dest.minY)) source=\(Int(start.midX)),\(Int(start.midY))")
+            VanmoLogger.storage.info("[Debug][Downloads] hero dest=\(Int(dest.width), privacy: .public)x\(Int(dest.height), privacy: .public) y=\(Int(dest.minY), privacy: .public) source=\(Int(start.midX), privacy: .public),\(Int(start.midY), privacy: .public)")
 #endif
             self.capsuleOpacity = 1
             self.capsuleCenter = CGPoint(x: start.midX, y: start.midY)

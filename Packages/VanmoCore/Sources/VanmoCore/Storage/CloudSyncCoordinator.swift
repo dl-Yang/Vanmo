@@ -70,7 +70,7 @@ public final class CloudSyncCoordinator: ObservableObject {
             #if DEBUG
             let connections = (try? context.fetch(FetchDescriptor<SavedConnection>())) ?? []
             let types = connections.map(\.type.rawValue).sorted().joined(separator: ",")
-            print("[Debug][CloudKit] local save reason=\(reason) preferenceOn=\(CloudSyncPreferences.isEnabled) attachedPrivate=\(ModelContainerFactory.openedCloudStoreWithPrivateCloudKit) connections=\(connections.count) types=\(types)")
+            VanmoLogger.storage.info("[Debug][CloudKit] local save reason=\(reason, privacy: .public) preferenceOn=\(CloudSyncPreferences.isEnabled, privacy: .public) attachedPrivate=\(ModelContainerFactory.openedCloudStoreWithPrivateCloudKit, privacy: .public) connections=\(connections.count, privacy: .public) types=\(types, privacy: .public)")
             #endif
         } catch {
             statusMessage = "同步失败：\(error.localizedDescription)"

@@ -75,7 +75,7 @@ enum CloudStoreCloudKitAdoption {
         guard let event = notification.userInfo?[
             NSPersistentCloudKitContainer.eventNotificationUserInfoKey
         ] as? NSPersistentCloudKitContainer.Event else { return }
-        print("[Debug][CloudKit] mirroring type=\(event.type.rawValue) ended=\(event.endDate != nil) \(debugErrorSummary(event.error))")
+        VanmoLogger.storage.info("[Debug][CloudKit] mirroring type=\(event.type.rawValue, privacy: .public) ended=\(event.endDate != nil, privacy: .public) \(debugErrorSummary(event.error), privacy: .public)")
         if event.type.rawValue == 2, event.endDate != nil, isPartialCloudKitFailure(event.error) {
             probePrivateDatabaseAfterExportFailure()
         }
@@ -85,11 +85,11 @@ enum CloudStoreCloudKitAdoption {
         #if canImport(CloudKit)
         let container = CKContainer(identifier: ModelContainerFactory.cloudKitContainerIdentifier)
         container.accountStatus { status, error in
-            print("[Debug][CloudKit] accountStatus=\(status.rawValue) \(debugErrorSummary(error))")
+            VanmoLogger.storage.info("[Debug][CloudKit] accountStatus=\(status.rawValue, privacy: .public) \(debugErrorSummary(error), privacy: .public)")
         }
         container.privateCloudDatabase.fetchAllRecordZones { zones, error in
             let names = (zones ?? []).map(\.zoneID.zoneName).sorted().joined(separator: ",")
-            print("[Debug][CloudKit] zones=\(names) count=\(zones?.count ?? 0) \(debugErrorSummary(error))")
+            VanmoLogger.storage.info("[Debug][CloudKit] zones=\(names, privacy: .public) count=\(zones?.count ?? 0, privacy: .public) \(debugErrorSummary(error), privacy: .public)")
         }
         #endif
     }
@@ -196,7 +196,7 @@ enum CloudStoreCloudKitAdoption {
         let record = CKRecord(recordType: "VanmoCloudKitProbe")
         record["probe"] = "ok"
         container.privateCloudDatabase.save(record) { _, error in
-            print("[Debug][CloudKit] exportProbe \(debugErrorSummary(error))")
+            VanmoLogger.storage.info("[Debug][CloudKit] exportProbe \(debugErrorSummary(error), privacy: .public)")
         }
         #endif
     }

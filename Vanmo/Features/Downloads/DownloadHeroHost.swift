@@ -327,7 +327,7 @@ struct DownloadIslandRingHost: View {
         }
         DownloadLiveActivityBridge.shared.sync(tasks: downloadManager.tasks)
 #if DEBUG
-        print("[Debug][Downloads] island handoff hide")
+        VanmoLogger.storage.info("[Debug][Downloads] island handoff hide")
 #endif
     }
 
@@ -340,7 +340,7 @@ struct DownloadIslandRingHost: View {
         DownloadLiveActivityBridge.shared.sync(tasks: downloadManager.tasks)
         apply(selectedPresentation, preferAppear: true)
 #if DEBUG
-        print("[Debug][Downloads] island handoff restore")
+        VanmoLogger.storage.info("[Debug][Downloads] island handoff restore")
 #endif
     }
 
@@ -426,7 +426,7 @@ struct DownloadIslandRingHost: View {
             }
             adoptCompactWithoutAppear()
 #if DEBUG
-            print("[Debug][Downloads] island land compact")
+            VanmoLogger.storage.info("[Debug][Downloads] island land compact")
 #endif
             return
         }
@@ -471,7 +471,7 @@ struct DownloadIslandRingHost: View {
     private func expand() {
         guard mode == .compact, !isDismissing, !DownloadIslandHandoff.shared.isParked else { return }
 #if DEBUG
-        print("[Debug][Downloads] island expand")
+        VanmoLogger.storage.info("[Debug][Downloads] island expand")
 #endif
         if reduceMotion {
             var transaction = Transaction()
@@ -489,7 +489,7 @@ struct DownloadIslandRingHost: View {
     private func collapseToCompact() {
         guard mode == .expanded else { return }
 #if DEBUG
-        print("[Debug][Downloads] island collapse")
+        VanmoLogger.storage.info("[Debug][Downloads] island collapse")
 #endif
         if reduceMotion {
             var transaction = Transaction()
@@ -507,7 +507,7 @@ struct DownloadIslandRingHost: View {
     private func resumeDownload(_ chrome: DownloadIslandChrome) {
         guard let id = chrome.taskID, chrome.isPaused, !chrome.isCompleted else { return }
 #if DEBUG
-        print("[Debug][Downloads] island compact resume task=\(id.uuidString)")
+        VanmoLogger.storage.info("[Debug][Downloads] island compact resume task=\(id.uuidString, privacy: .public)")
 #endif
         Task { await DownloadManager.shared.resume(id) }
     }
@@ -515,7 +515,7 @@ struct DownloadIslandRingHost: View {
     private func toggleDownload(_ chrome: DownloadIslandChrome) {
         guard let id = chrome.taskID, !chrome.isCompleted else { return }
 #if DEBUG
-        print("[Debug][Downloads] island expanded toggle paused=\(chrome.isPaused) task=\(id.uuidString)")
+        VanmoLogger.storage.info("[Debug][Downloads] island expanded toggle paused=\(chrome.isPaused, privacy: .public) task=\(id.uuidString, privacy: .public)")
 #endif
         Task {
             if chrome.isPaused {
@@ -970,7 +970,7 @@ final class IslandDebugDarwin {
                     let hook = Unmanaged<IslandDebugDarwin>.fromOpaque(observer).takeUnretainedValue()
                     let raw = name.rawValue as String
                     DispatchQueue.main.async {
-                        print("[Debug][Downloads] island walk action=\(raw)")
+                        VanmoLogger.storage.info("[Debug][Downloads] island walk action=\(raw, privacy: .public)")
                         hook.handler?(raw)
                     }
                 },

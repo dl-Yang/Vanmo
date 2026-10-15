@@ -42,7 +42,7 @@ public enum ModelContainerFactory {
         let database = resolvedCloudKitDatabase()
         #if DEBUG
         CloudStoreCloudKitAdoption.startMirroringLogs()
-        print("[Debug][CloudKit] launch enabled=\(CloudSyncPreferences.isEnabled) requestPrivate=\(shouldAttachPrivateCloudKit) needsAdoption=\(CloudStoreCloudKitAdoption.needsAdoption) generation=\(UserDefaults.standard.integer(forKey: CloudStoreCloudKitAdoption.generationKey)) store=\(CloudStoreCloudKitAdoption.activeStoreName) db=\(String(describing: database)) container=\(cloudKitContainerIdentifier)")
+        VanmoLogger.storage.info("[Debug][CloudKit] launch enabled=\(CloudSyncPreferences.isEnabled, privacy: .public) requestPrivate=\(shouldAttachPrivateCloudKit, privacy: .public) needsAdoption=\(CloudStoreCloudKitAdoption.needsAdoption, privacy: .public) generation=\(UserDefaults.standard.integer(forKey: CloudStoreCloudKitAdoption.generationKey), privacy: .public) store=\(CloudStoreCloudKitAdoption.activeStoreName, privacy: .public) db=\(String(describing: database), privacy: .public) container=\(cloudKitContainerIdentifier, privacy: .public)")
         #endif
         return makeOnDiskContainer(
             storeDirectory: nil,
@@ -71,12 +71,12 @@ public enum ModelContainerFactory {
             }
             if adoptionPrepared {
                 #if DEBUG
-                print("[Debug][CloudKit] reset CloudStore to adopt private CloudKit connections=\(snapshot.connections.count) bookmarks=\(snapshot.bookmarks.count) mediaStates=\(snapshot.mediaStates.count) tombstones=\(snapshot.tombstones.count)")
+                VanmoLogger.storage.info("[Debug][CloudKit] reset CloudStore to adopt private CloudKit connections=\(snapshot.connections.count, privacy: .public) bookmarks=\(snapshot.bookmarks.count, privacy: .public) mediaStates=\(snapshot.mediaStates.count, privacy: .public) tombstones=\(snapshot.tombstones.count, privacy: .public)")
                 #endif
             } else {
                 VanmoLogger.storage.error("CloudStore snapshot failed; keeping existing CloudStore")
                 #if DEBUG
-                print("[Debug][CloudKit] snapshot failed; opening legacy CloudStore without private CloudKit")
+                VanmoLogger.storage.info("[Debug][CloudKit] snapshot failed; opening legacy CloudStore without private CloudKit")
                 #endif
             }
         }
@@ -114,7 +114,7 @@ public enum ModelContainerFactory {
                 }
             }
             #if DEBUG
-            print("[Debug][CloudKit] ModelContainer opened attachedPrivate=\(openedCloudStoreWithPrivateCloudKit) store=\(destinationName) wantsPrivate=\(wantsPrivate)")
+            VanmoLogger.storage.info("[Debug][CloudKit] ModelContainer opened attachedPrivate=\(openedCloudStoreWithPrivateCloudKit, privacy: .public) store=\(destinationName, privacy: .public) wantsPrivate=\(wantsPrivate, privacy: .public)")
             logCloudStoreCounts(container)
             #endif
             return container
@@ -124,7 +124,7 @@ public enum ModelContainerFactory {
                 "CloudKit ModelContainer failed: \(error.localizedDescription, privacy: .public); retrying local CloudStore"
             )
             #if DEBUG
-            print("[Debug][CloudKit] create threw \(error.localizedDescription); retrying cloudKitDatabase=none")
+            VanmoLogger.storage.info("[Debug][CloudKit] create threw \(error.localizedDescription, privacy: .public); retrying cloudKitDatabase=none")
             #endif
             if adoptionPrepared {
                 _ = removeCloudStore(
@@ -291,7 +291,7 @@ public enum ModelContainerFactory {
         guard markAdopted, openedCloudStoreWithPrivateCloudKit, restored else {
             #if DEBUG
             if markAdopted {
-                print("[Debug][CloudKit] adoption not marked attachedPrivate=\(openedCloudStoreWithPrivateCloudKit) restored=\(restored)")
+                VanmoLogger.storage.info("[Debug][CloudKit] adoption not marked attachedPrivate=\(openedCloudStoreWithPrivateCloudKit, privacy: .public) restored=\(restored, privacy: .public)")
             }
             #endif
             return restored ? .skipped : .restoreFailed
@@ -301,7 +301,7 @@ public enum ModelContainerFactory {
             _ = removeCloudStore(in: storeDirectory, cloudStoreName: name)
         }
         #if DEBUG
-        print("[Debug][CloudKit] adopted \(CloudStoreCloudKitAdoption.adoptedStoreName) generation=\(CloudStoreCloudKitAdoption.currentGeneration)")
+        VanmoLogger.storage.info("[Debug][CloudKit] adopted \(CloudStoreCloudKitAdoption.adoptedStoreName, privacy: .public) generation=\(CloudStoreCloudKitAdoption.currentGeneration, privacy: .public)")
         #endif
         return .adopted
     }
@@ -367,7 +367,7 @@ public enum ModelContainerFactory {
         let bookmarks = (try? context.fetch(FetchDescriptor<FolderBookmark>()))?.count ?? 0
         let states = (try? context.fetch(FetchDescriptor<CloudMediaState>()))?.count ?? 0
         let tombstones = (try? context.fetch(FetchDescriptor<ConnectionTombstone>()))?.count ?? 0
-        print("[Debug][CloudKit] cloudCounts connections=\(connections.count) types=\(types) bookmarks=\(bookmarks) mediaStates=\(states) tombstones=\(tombstones)")
+        VanmoLogger.storage.info("[Debug][CloudKit] cloudCounts connections=\(connections.count, privacy: .public) types=\(types, privacy: .public) bookmarks=\(bookmarks, privacy: .public) mediaStates=\(states, privacy: .public) tombstones=\(tombstones, privacy: .public)")
     }
     #endif
 

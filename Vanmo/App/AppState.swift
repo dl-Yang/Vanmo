@@ -44,7 +44,7 @@ final class AppState: ObservableObject {
             currentPlayingItem = item
             isPlayerPresented = true
 #if DEBUG
-            print("[Debug][Player] present mediaType=\(item.mediaType.rawValue) isFile=\(item.fileURL.isFileURL) ext=\(item.fileURL.pathExtension.lowercased())")
+            VanmoLogger.player.info("[Debug][Player] present mediaType=\(item.mediaType.rawValue, privacy: .public) isFile=\(item.fileURL.isFileURL, privacy: .public) ext=\(item.fileURL.pathExtension.lowercased(), privacy: .public)")
 #endif
         }
     }

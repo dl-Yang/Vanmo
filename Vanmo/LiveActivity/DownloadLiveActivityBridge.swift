@@ -41,7 +41,7 @@ final class DownloadLiveActivityBridge: ObservableObject {
         if !enabled || !usesSystemActivity {
             previousID = presentation.task?.id
 #if DEBUG
-            print("[Debug][Downloads] live activity skipped island=\(DownloadIslandCapability.hasDynamicIsland) notch=\(DownloadIslandCapability.hasNotchStatusBar) enabled=\(enabled)")
+            VanmoLogger.storage.info("[Debug][Downloads] live activity skipped island=\(DownloadIslandCapability.hasDynamicIsland, privacy: .public) notch=\(DownloadIslandCapability.hasNotchStatusBar, privacy: .public) enabled=\(enabled, privacy: .public)")
 #endif
             if !enabled {
                 startFailed = false
@@ -186,14 +186,14 @@ final class DownloadLiveActivityBridge: ObservableObject {
             startFailed = false
             lastPublishedKey = "\(state.taskID)|\(state.title)|\(state.percent)|\(state.isCompleted)|\(state.isPaused)|\(state.receivedBytes)|\(state.totalBytes)|\(alertOnComplete)"
 #if DEBUG
-            print("[Debug][Downloads] live activity started enabled=\(enabled)")
+            VanmoLogger.storage.info("[Debug][Downloads] live activity started enabled=\(enabled, privacy: .public)")
 #endif
         } catch {
             startFailed = true
             lastPublishedKey = nil
             displayedSnapshot = nil
 #if DEBUG
-            print("[Debug][Downloads] live activity start failed enabled=\(enabled) type=\(type(of: error))")
+            VanmoLogger.storage.info("[Debug][Downloads] live activity start failed enabled=\(enabled, privacy: .public) type=\(type(of: error), privacy: .public)")
 #endif
         }
     }

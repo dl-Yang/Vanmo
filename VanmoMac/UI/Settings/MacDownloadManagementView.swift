@@ -98,7 +98,7 @@ struct MacDownloadManagementView: View {
                         Button(L10n.tr("全部暂停")) {
                             Task {
 #if DEBUG
-                                print("[Debug][Downloads] action pauseAll")
+                                VanmoLogger.storage.info("[Debug][Downloads] action pauseAll")
 #endif
                                 await downloadManager.pauseAll()
                             }
@@ -111,7 +111,7 @@ struct MacDownloadManagementView: View {
                         Button(L10n.tr("全部继续")) {
                             Task {
 #if DEBUG
-                                print("[Debug][Downloads] action resumeAll")
+                                VanmoLogger.storage.info("[Debug][Downloads] action resumeAll")
 #endif
                                 await downloadManager.resumeAll()
                             }
@@ -265,7 +265,7 @@ struct MacDownloadManagementView: View {
 
     private func openDetail(for task: DownloadTaskSnapshot) {
 #if DEBUG
-        print("[Debug][Downloads] open detail task=\(task.id.uuidString) mediaType=\(task.request.mediaType.rawValue)")
+        VanmoLogger.storage.info("[Debug][Downloads] open detail task=\(task.id.uuidString, privacy: .public) mediaType=\(task.request.mediaType.rawValue, privacy: .public)")
 #endif
         appState.requestDownloadDetail(
             for: task.request,
@@ -277,14 +277,14 @@ struct MacDownloadManagementView: View {
     private func logTaskSnapshots(reason: String) {
 #if DEBUG
         let tasks = downloadManager.tasks
-        print("[Debug][Downloads] \(reason) count=\(tasks.count)")
+        VanmoLogger.storage.info("[Debug][Downloads] \(reason, privacy: .public) count=\(tasks.count, privacy: .public)")
         for task in tasks {
             let percent = task.totalBytes > 0 ? Int(task.progress * 100) : -1
             let bucket = percent < 0 ? -1 : (percent / 10) * 10
             let signature = "\(task.status.rawValue)|\(bucket)"
             guard lastLoggedTaskSignatures[task.id] != signature else { continue }
             lastLoggedTaskSignatures[task.id] = signature
-            print("[Debug][Downloads] task=\(task.id.uuidString) status=\(task.status.rawValue) progress=\(percent) received=\(task.receivedBytes) total=\(task.totalBytes) type=\(task.request.connectionType?.rawValue ?? "none") media=\(task.request.mediaType.rawValue)")
+            VanmoLogger.storage.info("[Debug][Downloads] task=\(task.id.uuidString, privacy: .public) status=\(task.status.rawValue, privacy: .public) progress=\(percent, privacy: .public) received=\(task.receivedBytes, privacy: .public) total=\(task.totalBytes, privacy: .public) type=\(task.request.connectionType?.rawValue ?? "none", privacy: .public) media=\(task.request.mediaType.rawValue, privacy: .public)")
         }
 #endif
     }

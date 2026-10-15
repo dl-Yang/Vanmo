@@ -889,7 +889,7 @@ struct MacMediaDetailView: View {
                         posterURL: request.postUrl ?? item.posterURL
                     )
 #if DEBUG
-                    print("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue) connection=\(request.connectionType?.rawValue ?? "none")")
+                    VanmoLogger.library.info("[Debug][Downloads] enqueued source=detail mediaType=\(item.mediaType.rawValue, privacy: .public) connection=\(request.connectionType?.rawValue ?? "none", privacy: .public)")
 #endif
                 } catch {
                     downloadErrorMessage = error.localizedDescription
@@ -931,7 +931,7 @@ struct MacMediaDetailView: View {
                     )
                 }
 #if DEBUG
-                print("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count) connection=\(connectionType?.rawValue ?? "none")")
+                VanmoLogger.library.info("[Debug][Downloads] enqueued source=detail-episodes count=\(requests.count, privacy: .public) connection=\(connectionType?.rawValue ?? "none", privacy: .public)")
 #endif
                 isDownloadPickerPresented = false
                 selectedDownloadEpisodes.removeAll()

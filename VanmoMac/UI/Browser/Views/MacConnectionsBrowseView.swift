@@ -430,12 +430,12 @@ struct MacConnectionsBrowseView: View {
             )
             try await downloadManager.enqueue(request)
 #if DEBUG
-            print("[Debug][Downloads] enqueued source=browser connection=\(connection.type.rawValue)")
+            VanmoLogger.storage.info("[Debug][Downloads] enqueued source=browser connection=\(connection.type.rawValue, privacy: .public)")
 #endif
         } catch {
 #if DEBUG
             let nsError = error as NSError
-            print("[Debug][Downloads] enqueue failed source=browser domain=\(nsError.domain) code=\(nsError.code)")
+            VanmoLogger.storage.info("[Debug][Downloads] enqueue failed source=browser domain=\(nsError.domain, privacy: .public) code=\(nsError.code, privacy: .public)")
 #endif
             connectionsViewModel.errorMessage = error.localizedDescription
             connectionsViewModel.showError = true

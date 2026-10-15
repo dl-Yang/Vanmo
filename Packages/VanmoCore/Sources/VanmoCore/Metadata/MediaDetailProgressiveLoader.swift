@@ -93,10 +93,7 @@ public final class MediaDetailProgressiveLoader {
 
                 let startedAt = Date()
 #if DEBUG
-                print(
-                    "[Debug][DetailMetadata] phase=start type=\(item.mediaType.rawValue) "
-                        + "metadata=\(autoDownloadMetadata) seasons=\(item.mediaType == .tvShow)"
-                )
+                VanmoLogger.metadata.info("[Debug][DetailMetadata] phase=start type=\(item.mediaType.rawValue, privacy: .public) metadata=\(autoDownloadMetadata, privacy: .public) seasons=\(item.mediaType == .tvShow, privacy: .public)")
 #endif
                 let key = MetadataCacheKey.from(item)
                 if let cached = await loadCache(key) {
@@ -224,7 +221,7 @@ public final class MediaDetailProgressiveLoader {
 #if DEBUG
     private nonisolated static func logPhase(_ phase: String, startedAt: Date) {
         let milliseconds = Int(Date().timeIntervalSince(startedAt) * 1_000)
-        print("[Debug][DetailMetadata] phase=\(phase) elapsedMs=\(milliseconds)")
+        VanmoLogger.metadata.info("[Debug][DetailMetadata] phase=\(phase, privacy: .public) elapsedMs=\(milliseconds, privacy: .public)")
     }
 #endif
 }
