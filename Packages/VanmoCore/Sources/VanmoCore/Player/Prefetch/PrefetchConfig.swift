@@ -35,6 +35,12 @@ public enum PrefetchConfig {
     /// 从当前播放点向后预缓存的时间目标。
     public static let aheadTargetSeconds: TimeInterval = 180
 
+    /// 续播和 seek 的关键帧在播放点之前。先缓存这一小段，避免解码追上时钟前一直黑屏。
+    public static let lookbehindTargetSeconds: TimeInterval = 15
+
+    /// 向前回看的字节上限。按片源平均码率换算，避免高码率把回看拉得太长。
+    public static let maxLookbehindBytes: Int64 = 8 * 1024 * 1024
+
     /// 单个会话保留的预缓存字节上限。内存仍受 `maxMemoryCache` 约束，超出部分在 tmp。
     public static let maxSessionCacheBytes: Int64 = 256 * 1024 * 1024
 
@@ -43,6 +49,14 @@ public enum PrefetchConfig {
         let cap = maxSessionCacheBytes
         guard totalSize > 0, duration > 0 else { return cap }
         let byTime = Int64((Double(totalSize) / duration) * aheadTargetSeconds)
+        return max(Int64(chunkSize), min(cap, byTime))
+    }
+
+    /// 播放点之前要先备好的字节。没有时长时用上限，有时长时按平均码率取 15 秒。
+    public static func lookbehindByteBudget(totalSize: Int64, duration: TimeInterval) -> Int64 {
+        let cap = maxLookbehindBytes
+        guard totalSize > 0, duration > 0 else { return cap }
+        let byTime = Int64((Double(totalSize) / duration) * lookbehindTargetSeconds)
         return max(Int64(chunkSize), min(cap, byTime))
     }
 

@@ -299,6 +299,70 @@ final class PrefetchTests: XCTestCase {
         XCTAssertEqual(PrefetchConfig.aheadTargetSeconds, 180)
     }
 
+    func testLookbehindByteBudgetIsFifteenSecondsCapped() {
+        let total: Int64 = 10 * 1024 * 1024
+        let budget = PrefetchConfig.lookbehindByteBudget(totalSize: total, duration: 100)
+        let expected = Int64((Double(total) / 100) * PrefetchConfig.lookbehindTargetSeconds)
+        XCTAssertEqual(budget, max(Int64(PrefetchConfig.chunkSize), expected))
+        XCTAssertLessThan(budget, PrefetchConfig.maxLookbehindBytes)
+        let capped = PrefetchConfig.lookbehindByteBudget(
+            totalSize: 512 * 1024 * 1024,
+            duration: 200
+        )
+        XCTAssertEqual(capped, PrefetchConfig.maxLookbehindBytes)
+        XCTAssertEqual(PrefetchConfig.lookbehindTargetSeconds, 15)
+    }
+
+    func testLookbehindFillsBeforePlayheadInsideHalfBudget() async throws {
+        let chunks = 32
+        let source = FakePrefetchByteSource(
+            totalSize: Int64(PrefetchConfig.chunkSize * chunks),
+            pipelineDepth: 2
+        )
+        let session = try PrefetchSession(
+            token: "lookbehind-\(UUID().uuidString)",
+            source: source
+        )
+        session.notePlayhead(fraction: 2 / Double(chunks), duration: TimeInterval(chunks))
+        try await waitUntil {
+            let starts = await source.fetchedStarts
+            return starts.contains(0)
+        }
+        let starts = await source.fetchedStarts
+        XCTAssertTrue(starts.contains(0))
+        await session.cleanup()
+    }
+
+    func testLookbehindRetriesAfterPlayheadLeavesDuringFill() async throws {
+        let chunks = 40
+        let gate = TestAsyncGate()
+        let source = FakePrefetchByteSource(
+            totalSize: Int64(PrefetchConfig.chunkSize * chunks),
+            pipelineDepth: 1,
+            fetchGate: gate
+        )
+        let session = try PrefetchSession(
+            token: "lookbehind-retry-\(UUID().uuidString)",
+            source: source
+        )
+        let resume = 20 / Double(chunks)
+        session.notePlayhead(fraction: resume, duration: TimeInterval(chunks))
+        try await waitUntil { await source.fetchCount >= 1 }
+        session.notePlayhead(fraction: 0, duration: TimeInterval(chunks))
+        await gate.open()
+        try await waitUntil {
+            let starts = await source.fetchedStarts
+            return starts.contains(0)
+        }
+        session.notePlayhead(fraction: resume, duration: TimeInterval(chunks))
+        let missed = Int64(PrefetchConfig.chunkSize * 10)
+        try await waitUntil {
+            let starts = await source.fetchedStarts
+            return starts.contains(missed)
+        }
+        await session.cleanup()
+    }
+
     func testRangeCacheEvictsChunksFarthestFromPlayhead() throws {
         let cache = try RangeCache(sessionId: "evict-\(UUID().uuidString)")
         let chunk = PrefetchConfig.chunkSize
@@ -648,6 +712,7 @@ private actor FakePrefetchByteSource: PrefetchByteSource {
 
     private(set) var probeCount = 0
     private(set) var fetchCount = 0
+    private(set) var fetchedStarts: [Int64] = []
     private(set) var maximumActiveFetches = 0
     private(set) var closeStarted = false
     private(set) var isClosed = false
@@ -685,6 +750,7 @@ private actor FakePrefetchByteSource: PrefetchByteSource {
 
     func data(forInclusiveRange range: ClosedRange<Int64>) async throws -> Data {
         fetchCount += 1
+        fetchedStarts.append(range.lowerBound)
         activeFetches += 1
         maximumActiveFetches = max(maximumActiveFetches, activeFetches)
         defer { activeFetches -= 1 }

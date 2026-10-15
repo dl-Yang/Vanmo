@@ -58,6 +58,8 @@ public final class PrefetchSession: @unchecked Sendable {
     private var activeBodyOrder: [UInt64] = []
     private let maxConcurrentBodies = 4
     private var aheadTask: Task<Void, Never>?
+    /// 已经为哪个字节位置补过向前回看，避免每次循环都再下一次。
+    private var lookbehindFilledAround: Int64 = -1
     private var requestedFraction: Double = 0
     private var requestedDuration: TimeInterval = 0
 
@@ -702,7 +704,25 @@ public final class PrefetchSession: @unchecked Sendable {
                 let anchor = min(size - 1, max(0, Int64((Double(size) * request.fraction).rounded(.down))))
                 let budget = PrefetchConfig.aheadByteBudget(totalSize: size, duration: request.duration)
                 let end = min(size - 1, anchor + budget - 1)
-                try await fillAhead(from: anchor, through: max(anchor, end))
+                let lookbehind = PrefetchConfig.lookbehindByteBudget(totalSize: size, duration: request.duration)
+                let needsLookbehind = lookbehindFilledAround < 0
+                    || abs(anchor - lookbehindFilledAround) > lookbehind / 2
+                if needsLookbehind {
+                    let behindStart = max(0, anchor - lookbehind)
+                    let anchorChunkEnd = min(
+                        size - 1,
+                        ((anchor / Int64(PrefetchConfig.chunkSize)) + 1) * Int64(PrefetchConfig.chunkSize) - 1
+                    )
+                    if try await fillAhead(from: behindStart, through: anchorChunkEnd, stayNear: anchor) {
+                        lookbehindFilledAround = anchor
+#if DEBUG
+                        VanmoLogger.prefetch.info(
+                            "[Debug][Prefetch] event=lookbehindFill bytes=\(anchor - behindStart, privacy: .public)"
+                        )
+#endif
+                    }
+                }
+                try await fillAhead(from: anchor, through: max(anchor, end), stayNear: anchor)
                 let latest = playheadRequest()
                 let evictAnchor: Int64
                 if let size = latest.size, size > 0 {
@@ -731,9 +751,10 @@ public final class PrefetchSession: @unchecked Sendable {
         }
     }
 
-    private func fillAhead(from anchor: Int64, through end: Int64) async throws {
+    /// 返回 false 表示播放头已经离开，区间没有填完。
+    private func fillAhead(from start: Int64, through end: Int64, stayNear: Int64) async throws -> Bool {
         let depth = min(2, max(1, source.pipelineDepth))
-        var cursor = (anchor / Int64(chunkSize)) * Int64(chunkSize)
+        var cursor = (start / Int64(chunkSize)) * Int64(chunkSize)
         var pipeline: [Task<Data, Error>] = []
 
         func enqueue() throws {
@@ -753,11 +774,11 @@ public final class PrefetchSession: @unchecked Sendable {
             let request = playheadRequest()
             guard request.open, let size = request.size, size > 0 else { throw CancellationError() }
             let latestAnchor = min(size - 1, max(0, Int64((Double(size) * request.fraction).rounded(.down))))
-            if abs(latestAnchor - anchor) > Int64(chunkSize) * 2 {
-                return
+            if abs(latestAnchor - stayNear) > Int64(chunkSize) * 2 {
+                return false
             }
             try enqueue()
-            guard !pipeline.isEmpty else { return }
+            guard !pipeline.isEmpty else { return true }
             _ = try await pipeline.removeFirst().value
         }
     }
