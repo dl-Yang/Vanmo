@@ -333,32 +333,33 @@ final class PrefetchTests: XCTestCase {
         await session.cleanup()
     }
 
-    func testLookbehindRetriesAfterPlayheadLeavesDuringFill() async throws {
-        let chunks = 40
-        let gate = TestAsyncGate()
+    func testSteadyPlaybackDoesNotRepeatLookbehind() async throws {
+        let chunks = 200
+        let duration = 300.0
         let source = FakePrefetchByteSource(
             totalSize: Int64(PrefetchConfig.chunkSize * chunks),
-            pipelineDepth: 1,
-            fetchGate: gate
+            pipelineDepth: 2
         )
         let session = try PrefetchSession(
-            token: "lookbehind-retry-\(UUID().uuidString)",
+            token: "lookbehind-steady-\(UUID().uuidString)",
             source: source
         )
-        let resume = 20 / Double(chunks)
-        session.notePlayhead(fraction: resume, duration: TimeInterval(chunks))
-        try await waitUntil { await source.fetchCount >= 1 }
-        session.notePlayhead(fraction: 0, duration: TimeInterval(chunks))
-        await gate.open()
+        session.notePlayhead(fraction: 50 / Double(chunks), duration: duration)
+        let firstBehind = Int64(PrefetchConfig.chunkSize * 40)
         try await waitUntil {
             let starts = await source.fetchedStarts
-            return starts.contains(0)
+            return starts.contains(firstBehind)
         }
-        session.notePlayhead(fraction: resume, duration: TimeInterval(chunks))
-        let missed = Int64(PrefetchConfig.chunkSize * 10)
+        let before = await source.fetchedStarts.filter { $0 == firstBehind }.count
+        session.notePlayhead(fraction: 58 / Double(chunks), duration: duration)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let after = await source.fetchedStarts.filter { $0 == firstBehind }.count
+        XCTAssertEqual(after, before)
+        session.notePlayhead(fraction: 20 / Double(chunks), duration: duration)
+        let seekBehind = Int64(PrefetchConfig.chunkSize * 10)
         try await waitUntil {
             let starts = await source.fetchedStarts
-            return starts.contains(missed)
+            return starts.contains(seekBehind)
         }
         await session.cleanup()
     }

@@ -705,8 +705,11 @@ public final class PrefetchSession: @unchecked Sendable {
                 let budget = PrefetchConfig.aheadByteBudget(totalSize: size, duration: request.duration)
                 let end = min(size - 1, anchor + budget - 1)
                 let lookbehind = PrefetchConfig.lookbehindByteBudget(totalSize: size, duration: request.duration)
+                // 正常往前播时，刚播过的数据还在向前窗口里，不必反复回拉。
+                // 只在第一次，以及往后跳出向前窗口、或明显往回跳时再补。
                 let needsLookbehind = lookbehindFilledAround < 0
-                    || abs(anchor - lookbehindFilledAround) > lookbehind / 2
+                    || anchor + Int64(chunkSize) * 2 < lookbehindFilledAround
+                    || anchor > lookbehindFilledAround + budget
                 if needsLookbehind {
                     let behindStart = max(0, anchor - lookbehind)
                     let anchorChunkEnd = min(
