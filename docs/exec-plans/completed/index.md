@@ -4,6 +4,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
+- [`2026-10-16-remove-legacy-ffmpeg.md`](2026-10-16-remove-legacy-ffmpeg.md) — **Completed.** Removed the unused `FFMPEG_ENABLED` flag, the empty iOS bridging header, and `scripts/build-ffmpeg-ios.sh`. FFmpeg decoding stays in KSPlayer.
 - [`2026-10-15-hls-prime-size-probe.md`](2026-10-15-hls-prime-size-probe.md) — **Completed.** The HLS quality primer confirms a finished segment with a size probe instead of downloading it again. An iPhone 360p switch stayed in lip sync and logged `sizeProbe` with no second full download.
 - [`2026-10-15-prefetch-lookbehind.md`](2026-10-15-prefetch-lookbehind.md) — **Completed.** Prefetch now fills about 15 seconds or 8 MiB before the playhead so a resume keyframe is local before the forward fill. iPhone resumes of the same Emby item then dropped the gap after `ready` from about 6 seconds to about 2 seconds, with one lookbehind fill per open.
 - [`2026-10-15-vanmo-logger-migration.md`](2026-10-15-vanmo-logger-migration.md) — **Completed.** Remaining debug `print` calls now use `VanmoLogger`. The only `print` left in Swift is the CloudKit model report inside `ModelContainerFactoryTests`.

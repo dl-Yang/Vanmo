@@ -51,7 +51,7 @@ Vanmo/
 │   ├── Features/                # Library / Browser / Player / Search / Settings
 │   ├── Shared/                  # iOS components, extensions, UIKit OAuth bridge
 │   ├── Resources/               # Info.plist, assets, Lottie resources
-│   └── Frameworks/FFmpeg/       # Local build output; normally not versioned
+│   └── Frameworks/FFmpeg/       # Ignored leftover local output; not a build input
 ├── VanmoMac/                    # macOS application
 │   ├── App/                     # App entry point, routing, window coordination
 │   ├── Player/                  # macOS AVPlayer/KSPlayer and player window
@@ -106,8 +106,7 @@ Boundary rules:
 - `VanmoDownloadWidget` is an iOS WidgetKit extension embedded in `Vanmo`. It renders the download Live Activity only. Shared `DownloadLiveActivityAttributes` and `DownloadLiveActivityIntents` are compiled into both targets; the widget does not import `VanmoCore`. Expanded pause / resume / cancel reach `DownloadManager` through an app-registered relay. Lock-screen taps use `vanmo://downloads`.
 - `VanmoCore` itself depends on SWXMLHash and SMBClient.
 - System frameworks include SwiftUI, SwiftData, AVFoundation, Network, and Security. iOS also uses UIKit; macOS uses AppKit.
-- `FFMPEG_ENABLED` is still defined for both app targets, but no current Swift source consumes the condition and the Xcode project does not link static libraries from `Vanmo/Frameworks/FFmpeg/`.
-- Current FFmpeg decoding is provided by the KSPlayer package. The standalone FFmpeg 7.1 workflow in `scripts/build-ffmpeg-ios.sh` appears to be a legacy path and is not a current build prerequisite.
+- FFmpeg decoding is provided by the KSPlayer package. The app targets do not define `FFMPEG_ENABLED`, do not use an Objective-C bridging header, and do not build a standalone FFmpeg.
 
 ### 3.3 Debug and Release Differences
 
@@ -633,8 +632,7 @@ See `docs/RELIABILITY.md` for the complete command stages and evidence boundarie
 5. **CloudKit attach can still assert.** Launch uses `.private("iCloud.com.vanmo.app")` when sync is enabled. A thrown create falls back to `.none`, but an unbound-container `CKContainer` assert is not catchable. Real sync evidence still requires a signed device or Mac, an iCloud account, and the bound container. Simulator Debug is not CloudKit evidence.
 6. **iOS UI evidence is visual, not automated.** Physical-device walks require screenshots and a screen recording. Simulator walks are agent-operated. Broader iOS/macOS player or real-source journeys still depend on later recorded visual evidence.
 7. **Playback implementations can drift.** iOS and macOS do not share one AVFoundation/KSPlayer adapter protocol.
-8. **Legacy FFmpeg configuration remains.** Playback currently uses FFmpeg through KSPlayer, while the repository retains an unused `FFMPEG_ENABLED` definition, an effectively empty bridging header, and a standalone FFmpeg build script.
-9. **Documentation routing can drift.** All Harness state belongs under `docs/` and must remain consistent with current code, `project.yml`, package manifests, and this architecture document.
+8. **Documentation routing can drift.** All Harness state belongs under `docs/` and must remain consistent with current code, `project.yml`, package manifests, and this architecture document.
 
 ## 12. Extension Guidelines
 

@@ -33,7 +33,7 @@ fastlane/test_output
 *.mobileprovision
 *.cer
 
-# FFmpeg built libraries (use scripts/build-ffmpeg-ios.sh to rebuild)
+# Leftover local FFmpeg build output. Playback uses KSPlayer's FFmpeg.
 Vanmo/Frameworks/FFmpeg/
 
 # OS

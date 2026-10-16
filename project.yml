@@ -69,12 +69,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.vanmo.app
         INFOPLIST_FILE: Vanmo/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: false
-        SWIFT_OBJC_BRIDGING_HEADER: Vanmo/Vanmo-Bridging-Header.h
-        GCC_PREPROCESSOR_DEFINITIONS:
-          - "FFMPEG_ENABLED=1"
-          - "$(inherited)"
-        OTHER_SWIFT_FLAGS:
-          - "-DFFMPEG_ENABLED"
         OTHER_LDFLAGS:
           - "-lz"
           - "-lbz2"
@@ -87,12 +81,10 @@ targets:
         Debug:
           CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo-Cloud.entitlements
           OTHER_SWIFT_FLAGS:
-            - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"
         Release:
           CODE_SIGN_ENTITLEMENTS: Vanmo/Vanmo-Cloud.entitlements
           OTHER_SWIFT_FLAGS:
-            - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"
     entitlements:
       path: Vanmo/Vanmo-Cloud.entitlements
@@ -174,18 +166,14 @@ targets:
         INFOPLIST_FILE: VanmoMac/Resources/Info-Mac.plist
         GENERATE_INFOPLIST_FILE: false
         VALIDATE_PRODUCT: NO
-        OTHER_SWIFT_FLAGS:
-          - "-DFFMPEG_ENABLED"
       configs:
         Debug:
           CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac-Cloud.entitlements
           OTHER_SWIFT_FLAGS:
-            - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"
         Release:
           CODE_SIGN_ENTITLEMENTS: VanmoMac/Vanmo-Mac-Cloud.entitlements
           OTHER_SWIFT_FLAGS:
-            - "-DFFMPEG_ENABLED"
             - "-DCLOUDKIT_SYNC_ENABLED"
     entitlements:
       path: VanmoMac/Vanmo-Mac-Cloud.entitlements

@@ -261,7 +261,6 @@
 		47EA488509E18DC2C884AAA5 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerEngineFactory.swift; sourceTree = "<group>"; };
 		49FBE7AC773A8FA662C936AF /* MacPlayerWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerWindowController.swift; sourceTree = "<group>"; };
-		4B358B3F19A7451D4A44F686 /* Vanmo-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Vanmo-Bridging-Header.h"; sourceTree = "<group>"; };
 		4B66D66010D55C24223DFAAD /* aliyunDrive.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = aliyunDrive.png; sourceTree = "<group>"; };
 		4C6BDDB2CF6F1E7BB4CB1DCB /* MacLocalFilePlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLocalFilePlayback.swift; sourceTree = "<group>"; };
 		525103842B302272BB888AAD /* MacMediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMediaDetailView.swift; sourceTree = "<group>"; };
@@ -1033,7 +1032,6 @@
 		EEE7CE448AD3D26D2778B930 /* Vanmo */ = {
 			isa = PBXGroup;
 			children = (
-				4B358B3F19A7451D4A44F686 /* Vanmo-Bridging-Header.h */,
 				8331488DDF8E08E73F3667EF /* Vanmo-Cloud.entitlements */,
 				529EDB8110AF477715A8A72C /* Vanmo-Mac-Cloud.entitlements */,
 				D09B8FEDE094A9A00BE8EC90 /* Vanmo-Mac.entitlements */,
@@ -1481,7 +1479,6 @@
 					"@executable_path/../Frameworks",
 				);
 				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
 					"-DCLOUDKIT_SYNC_ENABLED",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
@@ -1559,10 +1556,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"FFMPEG_ENABLED=1",
-					"$(inherited)",
-				);
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Vanmo/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1579,12 +1572,10 @@
 					CoreFoundation,
 				);
 				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
 					"-DCLOUDKIT_SYNC_ENABLED",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
-				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -1595,10 +1586,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"FFMPEG_ENABLED=1",
-					"$(inherited)",
-				);
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Vanmo/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1615,12 +1602,10 @@
 					CoreFoundation,
 				);
 				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
 					"-DCLOUDKIT_SYNC_ENABLED",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app;
 				SDKROOT = iphoneos;
-				SWIFT_OBJC_BRIDGING_HEADER = "Vanmo/Vanmo-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -1653,7 +1638,6 @@
 					"@executable_path/../Frameworks",
 				);
 				OTHER_SWIFT_FLAGS = (
-					"-DFFMPEG_ENABLED",
 					"-DCLOUDKIT_SYNC_ENABLED",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.vanmo.app.mac;
