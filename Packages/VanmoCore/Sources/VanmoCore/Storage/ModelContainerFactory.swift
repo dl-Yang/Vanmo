@@ -171,7 +171,8 @@ public enum ModelContainerFactory {
         cloudKitDatabase: ModelConfiguration.CloudKitDatabase,
         isStoredInMemoryOnly: Bool,
         storeDirectory: URL? = nil,
-        cloudStoreName: String = CloudStoreCloudKitAdoption.activeStoreName
+        cloudStoreName: String = CloudStoreCloudKitAdoption.activeStoreName,
+        migrationPlan: (any SchemaMigrationPlan.Type)? = VanmoSchemaMigrationPlan.self
     ) throws -> ModelContainer {
         let configurations = makeConfigurations(
             cloudKitDatabase: cloudKitDatabase,
@@ -181,6 +182,7 @@ public enum ModelContainerFactory {
         )
         return try ModelContainer(
             for: schema,
+            migrationPlan: migrationPlan,
             configurations: [configurations.local, configurations.cloud]
         )
     }

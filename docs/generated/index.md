@@ -21,6 +21,6 @@ in the appropriate design document instead.
 Vanmo does not currently have a reliable generator for a SwiftData schema
 document. The live store assignments are defined in
 `Packages/VanmoCore/Sources/VanmoCore/Storage/ModelContainerFactory.swift`, and
-the repository has no explicit `VersionedSchema` or `SchemaMigrationPlan`.
+`VanmoSchemaV1` and an empty `VanmoSchemaMigrationPlan` describe the current models.
 Therefore this directory intentionally contains no synthetic database-schema
 artifact. Do not create or label a manually assembled schema as generated.

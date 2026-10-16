@@ -321,6 +321,68 @@ final class ModelContainerFactoryTests: XCTestCase {
         XCTAssertTrue(ModelContainerFactory.shouldAttachPrivateCloudKit)
     }
 
+    func testVersionedSchemaMatchesTheContainerModels() {
+        let modelNames = VanmoSchemaV1.models.map { String(describing: $0) }
+        // Schema.entities is alphabetical, not the Schema([...]) argument order.
+        XCTAssertEqual(ModelContainerFactory.schema.entities.map(\.name).sorted(), modelNames.sorted())
+        XCTAssertEqual(VanmoSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
+        XCTAssertEqual(
+            VanmoSchemaMigrationPlan.schemas.map { ObjectIdentifier($0) },
+            [ObjectIdentifier(VanmoSchemaV1.self)]
+        )
+        XCTAssertTrue(VanmoSchemaMigrationPlan.stages.isEmpty)
+    }
+
+    func testStoreWrittenWithoutMigrationPlanReopensWithCurrentPlan() throws {
+        let directory = try makeTemporaryStoreDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let mediaID = UUID()
+        let connectionID = UUID()
+        try writeUnversionedStore(
+            in: directory,
+            mediaID: mediaID,
+            connectionID: connectionID
+        )
+
+        let container = try ModelContainerFactory.makeContainerThrowing(
+            cloudKitDatabase: .none,
+            isStoredInMemoryOnly: false,
+            storeDirectory: directory
+        )
+        let context = ModelContext(container)
+        let items = try context.fetch(FetchDescriptor<MediaItem>())
+        let connections = try context.fetch(FetchDescriptor<SavedConnection>())
+        XCTAssertEqual(items.map(\.id), [mediaID])
+        XCTAssertEqual(items.map(\.title), ["Kept"])
+        XCTAssertEqual(connections.map(\.id), [connectionID])
+        XCTAssertEqual(connections.map(\.name), ["Kept"])
+    }
+
+    private func writeUnversionedStore(
+        in directory: URL,
+        mediaID: UUID,
+        connectionID: UUID
+    ) throws {
+        let container = try ModelContainerFactory.makeContainerThrowing(
+            cloudKitDatabase: .none,
+            isStoredInMemoryOnly: false,
+            storeDirectory: directory,
+            migrationPlan: nil
+        )
+        let context = ModelContext(container)
+        let item = MediaItem(
+            title: "Kept",
+            fileURL: URL(fileURLWithPath: "/tmp/kept.mp4")
+        )
+        item.id = mediaID
+        context.insert(item)
+        let connection = SavedConnection(name: "Kept", type: .smb, host: "example.local")
+        connection.id = connectionID
+        context.insert(connection)
+        try context.save()
+    }
+
     private func seedCloudStore(
         in directory: URL,
         connectionName: String,
