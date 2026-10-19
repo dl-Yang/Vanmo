@@ -120,10 +120,7 @@ public actor VideoThumbnailQueue {
     private func fillPoster(for item: MediaItem, context: ModelContext) async {
         let cancelled = isCancelled
         guard !cancelled else { return }
-        let request: VideoThumbnailRequest? = await MainActor.run {
-            guard !cancelled, !item.isDeleted, item.posterURL == nil else { return nil }
-            return VideoThumbnailRequest.from(item: item, sourceURL: item.fileURL)
-        }
+        let request = await Self.thumbnailRequest(for: item, cancelled: cancelled)
         guard let request else {
             LibraryScanDebugLog.thumbnail("skip noRequest file=\(LibraryScanDebugLog.leaf("item"))")
             return
@@ -147,12 +144,33 @@ public actor VideoThumbnailQueue {
         }
 
         let stillCancelled = isCancelled
-        await MainActor.run {
-            guard !stillCancelled, !item.isDeleted, item.modelContext != nil, item.posterURL == nil else { return }
-            item.posterURL = fileURL
-            try? context.save()
-            LibraryScanDebugLog.thumbnail("posterSaved file=\(LibraryScanDebugLog.leaf(request.path))")
-        }
+        await Self.savePoster(
+            fileURL,
+            for: item,
+            context: context,
+            cancelled: stillCancelled,
+            path: request.path
+        )
+    }
+
+    @MainActor
+    private static func thumbnailRequest(for item: MediaItem, cancelled: Bool) -> VideoThumbnailRequest? {
+        guard !cancelled, !item.isDeleted, item.posterURL == nil else { return nil }
+        return VideoThumbnailRequest.from(item: item, sourceURL: item.fileURL)
+    }
+
+    @MainActor
+    private static func savePoster(
+        _ fileURL: URL,
+        for item: MediaItem,
+        context: ModelContext,
+        cancelled: Bool,
+        path: String
+    ) {
+        guard !cancelled, !item.isDeleted, item.modelContext != nil, item.posterURL == nil else { return }
+        item.posterURL = fileURL
+        try? context.save()
+        LibraryScanDebugLog.thumbnail("posterSaved file=\(LibraryScanDebugLog.leaf(path))")
     }
 
     private func resolvedPlaybackURL(for item: MediaItem, request: VideoThumbnailRequest) async throws -> URL {

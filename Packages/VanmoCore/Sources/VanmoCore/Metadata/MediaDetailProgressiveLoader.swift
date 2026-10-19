@@ -105,7 +105,11 @@ public final class MediaDetailProgressiveLoader {
 
                 await withTaskGroup(of: MediaDetailLoadEvent?.self) { group in
                     if autoDownloadMetadata {
-                        group.addTask { @MainActor [loadMetadata, storeRecord, scheduleArtwork] in
+                        group.addTask { @MainActor [
+                            loadMetadata = self.loadMetadata,
+                            storeRecord = self.storeRecord,
+                            scheduleArtwork = self.scheduleArtwork
+                        ] in
                             do {
                                 guard let draft = try await loadMetadata(item, force, connection) else {
                                     return nil
@@ -122,7 +126,7 @@ public final class MediaDetailProgressiveLoader {
                     }
 
                     if item.mediaType == .tvShow, item.serverId?.isEmpty == false {
-                        group.addTask { @MainActor [loadSeasons] in
+                        group.addTask { @MainActor [loadSeasons = self.loadSeasons] in
                             do {
                                 return .seasons(try await loadSeasons(item, connection))
                             } catch {
@@ -132,7 +136,7 @@ public final class MediaDetailProgressiveLoader {
                     }
 
                     if item.mediaType != .boxSet, item.serverId?.isEmpty == false {
-                        group.addTask { @MainActor [loadCollections] in
+                        group.addTask { @MainActor [loadCollections = self.loadCollections] in
                             do {
                                 return .collections(try await loadCollections(item, connection))
                             } catch {

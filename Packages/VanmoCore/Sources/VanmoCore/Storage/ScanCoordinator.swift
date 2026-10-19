@@ -69,6 +69,7 @@ public final class ScanCoordinator: ObservableObject {
         )
         context.insert(job)
         activeJob = job
+        let jobID = job.id
 
         scanTask = Task {
             let scanner = MediaScanner(modelContainer: modelContainer)
@@ -99,8 +100,11 @@ public final class ScanCoordinator: ObservableObject {
                         },
                         onProgress: { [weak self] progress in
                             Task { @MainActor in
-                                self?.progress = progress
-                                self?.update(job: job, with: progress)
+                                guard let self, self.activeJob?.id == jobID else { return }
+                                self.progress = progress
+                                if let job = self.activeJob {
+                                    self.update(job: job, with: progress)
+                                }
                             }
                         }
                     )

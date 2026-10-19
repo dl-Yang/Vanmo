@@ -219,7 +219,7 @@ public enum MediaType: String, Codable, CaseIterable, Sendable {
 }
 
 
-public struct AudioTrackInfo: Codable, Identifiable, Hashable {
+public struct AudioTrackInfo: Codable, Identifiable, Hashable, Sendable {
     public var id: Int
     public init(id: Int, language: String? = nil, title: String? = nil, codec: String? = nil, channels: Int? = nil) {
         self.id = id; self.language = language; self.title = title; self.codec = codec; self.channels = channels
@@ -250,7 +250,7 @@ public struct AudioTrackInfo: Codable, Identifiable, Hashable {
     }
 }
 
-public struct SubtitleTrackInfo: Codable, Identifiable, Hashable {
+public struct SubtitleTrackInfo: Codable, Identifiable, Hashable, Sendable {
     public var id: Int
     public init(id: Int, language: String? = nil, title: String? = nil, isEmbedded: Bool = true, fileURL: URL? = nil) {
         self.id = id; self.language = language; self.title = title; self.isEmbedded = isEmbedded; self.fileURL = fileURL

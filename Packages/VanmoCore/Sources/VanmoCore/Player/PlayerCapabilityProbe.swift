@@ -3,7 +3,7 @@ import AVFoundation
 import CoreMedia
 
 /// 视频动态范围。`rawValue` 用于持久化到 `MediaItem`。
-public enum DynamicRange: String {
+public enum DynamicRange: String, Sendable {
     case sdr
     /// 通用 HDR（探测到 PQ 但未细分具体标准）
     case hdr

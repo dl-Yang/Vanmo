@@ -4,6 +4,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
+- [`2026-10-19-vanmocore-sendable.md`](2026-10-19-vanmocore-sendable.md) — **Completed.** `VanmoCore` no longer emits Swift 6 `Sendable` warnings. App-target closures that capture `ModelContext` remain.
 - [`2026-10-16-swiftdata-schema-v1.md`](2026-10-16-swiftdata-schema-v1.md) — **Completed.** Current SwiftData models are `VanmoSchemaV1`. `VanmoSchemaMigrationPlan` has no stages, and an unversioned store reopens with its rows intact.
 - [`2026-10-16-remove-legacy-ffmpeg.md`](2026-10-16-remove-legacy-ffmpeg.md) — **Completed.** Removed the unused `FFMPEG_ENABLED` flag, the empty iOS bridging header, and `scripts/build-ffmpeg-ios.sh`. FFmpeg decoding stays in KSPlayer.
 - [`2026-10-15-hls-prime-size-probe.md`](2026-10-15-hls-prime-size-probe.md) — **Completed.** The HLS quality primer confirms a finished segment with a size probe instead of downloading it again. An iPhone 360p switch stayed in lip sync and logged `sizeProbe` with no second full download.

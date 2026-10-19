@@ -61,9 +61,7 @@ public actor MediaProbeQueue {
         guard !Task.isCancelled, let provider else { return }
 
         let fingerprint = ProbeFingerprint.from(item: item)
-        await MainActor.run {
-            MediaProbeApplicator.markPending(item)
-        }
+        await Self.markPending(item)
 
         do {
             let playbackURL: URL
@@ -76,19 +74,30 @@ public actor MediaProbeQueue {
             }
 
             let result = try await provider.probe(url: playbackURL, timeout: 12)
-            await MainActor.run {
-                MediaProbeApplicator.apply(result, to: item, fingerprint: fingerprint)
-                try? context.save()
-            }
+            await Self.apply(result, to: item, fingerprint: fingerprint, context: context)
         } catch {
-            await MainActor.run {
-                MediaProbeApplicator.apply(
-                    MediaProbeResult(status: .failed, message: error.localizedDescription),
-                    to: item,
-                    fingerprint: fingerprint
-                )
-                try? context.save()
-            }
+            await Self.apply(
+                MediaProbeResult(status: .failed, message: error.localizedDescription),
+                to: item,
+                fingerprint: fingerprint,
+                context: context
+            )
         }
+    }
+
+    @MainActor
+    private static func markPending(_ item: MediaItem) {
+        MediaProbeApplicator.markPending(item)
+    }
+
+    @MainActor
+    private static func apply(
+        _ result: MediaProbeResult,
+        to item: MediaItem,
+        fingerprint: ProbeFingerprint,
+        context: ModelContext
+    ) {
+        MediaProbeApplicator.apply(result, to: item, fingerprint: fingerprint)
+        try? context.save()
     }
 }

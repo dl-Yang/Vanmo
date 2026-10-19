@@ -10,17 +10,12 @@ public actor MediaScanner {
 
     @MainActor
     public func scanLocalDirectory(_ directoryURL: URL, in context: ModelContext) async throws -> [MediaItem] {
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(
-            at: directoryURL,
-            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
+        let fileURLs = Self.enumeratedFileURLs(in: directoryURL)
 
         var newItems: [MediaItem] = []
         let existingURLs = try existingFileURLs(in: context)
 
-        for case let fileURL as URL in enumerator {
+        for fileURL in fileURLs {
             guard fileURL.isVideoFile else { continue }
             guard !existingURLs.contains(fileURL.absoluteString) else { continue }
 
@@ -62,9 +57,7 @@ public actor MediaScanner {
         shouldPause: (@Sendable () async -> Void)? = nil,
         onProgress: (@Sendable (ScanProgress) -> Void)? = nil
     ) async throws -> ScanResult {
-        let existing = try await MainActor.run {
-            try existingServerItemMap(connectionId: connectionId, in: context)
-        }
+        let existing = try await existingServerItemMap(connectionId: connectionId, in: context)
 
         let state = RemoteScanAccumulator(
             options: options,
@@ -108,15 +101,13 @@ public actor MediaScanner {
             && connectionId != nil
 
         if canPrune, let connectionId {
-            prunedCount = try await MainActor.run {
-                try pruneMissingItems(
-                    connectionId: connectionId,
-                    seenKeys: snapshot.seenKeys,
-                    in: context
-                )
-            }
+            prunedCount = try await pruneMissingItems(
+                connectionId: connectionId,
+                seenKeys: snapshot.seenKeys,
+                in: context
+            )
             if prunedCount > 0 {
-                try await MainActor.run { try context.save() }
+                try await save(context)
             }
         }
 
@@ -246,7 +237,7 @@ public actor MediaScanner {
             for file in videoFiles {
                 await state.markVideoDiscovered()
 
-                let activeConnectionId = await state.connectionId
+                let activeConnectionId = state.connectionId
                 let key = serverItemKey(serverId: file.path, connectionId: activeConnectionId)
                 await state.markSeen(key: key)
 
@@ -255,9 +246,7 @@ public actor MediaScanner {
 
                 if let existingItem = await state.existingItem(for: key) {
                     if existingItem.sourceConnectionId == nil, let activeConnectionId {
-                        await MainActor.run {
-                            existingItem.sourceConnectionId = activeConnectionId
-                        }
+                        await setSourceConnection(existingItem, activeConnectionId)
                         await state.incrementPendingBatch()
                     }
 
@@ -273,17 +262,15 @@ public actor MediaScanner {
                         continue
                     }
 
-                    await MainActor.run {
-                        MediaItemFactory.applyRemoteFileMetadata(
-                            file,
-                            streamURL: storageURL,
-                            connectionId: activeConnectionId,
-                            directoryPath: current,
-                            nfoByFileName: nfoByFileName,
-                            identification: identification,
-                            to: existingItem
-                        )
-                    }
+                    await applyRemoteFile(
+                        file,
+                        streamURL: storageURL,
+                        connectionId: activeConnectionId,
+                        directoryPath: current,
+                        nfoByFileName: nfoByFileName,
+                        identification: identification,
+                        to: existingItem
+                    )
                     await state.recordUpdated(existingItem)
                     await flushBatchIfNeeded(context: context, pendingInBatch: await state.pendingBatchCount(), force: false, batchSize: await state.batchSize, reset: { await state.resetPendingBatch() })
                     continue
@@ -300,7 +287,7 @@ public actor MediaScanner {
                     continue
                 }
 
-                await MainActor.run { context.insert(item) }
+                await insert(item, into: context)
                 await state.recordInserted(item, key: key)
                 await flushBatchIfNeeded(context: context, pendingInBatch: await state.pendingBatchCount(), force: false, batchSize: await state.batchSize, reset: { await state.resetPendingBatch() })
             }
@@ -341,7 +328,7 @@ public actor MediaScanner {
     ) async {
         guard force || pendingInBatch >= batchSize else { return }
         guard pendingInBatch > 0 else { return }
-        await MainActor.run { try? context.save() }
+        try? await save(context)
         if let reset {
             await reset()
         }
@@ -387,6 +374,56 @@ public actor MediaScanner {
         } catch {
             return nil
         }
+    }
+
+    private nonisolated static func enumeratedFileURLs(in directoryURL: URL) -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: directoryURL,
+            includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var urls: [URL] = []
+        for case let fileURL as URL in enumerator {
+            urls.append(fileURL)
+        }
+        return urls
+    }
+
+    @MainActor
+    private func save(_ context: ModelContext) throws {
+        try context.save()
+    }
+
+    @MainActor
+    private func insert(_ item: MediaItem, into context: ModelContext) {
+        context.insert(item)
+    }
+
+    @MainActor
+    private func setSourceConnection(_ item: MediaItem, _ connectionId: UUID) {
+        item.sourceConnectionId = connectionId
+    }
+
+    @MainActor
+    private func applyRemoteFile(
+        _ file: RemoteFile,
+        streamURL: URL,
+        connectionId: UUID?,
+        directoryPath: String,
+        nfoByFileName: [String: ParsedNFOMetadata],
+        identification: MediaIdentificationResult?,
+        to item: MediaItem
+    ) {
+        MediaItemFactory.applyRemoteFileMetadata(
+            file,
+            streamURL: streamURL,
+            connectionId: connectionId,
+            directoryPath: directoryPath,
+            nfoByFileName: nfoByFileName,
+            identification: identification,
+            to: item
+        )
     }
 
     @MainActor
