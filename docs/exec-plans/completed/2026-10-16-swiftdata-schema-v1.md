@@ -29,11 +29,11 @@ Give the current SwiftData models an explicit version and migration plan before 
 ## Risks
 
 - A future non-additive change still has to add a later version and a lightweight stage. Shipping that change without the stage can fail existing stores.
-- This run did not reopen a user's existing CloudStore or LocalStore on a device.
 
 ## Progress Log
 
 - 2026-10-16: Added version 1 and the empty plan, and confirmed an unversioned store reopens with both rows intact.
+- 2026-10-20: Installed a Debug build at `2ccc166` on iPhone 17 Pro over an existing install and cold-launched it. The log showed `ModelContainer opened attachedPrivate=true store=CloudStore-ck3`, and CloudStore still had 11 connections and 19 media states. The Emby library was still present locally. The operator confirmed the library, saved connections, and playback with no crash. The syslog stream stalled after launch, so the playback step has no log line.
 
 ## Open Decisions
 

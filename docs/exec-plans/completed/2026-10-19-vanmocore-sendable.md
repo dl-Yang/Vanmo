@@ -35,6 +35,7 @@ Clear the Swift 6 `Sendable` warnings emitted by `VanmoCore`, so a later languag
 ## Progress Log
 
 - 2026-10-19: Cleared the `VanmoCore` Swift 6 `Sendable` warnings and rebuilt both apps.
+- 2026-10-20: On iPhone 17 Pro with a Debug build at `2ccc166`, a directory sync of the `yinguSMB` share logged `done status=completed inserted=4 movies=4 thumbs=4`. `posterSaved` was logged for `J.mp4`, `L.mp4`, and one `.mov`, and Home showed one visible connection with a movie row. A `.m3u8` playlist file logged `extractFail`, which is expected for a playlist file. The operator confirmed the sync finished, the videos and covers appeared on Home, and nothing crashed.
 
 ## Open Decisions
 
