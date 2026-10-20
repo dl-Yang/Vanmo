@@ -37,7 +37,7 @@ Before-and-after runs use the same media, source, network, device, and build con
 - Run at least three cold starts per scenario.
 - Run at least one 15-minute steady-state session per platform.
 - Exercise two non-adjacent seeks, pause/resume, item switching, and close cleanup.
-- iOS physical-device evidence uses local Console plus Energy Log, Time Profiler, Network, and Allocations. macOS uses the corresponding local Instruments templates.
+- iOS physical-device evidence uses local Console plus Energy Log (Power Profiler on Xcode 26), Time Profiler, Network, and Allocations. macOS uses the corresponding local Instruments templates.
 - KSPlayer steady display FPS should remain at least 95% of nominal FPS when the source throughput is sufficient.
 - Steady A/V synchronization difference should remain below 50 milliseconds in absolute value.
 - A standard-network run must not add rebuffer events relative to its baseline.

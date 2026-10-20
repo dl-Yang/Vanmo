@@ -4,6 +4,7 @@ Completed plans remain as durable evidence of what was attempted, decided, and v
 
 ## Completed Plans
 
+- [`2026-10-20-ios-instruments-emby-session.md`](2026-10-20-ios-instruments-emby-session.md) — **Completed.** First iPhone Instruments session on Emby Original playback, with thermal state Fair throughout. Direct HTTPS held 24 fps at 0.197 cores, two thirds of it in FFmpeg's software TLS. An 11-minute proxy run held 24 fps with no drops or buffering. A separate proxy profile averaged 0.244 cores; its largest attributed hotspots were per-chunk atomic cache writes (about 20 ms/s) and main-thread SwiftUI updates (about 40 ms/s). The direct and proxy CPU figures are not an A/B. Not measured: allocations during playback, battery drain, and a `preferredFrame` comparison.
 - [`2026-10-19-vanmocore-sendable.md`](2026-10-19-vanmocore-sendable.md) — **Completed.** `VanmoCore` no longer emits Swift 6 `Sendable` warnings. App-target closures that capture `ModelContext` remain.
 - [`2026-10-16-swiftdata-schema-v1.md`](2026-10-16-swiftdata-schema-v1.md) — **Completed.** Current SwiftData models are `VanmoSchemaV1`. `VanmoSchemaMigrationPlan` has no stages, and an unversioned store reopens with its rows intact.
 - [`2026-10-16-remove-legacy-ffmpeg.md`](2026-10-16-remove-legacy-ffmpeg.md) — **Completed.** Removed the unused `FFMPEG_ENABLED` flag, the empty iOS bridging header, and `scripts/build-ffmpeg-ios.sh`. FFmpeg decoding stays in KSPlayer.

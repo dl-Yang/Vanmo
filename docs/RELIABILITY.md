@@ -118,7 +118,9 @@ Current evidence as of September 17, 2026:
 
 Playback performance evidence uses local Debug `VanmoLogger` output and Instruments only. Filter Console for `[Debug][PlaybackPerf]` (Player or Prefetch category) to capture engine-ready timing, buffering duration, seek recovery, KS frame/A-V-sync/drop aggregates, prefetch response work, and iOS thermal-state changes. These logs contain source categories and aggregate values, not complete URLs or media titles.
 
-Use the same media, source, network, device, and build for before-and-after comparisons. Record at least three cold starts plus one 15-minute steady run, two non-adjacent seeks, pause/resume, item switching, and close cleanup. iOS requires a physical-device Energy Log, Time Profiler, Network, and Allocations pass for heat claims; Simulator output is compile and functional evidence only.
+Use the same media, source, network, device, and build for before-and-after comparisons. Record at least three cold starts plus one 15-minute steady run, two non-adjacent seeks, pause/resume, item switching, and close cleanup. iOS requires a physical-device Energy Log (Power Profiler on Xcode 26), Time Profiler, Network, and Allocations pass for heat claims; Simulator output is compile and functional evidence only.
+
+On Xcode 26, `xctrace` has no Energy Log template; use `--template 'Power Profiler'` with `--instrument 'Time Profiler' --instrument 'Network Connections'`. Its battery reading stays at 0 %/hr while the device charges, so battery-drain claims need an unplugged run. Start Allocations with `--launch -- com.vanmo.app` and a time limit long enough to cover playback: on 2026-10-20 `--attach <pid>` failed for Allocations although Time Profiler attached to the same pid. Network Connections can miss app traffic while a `utun` tunnel is active; cross-check throughput against `PlaybackPerf` `bytesDelta`.
 
 Debug A/B controls:
 
