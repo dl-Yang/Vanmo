@@ -18,7 +18,7 @@ These rules apply to every plan listed below. A validation-only plan does not au
 
 Out of default scope for this set: downloads, library scan persistence, playback-progress sync, CloudKit, and Figma changes.
 
-Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local folder, Google Drive. Advance one plan at a time. AList connect, list, play, and Files-browser download are recorded under `docs/exec-plans/completed/`. FTP real-source connect, list, play, and download are recorded under `docs/exec-plans/completed/`. SFTP password connect, list, prefetch play, and Files-browser download are recorded under `docs/exec-plans/completed/`. Baidu Netdisk implicit OAuth, list, and `dlink` play are recorded under `docs/exec-plans/completed/`. The FTP placeholder expected-failure record remains under `docs/exec-plans/completed/`.
+Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local folder, Google Drive. Advance one plan at a time. AList connect, list, play, and Files-browser download are recorded under `docs/exec-plans/completed/`. FTP real-source connect, list, play, and download are recorded under `docs/exec-plans/completed/`. SFTP password connect, list, prefetch play, and Files-browser download are recorded under `docs/exec-plans/completed/`. Baidu Netdisk implicit OAuth, list, and `dlink` play are recorded under `docs/exec-plans/completed/`. The FTP placeholder expected-failure record remains under `docs/exec-plans/completed/`. The 115 official-cloud placeholder walk (disabled Save on both platforms) is recorded under `docs/exec-plans/completed/`.
 
 ## Current Plans
 
@@ -41,7 +41,6 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 
 - [`2026-08-28-nfs-connection-validation.md`](2026-08-28-nfs-connection-validation.md) — **Not started.** Generic HTTP placeholder, empty listing
 - [`2026-08-28-dlna-connection-validation.md`](2026-08-28-dlna-connection-validation.md) — **Not started.** Generic HTTP placeholder, no SSDP discovery
-- [`2026-08-28-drive115-connection-validation.md`](2026-08-28-drive115-connection-validation.md) — **Not started.** Official-cloud placeholder; save disabled
 - [`2026-08-28-quark-drive-connection-validation.md`](2026-08-28-quark-drive-connection-validation.md) — **Not started.** Official-cloud placeholder; save disabled
 - [`2026-08-28-mega-connection-validation.md`](2026-08-28-mega-connection-validation.md) — **Not started.** Official-cloud placeholder; save disabled
 
