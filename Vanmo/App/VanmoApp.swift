@@ -11,6 +11,7 @@ struct VanmoApp: App {
         ColorTheme.migrateStoredValue()
         AppLanguage.lockForCurrentProcess()
         OAuthCoordinator.shared.presentationContextProvider = UIKitOAuthPresentationContextProvider.shared
+        YandexLoginAuthenticator.shared.activate()
         PrefetchTemporaryStore.cleanupOrphans()
         MediaProbeBootstrap.configure()
         ScanBackgroundTask.register()

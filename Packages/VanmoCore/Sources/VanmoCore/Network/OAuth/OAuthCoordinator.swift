@@ -4,6 +4,13 @@ import AuthenticationServices
 public protocol OAuthPresentationContextProvider: AnyObject {
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor
 }
+
+/// 由 App target 注入的平台原生登录实现（如 iOS 上的 YandexLoginSDK），
+/// 用于 VanmoCore 无法直接依赖 UIKit SDK 的网盘。
+@MainActor
+public protocol OAuthExternalAuthenticator: AnyObject {
+    func authenticate(type: ConnectionType) async throws -> OAuthCredential
+}
 import CryptoKit
 import Foundation
 
@@ -17,6 +24,8 @@ public final class OAuthCoordinator: NSObject {
     public static var shared = OAuthCoordinator()
 
     public var presentationContextProvider: OAuthPresentationContextProvider?
+    /// 已注册外部登录器的网盘不走 `ASWebAuthenticationSession`。
+    public var externalAuthenticators: [ConnectionType: OAuthExternalAuthenticator] = [:]
 
     private var session: ASWebAuthenticationSession?
 
@@ -32,6 +41,9 @@ public final class OAuthCoordinator: NSObject {
             )
         }
 
+        if let externalAuthenticator = externalAuthenticators[type] {
+            return try await externalAuthenticator.authenticate(type: type)
+        }
         if OAuthProviderConfiguration.usesImplicitGrant(for: type) {
             return try await authenticateImplicit(type: type)
         }
@@ -255,6 +267,11 @@ public final class OAuthCoordinator: NSObject {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.connectionFailed("Invalid response type")
         }
+#if DEBUG
+        let tokenHost = url.host ?? "-"
+        let tokenStatus = httpResponse.statusCode
+        VanmoLogger.network.info("[Debug][OAuth] token request host=\(tokenHost, privacy: .public) status=\(tokenStatus, privacy: .public)")
+#endif
         guard (200...299).contains(httpResponse.statusCode) else {
             let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
             throw NetworkError.connectionFailed("OAuth token 请求失败 (\(httpResponse.statusCode)): \(body)")
@@ -275,6 +292,14 @@ public final class OAuthCoordinator: NSObject {
                 url: url,
                 callbackURLScheme: OAuthProviderConfiguration.callbackURLScheme(for: type)
             ) { callbackURL, error in
+#if DEBUG
+                let callbackPath = callbackURL.map { "\($0.host ?? "-")\($0.path)" } ?? "nil"
+                let queryNames = callbackURL
+                    .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems }?
+                    .map(\.name).sorted().joined(separator: ",") ?? "-"
+                let errorCode = (error as NSError?).map { "\($0.domain)#\($0.code)" } ?? "nil"
+                VanmoLogger.network.info("[Debug][OAuth] session finished type=\(type.rawValue, privacy: .public) callback=\(callbackPath, privacy: .public) keys=\(queryNames, privacy: .public) error=\(errorCode, privacy: .public)")
+#endif
                 if let callbackURL {
                     continuation.resume(returning: callbackURL)
                 } else if let error {
@@ -289,7 +314,8 @@ public final class OAuthCoordinator: NSObject {
             }
 
             authSession.presentationContextProvider = self
-            authSession.prefersEphemeralWebBrowserSession = true
+            authSession.prefersEphemeralWebBrowserSession =
+                OAuthProviderConfiguration.prefersEphemeralWebBrowserSession(for: type)
             session = authSession
 
             if !authSession.start() {

@@ -11,7 +11,7 @@ import Foundation
 /// | OneDrive | Application (client) ID（公共客户端，无需 Secret，走 PKCE） | https://portal.azure.com （Microsoft Entra ID → 应用注册） |
 /// | Box | Client ID + Client Secret | https://app.box.com/developers/console |
 /// | pCloud | Client ID + Client Secret | https://docs.pcloud.com/my_apps/ |
-/// | Yandex.Disk | Client ID + Client Secret | https://oauth.yandex.com |
+/// | Yandex.Disk | Client ID（iOS 走 YandexLoginSDK，macOS 走 PKCE，均无需 Secret） | https://oauth.yandex.com |
 /// | 百度网盘 | AppKey（简化模式，无需 Secret） | https://pan.baidu.com/union/console/applist |
 ///
 /// Redirect URI 按 provider 分流：
@@ -67,7 +67,8 @@ public enum OAuthProviderConfiguration {
         case .pCloudDrive:
             return ""
         case .yandexDisk:
-            return ""
+            // 更换时须同步 iOS `Info.plist` 的 `yx{Client ID}` scheme 与 project.yml 的 Associated Domain。
+            return "4cbf02a3c61e404a89d3af6c83e71a64"
         case .baiduNetdisk:
             return "j5nV46HZKiRzYq5TuHdsYN9DYfvk76AL"
         default:
@@ -75,15 +76,13 @@ public enum OAuthProviderConfiguration {
         }
     }
 
-    /// TODO(User)：Google Drive / OneDrive 走 PKCE 公共客户端，不需要 Secret；
-    /// Box / pCloud / Yandex.Disk 需要在下方填入开发者后台申请到的 Client Secret。
+    /// TODO(User)：Google Drive / OneDrive / Yandex.Disk 走 PKCE 公共客户端，不需要 Secret；
+    /// Box / pCloud 需要在下方填入开发者后台申请到的 Client Secret。
     public static func clientSecret(for type: ConnectionType) -> String? {
         switch type {
         case .box:
             return nil
         case .pCloudDrive:
-            return nil
-        case .yandexDisk:
             return nil
         default:
             return nil
@@ -101,7 +100,8 @@ public enum OAuthProviderConfiguration {
         case .pCloudDrive:
             return ""
         case .yandexDisk:
-            return "cloud_api:disk.read cloud_api:disk.info"
+            // 须是 oauth.yandex.com 应用已登记权限的子集；YandexDiskService 只调用 resources / download。
+            return "cloud_api:disk.read"
         case .baiduNetdisk:
             return "basic,netdisk"
         default:
@@ -112,11 +112,17 @@ public enum OAuthProviderConfiguration {
     /// 是否使用 PKCE（code_verifier / code_challenge），公共客户端优先选择，避免在 App 内嵌 Client Secret。
     public static func usesPKCE(for type: ConnectionType) -> Bool {
         switch type {
-        case .googleDrive, .oneDrive:
+        case .googleDrive, .oneDrive, .yandexDisk:
             return true
         default:
             return false
         }
+    }
+
+    /// Yandex 经 Google 等社交账号登录后会落到账号主页而非授权确认页，
+    /// 需保留 Cookie，让再次授权直接进入确认页。
+    public static func prefersEphemeralWebBrowserSession(for type: ConnectionType) -> Bool {
+        type != .yandexDisk
     }
 
     /// 是否走 OAuth 2.0 简化模式（Implicit Grant）：回调 fragment 直接返回 access_token，无 refresh_token。
@@ -164,7 +170,7 @@ public enum OAuthProviderConfiguration {
         guard !clientID(for: type).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return false
         }
-        // PKCE 公共客户端（Google/OneDrive）与简化模式（百度网盘）不需要 secret；
+        // PKCE 公共客户端（Google/OneDrive/Yandex.Disk）与简化模式（百度网盘）不需要 secret；
         // 其余走 client secret 模式的网盘必须同时配置好 secret，否则 token exchange 必然失败。
         if usesPKCE(for: type) || usesImplicitGrant(for: type) {
             return true
@@ -184,7 +190,7 @@ public enum OAuthProviderConfiguration {
         case .pCloudDrive:
             return "需要先在 pCloud 开发者后台注册 App 并填入 Client ID / Client Secret。"
         case .yandexDisk:
-            return "需要先在 oauth.yandex.com 注册应用并填入 Client ID / Client Secret。"
+            return "需要先在 oauth.yandex.com 注册应用（iOS 平台 + Web services 平台）并填入 Client ID。"
         case .baiduNetdisk:
             return "需要先在百度网盘开放平台创建应用并填入 AppKey，回调地址登记为 vanmo://oauth/baiduNetdisk。"
         default:

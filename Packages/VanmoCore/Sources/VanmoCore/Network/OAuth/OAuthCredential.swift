@@ -11,6 +11,24 @@ public struct OAuthCredential: Codable, Sendable {
     /// 部分网盘（如 pCloud）登录后需要固定到特定数据中心 host，登录时一并记录。
     public var apiHost: String?
 
+    public init(
+        provider: ConnectionType,
+        accessToken: String,
+        refreshToken: String,
+        expiresAt: Date,
+        tokenType: String,
+        scope: String?,
+        apiHost: String?
+    ) {
+        self.provider = provider
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.expiresAt = expiresAt
+        self.tokenType = tokenType
+        self.scope = scope
+        self.apiHost = apiHost
+    }
+
     public var isExpired: Bool {
         Date().addingTimeInterval(60) >= expiresAt
     }

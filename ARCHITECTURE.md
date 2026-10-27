@@ -102,7 +102,7 @@ Boundary rules:
 ### 3.2 Dependencies
 
 - Both apps depend on `VanmoCore`, Kingfisher, KSPlayer, and Lottie.
-- The iOS target also declares direct dependencies on SWXMLHash and SMBClient.
+- The iOS target also declares direct dependencies on SWXMLHash, SMBClient, and YandexLoginSDK 3.2.0 (iOS-only, UIKit-based; macOS has no equivalent SDK).
 - `VanmoDownloadWidget` is an iOS WidgetKit extension embedded in `Vanmo`. It renders the download Live Activity only. Shared `DownloadLiveActivityAttributes` and `DownloadLiveActivityIntents` are compiled into both targets; the widget does not import `VanmoCore`. Expanded pause / resume / cancel reach `DownloadManager` through an app-registered relay. Lock-screen taps use `vanmo://downloads`.
 - `VanmoCore` itself depends on SWXMLHash and SMBClient.
 - System frameworks include SwiftUI, SwiftData, AVFoundation, Network, and Security. iOS also uses UIKit; macOS uses AppKit.
@@ -126,6 +126,7 @@ iOS, macOS, and `VanmoCore` each ship `PrivacyInfo.xcprivacy`. The files declare
 
 - Locks the interface language for the process from `AppLanguagePreference`.
 - Installs `UIKitOAuthPresentationContextProvider`.
+- Activates YandexLoginSDK and, on success, registers `YandexLoginAuthenticator` as the `.yandexDisk` entry in `OAuthCoordinator.externalAuthenticators`. `ContentView` forwards `onOpenURL` and web-browsing `NSUserActivity` to the SDK first.
 - Removes orphaned prefetch temporary files.
 - Registers the KSPlayer media-probe provider.
 - Registers the iOS background scan task.
@@ -328,6 +329,7 @@ Credential boundaries:
 
 - Connection passwords are stored through `KeychainManager`, primarily under `conn_<UUID>` keys.
 - OAuth credentials are stored through `OAuthCredentialStore`.
+- `OAuthCoordinator.authenticate(type:)` delegates to an app-registered `OAuthExternalAuthenticator` when one exists for the type; otherwise it runs `ASWebAuthenticationSession`. Yandex.Disk uses this split: iOS signs in through YandexLoginSDK (Yandex app or SDK web flow, access token only, no refresh token), macOS uses the shared PKCE authorization-code flow with `vanmo://oauth/yandexDisk`. Neither platform embeds a Yandex client secret. The shared flow uses an ephemeral browser session for every provider except Yandex.Disk, because Yandex social sign-in does not return to the consent page and only a persistent session lets a retry reach it.
 - `SavedConnection` stores only non-sensitive configuration.
 - Local folders use security-scoped bookmarks to restore access across launches.
 

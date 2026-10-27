@@ -24,6 +24,7 @@
 		14EA1A3581D94AF5E0C7B3B6 /* PlayerEngineFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4927542CA0B0CB1C801B7104 /* PlayerEngineFactory.swift */; };
 		18C063410011D1BAE4E03928 /* OAuthPresentationContextProvider+UIKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40B8F6353F818D4B07C53870 /* OAuthPresentationContextProvider+UIKit.swift */; };
 		197EEEB941D6C6F3220D8584 /* BrowserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C0E5923BE6FFCEFCB6C4DC /* BrowserViewModel.swift */; };
+		19F187013D321DEF128AA9B3 /* YandexLoginAuthenticator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0AB0B38D14263D2046ED37 /* YandexLoginAuthenticator.swift */; };
 		1AF2B09C006AF39CD9B4406F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FD492D409C7B0BA75E6B39 /* SettingsView.swift */; };
 		1BB6DD34A9CDD2708545EDA2 /* SecondFloorItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68ADF359717CDE03BB014EA2 /* SecondFloorItemView.swift */; };
 		1FD4C7990399D6FDC6398DAB /* plex.png in Resources */ = {isa = PBXBuildFile; fileRef = 58B4B29A68276E4D731CAB87 /* plex.png */; };
@@ -166,6 +167,7 @@
 		E0FAC95A6979184AF1A20D19 /* MediaTitleLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E62860E3F1CBFF413348E1C /* MediaTitleLogoView.swift */; };
 		E26B09812679EA5577216C17 /* MacMediaListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D28884D0283563E4720407AA /* MacMediaListRow.swift */; };
 		E27647CBF81A4FD67C50E33E /* KSPlayerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781055690453E6D2950A0933 /* KSPlayerEngine.swift */; };
+		E5FBE6EF893740E3F8E9C169 /* YandexLoginSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 7E004AF600C16B3A07067279 /* YandexLoginSDK */; };
 		E6444CC19A56F2EA054167E5 /* MacPlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF13EE778805D51585A39F36 /* MacPlayerViewModel.swift */; };
 		E8761CCFA33636AA4AA9D229 /* SWXMLHash in Frameworks */ = {isa = PBXBuildFile; productRef = 8023341C67DBE97AAEFDD222 /* SWXMLHash */; };
 		EB215A56D1547DDFADF6C4C4 /* iptv.png in Resources */ = {isa = PBXBuildFile; fileRef = 6D6524ADADB8CC750BE7000A /* iptv.png */; };
@@ -337,6 +339,7 @@
 		B7719C17F340864CF4664CC1 /* PosterCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterCard.swift; sourceTree = "<group>"; };
 		B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingIndicatorView.swift; sourceTree = "<group>"; };
 		BB8D04491E43FFAB67798BFC /* MacLibraryHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibraryHomeView.swift; sourceTree = "<group>"; };
+		BD0AB0B38D14263D2046ED37 /* YandexLoginAuthenticator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YandexLoginAuthenticator.swift; sourceTree = "<group>"; };
 		BE379EC1C792DAB020AA6723 /* oneDrive.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = oneDrive.png; sourceTree = "<group>"; };
 		BEC3480B949E6965C136DCA2 /* MediaDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDetailView.swift; sourceTree = "<group>"; };
 		C64BB62C8F69AE1F342C8CE4 /* mega.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = mega.png; sourceTree = "<group>"; };
@@ -414,6 +417,7 @@
 				C2EA8CA629CD6139C41F47A7 /* KSPlayer in Frameworks */,
 				3B534824573E767CB230923B /* SMBClient in Frameworks */,
 				C28B4790C8056E84482AFF8A /* Lottie in Frameworks */,
+				E5FBE6EF893740E3F8E9C169 /* YandexLoginSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -965,6 +969,7 @@
 			isa = PBXGroup;
 			children = (
 				40B8F6353F818D4B07C53870 /* OAuthPresentationContextProvider+UIKit.swift */,
+				BD0AB0B38D14263D2046ED37 /* YandexLoginAuthenticator.swift */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -1133,6 +1138,7 @@
 				96C3373D06C4EC5E811543F2 /* KSPlayer */,
 				5A39B9DEAA17BB6049518605 /* SMBClient */,
 				C13966A794B8810C8E1F267D /* Lottie */,
+				7E004AF600C16B3A07067279 /* YandexLoginSDK */,
 			);
 			productName = Vanmo;
 			productReference = 2ED5FA5F309C5FEE69C998B0 /* Vanmo.app */;
@@ -1194,6 +1200,7 @@
 				A522FF186BB4E4A9E1CFFCC7 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				A710839B90DFF485E760BEBA /* XCRemoteSwiftPackageReference "SMBClient" */,
 				0383DE30F75F95783E318F43 /* XCRemoteSwiftPackageReference "SWXMLHash" */,
+				59E6529732D6E9F47C79EA71 /* XCRemoteSwiftPackageReference "yandex-login-sdk-ios" */,
 				2B600C39D0CC1FC66B20547B /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				FA882A96481864BE9677FFD2 /* XCLocalSwiftPackageReference "Packages/VanmoCore" */,
 			);
@@ -1442,6 +1449,7 @@
 				08D449B2FCD839563D28E73A /* URL+Extensions.swift in Sources */,
 				3CBDFA6CC2E597136D0A5676 /* VanmoApp.swift in Sources */,
 				8BB64D8644EE2B2352FB49BC /* View+Extensions.swift in Sources */,
+				19F187013D321DEF128AA9B3 /* YandexLoginAuthenticator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1804,6 +1812,14 @@
 				minimumVersion = 2.2.0;
 			};
 		};
+		59E6529732D6E9F47C79EA71 /* XCRemoteSwiftPackageReference "yandex-login-sdk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/yandexmobile/yandex-login-sdk-ios.git";
+			requirement = {
+				kind = exactVersion;
+				version = 3.2.0;
+			};
+		};
 		A522FF186BB4E4A9E1CFFCC7 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
@@ -1840,6 +1856,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A522FF186BB4E4A9E1CFFCC7 /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
+		};
+		7E004AF600C16B3A07067279 /* YandexLoginSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 59E6529732D6E9F47C79EA71 /* XCRemoteSwiftPackageReference "yandex-login-sdk-ios" */;
+			productName = YandexLoginSDK;
 		};
 		8023341C67DBE97AAEFDD222 /* SWXMLHash */ = {
 			isa = XCSwiftPackageProductDependency;

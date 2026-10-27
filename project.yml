@@ -37,6 +37,9 @@ packages:
   lottie-ios:
     url: https://github.com/airbnb/lottie-ios.git
     majorVersion: 4.6.0
+  YandexLoginSDK:
+    url: https://github.com/yandexmobile/yandex-login-sdk-ios.git
+    exactVersion: 3.2.0
 
 targets:
   Vanmo:
@@ -50,6 +53,7 @@ targets:
       - package: SMBClient
       - package: lottie-ios
         product: Lottie
+      - package: YandexLoginSDK
       - target: VanmoDownloadWidget
         embed: true
         codeSign: true
@@ -97,6 +101,8 @@ targets:
           - CloudKit
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.vanmo.app
+        com.apple.developer.associated-domains:
+          - applinks:yx4cbf02a3c61e404a89d3af6c83e71a64.oauth.yandex.com
     postBuildScripts:
       - name: Fix KSPlayer Framework Plist
         basedOnDependencyAnalysis: false

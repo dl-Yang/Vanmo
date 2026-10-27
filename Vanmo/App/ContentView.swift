@@ -85,8 +85,12 @@ struct ContentView: View {
             }
         }
         .onOpenURL { url in
+            if YandexLoginAuthenticator.shared.handleOpenURL(url) { return }
             guard url.scheme == "vanmo", url.host == "downloads" else { return }
             appState.openDownloads()
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
+            _ = YandexLoginAuthenticator.shared.handleUserActivity(userActivity)
         }
         .onReceive(NotificationCenter.default.publisher(for: .mediaFavoriteDidChange)) { _ in
             // 持久化到 AppState，避免 LibraryView 未挂载时通知丢失。

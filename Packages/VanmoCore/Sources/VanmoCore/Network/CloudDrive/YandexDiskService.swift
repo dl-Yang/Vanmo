@@ -141,6 +141,11 @@ public final class YandexDiskService: RemoteFileService {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.connectionFailed("Invalid response type")
         }
+#if DEBUG
+        let endpoint = "resources\(path)"
+        let statusCode = httpResponse.statusCode
+        VanmoLogger.network.info("[Debug][YandexDisk] request endpoint=\(endpoint, privacy: .public) status=\(statusCode, privacy: .public)")
+#endif
 
         switch httpResponse.statusCode {
         case 200...299:
@@ -154,10 +159,24 @@ public final class YandexDiskService: RemoteFileService {
         case 429:
             throw NetworkError.transferFailed("Yandex.Disk 请求过于频繁，请稍后重试")
         default:
-            let message = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            throw NetworkError.transferFailed("Yandex.Disk API \(httpResponse.statusCode): \(message)")
+            throw NetworkError.transferFailed(Self.errorMessage(statusCode: httpResponse.statusCode, data: data))
         }
     }
+
+    static func errorMessage(statusCode: Int, data: Data) -> String {
+        // 未开通 Yandex 邮箱的账号（如仅用 Google 等社交账号注册）能拿到 token，但 Disk API 一律 403。
+        if statusCode == 403,
+           let body = try? JSONDecoder().decode(YandexErrorBody.self, from: data),
+           body.error == "DiskUnsupportedUserAccountTypeError" {
+            return "该 Yandex 账号无法使用 Yandex.Disk：需要开通 Yandex 邮箱的账号，仅通过 Google 等第三方账号注册的账号不受支持。"
+        }
+        let message = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+        return "Yandex.Disk API \(statusCode): \(message)"
+    }
+}
+
+private struct YandexErrorBody: Decodable {
+    let error: String
 }
 
 // MARK: - API models

@@ -35,7 +35,6 @@ Suggested run order for remaining implemented sources: Plex, fnOS, IPTV, local f
 - [`2026-08-28-onedrive-connection-validation.md`](2026-08-28-onedrive-connection-validation.md) — **Blocked.** Client ID empty; login stays disabled
 - [`2026-08-28-box-connection-validation.md`](2026-08-28-box-connection-validation.md) — **Blocked.** Client ID and secret empty; login stays disabled
 - [`2026-08-28-pcloud-connection-validation.md`](2026-08-28-pcloud-connection-validation.md) — **Blocked.** Client ID and secret empty; login stays disabled
-- [`2026-08-28-yandex-disk-connection-validation.md`](2026-08-28-yandex-disk-connection-validation.md) — **Blocked.** Client ID and secret empty; login stays disabled
 
 ### Placeholder or unsupported expected failure
 

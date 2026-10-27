@@ -64,7 +64,7 @@ Required Reason API reasons match current use:
 
 Cache-size inventory uses `totalFileAllocatedSizeKey`, not volume-capacity APIs, so Disk Space is not declared. Do not add Disk Space, System Boot Time, or Active Keyboard categories unless first-party code starts calling those APIs. Do not add a tracking domain or flip `NSPrivacyTracking` without a separate privacy review and App Tracking Transparency work.
 
-Third-party packages (Kingfisher, KSPlayer, Lottie, SMBClient, Citadel) must ship their own manifests. First-party files cannot cover those binaries.
+Third-party packages (Kingfisher, KSPlayer, Lottie, SMBClient, Citadel, YandexLoginSDK) must ship their own manifests. First-party files cannot cover those binaries.
 
 ## Untrusted Inputs
 
@@ -90,6 +90,7 @@ Use the documented scripts for normal builds and checks. Never weaken sandboxing
 - Add dependencies only through `project.yml` or `Packages/VanmoCore/Package.swift`, with a documented need, ownership boundary, license/trust review, and verification plan.
 - The SMB stack currently pins `thatcube/SMBClient` revision `d8baadc` (open upstream PR #234, MIT, based on `66eafaa`) so 3.1.1 AES-GCM encryption can be negotiated. Return the URL to `kishikawakatsumi/SMBClient` when that commit is on `main`. Do not unpin to a floating branch.
 - SFTP uses `orlandos-nl/Citadel` 0.12.1 (MIT) from `Packages/VanmoCore/Package.swift`. Citadel 0.12.1 depends on SwiftNIO, Swift Crypto, and the `Wellz26/swift-nio-ssh` 0.3.x fork rather than `apple/swift-nio-ssh`. Keep the Citadel version pin; do not float to `main`.
+- iOS Yandex.Disk sign-in uses `yandexmobile/yandex-login-sdk-ios` pinned to `exactVersion: 3.2.0` (Apache-2.0; vendored CertificateTransparency is MIT; ships its own `PrivacyInfo.xcprivacy`). Only the public Yandex client ID is in source, `Info.plist` (`yx{client ID}` scheme), and the associated domain `applinks:yx{client ID}.oauth.yandex.com`; the client secret is never committed: macOS (and the iOS web fallback) use PKCE, and the iOS SDK flow needs only the public client ID. SDK error `message` strings can echo response JSON or request parameters, so Vanmo logs and displays only the error type, domain, and code. After capturing the token, Vanmo calls the SDK `logout()` so the token is kept only in `OAuthCredentialStore`, not also in the SDK's own Keychain item. The requested scope is `cloud_api:disk.read` only. On macOS (and the iOS PKCE fallback), the Yandex authorization session is not ephemeral, so the Yandex web session is shared with the system browser. Other OAuth providers keep ephemeral sessions.
 - First-version SFTP host-key policy is Citadel `.acceptAnything()`. There is no known-hosts UI or TOFU store. Use only with operator-entered hosts the user intends to trust.
 - `sftp://user:pass@host/path` may be persisted on `MediaItem.fileURL`, matching the existing FTP/SMB credential-in-URL trade-off. Logs must use `safePlaybackLogDescription` and must not print passwords.
 - Regenerate the Xcode project after `project.yml` dependency or target changes; never hand-edit `project.pbxproj`.
