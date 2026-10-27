@@ -38,11 +38,11 @@
 
 - [x] **通用 OAuth 2.0 基础设施**：`OAuthCoordinator`/`OAuthCredentialStore`/`OAuthProviderConfiguration` 支持 PKCE（公共客户端）与 Client Secret 两种授权码流程；Google Drive 使用 iOS Client ID 派生的 `com.googleusercontent.apps.*:/oauth2redirect`，其余 OAuth 网盘使用 `vanmo://oauth/{type}`；开发者 Client ID / Secret 需手动在对应开发者后台申请后填入 `OAuthProviderConfiguration`。
 - [x] **Google Drive**：`GoogleDriveService` 已实现目录浏览（`files.list` 分页）、取流（`alt=media`，播放期间持续携带 Bearer token）、下载与 401 自动 refresh；需要在 Google Cloud Console 创建 iOS 类型 OAuth 客户端并填入 Client ID。
-- [x] **OneDrive**：`OneDriveService` 已实现目录浏览（Microsoft Graph `/me/drive` children 分页）、取流（`@microsoft.graph.downloadUrl` 匿名直链）与下载；需要在 Microsoft Entra 管理中心注册公共客户端应用并填入 Application (client) ID。
+- [x] **OneDrive**：`OneDriveService` 已实现目录浏览（Microsoft Graph `/me/drive` children 分页）、取流（`@microsoft.graph.downloadUrl` 匿名直链）与下载；Entra 公共客户端（Application (client) ID `4f24ca70-48e9-4a63-8e51-e35647350e64`）+ PKCE 已配置，2026-10-27 在 iPhone 17 Pro 与 VanmoMac 完成登录、浏览、播放、下载验收。真机联调发现 `$select` 会导致 Graph 丢弃 `@microsoft.graph.downloadUrl`，单文件元数据请求已改为取完整 `driveItem`。
 - [x] **Box**：`BoxDriveService` 已实现目录浏览（`folders/{id}/items`）、取流（拦截 `/files/{id}/content` 的 302 只取 `Location`）与下载；需要在 Box Developer Console 创建自定义 App 并填入 Client ID / Client Secret。
 - [x] **pCloud**：`PCloudDriveService` 已实现目录浏览（`listfolder`）、取流（`getfilelink`）与下载，自动识别登录返回的 US/EU 数据中心 host；需要在 pCloud 开发者后台注册 App 并填入 Client ID / Client Secret。
 - [x] **Yandex.Disk**：`YandexDiskService` 已实现目录浏览（`/v1/disk/resources`）、取流（`/resources/download`）与下载；需要在 oauth.yandex.com 注册应用并填入 Client ID / Client Secret。
-- [ ] **上述 5 个网盘的真实登录/浏览/播放/下载验证**：当前仅完成协议实现与编译验证，尚未填入真实开发者凭据做端到端联调；拿到凭据后需要逐个真机验证登录态刷新、大文件续传、分页边界、错误提示文案。
+- [ ] **上述 5 个网盘的真实登录/浏览/播放/下载验证**：OneDrive（2026-10-27）与 Yandex.Disk（2026-10-27）已完成真实登录、浏览、播放、下载验收；Box、pCloud 仍缺开发者凭据；Google Drive 在 2026-10-27 的 macOS 联调中出现 token refresh `400`，需单独排查。后续补齐时仍需逐项验证登录态刷新、大文件续传、分页边界与错误提示文案。
 - [ ] **MEGA 完整接入待评估**：官方无标准 REST + OAuth 接口，需要官方 MEGA SDK（C++，端到端加密，每个文件需客户端侧解密）深度集成，工作量和风险显著高于其余网盘；当前仅保留合规占位入口（`ConnectionType.mega`，复用官方网盘占位 UI 与 `UnsupportedOfficialCloudDriveService`），完整支持留待后续单独评估排期。
 
 ### 3. 云同步与多端

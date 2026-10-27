@@ -61,7 +61,7 @@ public enum OAuthProviderConfiguration {
         case .googleDrive:
             return "311522710381-42mtgv9v8kbjm6dqtta9e2ntmane387g.apps.googleusercontent.com"
         case .oneDrive:
-            return ""
+            return "4f24ca70-48e9-4a63-8e51-e35647350e64"
         case .box:
             return ""
         case .pCloudDrive:
