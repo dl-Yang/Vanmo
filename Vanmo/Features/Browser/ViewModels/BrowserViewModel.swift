@@ -28,7 +28,11 @@ final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var selectedConnectionID: UUID?
     @Published private(set) var currentPath = "/"
     @Published private(set) var pathStack: [String] = []
-    @Published private(set) var files: [RemoteFile] = []
+    @Published private(set) var files: [RemoteFile] = [] {
+        didSet { refreshLibraryStates() }
+    }
+    /// 当前目录视频在本地媒体库中的海报 / 背景图 / 进度，键为 `RemoteFile.path`。
+    @Published private(set) var libraryStates: [String: FileLibraryState] = [:]
     @Published private(set) var isBrowsingFiles = false
     @Published private(set) var epgGuide = EPGGuide(programsByChannel: [:])
     @Published private(set) var isLoadingEPG = false
@@ -916,6 +920,36 @@ final class ConnectionsViewModel: ObservableObject {
         if !(await loadDirectory(path: previousPath)) {
             pathStack.append(previousPath)
         }
+    }
+
+    func refreshLibraryStates() {
+        guard let context = modelContext,
+              let connection = selectedConnection,
+              connection.type != .iptv else {
+            if !libraryStates.isEmpty { libraryStates = [:] }
+            return
+        }
+        let paths = Set(files.lazy.filter(\.isVideo).map(\.path))
+        libraryStates = FileBrowserLibrary.states(connectionId: connection.id, paths: paths, in: context)
+    }
+
+    /// Files 页播放复用或写入媒体库条目，播放器写回的进度才能持久化并显示在卡片上。
+    /// 扫描进行中不插入，避免与扫描器按快照插入的同路径条目重复。
+    func persistentPlaybackItem(for file: RemoteFile, candidate: MediaItem) -> MediaItem {
+        guard let context = modelContext,
+              let connection = selectedConnection,
+              connection.type != .iptv,
+              !candidate.isLiveStream else { return candidate }
+        if scanCoordinator.isActive {
+            return FileBrowserLibrary.existingItem(connectionId: connection.id, path: file.path, in: context) ?? candidate
+        }
+        return FileBrowserLibrary.persistentItem(
+            for: file,
+            candidate: candidate,
+            connectionId: connection.id,
+            connectionType: connection.type,
+            in: context
+        )
     }
 
     func thumbnailURL(for file: RemoteFile) async -> URL? {

@@ -347,6 +347,16 @@ public struct RemoteFile: Identifiable, Hashable, Sendable {
     public var contentVersion: String? = nil
     /// 远端 MIME 类型（若协议提供）。
     public var mimeType: String? = nil
+    /// 媒体服务器海报（Emby/Jellyfin Primary）。可能携带访问令牌，仅内存使用，禁止写日志。
+    public var posterURL: URL? = nil
+    /// 媒体服务器背景图（Backdrop）。可能携带访问令牌，仅内存使用，禁止写日志。
+    public var backdropURL: URL? = nil
+    /// 服务器侧观看进度（秒），仅媒体服务器来源填充。
+    public var playbackPosition: TimeInterval? = nil
+    /// 服务器侧时长（秒），仅媒体服务器来源填充。
+    public var runtime: TimeInterval? = nil
+    /// 服务器侧已看完标记。
+    public var isPlayed: Bool = false
 
     public init(
         name: String,
@@ -360,7 +370,12 @@ public struct RemoteFile: Identifiable, Hashable, Sendable {
         tvgId: String? = nil,
         stableId: String? = nil,
         contentVersion: String? = nil,
-        mimeType: String? = nil
+        mimeType: String? = nil,
+        posterURL: URL? = nil,
+        backdropURL: URL? = nil,
+        playbackPosition: TimeInterval? = nil,
+        runtime: TimeInterval? = nil,
+        isPlayed: Bool = false
     ) {
         self.name = name
         self.path = path
@@ -374,6 +389,11 @@ public struct RemoteFile: Identifiable, Hashable, Sendable {
         self.stableId = stableId
         self.contentVersion = contentVersion
         self.mimeType = mimeType
+        self.posterURL = posterURL
+        self.backdropURL = backdropURL
+        self.playbackPosition = playbackPosition
+        self.runtime = runtime
+        self.isPlayed = isPlayed
     }
 
     public var isVideo: Bool { type == .video }

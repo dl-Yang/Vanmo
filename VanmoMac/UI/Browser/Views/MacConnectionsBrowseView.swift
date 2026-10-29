@@ -8,6 +8,20 @@ struct MacConnectionsBrowseView: View {
     @EnvironmentObject private var searchViewModel: MacSearchViewModel
     @EnvironmentObject private var downloadManager: DownloadManager
     @Environment(\.macTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("files.browserLayout") private var layoutRaw = MacFilesBrowserLayout.grid.rawValue
+    /// 正在打开的文件夹路径：保留旧内容并在该条目上显示打开态，加载完成后再做展开过渡。
+    @State private var openingFolderPath: String?
+    @State private var isNavigatingDirectory = false
+    @State private var folderTransition = MacFolderTransitionState()
+    @State private var tileFrames = MacFilesTileFrameStore()
+    @State private var contentSize: CGSize = .zero
+
+    private static let contentSpace = "mac.files.browser.content"
+    private static let gridColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 16, alignment: .top),
+        count: 3
+    )
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,6 +63,12 @@ struct MacConnectionsBrowseView: View {
         }
         .onChange(of: connectionsViewModel.pendingFolderBookmarkNavigation?.id) { _, _ in
             Task { await openPendingFolderBookmarkIfNeeded() }
+        }
+        .onChange(of: appState.isPlayerPresented) { _, isPresented in
+            if !isPresented { connectionsViewModel.refreshLibraryStates() }
+        }
+        .onChange(of: connectionsViewModel.selectedConnectionID) { _, _ in
+            folderTransition = MacFolderTransitionState()
         }
         .contextMenu {
             connectionContextMenu
@@ -100,6 +120,10 @@ struct MacConnectionsBrowseView: View {
                 }
                 .buttonStyle(.plain)
                 .help(L10n.tr("同步当前目录到媒体库"))
+
+                if connectionsViewModel.selectedConnection?.type != .iptv {
+                    layoutToggle
+                }
 
                 Menu {
                     connectionContextMenu
@@ -177,7 +201,7 @@ struct MacConnectionsBrowseView: View {
                     }
 
                     Button {
-                        Task { await connectionsViewModel.navigateToDirectory(item.path) }
+                        navigateToBreadcrumb(item.path)
                     } label: {
                         Text(item.title)
                             .font(.system(size: 13, weight: index == breadcrumbItems.count - 1 ? .semibold : .medium))
@@ -202,26 +226,142 @@ struct MacConnectionsBrowseView: View {
     private var browserContent: some View {
         if connectionsViewModel.selectedConnection == nil {
             emptySelectionState
-        } else if connectionsViewModel.isBrowsingFiles {
+        } else if connectionsViewModel.isBrowsingFiles && !isNavigatingDirectory {
             loadingState
         } else if let message = connectionsViewModel.fileBrowserErrorMessage {
             messageState(icon: "exclamationmark.triangle", title: L10n.tr("无法加载目录"), message: message)
         } else if connectionsViewModel.files.isEmpty {
             messageState(icon: "folder", title: L10n.tr("文件夹为空"), message: L10n.tr("此目录下没有可显示的文件"))
         } else {
-            fileList
+            directoryContainer
         }
     }
 
-    private var fileList: some View {
+    // MARK: - Layout
+
+    private var layout: MacFilesBrowserLayout {
+        guard connectionsViewModel.selectedConnection?.type != .iptv else { return .list }
+        return MacFilesBrowserLayout(rawValue: layoutRaw) ?? .grid
+    }
+
+    /// 图标显示点击后切换到的布局（网格态显示列表图标）。
+    private var layoutToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                layoutRaw = (layout == .grid ? MacFilesBrowserLayout.list : .grid).rawValue
+            }
+        } label: {
+            Image(systemName: layout == .grid ? "list.bullet" : "square.grid.2x2")
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(layout == .grid ? L10n.tr("切换为列表") : L10n.tr("切换为网格"))
+        .accessibilityLabel(layout == .grid ? L10n.tr("切换为列表") : L10n.tr("切换为网格"))
+    }
+
+    /// 以连接 + 目录路径为身份做“文件夹打开”过渡：前进时从被点文件夹处展开，返回时收回到对应位置。
+    private var directoryContainer: some View {
+        ZStack {
+            directoryListing
+                .id("\(connectionsViewModel.selectedConnectionID?.uuidString ?? "")|\(connectionsViewModel.currentPath)")
+                .transition(MacFolderOpenTransition(
+                    anchor: folderTransition.anchor,
+                    isForward: folderTransition.isForward,
+                    reduceMotion: reduceMotion
+                ))
+                .zIndex(Double(connectionsViewModel.pathStack.count))
+        }
+        .coordinateSpace(.named(Self.contentSpace))
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
+        .animation(
+            reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.32, dampingFraction: 0.88),
+            value: connectionsViewModel.currentPath
+        )
+    }
+
+    private var directoryListing: some View {
         ScrollView {
-            LazyVStack(spacing: 4) {
-                ForEach(connectionsViewModel.files) { file in
-                    fileRow(file)
+            if layout == .grid {
+                gridListing
+            } else {
+                LazyVStack(spacing: 4) {
+                    ForEach(connectionsViewModel.files) { file in
+                        fileRow(file)
+                    }
+                }
+                .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+                .padding(.vertical, 12)
+            }
+        }
+    }
+
+    private var gridListing: some View {
+        let folders = connectionsViewModel.files.filter(\.isDirectory)
+        let items = connectionsViewModel.files.filter { !$0.isDirectory }
+        return VStack(alignment: .leading, spacing: 12) {
+            if !folders.isEmpty {
+                gridSectionHeader(L10n.tr("文件夹"))
+                LazyVGrid(columns: Self.gridColumns, spacing: 20) {
+                    ForEach(folders) { folder in
+                        folderGridTile(folder)
+                    }
                 }
             }
-            .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-            .padding(.vertical, 12)
+            if !items.isEmpty {
+                gridSectionHeader(items.allSatisfy(\.isVideo) ? L10n.tr("视频") : L10n.tr("文件"))
+                    .padding(.top, folders.isEmpty ? 0 : 8)
+                LazyVGrid(columns: Self.gridColumns, spacing: 20) {
+                    ForEach(items) { file in
+                        fileGridCard(file)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
+    }
+
+    private func gridSectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(theme.sectionHeader)
+    }
+
+    private func folderGridTile(_ folder: RemoteFile) -> some View {
+        Button {
+            openFolder(folder)
+        } label: {
+            MacFolderGridTile(
+                name: folder.name,
+                isOpening: openingFolderPath == folder.path,
+                isLoading: openingFolderPath == folder.path && connectionsViewModel.isBrowsingFiles,
+                reduceMotion: reduceMotion
+            )
+        }
+        .buttonStyle(.plain)
+        .reportMacTileFrame(path: folder.path, in: Self.contentSpace, store: tileFrames)
+        .contextMenu {
+            fileContextMenu(for: folder)
+        }
+    }
+
+    private func fileGridCard(_ file: RemoteFile) -> some View {
+        Button {
+            Task { await handleFileTap(file) }
+        } label: {
+            MacVideoGridCard(
+                file: file,
+                artwork: artworkCandidates(for: file),
+                progress: watchProgress(for: file),
+                extract: extractedFrameLoader(for: file)
+            )
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            fileContextMenu(for: file)
         }
     }
 
@@ -229,21 +369,41 @@ struct MacConnectionsBrowseView: View {
         Button {
             Task { await handleFileTap(file) }
         } label: {
-            MacConnectionFileRow(file: file) { file in
-                await connectionsViewModel.thumbnailURL(for: file)
-            }
+            MacConnectionFileRow(
+                file: file,
+                isOpening: openingFolderPath == file.path,
+                artwork: artworkCandidates(for: file),
+                extract: extractedFrameLoader(for: file)
+            )
         }
         .buttonStyle(MacConnectionFileRowButtonStyle(theme: theme))
+        .reportMacTileFrame(path: file.isDirectory ? file.path : nil, in: Self.contentSpace, store: tileFrames)
         .contextMenu {
             fileContextMenu(for: file)
         }
+    }
+
+    private func artworkCandidates(for file: RemoteFile) -> [URL] {
+        guard file.isVideo else { return [] }
+        return FileCoverResolver.artworkCandidates(for: file, library: connectionsViewModel.libraryStates[file.path])
+    }
+
+    private func watchProgress(for file: RemoteFile) -> FileWatchProgress? {
+        guard file.isVideo else { return nil }
+        return FileCoverResolver.progress(for: file, library: connectionsViewModel.libraryStates[file.path])
+    }
+
+    private func extractedFrameLoader(for file: RemoteFile) -> (() async -> URL?)? {
+        guard file.isVideo else { return nil }
+        let viewModel = connectionsViewModel
+        return { await viewModel.thumbnailURL(for: file) }
     }
 
     @ViewBuilder
     private func fileContextMenu(for file: RemoteFile) -> some View {
         if file.isDirectory {
             Button {
-                Task { await connectionsViewModel.openDirectory(file) }
+                openFolder(file)
             } label: {
                 Label(L10n.tr("打开"), systemImage: "folder")
             }
@@ -411,10 +571,60 @@ struct MacConnectionsBrowseView: View {
 
     private func handleFileTap(_ file: RemoteFile) async {
         if file.isDirectory {
-            await connectionsViewModel.openDirectory(file)
+            openFolder(file)
         } else if file.isVideo {
             await play(file)
         }
+    }
+
+    private func openFolder(_ folder: RemoteFile) {
+        guard folder.isDirectory, !isNavigatingDirectory, !connectionsViewModel.isBrowsingFiles else { return }
+        let anchor = tileAnchor(for: folder.path)
+        folderTransition.anchor = anchor
+        folderTransition.isForward = true
+        isNavigatingDirectory = true
+        withAnimation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7)) {
+            openingFolderPath = folder.path
+        }
+        Task {
+            let depth = connectionsViewModel.pathStack.count
+            await connectionsViewModel.openDirectory(folder)
+            if connectionsViewModel.pathStack.count > depth {
+                folderTransition.anchorStack.append(anchor)
+            }
+            openingFolderPath = nil
+            isNavigatingDirectory = false
+        }
+    }
+
+    /// 面包屑只指向祖先目录：按 `pathStack` 中的位置算出后退层数（Emby 等 ID 路径没有可用的路径深度），
+    /// 内容收回到进入那一层时记录的锚点。
+    private func navigateToBreadcrumb(_ path: String) {
+        guard !isNavigatingDirectory else { return }
+        let pathStack = connectionsViewModel.pathStack
+        let levelsUp = path == "/"
+            ? pathStack.count
+            : pathStack.lastIndex(of: path).map { pathStack.count - $0 } ?? 0
+        let originalStack = folderTransition.anchorStack
+        let remaining = max(originalStack.count - levelsUp, 0)
+        folderTransition.anchor = levelsUp > 0 && remaining < originalStack.count ? originalStack[remaining] : .center
+        folderTransition.isForward = false
+        isNavigatingDirectory = true
+        Task {
+            await connectionsViewModel.navigateToDirectory(path)
+            folderTransition.anchorStack = Array(originalStack.prefix(connectionsViewModel.pathStack.count))
+            isNavigatingDirectory = false
+        }
+    }
+
+    private func tileAnchor(for path: String) -> UnitPoint {
+        guard let frame = tileFrames.frames[path], contentSize.width > 0, contentSize.height > 0 else {
+            return .center
+        }
+        return UnitPoint(
+            x: min(max(frame.midX / contentSize.width, 0), 1),
+            y: min(max(frame.midY / contentSize.height, 0), 1)
+        )
     }
 
     private func play(_ file: RemoteFile) async {
@@ -475,7 +685,9 @@ private struct MacConnectionFileRow: View {
     @Environment(\.macTheme) private var theme
 
     let file: RemoteFile
-    var thumbnailProvider: ((RemoteFile) async -> URL?)?
+    var isOpening = false
+    var artwork: [URL] = []
+    var extract: (() async -> URL?)?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -516,9 +728,14 @@ private struct MacConnectionFileRow: View {
     @ViewBuilder
     private var fileIcon: some View {
         if file.isDirectory {
-            systemGlyph(iconName)
-        } else if file.isVideo, thumbnailProvider != nil {
-            MacFileVideoThumbnailIcon(file: file, load: thumbnailProvider) {
+            Image(isOpening ? "MacFilesFolderOpen" : "MacFilesFolder")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 20, height: 20)
+                .foregroundStyle(MacDesignTokens.accentBlue)
+        } else if file.isVideo {
+            MacFilesCoverImage(candidates: artwork, extract: extract) {
                 systemGlyph("film")
             }
         } else {
@@ -557,32 +774,244 @@ private struct MacConnectionFileRow: View {
     }
 }
 
-private struct MacFileVideoThumbnailIcon<Fallback: View>: View {
-    let file: RemoteFile
-    let load: ((RemoteFile) async -> URL?)?
-    @ViewBuilder let fallback: () -> Fallback
+/// 按优先级依次尝试封面地址（海报 → 背景图），全部缺失或加载失败后再抽帧，最后显示占位图标。
+private struct MacFilesCoverImage<Placeholder: View>: View {
+    let candidates: [URL]
+    let extract: (() async -> URL?)?
+    @ViewBuilder let placeholder: () -> Placeholder
 
-    @State private var thumbnailURL: URL?
+    @State private var step = 0
+    @State private var extractedURL: URL?
 
     var body: some View {
         Group {
-            if let thumbnailURL {
-                AsyncImage(url: thumbnailURL) { phase in
-                    if case .success(let image) = phase {
+            if let url = currentURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
                         image
                             .resizable()
                             .scaledToFill()
-                    } else {
-                        fallback()
+                    case .failure:
+                        placeholder().onAppear { step += 1 }
+                    default:
+                        placeholder()
                     }
                 }
+                .id(url)
             } else {
-                fallback()
+                placeholder()
             }
         }
-        .task(id: file.path) {
-            guard let load else { return }
-            thumbnailURL = await load(file)
+        .onChange(of: candidates) { _, _ in
+            step = 0
+            extractedURL = nil
+        }
+        .task(id: MacCoverStepKey(candidates: candidates, step: step)) {
+            guard step == candidates.count, extractedURL == nil, let extract else { return }
+            extractedURL = await extract()
+        }
+    }
+
+    private var currentURL: URL? {
+        if step < candidates.count { return candidates[step] }
+        return step == candidates.count ? extractedURL : nil
+    }
+}
+
+private struct MacCoverStepKey: Hashable {
+    let candidates: [URL]
+    let step: Int
+}
+
+// MARK: - Grid (Files-Grid)
+
+private struct MacFolderGridTile: View {
+    @Environment(\.macTheme) private var theme
+    @State private var isHovered = false
+
+    let name: String
+    let isOpening: Bool
+    let isLoading: Bool
+    let reduceMotion: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(MacDesignTokens.accentBlue.opacity(isHovered ? 0.16 : 0.12))
+                .frame(height: 112)
+                .overlay {
+                    Image(isOpening ? "MacFilesFolderOpen" : "MacFilesFolder")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 44, height: 44)
+                        .foregroundStyle(MacDesignTokens.accentBlue)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(10)
+                    }
+                }
+                .scaleEffect(isOpening && !reduceMotion ? 1.06 : 1)
+
+            Text(name)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.primaryText)
+                .lineLimit(2, reservesSpace: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct MacVideoGridCard: View {
+    @Environment(\.macTheme) private var theme
+    @State private var isHovered = false
+
+    let file: RemoteFile
+    let artwork: [URL]
+    let progress: FileWatchProgress?
+    let extract: (() async -> URL?)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            cover
+            Text(file.name)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(theme.primaryText)
+                .lineLimit(2, reservesSpace: true)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .contentShape(Rectangle())
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(progressDescription)
+    }
+
+    private var cover: some View {
+        Color.clear
+            .aspectRatio(16.0 / 9.0, contentMode: .fit)
+            .overlay {
+                if file.isVideo {
+                    MacFilesCoverImage(candidates: artwork, extract: extract) { placeholderGlyph }
+                } else {
+                    placeholderGlyph
+                }
+            }
+            .overlay(alignment: .bottom) { progressBar }
+            .overlay(alignment: .topTrailing) { watchedBadge }
+            .overlay {
+                if isHovered && file.isVideo {
+                    ZStack {
+                        Color.black.opacity(0.25)
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.white.opacity(0.9))
+                    }
+                }
+            }
+            .background(theme.secondaryButtonBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var placeholderGlyph: some View {
+        Image(systemName: file.isVideo ? "film" : file.type.macBrowseSystemImage)
+            .font(.system(size: 28, weight: .light))
+            .foregroundStyle(theme.tertiaryText)
+    }
+
+    @ViewBuilder
+    private var progressBar: some View {
+        if let progress, !progress.isWatched, progress.fraction > 0 {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.35))
+                    Capsule()
+                        .fill(MacDesignTokens.accentBlue)
+                        .frame(width: max(4, proxy.size.width * progress.fraction))
+                }
+            }
+            .frame(height: 4)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var watchedBadge: some View {
+        if progress?.isWatched == true {
+            Image(systemName: "checkmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(Color.black.opacity(0.55), in: Circle())
+                .padding(8)
+        }
+    }
+
+    private var progressDescription: String {
+        guard let progress else { return "" }
+        if progress.isWatched { return L10n.tr("已看完") }
+        return L10n.tr("已观看 %d%%", Int((progress.fraction * 100).rounded()))
+    }
+}
+
+// MARK: - Layout & Transition State
+
+private enum MacFilesBrowserLayout: String {
+    case grid
+    case list
+}
+
+private struct MacFolderTransitionState {
+    var anchor: UnitPoint = .center
+    var isForward = false
+    /// 每进入一级记录被点文件夹的锚点，返回时内容收回到对应位置。
+    var anchorStack: [UnitPoint] = []
+}
+
+/// 文件夹条目在内容区的位置。引用类型：滚动时更新不触发视图刷新。
+private final class MacFilesTileFrameStore {
+    var frames: [String: CGRect] = [:]
+}
+
+private extension View {
+    func reportMacTileFrame(path: String?, in space: String, store: MacFilesTileFrameStore) -> some View {
+        onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(space))
+        } action: { frame in
+            guard let path else { return }
+            store.frames[path] = frame
+        }
+    }
+}
+
+/// 前进：新目录从被点文件夹处放大展开，旧目录轻微放大淡出；返回：反向收回。Reduce Motion 只淡入淡出。
+private struct MacFolderOpenTransition: Transition {
+    let anchor: UnitPoint
+    let isForward: Bool
+    let reduceMotion: Bool
+
+    func body(content: Content, phase: TransitionPhase) -> some View {
+        content
+            .scaleEffect(scale(for: phase), anchor: anchor)
+            .opacity(phase.isIdentity ? 1 : 0)
+    }
+
+    private func scale(for phase: TransitionPhase) -> CGFloat {
+        guard !reduceMotion else { return 1 }
+        switch phase {
+        case .identity: return 1
+        case .willAppear: return isForward ? 0.2 : 1.03
+        case .didDisappear: return isForward ? 1.03 : 0.2
         }
     }
 }
@@ -623,6 +1052,33 @@ private extension RemoteFileType {
         case .other: L10n.tr("文件")
         }
     }
+
+    var macBrowseSystemImage: String {
+        switch self {
+        case .video: "film"
+        case .subtitle: "captions.bubble"
+        case .audio: "music.note"
+        case .image: "photo"
+        case .directory: "folder"
+        case .other: "doc"
+        }
+    }
+}
+
+#Preview("Grid States") {
+    let video = RemoteFile(name: "Dune Prophecy S01E01.mkv", path: "/v1", size: 1, isDirectory: false, modifiedDate: nil, type: .video)
+    let subtitle = RemoteFile(name: "Dune Prophecy S01E01.srt", path: "/s1", size: 1, isDirectory: false, modifiedDate: nil, type: .subtitle)
+    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16, alignment: .top), count: 3), spacing: 20) {
+        MacFolderGridTile(name: "Specials", isOpening: false, isLoading: false, reduceMotion: false)
+        MacFolderGridTile(name: "Extras", isOpening: true, isLoading: true, reduceMotion: false)
+        MacFolderGridTile(name: "A very long folder name that wraps onto two lines", isOpening: false, isLoading: false, reduceMotion: false)
+        MacVideoGridCard(file: video, artwork: [], progress: FileWatchProgress(fraction: 0.42, isWatched: false), extract: nil)
+        MacVideoGridCard(file: video, artwork: [], progress: FileWatchProgress(fraction: 1, isWatched: true), extract: nil)
+        MacVideoGridCard(file: subtitle, artwork: [], progress: nil, extract: nil)
+    }
+    .padding(24)
+    .frame(width: 944)
+    .macTheme(.light)
 }
 
 #Preview("Browse Light") {

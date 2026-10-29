@@ -12,6 +12,14 @@ struct ConnectionsView: View {
     /// 非 nil = 进入该连接的文件 / 文件夹浏览页（Files-Folders(-Videos)-Light）。
     @State private var enteredConnectionID: UUID?
     @State private var editingConnection: SavedConnection?
+    @AppStorage("files.browserLayout") private var layoutRaw = FilesBrowserLayout.grid.rawValue
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 正在打开的文件夹路径：保留旧内容并在该条目上显示打开态，加载完成后再做展开过渡。
+    @State private var openingFolderPath: String?
+    @State private var isNavigatingDirectory = false
+    @State private var folderTransition = FolderTransitionState()
+    @State private var tileFrames = FilesTileFrameStore()
+    @State private var contentSize: CGSize = .zero
 #if DEBUG
     /// 关闭播放器后 `.task` 会重跑；调试验收每个进程只触发一次。
     private static var didRunDebugSourceAcceptance = false
@@ -60,6 +68,9 @@ struct ConnectionsView: View {
         }
         .onChange(of: viewModel.pendingFolderBookmarkNavigation?.id) { _, _ in
             Task { await openPendingFolderBookmarkIfNeeded() }
+        }
+        .onChange(of: appState.isPlayerPresented) { _, isPresented in
+            if !isPresented { viewModel.refreshLibraryStates() }
         }
         .alert(L10n.tr("错误"), isPresented: $viewModel.showError) {
             Button(L10n.tr("确定")) {}
@@ -149,11 +160,30 @@ struct ConnectionsView: View {
         }
     }
 
-    // MARK: - 浏览页：文件夹 / 视频列表（Files-Folders(-Videos)-Light）
+    // MARK: - 浏览页：文件夹 / 视频（Files-Folders(-Videos) 列表 / Files-Grid 网格）
+
+    private static let contentSpace = "files.browser.content"
+    private static let gridColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 12, alignment: .top),
+        count: 3
+    )
+
+    private var layout: FilesBrowserLayout {
+        FilesBrowserLayout(rawValue: layoutRaw) ?? .grid
+    }
 
     private var fileBrowser: some View {
         VStack(spacing: 0) {
             FilesHeader(title: browserTitle, onBack: handleBack) {
+                if isNavigatingDirectory && viewModel.isBrowsingFiles && openingFolderPath == nil {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(FilesDesign.accent)
+                        .frame(width: 32, height: 32)
+                }
+                if !isIPTVBrowsing {
+                    layoutToggle
+                }
                 Menu {
                     Button {
                         Task { await viewModel.refreshCurrentDirectory() }
@@ -174,9 +204,27 @@ struct ConnectionsView: View {
         }
     }
 
+    /// 图标显示点按后切换到的布局（网格态显示列表图标）。
+    private var layoutToggle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                layoutRaw = (layout == .grid ? FilesBrowserLayout.list : .grid).rawValue
+            }
+        } label: {
+            Image(systemName: layout == .grid ? "list.bullet" : "square.grid.2x2")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(FilesDesign.secondaryIcon)
+                .frame(width: 32, height: 32)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(layout == .grid ? L10n.tr("切换为列表") : L10n.tr("切换为网格"))
+        .accessibilityIdentifier("files.layoutToggle")
+    }
+
     @ViewBuilder
     private var browserContent: some View {
-        if viewModel.isBrowsingFiles {
+        if viewModel.isBrowsingFiles && !isNavigatingDirectory {
             VStack(spacing: 10) {
                 ProgressView()
                     .tint(FilesDesign.accent)
@@ -196,7 +244,36 @@ struct ConnectionsView: View {
         } else if isIPTVBrowsing {
             iptvChannelList
         } else {
-            ScrollView(showsIndicators: false) {
+            directoryContainer
+        }
+    }
+
+    /// 以目录路径为身份做“文件夹打开”过渡：前进时新内容从被点文件夹处展开，返回时收回到该处。
+    private var directoryContainer: some View {
+        ZStack {
+            directoryListing
+                .id(viewModel.currentPath)
+                .transition(FolderOpenTransition(
+                    anchor: folderTransition.anchor,
+                    isForward: folderTransition.isForward,
+                    reduceMotion: reduceMotion
+                ))
+                .zIndex(Double(viewModel.pathStack.count))
+        }
+        .coordinateSpace(.named(Self.contentSpace))
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
+        .animation(directoryAnimation, value: viewModel.currentPath)
+    }
+
+    private var directoryAnimation: Animation {
+        reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.38, dampingFraction: 0.86)
+    }
+
+    private var directoryListing: some View {
+        ScrollView(showsIndicators: false) {
+            if layout == .grid {
+                gridListing
+            } else {
                 VStack(spacing: 4) {
                     ForEach(viewModel.files) { file in
                         fileRow(file)
@@ -205,56 +282,137 @@ struct ConnectionsView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
-            .refreshable {
-                await viewModel.refreshCurrentDirectory()
+        }
+        .refreshable {
+            await viewModel.refreshCurrentDirectory()
+        }
+    }
+
+    private var gridListing: some View {
+        let folders = viewModel.files.filter(\.isDirectory)
+        let items = viewModel.files.filter { !$0.isDirectory }
+        return VStack(alignment: .leading, spacing: 12) {
+            if !folders.isEmpty {
+                FilesSectionHeader(title: L10n.tr("文件夹"))
+                LazyVGrid(columns: Self.gridColumns, spacing: 16) {
+                    ForEach(folders) { folder in
+                        folderGridTile(folder)
+                    }
+                }
+            }
+            if !items.isEmpty {
+                FilesSectionHeader(title: items.allSatisfy(\.isVideo) ? L10n.tr("视频") : L10n.tr("文件"))
+                    .padding(.top, folders.isEmpty ? 0 : 8)
+                LazyVGrid(columns: Self.gridColumns, spacing: 16) {
+                    ForEach(items) { file in
+                        fileGridCard(file)
+                    }
+                }
             }
         }
+        .padding(16)
+    }
+
+    private func folderGridTile(_ folder: RemoteFile) -> some View {
+        Button {
+            openFolder(folder)
+        } label: {
+            FolderGridTile(
+                name: folder.name,
+                isOpening: openingFolderPath == folder.path,
+                isLoading: openingFolderPath == folder.path && viewModel.isBrowsingFiles,
+                reduceMotion: reduceMotion
+            )
+        }
+        .buttonStyle(FilesGridButtonStyle())
+        .reportTileFrame(path: folder.path, in: Self.contentSpace, store: tileFrames)
+        .contextMenu { fileContextMenu(folder) }
+    }
+
+    private func fileGridCard(_ file: RemoteFile) -> some View {
+        Button {
+            Task { await handleFileTap(file) }
+        } label: {
+            FileGridCard(
+                file: file,
+                artwork: artworkCandidates(for: file),
+                progress: watchProgress(for: file),
+                extract: extractedFrameLoader(for: file)
+            )
+        }
+        .buttonStyle(FilesGridButtonStyle())
+        .contextMenu { fileContextMenu(file) }
     }
 
     private func fileRow(_ file: RemoteFile) -> some View {
         Button {
             Task { await handleFileTap(file) }
         } label: {
-            FileCard(file: file) { file in
-                await viewModel.thumbnailURL(for: file)
-            }
+            FileCard(
+                file: file,
+                isOpening: openingFolderPath == file.path,
+                artwork: artworkCandidates(for: file),
+                extract: extractedFrameLoader(for: file)
+            )
         }
         .buttonStyle(FilesRowButtonStyle())
-        .contextMenu {
-            if file.isDirectory {
-                Button {
-                    Task { await viewModel.openDirectory(file) }
-                } label: {
-                    Label(L10n.tr("打开"), systemImage: "folder")
-                }
-                if viewModel.canBookmarkFoldersInSelectedConnection {
-                    Button {
-                        viewModel.toggleFolderBookmark(file)
-                    } label: {
-                        if viewModel.isFolderBookmarked(file) {
-                            Label(L10n.tr("取消书签"), systemImage: "bookmark.slash")
-                        } else {
-                            Label(L10n.tr("添加书签"), systemImage: "bookmark")
-                        }
-                    }
-                }
+        .reportTileFrame(path: file.isDirectory ? file.path : nil, in: Self.contentSpace, store: tileFrames)
+        .contextMenu { fileContextMenu(file) }
+    }
+
+    @ViewBuilder
+    private func fileContextMenu(_ file: RemoteFile) -> some View {
+        if file.isDirectory {
+            Button {
+                openFolder(file)
+            } label: {
+                Label(L10n.tr("打开"), systemImage: "folder")
             }
-            if file.isVideo {
+            if viewModel.canBookmarkFoldersInSelectedConnection {
                 Button {
-                    Task { await play(file) }
+                    viewModel.toggleFolderBookmark(file)
                 } label: {
-                    Label(L10n.tr("播放"), systemImage: "play.fill")
-                }
-                if let connection = viewModel.selectedConnection,
-                   DownloadEligibility.isEligible(file: file, connectionType: connection.type) {
-                    Button {
-                        Task { await download(file, connection: connection) }
-                    } label: {
-                        Label(L10n.tr("下载"), systemImage: "arrow.down.circle")
+                    if viewModel.isFolderBookmarked(file) {
+                        Label(L10n.tr("取消书签"), systemImage: "bookmark.slash")
+                    } else {
+                        Label(L10n.tr("添加书签"), systemImage: "bookmark")
                     }
                 }
             }
         }
+        if file.isVideo {
+            Button {
+                Task { await play(file) }
+            } label: {
+                Label(L10n.tr("播放"), systemImage: "play.fill")
+            }
+            if let connection = viewModel.selectedConnection,
+               DownloadEligibility.isEligible(file: file, connectionType: connection.type) {
+                Button {
+                    Task { await download(file, connection: connection) }
+                } label: {
+                    Label(L10n.tr("下载"), systemImage: "arrow.down.circle")
+                }
+            }
+        }
+    }
+
+    // MARK: - 封面 & 进度
+
+    private func artworkCandidates(for file: RemoteFile) -> [URL] {
+        guard file.isVideo else { return [] }
+        return FileCoverResolver.artworkCandidates(for: file, library: viewModel.libraryStates[file.path])
+    }
+
+    private func watchProgress(for file: RemoteFile) -> FileWatchProgress? {
+        guard file.isVideo else { return nil }
+        return FileCoverResolver.progress(for: file, library: viewModel.libraryStates[file.path])
+    }
+
+    private func extractedFrameLoader(for file: RemoteFile) -> (() async -> URL?)? {
+        guard file.isVideo else { return nil }
+        let viewModel = viewModel
+        return { await viewModel.thumbnailURL(for: file) }
     }
 
     // MARK: - IPTV 频道（分组 + 台标）
@@ -396,15 +554,47 @@ struct ConnectionsView: View {
 #endif
 
     private func enter(_ connection: SavedConnection) {
+        folderTransition = FolderTransitionState()
         withAnimation(.easeInOut(duration: 0.25)) {
             enteredConnectionID = connection.id
         }
         Task { await viewModel.selectConnection(connection) }
     }
 
+    private func openFolder(_ folder: RemoteFile) {
+        guard folder.isDirectory, !isNavigatingDirectory else { return }
+        let anchor = tileAnchor(for: folder.path)
+        folderTransition.anchor = anchor
+        folderTransition.isForward = true
+        isNavigatingDirectory = true
+        withAnimation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.7)) {
+            openingFolderPath = folder.path
+        }
+        Task {
+            let depth = viewModel.pathStack.count
+            await viewModel.openDirectory(folder)
+            if viewModel.pathStack.count > depth {
+                folderTransition.anchorStack.append(anchor)
+            }
+            openingFolderPath = nil
+            isNavigatingDirectory = false
+        }
+    }
+
+    private func tileAnchor(for path: String) -> UnitPoint {
+        guard let frame = tileFrames.frames[path], contentSize.width > 0, contentSize.height > 0 else {
+            return .center
+        }
+        return UnitPoint(
+            x: min(max(frame.midX / contentSize.width, 0), 1),
+            y: min(max(frame.midY / contentSize.height, 0), 1)
+        )
+    }
+
     private func openPendingFolderBookmarkIfNeeded() async {
         guard let request = viewModel.pendingFolderBookmarkNavigation else { return }
         await MainActor.run {
+            folderTransition = FolderTransitionState()
             withAnimation(.easeInOut(duration: 0.25)) {
                 enteredConnectionID = request.connectionId
             }
@@ -418,7 +608,19 @@ struct ConnectionsView: View {
                 enteredConnectionID = nil
             }
         } else {
-            Task { await viewModel.goBackDirectory() }
+            guard !isNavigatingDirectory else { return }
+            let anchor = folderTransition.anchorStack.popLast() ?? .center
+            folderTransition.anchor = anchor
+            folderTransition.isForward = false
+            isNavigatingDirectory = true
+            Task {
+                let depth = viewModel.pathStack.count
+                await viewModel.goBackDirectory()
+                if viewModel.pathStack.count >= depth {
+                    folderTransition.anchorStack.append(anchor)
+                }
+                isNavigatingDirectory = false
+            }
         }
     }
 
@@ -426,7 +628,7 @@ struct ConnectionsView: View {
 
     private func handleFileTap(_ file: RemoteFile) async {
         if file.isDirectory {
-            await viewModel.openDirectory(file)
+            openFolder(file)
         } else if file.isVideo {
             await play(file)
         }
@@ -472,7 +674,7 @@ struct ConnectionsView: View {
                 let ext = (file.name as NSString).pathExtension
                 item.container = ext.isEmpty ? nil : ext.lowercased()
             }
-            appState.play(item)
+            appState.play(viewModel.persistentPlaybackItem(for: file, candidate: item))
         } catch {
             if isIPTVBrowsing {
                 viewModel.markChannelPlaybackFailed(file)
@@ -521,6 +723,7 @@ private enum FilesDesign {
     static let addButtonBackground = Color.vanmoAccent.opacity(0.12)  // “+” 按钮底
     static let iconBoxGray       = dyn("#E4E4E7", "#27272A")          // NAS / 视频图标底盒
     static let folderBoxBackground = Color.vanmoAccent.opacity(0.08)  // 文件夹图标底盒
+    static let folderBoxPressed  = Color.vanmoAccent.opacity(0.16)    // 网格文件夹按下
     static let statusConnected   = dyn("#009966", "#00D492")          // 已连接绿
     static let connectionDot     = dyn("#9F9FA9", "#52525C")          // 连接副标题分隔圆点
     static let videoDot          = dyn("#D4D4D8", "#3F3F47")          // 视频信息分隔圆点
@@ -683,17 +886,21 @@ private struct ConnectionCard: View {
 
 private struct FileCard: View {
     let file: RemoteFile
-    var thumbnailProvider: ((RemoteFile) async -> URL?)?
+    var isOpening = false
+    var artwork: [URL] = []
+    var extract: (() async -> URL?)?
 
     var body: some View {
         HStack(spacing: 0) {
             FilesIconBox(background: file.isDirectory ? FilesDesign.folderBoxBackground : FilesDesign.iconBoxGray) {
                 if file.isDirectory {
-                    fileGlyph(name: "FilesFolder", color: FilesDesign.accent)
-                } else if file.isVideo, thumbnailProvider != nil {
-                    FileVideoThumbnailIcon(file: file, load: thumbnailProvider, fallback: {
+                    fileGlyph(name: isOpening ? "FilesFolderOpen" : "FilesFolder", color: FilesDesign.accent)
+                } else if file.isVideo {
+                    FilesCoverImage(candidates: artwork, extract: extract) {
                         fileGlyph(name: "FilesFileVideo", color: FilesDesign.secondaryIcon)
-                    })
+                    }
+                    .frame(width: 24, height: 24)
+                    .clipped()
                 } else {
                     fileGlyph(name: "FilesFileVideo", color: FilesDesign.secondaryIcon)
                 }
@@ -750,35 +957,263 @@ private struct FileCard: View {
     }
 }
 
-private struct FileVideoThumbnailIcon<Fallback: View>: View {
-    let file: RemoteFile
-    let load: ((RemoteFile) async -> URL?)?
-    @ViewBuilder let fallback: () -> Fallback
+/// 按优先级依次尝试封面地址（海报 → 背景图），全部缺失或加载失败后再抽帧，最后显示占位图标。
+private struct FilesCoverImage<Placeholder: View>: View {
+    let candidates: [URL]
+    let extract: (() async -> URL?)?
+    @ViewBuilder let placeholder: () -> Placeholder
 
-    @State private var thumbnailURL: URL?
+    @State private var step = 0
+    @State private var extractedURL: URL?
 
     var body: some View {
         Group {
-            if let thumbnailURL {
-                AsyncImage(url: thumbnailURL) { phase in
-                    if case .success(let image) = phase {
+            if let url = currentURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
                         image
                             .resizable()
                             .scaledToFill()
-                    } else {
-                        fallback()
+                    case .failure:
+                        placeholder().onAppear { step += 1 }
+                    default:
+                        placeholder()
                     }
                 }
+                .id(url)
             } else {
-                fallback()
+                placeholder()
             }
         }
-        .frame(width: 24, height: 24)
-        .clipped()
-        .task(id: file.path) {
-            guard let load else { return }
-            thumbnailURL = await load(file)
+        .onChange(of: candidates) { _, _ in
+            step = 0
+            extractedURL = nil
         }
+        .task(id: CoverStepKey(candidates: candidates, step: step)) {
+            guard step == candidates.count, extractedURL == nil, let extract else { return }
+            extractedURL = await extract()
+        }
+    }
+
+    private var currentURL: URL? {
+        if step < candidates.count { return candidates[step] }
+        return step == candidates.count ? extractedURL : nil
+    }
+}
+
+private struct CoverStepKey: Hashable {
+    let candidates: [URL]
+    let step: Int
+}
+
+// MARK: - 网格卡片（Files-Grid）
+
+private struct FolderGridTile: View {
+    let name: String
+    let isOpening: Bool
+    let isLoading: Bool
+    let reduceMotion: Bool
+    @Environment(\.filesGridPressed) private var isPressed
+
+    var body: some View {
+        VStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(isPressed ? FilesDesign.folderBoxPressed : FilesDesign.folderBoxBackground)
+                .aspectRatio(103.0 / 84.0, contentMode: .fit)
+                .overlay {
+                    Image(isOpening ? "FilesFolderOpen" : "FilesFolder")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 36, height: 36)
+                        .foregroundStyle(FilesDesign.accent)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(FilesDesign.accent)
+                            .padding(8)
+                    }
+                }
+                .scaleEffect(isOpening && !reduceMotion ? 1.08 : 1)
+
+            Text(name)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(FilesDesign.title)
+                .multilineTextAlignment(.center)
+                .lineLimit(2, reservesSpace: true)
+                .frame(maxWidth: .infinity)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct FileGridCard: View {
+    let file: RemoteFile
+    let artwork: [URL]
+    let progress: FileWatchProgress?
+    let extract: (() async -> URL?)?
+    @Environment(\.filesGridPressed) private var isPressed
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            cover
+            Text(file.name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(FilesDesign.title)
+                .lineLimit(2, reservesSpace: true)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(progressDescription)
+    }
+
+    private var cover: some View {
+        Color.clear
+            .aspectRatio(16.0 / 9.0, contentMode: .fit)
+            .overlay {
+                if file.isVideo {
+                    FilesCoverImage(candidates: artwork, extract: extract) { placeholderGlyph }
+                } else {
+                    placeholderGlyph
+                }
+            }
+            .overlay(alignment: .bottom) { progressBar }
+            .overlay(alignment: .topTrailing) { watchedBadge }
+            .overlay {
+                if isPressed { Color.black.opacity(0.15) }
+            }
+            .background(FilesDesign.iconBoxGray)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var placeholderGlyph: some View {
+        if file.isVideo {
+            Image("FilesFileVideo")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .foregroundStyle(FilesDesign.secondaryIcon)
+        } else {
+            Image(systemName: file.type.filesSystemImage)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(FilesDesign.secondaryIcon)
+        }
+    }
+
+    @ViewBuilder
+    private var progressBar: some View {
+        if let progress, !progress.isWatched, progress.fraction > 0 {
+            ZStack(alignment: .bottom) {
+                LinearGradient(colors: [.clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 22)
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.35))
+                        Capsule()
+                            .fill(FilesDesign.accent)
+                            .frame(width: max(3, proxy.size.width * progress.fraction))
+                    }
+                }
+                .frame(height: 3)
+                .padding(.horizontal, 6)
+                .padding(.bottom, 6)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var watchedBadge: some View {
+        if progress?.isWatched == true {
+            Image(systemName: "checkmark")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 16, height: 16)
+                .background(Color.black.opacity(0.55), in: Circle())
+                .padding(6)
+        }
+    }
+
+    private var progressDescription: String {
+        guard let progress else { return "" }
+        if progress.isWatched { return L10n.tr("已看完") }
+        return L10n.tr("已观看 %d%%", Int((progress.fraction * 100).rounded()))
+    }
+}
+
+// MARK: - 布局 & 过渡状态
+
+private enum FilesBrowserLayout: String {
+    case grid
+    case list
+}
+
+private struct FolderTransitionState {
+    var anchor: UnitPoint = .center
+    var isForward = true
+    /// 每进入一级记录被点文件夹的锚点，返回时内容收回到对应位置。
+    var anchorStack: [UnitPoint] = []
+}
+
+/// 文件夹条目在内容区的位置。引用类型：滚动时更新不触发视图刷新。
+private final class FilesTileFrameStore {
+    var frames: [String: CGRect] = [:]
+}
+
+private extension View {
+    func reportTileFrame(path: String?, in space: String, store: FilesTileFrameStore) -> some View {
+        onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named(space))
+        } action: { frame in
+            guard let path else { return }
+            store.frames[path] = frame
+        }
+    }
+}
+
+/// 前进：新目录从被点文件夹处放大展开，旧目录轻微放大淡出；返回：反向收回。Reduce Motion 只淡入淡出。
+private struct FolderOpenTransition: Transition {
+    let anchor: UnitPoint
+    let isForward: Bool
+    let reduceMotion: Bool
+
+    func body(content: Content, phase: TransitionPhase) -> some View {
+        content
+            .scaleEffect(scale(for: phase), anchor: anchor)
+            .opacity(phase.isIdentity ? 1 : 0)
+    }
+
+    private func scale(for phase: TransitionPhase) -> CGFloat {
+        guard !reduceMotion else { return 1 }
+        switch phase {
+        case .identity: return 1
+        case .willAppear: return isForward ? 0.2 : 1.04
+        case .didDisappear: return isForward ? 1.04 : 0.2
+        }
+    }
+}
+
+private struct FilesGridPressedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private extension EnvironmentValues {
+    var filesGridPressed: Bool {
+        get { self[FilesGridPressedKey.self] }
+        set { self[FilesGridPressedKey.self] = newValue }
+    }
+}
+
+private struct FilesGridButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .environment(\.filesGridPressed, configuration.isPressed)
+            .contentShape(Rectangle())
     }
 }
 
@@ -941,6 +1376,17 @@ private extension RemoteFileType {
         case .other:     return L10n.tr("文件")
         }
     }
+
+    var filesSystemImage: String {
+        switch self {
+        case .video:     return "film"
+        case .subtitle:  return "captions.bubble"
+        case .audio:     return "music.note"
+        case .image:     return "photo"
+        case .directory: return "folder"
+        case .other:     return "doc"
+        }
+    }
 }
 
 // MARK: - Typealias for backward compatibility
@@ -963,4 +1409,19 @@ typealias BrowserView = ConnectionsView
     .environmentObject(AppState())
     .environmentObject(ConnectionsViewModel())
     .preferredColorScheme(.dark)
+}
+
+#Preview("Grid states") {
+    let video = RemoteFile(name: "Dune Prophecy S01E01.mkv", path: "/v1", size: 1, isDirectory: false, modifiedDate: nil, type: .video)
+    let subtitle = RemoteFile(name: "Dune Prophecy S01E01.srt", path: "/s1", size: 1, isDirectory: false, modifiedDate: nil, type: .subtitle)
+    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: 3), spacing: 16) {
+        FolderGridTile(name: "Specials", isOpening: false, isLoading: false, reduceMotion: false)
+        FolderGridTile(name: "Extras", isOpening: true, isLoading: true, reduceMotion: false)
+        FolderGridTile(name: "A very long folder name that wraps", isOpening: false, isLoading: false, reduceMotion: false)
+        FileGridCard(file: video, artwork: [], progress: FileWatchProgress(fraction: 0.42, isWatched: false), extract: nil)
+        FileGridCard(file: video, artwork: [], progress: FileWatchProgress(fraction: 1, isWatched: true), extract: nil)
+        FileGridCard(file: subtitle, artwork: [], progress: nil, extract: nil)
+    }
+    .padding(16)
+    .background(FilesDesign.background)
 }

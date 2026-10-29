@@ -2761,6 +2761,9 @@ final class PlayerViewModel: ObservableObject {
         guard !item.isLiveStream else { return }
         item.lastPlaybackPosition = currentTime
         item.lastPlayedAt = Date()
+        if item.duration <= 0, duration > 0 {
+            item.duration = duration
+        }
         if currentTime / max(duration, 1) > 0.9 {
             item.isWatched = true
             reportWatchedToServerIfNeeded()

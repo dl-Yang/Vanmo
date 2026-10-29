@@ -165,6 +165,9 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
             components.queryItems = [
                 URLQueryItem(name: "ParentId", value: path),
                 URLQueryItem(name: "Fields", value: "Path,Size,DateCreated,MediaSources"),
+                URLQueryItem(name: "EnableUserData", value: "true"),
+                URLQueryItem(name: "EnableImageTypes", value: "Primary,Backdrop"),
+                URLQueryItem(name: "ImageTypeLimit", value: "1"),
                 URLQueryItem(name: "api_key", value: token),
             ]
             url = components.url!
@@ -180,19 +183,50 @@ public final class EmbyService: MediaServerService, MediaSearchProviding {
 
         try validateEmbyResponse(response, body: data, context: "list items")
 
+        let files = try Self.remoteFiles(fromListing: data, baseURL: base, apiPrefix: apiPrefix, token: token)
+        VanmoLogger.network.info("[\(self.type.displayName)] Found \(files.count) items")
+        return files
+    }
+
+    /// 把 `Users/{id}/Items` 响应映射成 Files 浏览条目，附带海报 / 背景图与服务器观看进度。
+    static func remoteFiles(fromListing data: Data, baseURL: URL, apiPrefix: String, token: String) throws -> [RemoteFile] {
         let result = try JSONDecoder().decode(EmbyItemsResponse.self, from: data)
-        VanmoLogger.network.info("[\(self.type.displayName)] Found \(result.items.count) items")
+        let base = baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        func imageURL(itemId: String, type: String) -> URL? {
+            URL(string: "\(base)/\(apiPrefix)Items/\(itemId)/Images/\(type)?maxWidth=640&quality=85&api_key=\(token)")
+        }
 
         return result.items.map { item in
             let isFolder = item.isFolder ?? (item.type == "Folder" || item.type == "CollectionFolder" || item.type == "UserView")
             let fileType = Self.remoteFileType(itemType: item.type, isFolder: isFolder, path: item.path, name: item.name)
+
+            let posterURL: URL? = if item.imageTags?.primary != nil {
+                imageURL(itemId: item.id, type: "Primary")
+            } else if item.seriesPrimaryImageTag != nil, let seriesId = item.seriesId {
+                imageURL(itemId: seriesId, type: "Primary")
+            } else {
+                nil
+            }
+            let backdropURL: URL? = if item.backdropImageTags?.isEmpty == false {
+                imageURL(itemId: item.id, type: "Backdrop/0")
+            } else if item.parentBackdropImageTags?.isEmpty == false, let parentId = item.parentBackdropItemId {
+                imageURL(itemId: parentId, type: "Backdrop/0")
+            } else {
+                nil
+            }
+
             return RemoteFile(
                 name: item.name,
                 path: item.id,
                 size: item.size ?? 0,
                 isDirectory: isFolder,
                 modifiedDate: nil,
-                type: fileType
+                type: fileType,
+                posterURL: posterURL,
+                backdropURL: backdropURL,
+                playbackPosition: item.userData?.playbackPositionTicks.map { TimeInterval($0) / 10_000_000 },
+                runtime: item.runTimeTicks.map { TimeInterval($0) / 10_000_000 },
+                isPlayed: item.userData?.played ?? false
             )
         }
     }
@@ -1252,6 +1286,14 @@ private struct EmbyItem: Decodable {
     let isFolder: Bool?
     let path: String?
     let size: Int64?
+    let runTimeTicks: Int64?
+    let imageTags: EmbyImageTags?
+    let backdropImageTags: [String]?
+    let parentBackdropItemId: String?
+    let parentBackdropImageTags: [String]?
+    let seriesId: String?
+    let seriesPrimaryImageTag: String?
+    let userData: EmbyListingUserData?
 
     enum CodingKeys: String, CodingKey {
         case id = "Id"
@@ -1261,6 +1303,24 @@ private struct EmbyItem: Decodable {
         case isFolder = "IsFolder"
         case path = "Path"
         case size = "Size"
+        case runTimeTicks = "RunTimeTicks"
+        case imageTags = "ImageTags"
+        case backdropImageTags = "BackdropImageTags"
+        case parentBackdropItemId = "ParentBackdropItemId"
+        case parentBackdropImageTags = "ParentBackdropImageTags"
+        case seriesId = "SeriesId"
+        case seriesPrimaryImageTag = "SeriesPrimaryImageTag"
+        case userData = "UserData"
+    }
+}
+
+private struct EmbyListingUserData: Decodable {
+    let playbackPositionTicks: Int64?
+    let played: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case playbackPositionTicks = "PlaybackPositionTicks"
+        case played = "Played"
     }
 }
 
