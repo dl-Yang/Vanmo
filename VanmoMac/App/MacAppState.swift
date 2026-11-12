@@ -87,6 +87,7 @@ enum MacContentRoute: Equatable {
     case libraryEmbyFolderBrowse
     case libraryScannedShowDetail(connectionId: UUID, showTitle: String, parentDirectory: String)
     case connectionBrowser(activeConnectionId: UUID)
+    case directLinks
     case search
 }
 
@@ -348,7 +349,7 @@ final class MacAppState: ObservableObject {
         case .libraryCollectionFolder, .libraryScannedLibrary,
              .libraryEmbyFolderBrowse, .libraryScannedShowDetail:
             backFromLibrarySubRoute()
-        case .connectionBrowser:
+        case .connectionBrowser, .directLinks:
             exitConnectionBrowser()
         case .search:
             contentRoute = .library
@@ -365,6 +366,12 @@ final class MacAppState: ObservableObject {
     func enterConnectionBrowser(_ connection: SavedConnection) {
         clearLibrarySubRouteContext()
         contentRoute = .connectionBrowser(activeConnectionId: connection.id)
+        closeDetail()
+    }
+
+    func openDirectLinks() {
+        clearLibrarySubRouteContext()
+        contentRoute = .directLinks
         closeDetail()
     }
 

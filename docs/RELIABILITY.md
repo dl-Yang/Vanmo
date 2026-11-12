@@ -11,6 +11,8 @@ This document defines how Vanmo proves that the repository and user journeys are
 
 ### Bootstrap
 
+OAuth credentials come from the git-ignored `Local.xcconfig` (template `Local.xcconfig.example`), which `Config/Secrets.xcconfig` includes into both app targets. A machine without it still builds and tests; those sign-in controls stay disabled, and unit tests never read real credentials. A Release or Archive build must have `Local.xcconfig`, or every OAuth sign-in ships disabled.
+
 ```bash
 ./init.sh
 ```

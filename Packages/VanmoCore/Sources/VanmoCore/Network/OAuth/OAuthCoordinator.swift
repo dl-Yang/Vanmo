@@ -26,8 +26,12 @@ public final class OAuthCoordinator: NSObject {
     public var presentationContextProvider: OAuthPresentationContextProvider?
     /// 已注册外部登录器的网盘不走 `ASWebAuthenticationSession`。
     public var externalAuthenticators: [ConnectionType: OAuthExternalAuthenticator] = [:]
+    /// 凭据来自 App `Info.plist`；单元测试进程没有，需要替换。
+    var isProviderConfigured: (ConnectionType) -> Bool = OAuthProviderConfiguration.isConfigured(for:)
 
     private var session: ASWebAuthenticationSession?
+    /// Box 等使用一次性 refresh token 的网盘，需要把并发续期合并成一次网络请求。
+    private let refreshSingleFlight = OAuthRefreshSingleFlight()
 
     public override init() {}
 
@@ -35,7 +39,7 @@ public final class OAuthCoordinator: NSObject {
         guard type.supportsOAuthLogin else {
             throw NetworkError.unsupportedProtocol
         }
-        guard OAuthProviderConfiguration.isConfigured(for: type) else {
+        guard isProviderConfigured(type) else {
             throw NetworkError.connectionFailed(
                 "\(type.displayName) 尚未配置开发者凭据：\(OAuthProviderConfiguration.missingCredentialHint(for: type))"
             )
@@ -72,7 +76,16 @@ public final class OAuthCoordinator: NSObject {
         guard forceRefresh || credential.isExpired else {
             return credential.accessToken
         }
-        let refreshed = try await refresh(credential, type: type, connectionId: connectionId)
+        let refreshed = try await refreshSingleFlight.credential(for: connectionId) { [weak self] in
+            guard let self else { throw NetworkError.authenticationFailed }
+            // 等待期间可能已有另一次刷新完成并写回新 token；用旧 refresh_token 再刷一次会被
+            // Box 这类一次性轮换的实现判成 invalid_grant。存储里 token 已变化时直接复用。
+            let latest = (try? OAuthCredentialStore.load(connectionId: connectionId)) ?? credential
+            if latest.accessToken != credential.accessToken {
+                return latest
+            }
+            return try await self.refresh(latest, type: type, connectionId: connectionId)
+        }
         return refreshed.accessToken
     }
 
@@ -84,16 +97,15 @@ public final class OAuthCoordinator: NSObject {
             throw NetworkError.unsupportedProtocol
         }
 
-        var items = [
-            URLQueryItem(name: "grant_type", value: "refresh_token"),
-            URLQueryItem(name: "refresh_token", value: credential.refreshToken),
-            URLQueryItem(name: "client_id", value: OAuthProviderConfiguration.clientID(for: type)),
-        ]
-        if let secret = OAuthProviderConfiguration.clientSecret(for: type), !secret.isEmpty {
-            items.append(URLQueryItem(name: "client_secret", value: secret))
-        }
-
-        let response = try await requestToken(url: tokenURL, formItems: items)
+        let response = try await requestToken(
+            url: tokenURL,
+            formItems: Self.refreshFormItems(
+                credential: credential,
+                type: type,
+                clientSecret: OAuthProviderConfiguration.clientSecret(for: type)
+            ),
+            type: type
+        )
         let refreshedCredential = response.makeCredential(
             provider: type,
             fallbackRefreshToken: credential.refreshToken,
@@ -110,6 +122,11 @@ public final class OAuthCoordinator: NSObject {
         let pkce = OAuthProviderConfiguration.usesPKCE(for: type) ? PKCEPair.generate() : nil
 
         let authorizationURL = try makeAuthorizationCodeURL(type: type, state: state, pkce: pkce)
+#if DEBUG
+        VanmoLogger.network.info(
+            "[Debug][OAuth] authorize type=\(type.rawValue, privacy: .public) scope=\(OAuthProviderConfiguration.scope(for: type), privacy: .public)"
+        )
+#endif
         let callbackURL = try await startAuthenticationSession(url: authorizationURL, type: type)
 
         guard let components = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
@@ -199,7 +216,9 @@ public final class OAuthCoordinator: NSObject {
         if let pkce {
             items.append(URLQueryItem(name: "code_challenge", value: pkce.challenge))
             items.append(URLQueryItem(name: "code_challenge_method", value: "S256"))
-        } else if type != .googleDrive && type != .oneDrive {
+        } else if type != .googleDrive && type != .oneDrive && type != .box {
+            // Google 之外的旧授权码流程（如 pCloud）历史上依赖 offline 参数；Box 不认这个参数，
+            // 它的 refresh token 由应用配置和 scope 决定，不需要额外传参。
             items.append(URLQueryItem(name: "access_type", value: "offline"))
         }
         components?.queryItems = items
@@ -231,6 +250,23 @@ public final class OAuthCoordinator: NSObject {
             throw NetworkError.unsupportedProtocol
         }
 
+        let items = Self.authorizationCodeFormItems(
+            code: code,
+            type: type,
+            codeVerifier: codeVerifier,
+            clientSecret: OAuthProviderConfiguration.clientSecret(for: type)
+        )
+        let response = try await requestToken(url: tokenURL, formItems: items, type: type)
+        return response.makeCredential(provider: type, fallbackRefreshToken: "", apiHost: nil)
+    }
+
+    /// 授权码换取 token 的表单；抽成纯函数便于测试 Box 的 Secret 模式契约。
+    nonisolated static func authorizationCodeFormItems(
+        code: String,
+        type: ConnectionType,
+        codeVerifier: String?,
+        clientSecret: String?
+    ) -> [URLQueryItem] {
         var items = [
             URLQueryItem(name: "grant_type", value: "authorization_code"),
             URLQueryItem(name: "code", value: code),
@@ -240,15 +276,30 @@ public final class OAuthCoordinator: NSObject {
         if let codeVerifier {
             items.append(URLQueryItem(name: "code_verifier", value: codeVerifier))
         }
-        if let secret = OAuthProviderConfiguration.clientSecret(for: type), !secret.isEmpty {
-            items.append(URLQueryItem(name: "client_secret", value: secret))
+        if let clientSecret, !clientSecret.isEmpty {
+            items.append(URLQueryItem(name: "client_secret", value: clientSecret))
         }
-
-        let response = try await requestToken(url: tokenURL, formItems: items)
-        return response.makeCredential(provider: type, fallbackRefreshToken: "", apiHost: nil)
+        return items
     }
 
-    private func requestToken(url: URL, formItems: [URLQueryItem]) async throws -> OAuthTokenResponse {
+    /// refresh token 的表单；抽成纯函数便于测试 Box 的 Secret 模式契约。
+    nonisolated static func refreshFormItems(
+        credential: OAuthCredential,
+        type: ConnectionType,
+        clientSecret: String?
+    ) -> [URLQueryItem] {
+        var items = [
+            URLQueryItem(name: "grant_type", value: "refresh_token"),
+            URLQueryItem(name: "refresh_token", value: credential.refreshToken),
+            URLQueryItem(name: "client_id", value: OAuthProviderConfiguration.clientID(for: type)),
+        ]
+        if let clientSecret, !clientSecret.isEmpty {
+            items.append(URLQueryItem(name: "client_secret", value: clientSecret))
+        }
+        return items
+    }
+
+    private func requestToken(url: URL, formItems: [URLQueryItem], type: ConnectionType) async throws -> OAuthTokenResponse {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -273,14 +324,39 @@ public final class OAuthCoordinator: NSObject {
         VanmoLogger.network.info("[Debug][OAuth] token request host=\(tokenHost, privacy: .public) status=\(tokenStatus, privacy: .public)")
 #endif
         guard (200...299).contains(httpResponse.statusCode) else {
-            let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            throw NetworkError.connectionFailed("OAuth token 请求失败 (\(httpResponse.statusCode)): \(body)")
+            throw NetworkError.connectionFailed(
+                Self.tokenErrorMessage(statusCode: httpResponse.statusCode, data: data, type: type)
+            )
         }
 
         do {
-            return try JSONDecoder.oauth.decode(OAuthTokenResponse.self, from: data)
+            let token = try JSONDecoder.oauth.decode(OAuthTokenResponse.self, from: data)
+#if DEBUG
+            VanmoLogger.network.info(
+                "[Debug][OAuth] token granted type=\(type.rawValue, privacy: .public) scope=\(token.scope ?? "-", privacy: .public)"
+            )
+#endif
+            return token
         } catch {
             throw NetworkError.transferFailed("OAuth token 响应解析失败: \(error.localizedDescription)")
+        }
+    }
+
+    /// 把 token 端点的 OAuth 错误体翻译成可读文案。
+    /// Box 的 refresh token 有效期 60 天且一次性轮换，失效时返回 400 `invalid_grant`；
+    /// 这里必须提示重新登录，而不是把整段 JSON 抛给用户。
+    nonisolated static func tokenErrorMessage(statusCode: Int, data: Data, type: ConnectionType) -> String {
+        let body = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
+        guard let error = try? JSONDecoder.oauth.decode(OAuthTokenErrorResponse.self, from: data) else {
+            return "OAuth token 请求失败 (\(statusCode)): \(body)"
+        }
+        switch error.error {
+        case "invalid_grant":
+            return "\(type.displayName) 登录已过期或授权已被撤销，请重新授权登录。"
+        case "invalid_client":
+            return "\(type.displayName) 应用凭据无效，请检查 Client ID / Client Secret。"
+        default:
+            return "OAuth token 请求失败 (\(statusCode)): \(error.error)"
         }
     }
 
@@ -387,6 +463,12 @@ private struct OAuthTokenResponse: Decodable {
             apiHost: hostname ?? apiHost
         )
     }
+}
+
+/// OAuth 错误体（RFC 6749 §5.2）：`invalid_grant`、`invalid_client` 等。
+private struct OAuthTokenErrorResponse: Decodable {
+    let error: String
+    let errorDescription: String?
 }
 
 private extension JSONDecoder {

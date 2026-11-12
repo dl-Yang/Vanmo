@@ -24,6 +24,10 @@ public enum HlsTranscodePrimer {
             }
             return .variant(variant)
         }
+        // 字节区间分段指向同一个完整文件，按 URL 预下载会把整片拉完才开播；转码分段不使用该标签。
+        if lines.contains(where: { $0.uppercased().hasPrefix("#EXT-X-BYTERANGE") }) {
+            return nil
+        }
 
         var cursor: TimeInterval = 0
         var pendingDuration: TimeInterval?

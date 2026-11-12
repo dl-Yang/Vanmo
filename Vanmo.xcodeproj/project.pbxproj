@@ -41,6 +41,7 @@
 		3327E030E931885C3DF57DEA /* MacSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 420028D7778B000899098985 /* MacSidebarView.swift */; };
 		33DFE73FD27998678079F407 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = ADF90EC697DE5562B3A3B90F /* PrivacyInfo.xcprivacy */; };
 		3429123E6329B78C98DD493E /* smb.png in Resources */ = {isa = PBXBuildFile; fileRef = 9142879B3AF4CF446473F7C7 /* smb.png */; };
+		348174F0F7B4E68A310F7EDA /* MacPlexSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9683B000C6C3857A82C211F /* MacPlexSignInView.swift */; };
 		348399A49CBCA143089052E9 /* MacEpisodeSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 259F1B52F67CBB129B0214E9 /* MacEpisodeSelectorView.swift */; };
 		363D00137C601237B884871A /* sftp.png in Resources */ = {isa = PBXBuildFile; fileRef = F6D9D90CEE03512262E3FDBC /* sftp.png */; };
 		368E2796F56AC4A64B535705 /* DownloadLiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B470B000193E321F251817 /* DownloadLiveActivityIntents.swift */; };
@@ -112,6 +113,7 @@
 		92FE67DF76138D930B46E066 /* VanmoCore in Frameworks */ = {isa = PBXBuildFile; productRef = 42B7EA96FE9499172F66E647 /* VanmoCore */; };
 		93D79E4B24BB123992D01808 /* MacHomeCollectionCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F8B25C7F98E598559CBE6A /* MacHomeCollectionCache.swift */; };
 		94CC08A9C73E34D912F49CC8 /* emby.png in Resources */ = {isa = PBXBuildFile; fileRef = F0A25BAD49788F06D474B95F /* emby.png */; };
+		950A1AF976D1CAB58F925022 /* DirectLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 806ACA84E582C4C81E6687B9 /* DirectLinkView.swift */; };
 		9594C847839FD1AA5E98EBEC /* MacDownloadManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B07335DD76360DAFE15A376 /* MacDownloadManagementView.swift */; };
 		9674A00E86D78D53EDA38E2C /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03DEC87067987F9F73EF86AC /* SettingsViewModel.swift */; };
 		96980FF8C625A4CA15A5C525 /* MediaDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEC3480B949E6965C136DCA2 /* MediaDetailView.swift */; };
@@ -153,12 +155,14 @@
 		C8D53FF63F5EE1E87FD0AF8E /* MacScanSyncBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B45846B6B09E717C245CFD9 /* MacScanSyncBanner.swift */; };
 		CB6685A01E4B0E6B419481F1 /* baiduNetdisk.png in Resources */ = {isa = PBXBuildFile; fileRef = B09C32D3BB0EC025D1769F53 /* baiduNetdisk.png */; };
 		CEE663CAED98260E8D5DF085 /* DownloadNotchStatusBarHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 562559506E4D0EB0EC3253DC /* DownloadNotchStatusBarHost.swift */; };
+		D21405C993DC3DE0E4F41C8A /* PlexSignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9423B5C1BB4C147B450C942E /* PlexSignInView.swift */; };
 		D442E93B0F496CD0726CDA47 /* KSPlayerMediaProbeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86786584DACF6F5FC223B219 /* KSPlayerMediaProbeProvider.swift */; };
 		D59F902EE7228DE91DADB286 /* mega.png in Resources */ = {isa = PBXBuildFile; fileRef = C64BB62C8F69AE1F342C8CE4 /* mega.png */; };
 		D930CAE97EB033B3F87D6E2A /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = D672C6AFDA04BC432035478A /* InfoPlist.xcstrings */; };
 		DB26E3C4BEC970BA23430A51 /* Int64+FileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A521F383F9593A5453CA43 /* Int64+FileSize.swift */; };
 		DBAE52984CBCDC1E58D5A88B /* ScrubPreviewLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FD61BBE26ABC8686456240D /* ScrubPreviewLane.swift */; };
 		DC9562451E2BA559CAD83594 /* MacPlayerCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F280E2A3DEE8284306203CA /* MacPlayerCommands.swift */; };
+		DCDBB350B278CFA001105C4D /* MacDirectLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAC6D54ACF803F1819DE6FE6 /* MacDirectLinkView.swift */; };
 		DD63854EBFCF830BA275350B /* MacHeaderToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A076FE8593DEDD875F5BAA8 /* MacHeaderToolbar.swift */; };
 		DDE0739230E75BEA0D4173E5 /* loadingSpinner.json in Resources */ = {isa = PBXBuildFile; fileRef = A73A98C67D1020444BFEC4D4 /* loadingSpinner.json */; };
 		DF8996C7A702A264A72EE222 /* googleDrive.png in Resources */ = {isa = PBXBuildFile; fileRef = F0FEED6C64943C9903BD8BF9 /* googleDrive.png */; };
@@ -299,6 +303,7 @@
 		7BAFA7DEA8E1C7B77F951404 /* ftp.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ftp.png; sourceTree = "<group>"; };
 		7E56E086FB3E50923008C4CD /* FilterChipsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChipsRow.swift; sourceTree = "<group>"; };
 		7FA77F177C2594A21A8372CB /* KSPlayerVideoThumbnailExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KSPlayerVideoThumbnailExtractor.swift; sourceTree = "<group>"; };
+		806ACA84E582C4C81E6687B9 /* DirectLinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectLinkView.swift; sourceTree = "<group>"; };
 		8331488DDF8E08E73F3667EF /* Vanmo-Cloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Cloud.entitlements"; sourceTree = "<group>"; };
 		83FDFF1091EE82F447D35C39 /* MacKSPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacKSPlayerView.swift; sourceTree = "<group>"; };
 		8636415210B4191F85B68B7E /* MacRemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacRemoteImage.swift; sourceTree = "<group>"; };
@@ -315,6 +320,7 @@
 		9142879B3AF4CF446473F7C7 /* smb.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = smb.png; sourceTree = "<group>"; };
 		91F6A01D415D2E0A78B794D1 /* HomeCollectionCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeCollectionCache.swift; sourceTree = "<group>"; };
 		93D8C775D60C0C27275EBC99 /* MacPlayerControlsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlayerControlsOverlay.swift; sourceTree = "<group>"; };
+		9423B5C1BB4C147B450C942E /* PlexSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexSignInView.swift; sourceTree = "<group>"; };
 		96CE2D7094AEA16D95E3050C /* PlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViewModel.swift; sourceTree = "<group>"; };
 		98F884249848ED7286C2E2C8 /* MacTrackSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacTrackSelectorView.swift; sourceTree = "<group>"; };
 		9A8FE79D92665FF658B801E1 /* MacDownloadHeroController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDownloadHeroController.swift; sourceTree = "<group>"; };
@@ -331,10 +337,12 @@
 		A73A98C67D1020444BFEC4D4 /* loadingSpinner.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = loadingSpinner.json; sourceTree = "<group>"; };
 		A7C24C1365789AC10FDE893F /* MacAppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppState.swift; sourceTree = "<group>"; };
 		A9C894C4127F24180D62B76B /* drive115.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = drive115.png; sourceTree = "<group>"; };
+		AAC6D54ACF803F1819DE6FE6 /* MacDirectLinkView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDirectLinkView.swift; sourceTree = "<group>"; };
 		ABB1277459ADB58B16AE80D3 /* Vanmo-Mac-Cloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Vanmo-Mac-Cloud.entitlements"; sourceTree = "<group>"; };
 		ABF5F0C14AD796EE9479119E /* MacEmbyFolderBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacEmbyFolderBrowseView.swift; sourceTree = "<group>"; };
 		AD11C496362FE830670827E2 /* TimeInterval+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TimeInterval+Formatting.swift"; sourceTree = "<group>"; };
 		ADF90EC697DE5562B3A3B90F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		AF85E30F637D3C0044205538 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		B09C32D3BB0EC025D1769F53 /* baiduNetdisk.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = baiduNetdisk.png; sourceTree = "<group>"; };
 		B7719C17F340864CF4664CC1 /* PosterCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PosterCard.swift; sourceTree = "<group>"; };
 		B93DD4CC4AACCD7945E2FA3F /* LoadingIndicatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingIndicatorView.swift; sourceTree = "<group>"; };
@@ -346,6 +354,7 @@
 		C89DCC7A230E360B69645C74 /* yandexDisk.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = yandexDisk.png; sourceTree = "<group>"; };
 		C8A754B820B0940F082A42A0 /* DownloadManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManagementView.swift; sourceTree = "<group>"; };
 		C94F3DCFB672905D5522C5BC /* EmbyFolderBrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbyFolderBrowseView.swift; sourceTree = "<group>"; };
+		C9683B000C6C3857A82C211F /* MacPlexSignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacPlexSignInView.swift; sourceTree = "<group>"; };
 		C9AEA12D55448D2043E54EEB /* AddConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddConnectionView.swift; sourceTree = "<group>"; };
 		CB50A9840B362764031D0025 /* TrackSelectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackSelectorView.swift; sourceTree = "<group>"; };
 		CBDDB46BD212A7DB301BC1BC /* OAuthPresentationContextProvider+AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OAuthPresentationContextProvider+AppKit.swift"; sourceTree = "<group>"; };
@@ -441,6 +450,14 @@
 				525103842B302272BB888AAD /* MacMediaDetailView.swift */,
 			);
 			path = MediaDetail;
+			sourceTree = "<group>";
+		};
+		0D150171C3E365CE489F2F9D /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				AF85E30F637D3C0044205538 /* Secrets.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		0D650AD66912B79518250229 /* Localizable */ = {
@@ -561,6 +578,8 @@
 			children = (
 				C9AEA12D55448D2043E54EEB /* AddConnectionView.swift */,
 				237FCC0D25C4262103CAEA13 /* BrowserView.swift */,
+				806ACA84E582C4C81E6687B9 /* DirectLinkView.swift */,
+				9423B5C1BB4C147B450C942E /* PlexSignInView.swift */,
 				38C765C23D38D32911EEDECB /* ScanSyncBanner.swift */,
 			);
 			path = Views;
@@ -594,6 +613,7 @@
 		47A253A5BD2F57DDD9C75880 = {
 			isa = PBXGroup;
 			children = (
+				0D150171C3E365CE489F2F9D /* Config */,
 				E57DA65DAC674E2303207E31 /* Packages */,
 				EEE7CE448AD3D26D2778B930 /* Vanmo */,
 				841FBE4C3660700CD8BB7D87 /* VanmoDownloadWidget */,
@@ -626,6 +646,8 @@
 			children = (
 				1DF1A09D60750AB882EC5DF1 /* MacAddConnectionView.swift */,
 				CEB926F219094145468942FF /* MacConnectionsBrowseView.swift */,
+				AAC6D54ACF803F1819DE6FE6 /* MacDirectLinkView.swift */,
+				C9683B000C6C3857A82C211F /* MacPlexSignInView.swift */,
 				7B45846B6B09E717C245CFD9 /* MacScanSyncBanner.swift */,
 			);
 			path = Views;
@@ -1323,6 +1345,7 @@
 				60FA29961D5E179227A2CCF0 /* MacConnectionsBrowseView.swift in Sources */,
 				2A2B6EB9673A6E70E8E26511 /* MacConnectionsViewModel.swift in Sources */,
 				7E03C279AF25FF1638DB5A5F /* MacDesignTokens.swift in Sources */,
+				DCDBB350B278CFA001105C4D /* MacDirectLinkView.swift in Sources */,
 				C836DB936705EFC2025E0BE1 /* MacDownloadHeroController.swift in Sources */,
 				0B821EA8D2E7A82B5251135E /* MacDownloadHeroOverlay.swift in Sources */,
 				9594C847839FD1AA5E98EBEC /* MacDownloadManagementView.swift in Sources */,
@@ -1354,6 +1377,7 @@
 				C7AA44910F1A13235E11C84B /* MacPlayerView.swift in Sources */,
 				E6444CC19A56F2EA054167E5 /* MacPlayerViewModel.swift in Sources */,
 				69EEF69A6647D91612F19B44 /* MacPlayerWindowController.swift in Sources */,
+				348174F0F7B4E68A310F7EDA /* MacPlexSignInView.swift in Sources */,
 				8E1AF8E8D4BE98FCCBFFAA41 /* MacQuickLookPresenter.swift in Sources */,
 				47330A3092F593DB5BCA6784 /* MacRemoteImage.swift in Sources */,
 				C8D53FF63F5EE1E87FD0AF8E /* MacScanSyncBanner.swift in Sources */,
@@ -1389,6 +1413,7 @@
 				EBE3CFC47BAB98876DCD20FA /* ConnectionProviderIcon.swift in Sources */,
 				73EA987CC7F1298104A70F52 /* ContentView.swift in Sources */,
 				B0434F7B3AEC579CDD202B36 /* CountryMapper.swift in Sources */,
+				950A1AF976D1CAB58F925022 /* DirectLinkView.swift in Sources */,
 				2BCE6B2C8BF8958400994F81 /* DominantColorExtractor.swift in Sources */,
 				F4D7E1CC8D1762503A079BF8 /* DownloadHeroController.swift in Sources */,
 				C3ADA231F88174E7E524DA21 /* DownloadHeroHost.swift in Sources */,
@@ -1430,6 +1455,7 @@
 				7A65E96F10319126F9A09F98 /* PlayerState.swift in Sources */,
 				C14C03D8FB03333392179435 /* PlayerView.swift in Sources */,
 				FE0A2201C9F3CDCA472EBE00 /* PlayerViewModel.swift in Sources */,
+				D21405C993DC3DE0E4F41C8A /* PlexSignInView.swift in Sources */,
 				2DD0D4B83BF763364628E6FC /* PosterCard.swift in Sources */,
 				9CD389B71AFA7599F298FD22 /* RatingBadge.swift in Sources */,
 				91ADCE712648A2C9FEE0CFC0 /* ScanBackgroundTask.swift in Sources */,
@@ -1476,6 +1502,7 @@
 /* Begin XCBuildConfiguration section */
 		6FEB2A4AFCDB27D72AA94160 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AF85E30F637D3C0044205538 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac-Cloud.entitlements";
@@ -1560,6 +1587,7 @@
 		};
 		ADD14113AB831B4CD66C64B8 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AF85E30F637D3C0044205538 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
@@ -1590,6 +1618,7 @@
 		};
 		B014DF21DA8B7A1DFB365F13 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AF85E30F637D3C0044205538 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "Vanmo/Vanmo-Cloud.entitlements";
@@ -1635,6 +1664,7 @@
 		};
 		D8AF8354EF5F07692DDB1222 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AF85E30F637D3C0044205538 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "VanmoMac/Vanmo-Mac-Cloud.entitlements";

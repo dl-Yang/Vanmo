@@ -52,6 +52,7 @@ ln -s "$ROOT/Vanmo" "$MIRROR/Vanmo"
 ln -s "$ROOT/VanmoMac" "$MIRROR/VanmoMac"
 ln -s "$ROOT/VanmoDownloadWidget" "$MIRROR/VanmoDownloadWidget"
 ln -s "$ROOT/Packages" "$MIRROR/Packages"
+ln -s "$ROOT/Config" "$MIRROR/Config"
 
 if ! xcodegen generate --spec "$MIRROR/project.yml" --project "$MIRROR" --project-root "$MIRROR" --quiet; then
   fail "xcodegen generate failed (non-mutating temp mirror)"
@@ -70,7 +71,9 @@ fi
 set +e
 python3 - "$ROOT" "$DUMP_JSON" "$MIRROR" <<'PY'
 import json
+import plistlib
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -415,6 +418,101 @@ else:
         )
     else:
         pass_check("VanmoCore has no unconditional UIKit/AppKit/SwiftUI imports")
+
+
+def git(*args):
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
+
+
+# OAuth credentials live only in the untracked Local.xcconfig.
+if git("ls-files", "--error-unmatch", "Local.xcconfig").returncode == 0:
+    fail_check("Local.xcconfig is tracked by git; remove it from the index (git rm --cached Local.xcconfig)")
+else:
+    pass_check("Local.xcconfig is not tracked")
+if git("check-ignore", "-q", "Local.xcconfig").returncode != 0:
+    fail_check("Local.xcconfig must be listed in .gitignore")
+else:
+    pass_check("Local.xcconfig is git-ignored")
+
+
+def filled_credentials(source):
+    return [
+        match.group(1)
+        for match in re.finditer(r"^[ \t]*(VANMO_[A-Z0-9_]+)[ \t]*=[ \t]*(\S.*)$", source, re.MULTILINE)
+    ]
+
+
+SECRETS_XCCONFIG = "Config/Secrets.xcconfig"
+secrets_path = root / SECRETS_XCCONFIG
+if not secrets_path.is_file():
+    fail_check(f"{SECRETS_XCCONFIG} is missing")
+else:
+    sources = [("working tree", secrets_path.read_text(encoding="utf-8"))]
+    staged = git("show", f":{SECRETS_XCCONFIG}")
+    if staged.returncode == 0:
+        sources.append(("git index", staged.stdout))
+    for label, source in sources:
+        filled = filled_credentials(source)
+        if filled:
+            fail_check(
+                f"{SECRETS_XCCONFIG} must keep every credential empty in the {label}; "
+                f"move {', '.join(filled)} to Local.xcconfig"
+            )
+        else:
+            pass_check(f"{SECRETS_XCCONFIG} credentials are empty in the {label}")
+
+OAUTH_CONFIG = "Packages/VanmoCore/Sources/VanmoCore/Network/OAuth/OAuthProviderConfiguration.swift"
+oauth_source = (root / OAUTH_CONFIG).read_text(encoding="utf-8")
+credential_region = oauth_source.split("public static func clientID", 1)[-1].split("public static func scope", 1)[0]
+literals = [value for value in re.findall(r'return\s+"([^"]*)"', credential_region) if value.strip()]
+if "public static func clientID" not in oauth_source or "public static func scope" not in oauth_source:
+    fail_check(f"credential guard could not locate clientID/scope in {OAUTH_CONFIG}")
+elif literals:
+    fail_check(f"{OAUTH_CONFIG} returns literal OAuth credentials; read them from Local.xcconfig instead")
+else:
+    pass_check("OAuth credentials are not hard-coded in OAuthProviderConfiguration")
+
+for plist_path in ("Vanmo/Resources/Info.plist", "VanmoMac/Resources/Info-Mac.plist"):
+    with open(root / plist_path, "rb") as handle:
+        credentials = plistlib.load(handle).get("VanmoOAuthCredentials")
+    if not isinstance(credentials, dict) or not credentials:
+        fail_check(f"{plist_path} is missing VanmoOAuthCredentials")
+        continue
+    literal_keys = [
+        key for key, value in credentials.items()
+        if not re.fullmatch(r"\$\(VANMO_[A-Z0-9_]+\)", str(value))
+    ]
+    if literal_keys:
+        fail_check(f"{plist_path} VanmoOAuthCredentials must only reference $(VANMO_*): {', '.join(literal_keys)}")
+    else:
+        pass_check(f"{plist_path} VanmoOAuthCredentials only references build settings")
+
+with open(root / "Vanmo/Resources/Info.plist", "rb") as handle:
+    url_types = plistlib.load(handle).get("CFBundleURLTypes", [])
+credential_schemes = {
+    entry.get("CFBundleURLName"): entry.get("CFBundleURLSchemes", [])
+    for entry in url_types
+    if entry.get("CFBundleURLName") in ("com.vanmo.oauth.google", "YandexLoginSDK")
+}
+bad_schemes = [
+    f"{name}: {scheme[:12]}…"
+    for name, schemes in credential_schemes.items()
+    for scheme in schemes
+    if not re.fullmatch(r"(yx)?\$\(VANMO_[A-Z0-9_]+\)", scheme)
+]
+if len(credential_schemes) != 2:
+    fail_check("Vanmo/Resources/Info.plist must keep the Google and Yandex OAuth URL types")
+elif bad_schemes:
+    fail_check("Vanmo/Resources/Info.plist OAuth URL schemes must reference $(VANMO_*): " + ", ".join(bad_schemes))
+else:
+    pass_check("Vanmo/Resources/Info.plist OAuth URL schemes only reference build settings")
+
+for domain_path in ("project.yml", "Vanmo/Vanmo-Cloud.entitlements"):
+    domains = re.findall(r"applinks:yx([^.\s<]*)\.oauth\.yandex\.com", (root / domain_path).read_text(encoding="utf-8"))
+    if not domains or any(domain != "$(VANMO_YANDEX_DISK_CLIENT_ID)" for domain in domains):
+        fail_check(f"{domain_path} Yandex associated domain must be applinks:yx$(VANMO_YANDEX_DISK_CLIENT_ID).oauth.yandex.com")
+    else:
+        pass_check(f"{domain_path} Yandex associated domain only references the build setting")
 
 sys.exit(failures)
 PY

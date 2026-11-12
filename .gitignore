@@ -29,11 +29,12 @@ fastlane/test_output
 
 # Environment & Secrets
 .env
+/Local.xcconfig
 *.p12
 *.mobileprovision
 *.cer
 
-# Leftover local FFmpeg build output. Playback uses KSPlayer's FFmpeg.
+# FFmpeg built libraries (use scripts/build-ffmpeg-ios.sh to rebuild)
 Vanmo/Frameworks/FFmpeg/
 
 # OS
@@ -48,3 +49,5 @@ Thumbs.db
 .derivedData/
 
 fig/
+prompt/
+/tem

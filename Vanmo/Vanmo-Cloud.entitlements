@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:yx4cbf02a3c61e404a89d3af6c83e71a64.oauth.yandex.com</string>
+		<string>applinks:yx$(VANMO_YANDEX_DISK_CLIENT_ID).oauth.yandex.com</string>
 	</array>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>

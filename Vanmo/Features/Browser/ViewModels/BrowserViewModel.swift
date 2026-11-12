@@ -14,6 +14,7 @@ struct FolderBookmarkNavigationRequest: Identifiable, Equatable {
     let id = UUID()
     let connectionId: UUID
     let path: String
+    let title: String
 }
 
 @MainActor
@@ -28,6 +29,8 @@ final class ConnectionsViewModel: ObservableObject {
     @Published private(set) var selectedConnectionID: UUID?
     @Published private(set) var currentPath = "/"
     @Published private(set) var pathStack: [String] = []
+    /// 目录路径 -> 展示名。Box/OneDrive/Google Drive 的 path 是 `/item/{id}`，直接用 lastPathComponent 会把 id 当标题。
+    @Published private(set) var directoryDisplayNames: [String: String] = [:]
     @Published private(set) var files: [RemoteFile] = [] {
         didSet { refreshLibraryStates() }
     }
@@ -631,6 +634,172 @@ final class ConnectionsViewModel: ObservableObject {
         return await connectAndScan(saved, showErrorAlert: true)
     }
 
+    // MARK: - Plex PIN sign-in
+
+    /// 新建 Plex 连接：先按连接 UUID 写入 X-Plex-Token，再落库、选中并连接扫描。
+    /// `name` 为空时使用 Plex 服务器名；连接凭据只进 Keychain，`SavedConnection` 与 CloudKit 不含 token。
+    @discardableResult
+    func savePlexConnection(
+        name: String?,
+        token: String,
+        server: PlexServerResource,
+        endpoint: PlexServerConnection,
+        account: PlexAccount?
+    ) async -> Bool {
+        // modelContext 缺失 / 落库后取不到行都不是网络问题，用通用的连接失败文案。
+        guard let context = modelContext else {
+            errorMessage = L10n.tr("连接失败")
+            return false
+        }
+
+        let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let displayName = trimmedName.isEmpty ? server.name : trimmedName
+
+        // 同服务器/端口/账号的 Plex 行会被 ConnectionIdentity 合并；先复用已有行，
+        // 否则新行会在 loadSavedConnections 的去重里被删掉，token 也会挂在一个不存在的 UUID 上。
+        let resolved = ConnectionIdentity.resolveForSave(
+            name: displayName,
+            type: .plex,
+            host: endpoint.uri,
+            port: endpoint.port,
+            username: account?.username,
+            path: nil,
+            bookmarkData: nil,
+            in: context
+        )
+        let connection = resolved.connection
+        let connectionId = connection.id
+
+        do {
+            try PlexCredentialStore.saveToken(token, forConnectionId: connectionId)
+        } catch {
+            // 新建行尚未落库：避免没拿到 token 的空连接被后续无关的 save() 持久化。
+            if !resolved.reused {
+                context.delete(connection)
+            }
+            errorMessage = error.localizedDescription
+            return false
+        }
+
+        CloudSyncCoordinator.shared.markConnectionChanged(connection)
+        do {
+            try context.save()
+        } catch {
+            if !resolved.reused {
+                context.delete(connection)
+                try? PlexCredentialStore.deleteToken(forConnectionId: connectionId)
+            }
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
+        }
+        CloudSyncCoordinator.shared.requestSync(
+            reason: resolved.reused ? "plex-connection-updated" : "plex-connection-created",
+            context: context
+        )
+
+        await loadSavedConnections()
+        guard let saved = savedConnections.first(where: { $0.id == connectionId }) else {
+            errorMessage = L10n.tr("连接失败")
+            return false
+        }
+        CloudSyncedConnectionActivation.markProcessed([saved.id])
+        await selectConnection(saved, promptForMissingCredential: false)
+        let didConnect = await connectAndScan(saved, showErrorAlert: false)
+        if !didConnect {
+            errorMessage = connectionErrorMessages[saved.id] ?? L10n.tr("服务器不可达，请检查网络后重试。")
+        }
+        return didConnect
+    }
+
+    /// 重新登录已有 Plex 连接：更新 token、服务器地址与账号，保留连接名称和 id。
+    @discardableResult
+    func reloginPlexConnection(
+        _ connection: SavedConnection,
+        token: String,
+        server: PlexServerResource,
+        endpoint: PlexServerConnection,
+        account: PlexAccount?
+    ) async -> Bool {
+        guard let context = modelContext else {
+            errorMessage = L10n.tr("连接失败")
+            return false
+        }
+
+        do {
+            try PlexCredentialStore.saveToken(token, forConnectionId: connection.id)
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+
+        connection.host = endpoint.uri
+        connection.port = endpoint.port
+        connection.username = account?.username
+        CloudSyncCoordinator.shared.markConnectionChanged(connection)
+        do {
+            try context.save()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
+        }
+        CloudSyncCoordinator.shared.requestSync(reason: "plex-connection-relogin", context: context)
+
+        await resetCachedServiceAfterEditing(connection)
+        resetBrowserStateAfterEditing(connection)
+        connectionStatuses[connection.id] = .idle
+        connectionErrorMessages.removeValue(forKey: connection.id)
+        errorMessage = ""
+
+        await loadSavedConnections()
+        // 新地址可能与另一条更早的 Plex 行同身份，去重后本行会被删除；只继续使用仍可见的行。
+        guard let saved = savedConnections.first(where: { $0.id == connection.id }) else {
+            errorMessage = L10n.tr("连接失败")
+            return false
+        }
+        await selectConnection(saved, promptForMissingCredential: false)
+        let didConnect = await connectAndScan(saved, showErrorAlert: false)
+        if !didConnect {
+            errorMessage = connectionErrorMessages[saved.id] ?? L10n.tr("服务器不可达，请检查网络后重试。")
+        }
+        return didConnect
+    }
+
+    /// Plex 连接的凭据是否只剩 Plex 账号 token（无本机密码）。
+    /// 这种行不能弹密码输入，应走「重新登录 Plex」。
+    func plexConnectionNeedsReauthentication(_ connection: SavedConnection) -> Bool {
+        guard connection.type == .plex else { return false }
+        if PlexCredentialStore.token(forConnectionId: connection.id) != nil {
+            return false
+        }
+        let legacyPassword = try? KeychainManager.shared.loadString(for: "conn_\(connection.id)")
+        return CloudSyncedConnectionActivation.isMissingLocalPassword(legacyPassword)
+    }
+
+    /// 仅重命名已有连接（Plex 编辑页的「保存」不重新授权、不重新扫描）。
+    @discardableResult
+    func renameConnection(_ connection: SavedConnection, name: String) async -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard let context = modelContext else { return false }
+
+        connection.name = trimmed
+        CloudSyncCoordinator.shared.markConnectionChanged(connection)
+        updateFolderBookmarkConnectionNames(for: connection.id, to: trimmed, in: context)
+
+        do {
+            try context.save()
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+            return false
+        }
+        CloudSyncCoordinator.shared.requestSync(reason: "connection-renamed", context: context)
+        await loadSavedConnections()
+        return true
+    }
+
     /// 重新走一遍 OAuth 授权码流程，覆盖写入已有连接的凭据（用于 refresh token 失效等场景）。
     @discardableResult
     func reauthenticateOAuthConnection(_ connection: SavedConnection) async -> Bool {
@@ -668,6 +837,10 @@ final class ConnectionsViewModel: ObservableObject {
         try? KeychainManager.shared.delete(for: "conn_\(connection.id)")
         if connection.type.supportsOAuthLogin {
             try? OAuthCredentialStore.delete(connectionId: connection.id)
+        }
+        if connection.type == .plex {
+            // Plex 的 X-Plex-Token 按连接 UUID 单独存 Keychain，删除连接时同步清理。
+            try? PlexCredentialStore.deleteToken(forConnectionId: connection.id)
         }
 
         let deletedActiveMediaServer = activeMediaServerConnectionID == connection.id && isMediaServer(connection.type)
@@ -727,6 +900,7 @@ final class ConnectionsViewModel: ObservableObject {
         guard selectedConnectionID == connection.id else { return }
         currentPath = connection.browserRootPath
         pathStack = []
+        directoryDisplayNames = [:]
         files = []
         isBrowsingFiles = false
         fileBrowserErrorMessage = nil
@@ -794,7 +968,8 @@ final class ConnectionsViewModel: ObservableObject {
     func requestOpenFolderBookmark(_ bookmark: FolderBookmark) {
         pendingFolderBookmarkNavigation = FolderBookmarkNavigationRequest(
             connectionId: bookmark.connectionId,
-            path: bookmark.path
+            path: bookmark.path,
+            title: bookmark.title
         )
     }
 
@@ -814,13 +989,18 @@ final class ConnectionsViewModel: ObservableObject {
             selectedConnectionID = connection.id
             currentPath = "/"
             pathStack = []
+            directoryDisplayNames = [:]
             files = []
             fileBrowserErrorMessage = nil
             await disconnectBrowserServiceIfNeeded()
         }
 
         pathStack = []
+        directoryDisplayNames = [:]
         let didLoad = await loadDirectory(path: request.path)
+        if didLoad, request.path != "/", !request.title.isEmpty {
+            directoryDisplayNames[request.path] = request.title
+        }
         if pendingFolderBookmarkNavigation?.id == request.id {
             pendingFolderBookmarkNavigation = nil
         }
@@ -853,6 +1033,7 @@ final class ConnectionsViewModel: ObservableObject {
             selectedConnectionID = connection.id
             currentPath = connection.browserRootPath
             pathStack = []
+            directoryDisplayNames = [:]
             files = []
             fileBrowserErrorMessage = nil
             resetIPTVState()
@@ -912,7 +1093,13 @@ final class ConnectionsViewModel: ObservableObject {
         let previousPath = currentPath
         if await loadDirectory(path: file.path) {
             pathStack.append(previousPath)
+            directoryDisplayNames[currentPath] = file.name
         }
+    }
+
+    /// 目录在界面上的展示名；未知路径返回 nil，由调用方回退到路径末段。
+    func displayName(forPath path: String) -> String? {
+        directoryDisplayNames[path]
     }
 
     func goBackDirectory() async {
@@ -1061,6 +1248,7 @@ final class ConnectionsViewModel: ObservableObject {
         selectedConnectionID = savedConnections.first?.id
         currentPath = savedConnections.first?.browserRootPath ?? "/"
         pathStack = []
+        directoryDisplayNames = [:]
         files = []
         fileBrowserErrorMessage = nil
     }
@@ -1080,6 +1268,17 @@ final class ConnectionsViewModel: ObservableObject {
 
     @discardableResult
     func promptIfMissingLocalCredential(_ connection: SavedConnection, presentEditor: Bool = true) -> Bool {
+        // Plex 走 PIN token：本机没有 token 时提示重新登录 Plex，而不是要求输入密码。
+        if connection.type == .plex {
+            guard plexConnectionNeedsReauthentication(connection) else { return false }
+            let message = L10n.tr("Plex 登录状态已失效，请重新登录。")
+            connectionStatuses[connection.id] = .failed
+            connectionErrorMessages[connection.id] = message
+            if presentEditor, pendingMissingCredentialConnection == nil {
+                pendingMissingCredentialConnection = connection
+            }
+            return true
+        }
         guard CloudSyncedConnectionActivation.needsLocalCredential(connection) else {
             return false
         }
@@ -1197,6 +1396,7 @@ final class ConnectionsViewModel: ObservableObject {
         selectedConnectionFallback = nil
         currentPath = "/"
         pathStack = []
+        directoryDisplayNames = [:]
         files = []
         isBrowsingFiles = false
         fileBrowserErrorMessage = nil

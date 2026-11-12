@@ -249,5 +249,12 @@ public struct ConnectionIdentity: Hashable, Sendable {
            (try? KeychainManager.shared.loadString(for: "conn_\(winnerID)")) == nil {
             try? KeychainManager.shared.save(password, for: "conn_\(winnerID)")
         }
+
+        let loserPlexAccount = PlexCredentialStore.connectionTokenAccount(for: loserID)
+        let winnerPlexAccount = PlexCredentialStore.connectionTokenAccount(for: winnerID)
+        if let token = try? KeychainManager.shared.loadString(for: loserPlexAccount),
+           (try? KeychainManager.shared.loadString(for: winnerPlexAccount)) == nil {
+            try? KeychainManager.shared.save(token, for: winnerPlexAccount)
+        }
     }
 }

@@ -2409,7 +2409,7 @@ final class PlayerViewModel: ObservableObject {
         case "concat", "smb":
             return true
         default:
-            return PrefetchConfig.isMediaServerPlaylist(url)
+            return PrefetchConfig.isMediaServerPlaylist(url) || PrefetchConfig.isPlaylist(url)
         }
     }
 

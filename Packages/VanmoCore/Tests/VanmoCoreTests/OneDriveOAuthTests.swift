@@ -3,7 +3,7 @@ import XCTest
 
 final class OneDriveOAuthTests: XCTestCase {
     func testOneDriveIsConfiguredAsPKCEPublicClient() {
-        XCTAssertTrue(OAuthProviderConfiguration.isConfigured(for: .oneDrive))
+        XCTAssertTrue(OAuthProviderConfiguration.isConfigured(clientID: "id", clientSecret: nil, type: .oneDrive))
         XCTAssertTrue(OAuthProviderConfiguration.usesPKCE(for: .oneDrive))
         XCTAssertFalse(OAuthProviderConfiguration.usesImplicitGrant(for: .oneDrive))
         XCTAssertNil(OAuthProviderConfiguration.clientSecret(for: .oneDrive))

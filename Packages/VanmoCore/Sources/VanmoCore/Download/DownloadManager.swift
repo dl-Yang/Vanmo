@@ -274,6 +274,17 @@ public final class DownloadManager: ObservableObject {
 
         if let localURL = task.request.sourceFileURL, localURL.isFileURL {
             try await copyLocalFile(localURL, to: partURL, taskID: task.id)
+        } else if task.request.sourceConnectionId == nil,
+                  let directURL = task.request.sourceFileURL,
+                  ["http", "https"].contains(directURL.scheme?.lowercased()) {
+            try await downloadHTTP(
+                initialURL: directURL,
+                refreshURL: { directURL },
+                connectionType: nil,
+                connectionId: nil,
+                to: partURL,
+                taskID: task.id
+            )
         } else {
             let (service, remoteFile, type) = try await connectedService(for: task.request)
             defer { Task { await service.disconnect() } }
@@ -453,7 +464,7 @@ public final class DownloadManager: ObservableObject {
     private func downloadHTTP(
         initialURL: URL,
         refreshURL: () async throws -> URL,
-        connectionType: ConnectionType,
+        connectionType: ConnectionType?,
         connectionId: UUID?,
         to partURL: URL,
         taskID: UUID
@@ -554,7 +565,7 @@ public final class DownloadManager: ObservableObject {
     }
 
     private func makeHeaderProvider(
-        connectionType: ConnectionType,
+        connectionType: ConnectionType?,
         connectionId: UUID?,
         forceRefresh: Bool
     ) -> (() async -> [String: String])? {

@@ -79,6 +79,31 @@ final class PrefetchTests: XCTestCase {
         )
     }
 
+    func testAnyHLSPlaylistBypassesFilePrefetch() {
+        XCTAssertTrue(PrefetchConfig.isPlaylist(URL(string: "https://cdn.example.com/live/master.m3u8?token=x")!))
+        XCTAssertTrue(PrefetchConfig.isPlaylist(URL(string: "http://iptv.local/list.M3U")!))
+        XCTAssertFalse(PrefetchConfig.isPlaylist(URL(string: "https://cdn.example.com/movie.mkv")!))
+        XCTAssertFalse(PrefetchConfig.isPlaylist(URL(string: "https://cdn.example.com/watch?id=m3u8")!))
+    }
+
+    func testClosedFetcherFailsInsteadOfCreatingTaskOnInvalidatedSession() async {
+        let fetcher = RemoteFetcher(originalURL: URL(string: "https://example.invalid/movie.mkv")!)
+        fetcher.close()
+
+        do {
+            _ = try await fetcher.probeTotalSize()
+            XCTFail("probe after close must throw")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        do {
+            _ = try await fetcher.data(forInclusiveRange: 0...1)
+            XCTFail("range read after close must throw")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
     func testResumePlayheadIgnoresLeadingZeroUntilSeekLands() {
         let waiting = PrefetchResumePlayhead.resolve(reported: 0, pendingStart: 1051.5)
         XCTAssertEqual(waiting.time, 1051.5)

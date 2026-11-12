@@ -98,7 +98,10 @@ public struct DownloadRequest: Codable, Hashable, Identifiable, Sendable {
         if let sourceConnectionId {
             return "\(sourceConnectionId.uuidString):\(remotePath)"
         }
-        return sourceFileURL?.standardizedFileURL.path ?? remotePath
+        guard let sourceFileURL else { return remotePath }
+        return sourceFileURL.isFileURL
+            ? sourceFileURL.standardizedFileURL.path
+            : sourceFileURL.absoluteString
     }
 
     private static func sanitizedFileName(_ name: String) -> String {

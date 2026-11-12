@@ -36,7 +36,7 @@ Endpoint hosts, parameter names, and scope strings must be taken from the offici
 - `RemoteServiceFactory.create(for: .drive115)` returns `UnsupportedOfficialCloudDriveService`, whose `connect`, `listDirectory`, `streamURL`, and `download` all throw `NetworkError.unsupportedProtocol` ([`ServiceFactory.swift`](../../../Packages/VanmoCore/Sources/VanmoCore/Network/ServiceFactory.swift)).
 - `.drive115` is grouped with `.removedOfficialCloudDrive`, `.quarkDrive`, and `.mega` by `isOfficialCloudDrive`, which drives the disabled Save in both add forms and the placeholder captions.
 - `supportsOAuthLogin` currently means authorization-code or implicit browser flows (`isOAuthCloudDrive` / `isImplicitOAuthCloudDrive`); there is no device-code/QR flow.
-- `OAuthProviderConfiguration` holds public client IDs per provider and a `isConfigured(for:)` gate that disables the login control.
+- `OAuthProviderConfiguration` reads per-provider client IDs from the git-ignored `Local.xcconfig` (through `Info.plist` `VanmoOAuthCredentials`) and exposes an `isConfigured(for:)` gate that disables the login control.
 - `OAuthCoordinator` handles `ASWebAuthenticationSession` authorization-code and implicit flows, access-token refresh, and Keychain persistence through `OAuthCredentialStore`.
 - OAuth-backed cloud drives share a service shape: `connect` loads a valid access token, `listDirectory` pages the provider listing, `streamURL` resolves a short-lived download URL, and playback reuses `StreamingRequestHeaders` plus the prefetch proxy (Baidu Netdisk is the closest precedent).
 

@@ -536,13 +536,28 @@ struct MacConnectionsBrowseView: View {
         let currentPath = connectionsViewModel.currentPath
         guard currentPath != "/" else { return items }
 
-        var builtPath = ""
-        let components = currentPath.split(separator: "/").map(String.init)
-        for component in components {
-            builtPath = builtPath.isEmpty ? "/\(component)" : (builtPath as NSString).appendingPathComponent(component)
-            let title = component.isEmpty ? connection.name : component
-            items.append((title, builtPath))
+        // 用导航时记录的目录展示名，避免 Box/OneDrive/Google Drive 的 `/item/{id}` 路径把 id 当标题。
+        var ancestorPaths = connectionsViewModel.pathStack.filter { $0 != "/" }
+        if ancestorPaths.isEmpty {
+            // 书签跳转会清空 pathStack；普通斜杠路径按当前路径补回祖先层，
+            // 不透明 `/item/{id}` 路径没有可推导的中间层，只保留根和目标。
+            let components = currentPath.split(separator: "/").map(String.init)
+            if components.first != "item", components.count > 1 {
+                var built = ""
+                for component in components.dropLast() {
+                    built = built.isEmpty ? "/\(component)" : (built as NSString).appendingPathComponent(component)
+                    ancestorPaths.append(built)
+                }
+            }
         }
+        for path in ancestorPaths {
+            let title = connectionsViewModel.displayName(forPath: path)
+                ?? (path as NSString).lastPathComponent
+            items.append((title, path))
+        }
+        let title = connectionsViewModel.displayName(forPath: currentPath)
+            ?? (currentPath as NSString).lastPathComponent
+        items.append((title, currentPath))
         return items
     }
 

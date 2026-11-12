@@ -28,6 +28,11 @@ struct AddConnectionView: View {
     @State private var saveErrorMessage: String?
     @State private var workTask: Task<Void, Never>?
 
+    /// Plex PIN 登录 sheet；创建连接完全由该流程完成，本页只负责改名。
+    @State private var showPlexSignIn = false
+    @State private var plexFlowCompleted = false
+    @State private var isRenamingPlex = false
+
     init(viewModel: BrowserViewModel, editingConnection: SavedConnection? = nil) {
         self.viewModel = viewModel
         self.editingConnection = editingConnection
@@ -62,6 +67,8 @@ struct AddConnectionView: View {
                     localFolderSection
                 } else if selectedType.supportsOAuthLogin {
                     oauthCloudDriveSection
+                } else if selectedType == .plex {
+                    plexSignInSection
                 } else {
                     remoteServerSection
 
@@ -80,7 +87,7 @@ struct AddConnectionView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.tr("保存")) { save() }
-                        .disabled(!isValid || isBlocking)
+                        .disabled(!isValid || isBlocking || isRenamingPlex)
                 }
             }
             .onAppear {
@@ -95,6 +102,15 @@ struct AddConnectionView: View {
                 allowsMultipleSelection: false
             ) { result in
                 handleFolderImport(result)
+            }
+            .sheet(isPresented: $showPlexSignIn, onDismiss: handlePlexSheetDismiss) {
+                PlexSignInView(
+                    viewModel: viewModel,
+                    editingConnection: editingConnection,
+                    suggestedName: trimmedName.isEmpty ? nil : trimmedName
+                ) {
+                    plexFlowCompleted = true
+                }
             }
         }
         .overlay {
@@ -353,7 +369,86 @@ struct AddConnectionView: View {
         }
     }
 
+    private var plexSignInSection: some View {
+        Section(L10n.tr("账号登录")) {
+            if let editingConnection {
+                TextField(L10n.tr("名称"), text: $name)
+                    .textContentType(.name)
+
+                LabeledContent(L10n.tr("Plex 服务器")) {
+                    Text(displayedPlexServer)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                if let account = editingConnection.username, !account.isEmpty {
+                    Text(L10n.tr("已登录 Plex 账号：%@", account))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if viewModel.plexConnectionNeedsReauthentication(editingConnection) {
+                    Text(L10n.tr("Plex 登录状态已失效，请重新登录。"))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Button {
+                    showPlexSignIn = true
+                } label: {
+                    HStack {
+                        Text(L10n.tr("重新登录 Plex"))
+                        Spacer()
+                    }
+                }
+                .accessibilityIdentifier("connection.plex.relogin")
+            } else {
+                Button {
+                    showPlexSignIn = true
+                } label: {
+                    HStack {
+                        Text(L10n.tr("使用 Plex 账号登录"))
+                        Spacer()
+                    }
+                }
+                .accessibilityIdentifier("connection.plex.signIn")
+
+                Text(L10n.tr("通过 Plex 账号登录后自动创建连接"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     // MARK: - Helpers
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Plex 连接存的是完整 endpoint URI；摘要里去掉 scheme，只显示 host:port。
+    private var displayedPlexServer: String {
+        guard let editingConnection else { return "" }
+        if let url = URL(string: editingConnection.host),
+           let host = url.host {
+            let port = url.port.map { ":\($0)" } ?? ""
+            return host + port
+        }
+        return editingConnection.host
+    }
+
+    private func handlePlexSheetDismiss() {
+        guard plexFlowCompleted else { return }
+        plexFlowCompleted = false
+        // 重新登录成功的 Plex 行保留原名称；用户在名称栏里改过名时补一次改名，避免内容被丢弃。
+        if let editingConnection, !trimmedName.isEmpty, trimmedName != editingConnection.name {
+            Task { _ = await viewModel.renameConnection(editingConnection, name: trimmedName) }
+        }
+        workTask?.cancel()
+        workTask = nil
+        dismiss()
+    }
 
     private var isEditing: Bool {
         editingConnection != nil
@@ -393,6 +488,10 @@ struct AddConnectionView: View {
     }
 
     private var isValid: Bool {
+        // Plex 新连接由 PIN 登录流程创建；本页「保存」只负责给既有 Plex 连接改名。
+        if selectedType == .plex {
+            return isEditing && !trimmedName.isEmpty
+        }
         guard !name.isEmpty else { return false }
         if selectedType.isLocal {
             return folderBookmark != nil
@@ -677,7 +776,11 @@ struct AddConnectionView: View {
     }
 
     private func save() {
-        guard !isBlocking else { return }
+        guard !isBlocking, !isRenamingPlex else { return }
+        if selectedType == .plex {
+            savePlexRename()
+            return
+        }
         isSaving = true
         saveErrorMessage = nil
         workTask = Task {
@@ -744,6 +847,25 @@ struct AddConnectionView: View {
             }
             if Task.isCancelled { return }
             if didConnect {
+                dismiss()
+            } else {
+                saveErrorMessage = viewModel.errorMessage.isEmpty
+                    ? L10n.tr("服务器无响应或地址不正确。")
+                    : viewModel.errorMessage
+            }
+        }
+    }
+
+    /// 既有 Plex 连接只改名：不重新授权、不重新连接扫描。
+    private func savePlexRename() {
+        guard let editingConnection, !trimmedName.isEmpty else { return }
+        isRenamingPlex = true
+        saveErrorMessage = nil
+        workTask = Task {
+            let renamed = await viewModel.renameConnection(editingConnection, name: trimmedName)
+            isRenamingPlex = false
+            if Task.isCancelled { return }
+            if renamed {
                 dismiss()
             } else {
                 saveErrorMessage = viewModel.errorMessage.isEmpty

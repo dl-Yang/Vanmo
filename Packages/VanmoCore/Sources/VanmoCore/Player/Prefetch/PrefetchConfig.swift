@@ -88,6 +88,12 @@ public enum PrefetchConfig {
         isMediaServerStreamURL(url) && url.path.lowercased().contains(".m3u8")
     }
 
+    /// 任意 http(s) 的 `.m3u8` / `.m3u` 播放列表都不进入文件预取：代理只按字节区间缓存单个文件，
+    /// 无法改写播放列表里的相对分片地址。
+    public static func isPlaylist(_ url: URL) -> Bool {
+        MediaFormatProbe.playlistExtensions.contains(url.pathExtension.lowercased())
+    }
+
     /// Prefetch 二次 GET 会掐掉第一条 body；Emby/Jellyfin 直连上
     /// `isSecondOpen` 也会对 4K 再打一轮探测，拖长首帧。
     public static func shouldDisableSecondOpen(for url: URL) -> Bool {

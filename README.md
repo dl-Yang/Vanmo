@@ -34,6 +34,12 @@ Requirements:
 - Python 3 for the Harness documentation check included in `./init.sh`
 - an Apple development team when signing or device execution requires one
 
+Optional: OAuth cloud-drive credentials (Google Drive, OneDrive, Box, pCloud, Yandex.Disk, Baidu Netdisk) are read from a git-ignored `Local.xcconfig`. Without it the apps build and those sign-in controls stay disabled:
+
+```bash
+cp Local.xcconfig.example Local.xcconfig   # then fill in your own values
+```
+
 Resolve shared dependencies and run the repository baseline:
 
 ```bash

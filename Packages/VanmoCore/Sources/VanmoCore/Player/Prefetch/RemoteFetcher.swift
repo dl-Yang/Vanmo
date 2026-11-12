@@ -192,6 +192,7 @@ public final class RemoteFetcher {
     }
 
     func close() {
+        rangeSessionDelegate.markInvalidated()
         rangeSession.invalidateAndCancel()
         if ownsSession, rangeSession !== session {
             session.invalidateAndCancel()
@@ -400,6 +401,14 @@ public final class RemoteFetcher {
 
         private let lock = NSLock()
         private var pending: [Int: PendingRequest] = [:]
+        /// Creating a task on an invalidated `URLSession` raises an Objective-C exception.
+        private var isInvalidated = false
+
+        func markInvalidated() {
+            lock.lock()
+            isInvalidated = true
+            lock.unlock()
+        }
 
         func data(
             in session: URLSession,
@@ -437,13 +446,17 @@ public final class RemoteFetcher {
             let handle = RequestHandle()
             return try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { continuation in
+                    lock.lock()
+                    guard !isInvalidated else {
+                        lock.unlock()
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
                     let task = session.dataTask(with: request)
-                    let request = PendingRequest(
+                    pending[task.taskIdentifier] = PendingRequest(
                         kind: kind,
                         continuation: continuation
                     )
-                    lock.lock()
-                    pending[task.taskIdentifier] = request
                     lock.unlock()
                     handle.install(task)
                     task.resume()
@@ -548,6 +561,10 @@ public final class RemoteFetcher {
                 return
             }
             request.continuation.resume(returning: (request.data, response))
+        }
+
+        func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {
+            markInvalidated()
         }
 
         func urlSession(

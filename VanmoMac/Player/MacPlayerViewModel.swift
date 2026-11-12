@@ -1827,7 +1827,7 @@ final class MacPlayerViewModel: ObservableObject {
         case "concat":
             return true
         default:
-            return PrefetchConfig.isMediaServerPlaylist(url)
+            return PrefetchConfig.isMediaServerPlaylist(url) || PrefetchConfig.isPlaylist(url)
         }
     }
 

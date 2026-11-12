@@ -304,6 +304,21 @@ final class PlaybackQualityStreamTests: XCTestCase {
         XCTAssertTrue(target.url.absoluteString.contains("seg2.ts"))
     }
 
+    func testPrimerSkipsByteRangePlaylists() {
+        let base = URL(string: "https://cdn.example/hls/v1/prog_index.m3u8")!
+        let playlist = """
+        #EXTM3U
+        #EXT-X-MAP:URI="main.mp4",BYTERANGE="719@0"
+        #EXTINF:6.0,
+        #EXT-X-BYTERANGE:1500000@719
+        main.mp4
+        #EXTINF:6.0,
+        #EXT-X-BYTERANGE:1500000@1500719
+        main.mp4
+        """
+        XCTAssertNil(HlsTranscodePrimer.step(playlist: playlist, baseURL: base, startTime: 7))
+    }
+
     func testPrimerSkipsDirectStream() {
         let stream = URL(string: "https://emby.example/emby/Videos/253013/stream?static=true")!
         let playlist = URL(string: "https://emby.example/videos/253013/master.m3u8")!

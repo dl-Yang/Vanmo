@@ -15,13 +15,39 @@ public final class PlexService: MediaServerService, MediaSearchProviding {
     private var token: String?
     private var resolvedBaseURL: URL?
     private let session: URLSession
+    private let tokenResolver: @Sendable (UUID) -> String?
+    private let tokenSaver: @Sendable (UUID, String) throws -> Void
+    private let mirrorSaver: @Sendable (String, String) -> Void
 
     private static let plexTVBaseURL = URL(string: "https://plex.tv")!
     private static let clientName = "Vanmo"
     private static let clientVersion = "1.0.0"
 
-    public init(session: URLSession = .shared) {
+    public convenience init(session: URLSession = .shared) {
+        self.init(
+            session: session,
+            tokenResolver: { PlexCredentialStore.token(forConnectionId: $0) },
+            tokenSaver: { connectionId, token in
+                try PlexCredentialStore.saveToken(token, forConnectionId: connectionId)
+            },
+            mirrorSaver: { baseURL, token in
+                PlexCredentialStore.save(baseURL: baseURL, token: token)
+            }
+        )
+    }
+
+    /// 内部测试注入点：`swift test` 的未签名进程无法访问 Data Protection Keychain，
+    /// 因此凭据读写通过闭包注入。生产代码只使用 public init。
+    init(
+        session: URLSession,
+        tokenResolver: @escaping @Sendable (UUID) -> String?,
+        tokenSaver: @escaping @Sendable (UUID, String) throws -> Void,
+        mirrorSaver: @escaping @Sendable (String, String) -> Void
+    ) {
         self.session = session
+        self.tokenResolver = tokenResolver
+        self.tokenSaver = tokenSaver
+        self.mirrorSaver = mirrorSaver
     }
 
     // MARK: - RemoteFileService
@@ -29,25 +55,48 @@ public final class PlexService: MediaServerService, MediaSearchProviding {
     public func connect(config: ConnectionConfig) async throws {
         self.config = config
 
-        guard let username = config.username, !username.isEmpty,
-              let password = config.password, !password.isEmpty else {
+        let pmsURL = try pmsBaseURL(for: config)
+        self.resolvedBaseURL = pmsURL
+
+        let authToken: String
+        let authSource: String
+        if let connectionId = config.connectionId,
+           let stored = tokenResolver(connectionId)?
+               .trimmingCharacters(in: .whitespacesAndNewlines),
+           !stored.isEmpty {
+            authToken = stored
+            authSource = "connection"
+        } else if let username = config.username?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !username.isEmpty,
+                  let password = config.password,
+                  !password.isEmpty {
+            authToken = try await authenticatePlexTV(login: username, password: password)
+            authSource = "legacy-signin"
+        } else {
             throw NetworkError.authenticationFailed
         }
 
-        let pmsURL = pmsBaseURL(for: config)
-        self.resolvedBaseURL = pmsURL
-
-        VanmoLogger.network.info("[Plex] Authenticating to plex.tv as \(username)")
-
-        let authToken = try await authenticatePlexTV(login: username, password: password)
         self.token = authToken
 
         try await verifyPMS(baseURL: pmsURL, token: authToken)
 
         isConnected = true
-        PlexCredentialStore.save(baseURL: pmsURL.absoluteString, token: authToken)
 
-        VanmoLogger.network.info("[Plex] Connected to PMS at \(pmsURL.absoluteString)")
+        // PIN 流程已经按连接存好 token；legacy 密码路径在这里补写，
+        // 让下一次连接直接走 token-first。写入失败不影响本次已建立的连接。
+        if authSource != "connection", let connectionId = config.connectionId {
+            do {
+                try tokenSaver(connectionId, authToken)
+            } catch {
+                VanmoLogger.network.error(
+                    "[Plex] Failed to persist per-connection token: \(error.localizedDescription)"
+                )
+            }
+        }
+        mirrorSaver(pmsURL.absoluteString, authToken)
+
+        VanmoLogger.network.info("[Plex] Connected to PMS auth=\(authSource, privacy: .public)")
     }
 
     public func disconnect() async {
@@ -376,7 +425,7 @@ public final class PlexService: MediaServerService, MediaSearchProviding {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            VanmoLogger.network.error("[Plex] plex.tv signin failed: \(error.localizedDescription)")
+            VanmoLogger.network.error("[Plex] plex.tv signin network error")
             throw NetworkError.connectionFailed(error.localizedDescription)
         }
 
@@ -390,9 +439,8 @@ public final class PlexService: MediaServerService, MediaSearchProviding {
             if httpResponse.statusCode == 401 {
                 throw NetworkError.authenticationFailed
             }
-            let preview = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            VanmoLogger.network.error("[Plex] plex.tv signin failed body=\(preview)")
-            throw NetworkError.connectionFailed("plex.tv signin HTTP \(httpResponse.statusCode): \(preview)")
+            VanmoLogger.network.error("[Plex] plex.tv signin failed status=\(httpResponse.statusCode)")
+            throw NetworkError.connectionFailed("plex.tv signin HTTP \(httpResponse.statusCode)")
         }
 
         let result = try JSONDecoder().decode(PlexAuthResponse.self, from: data)
@@ -405,16 +453,54 @@ public final class PlexService: MediaServerService, MediaSearchProviding {
         _ = data
     }
 
-    private func pmsBaseURL(for config: ConnectionConfig) -> URL {
-        let host = config.host.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+    private func pmsBaseURL(for config: ConnectionConfig) throws -> URL {
+        let trimmed = config.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw NetworkError.invalidURL }
 
-        if host.hasPrefix("http://") || host.hasPrefix("https://") {
-            return URL(string: host)!
+        // 完整 endpoint URI（含 scheme）保留自身的 host 与 port，不能丢掉端口。
+        if let components = URLComponents(string: trimmed),
+           let scheme = components.scheme?.lowercased(),
+           scheme == "http" || scheme == "https",
+           let urlHost = components.host,
+           !urlHost.isEmpty {
+            var normalized = components
+            normalized.scheme = scheme
+            if let url = normalized.url {
+                return url
+            }
         }
 
+        // 裸 host：由端口推导 scheme，并补上配置端口；host 已带端口时不再拼接。
+        let hostAndPort = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard !hostAndPort.isEmpty else { throw NetworkError.invalidURL }
+
         let scheme = config.port == 443 ? "https" : "http"
-        let portSuffix = (config.port == 80 || config.port == 443) ? "" : ":\(config.port)"
-        return URL(string: "\(scheme)://\(host)\(portSuffix)")!
+        let shouldAppendPort = !Self.bareHostHasExplicitPort(hostAndPort)
+            && config.port != 80
+            && config.port != 443
+        let portSuffix = shouldAppendPort ? ":\(config.port)" : ""
+        guard let url = URL(string: "\(scheme)://\(hostAndPort)\(portSuffix)") else {
+            throw NetworkError.invalidURL
+        }
+        return url
+    }
+
+    /// 裸 host 是否已经自带端口（含 IPv6 方括号形式），避免重复拼接。
+    private static func bareHostHasExplicitPort(_ host: String) -> Bool {
+        if host.hasPrefix("[") {
+            guard let closing = host.firstIndex(of: "]") else { return false }
+            let suffix = host[host.index(after: closing)...]
+            guard suffix.hasPrefix(":") else { return false }
+            return Int(suffix.dropFirst()) != nil
+        }
+        let parts = host.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              !parts[0].isEmpty,
+              let port = Int(parts[1]),
+              (1...65535).contains(port) else {
+            return false
+        }
+        return true
     }
 
     private func applyHeaders(to request: inout URLRequest) {
@@ -635,6 +721,36 @@ public enum PlexCredentialStore {
     public static func clear() {
         UserDefaults.standard.removeObject(forKey: baseURLKey)
         try? KeychainManager.shared.delete(for: tokenKeychainAccount)
+    }
+}
+
+public extension PlexCredentialStore {
+    /// 按连接保存 X-Plex-Token，Keychain 账号为 `conn_<uuid>_plex`。
+    static func saveToken(_ token: String, forConnectionId connectionId: UUID) throws {
+        try KeychainManager.shared.save(token, for: connectionTokenAccount(for: connectionId))
+    }
+
+    /// 读取某个连接自己的 X-Plex-Token；读取失败时记录一行不含 token 的日志。
+    static func token(forConnectionId connectionId: UUID) -> String? {
+        do {
+            return try KeychainManager.shared.loadString(for: connectionTokenAccount(for: connectionId))
+        } catch {
+            VanmoLogger.network.error(
+                "[Plex] Failed to read per-connection token from Keychain: \(error.localizedDescription)"
+            )
+            return nil
+        }
+    }
+
+    static func deleteToken(forConnectionId connectionId: UUID) throws {
+        try KeychainManager.shared.delete(for: connectionTokenAccount(for: connectionId))
+    }
+}
+
+extension PlexCredentialStore {
+    /// 单个 Plex 连接的 Keychain account 名；与 `conn_<uuid>`（密码槽）分开。
+    static func connectionTokenAccount(for connectionId: UUID) -> String {
+        "conn_\(connectionId.uuidString)_plex"
     }
 }
 

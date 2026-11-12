@@ -27,6 +27,11 @@ struct MacAddConnectionView: View {
     @State private var isAuthenticatingOAuth = false
     @State private var oauthErrorMessage: String?
 
+    /// Plex 走 PIN 登录：新建连接由登录 sheet 创建，本页「保存」只给既有连接改名。
+    @State private var isPlexSignInPresented = false
+    @State private var plexSignInCompleted = false
+    @State private var isRenamingPlex = false
+
     init(viewModel: MacConnectionsViewModel, editingConnection: SavedConnection? = nil) {
         self.viewModel = viewModel
         self.editingConnection = editingConnection
@@ -80,6 +85,16 @@ struct MacAddConnectionView: View {
             Button(L10n.tr("确定")) {}
         } message: {
             Text(viewModel.errorMessage)
+        }
+        .sheet(isPresented: $isPlexSignInPresented, onDismiss: handlePlexSignInDismiss) {
+            MacPlexSignInView(
+                viewModel: viewModel,
+                editingConnection: editingConnection,
+                suggestedName: trimmedName.isEmpty ? nil : trimmedName
+            ) {
+                plexSignInCompleted = true
+            }
+            .macTheme(theme)
         }
     }
 
@@ -182,7 +197,7 @@ struct MacAddConnectionView: View {
                     .foregroundStyle(theme.primaryText)
             }
 
-            if let description = selectedType.macAddConnectionDescription {
+            if let description = selectedType.macAddConnectionDescription, selectedType != .plex {
                 Text(description)
                     .font(.system(size: 13))
                     .tracking(-0.08)
@@ -199,6 +214,8 @@ struct MacAddConnectionView: View {
             localFolderForm
         } else if selectedType.supportsOAuthLogin {
             oauthForm
+        } else if selectedType == .plex {
+            plexForm
         } else if selectedType.isOfficialCloudDrive {
             officialCloudDriveForm
         } else {
@@ -384,6 +401,86 @@ struct MacAddConnectionView: View {
         .frame(maxWidth: 400, alignment: .leading)
     }
 
+    private var plexForm: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let editingConnection {
+                formRow(label: L10n.tr("名称")) {
+                    macTextField(L10n.tr("Plex 服务器"), text: $name)
+                }
+
+                plexConnectionSummary(editingConnection)
+
+                if viewModel.plexConnectionNeedsReauthentication(editingConnection) {
+                    Text(L10n.tr("Plex 登录状态已失效，请重新登录。"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.orange)
+                        .padding(.leading, 72)
+                }
+
+                plexSignInButton(title: L10n.tr("重新登录 Plex"))
+            } else {
+                plexSignInButton(title: L10n.tr("使用 Plex 账号登录"))
+            }
+        }
+        .frame(maxWidth: 400, alignment: .leading)
+    }
+
+    private func plexConnectionSummary(_ connection: SavedConnection) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(L10n.tr("Plex 服务器"))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(theme.tertiaryText)
+
+            Text(displayedPlexServer)
+                .font(.system(size: 13))
+                .foregroundStyle(theme.primaryText)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            if let account = connection.username,
+               !account.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(L10n.tr("已登录 Plex 账号：%@", account))
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.tertiaryText)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(inputBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(inputBorder, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func plexSignInButton(title: String) -> some View {
+        Button {
+            isPlexSignInPresented = true
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                if viewModel.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(MacDesignTokens.accentBlue)
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isLoading)
+        .accessibilityIdentifier(editingConnection == nil ? "mac.plex.signIn" : "mac.plex.relogin")
+    }
+
     private var officialCloudDriveForm: some View {
         VStack(alignment: .leading, spacing: 16) {
             formRow(label: L10n.tr("名称")) {
@@ -399,6 +496,15 @@ struct MacAddConnectionView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
+            if selectedType == .plex && !isEditing {
+                Text(L10n.tr("通过 Plex 账号登录后自动创建连接"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.tertiaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .accessibilityIdentifier("mac.plex.footerHint")
+            }
+
             Spacer()
 
             Button(L10n.tr("取消")) { dismiss() }
@@ -406,7 +512,7 @@ struct MacAddConnectionView: View {
 
             Button(L10n.tr("保存")) { save() }
                 .buttonStyle(MacPrimaryActionButtonStyle())
-                .disabled(!isValid || viewModel.isLoading)
+                .disabled(!isValid || viewModel.isLoading || isRenamingPlex)
         }
         .padding(.horizontal, 24)
         .padding(.top, 17)
@@ -574,6 +680,11 @@ struct MacAddConnectionView: View {
     }
 
     private func save() {
+        if selectedType == .plex {
+            savePlexRename()
+            return
+        }
+
         Task {
             let didConnect: Bool
             if selectedType.isLocal {
@@ -634,6 +745,21 @@ struct MacAddConnectionView: View {
         }
     }
 
+    /// 既有 Plex 连接只改名：不重新授权、不重新连接扫描。
+    private func savePlexRename() {
+        guard let editingConnection, !trimmedName.isEmpty else { return }
+        isRenamingPlex = true
+        let newName = trimmedName
+        Task {
+            let renamed = await viewModel.renameConnection(editingConnection, name: newName)
+            isRenamingPlex = false
+            if Task.isCancelled { return }
+            if renamed {
+                dismiss()
+            }
+        }
+    }
+
     private func beginOAuthLogin() async {
         isAuthenticatingOAuth = true
         oauthErrorMessage = nil
@@ -656,6 +782,33 @@ struct MacAddConnectionView: View {
     // MARK: - Validation Helpers
 
     private var isEditing: Bool { editingConnection != nil }
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Plex 连接保存的是完整 endpoint URI；摘要里只显示 host:port。
+    private var displayedPlexServer: String {
+        guard let editingConnection else { return "" }
+        guard let url = URL(string: editingConnection.host), let host = url.host else {
+            return editingConnection.host
+        }
+        let port = url.port.map { ":\($0)" } ?? ""
+        return host + port
+    }
+
+    private func handlePlexSignInDismiss() {
+        guard plexSignInCompleted else { return }
+        plexSignInCompleted = false
+        // 重新登录成功的 Plex 行保留原名称；若用户在名称栏改过名，补一次改名，避免输入被丢弃。
+        if let editingConnection,
+           !trimmedName.isEmpty,
+           trimmedName != editingConnection.name {
+            let newName = trimmedName
+            Task { _ = await viewModel.renameConnection(editingConnection, name: newName) }
+        }
+        dismiss()
+    }
 
     private var editingPasswordHint: String {
         if let editingConnection, CloudSyncedConnectionActivation.needsLocalCredential(editingConnection) {
@@ -685,6 +838,10 @@ struct MacAddConnectionView: View {
     }
 
     private var isValid: Bool {
+        // Plex 新连接由 PIN 登录流程创建；本页「保存」只负责给既有 Plex 连接改名。
+        if selectedType == .plex {
+            return isEditing && !trimmedName.isEmpty
+        }
         guard !name.isEmpty else { return false }
         if selectedType.isLocal {
             return folderBookmark != nil
@@ -868,7 +1025,8 @@ struct MacAddConnectionView: View {
 
 // MARK: - Button Styles
 
-private struct MacPrimaryActionButtonStyle: ButtonStyle {
+/// 供 Plex 登录 sheet（`MacPlexSignInView`）复用，保持与 Add Connection 一致的按钮外观。
+struct MacPrimaryActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
@@ -882,7 +1040,7 @@ private struct MacPrimaryActionButtonStyle: ButtonStyle {
     }
 }
 
-private struct MacSecondaryActionButtonStyle: ButtonStyle {
+struct MacSecondaryActionButtonStyle: ButtonStyle {
     let theme: MacThemeColors
 
     @Environment(\.colorScheme) private var colorScheme

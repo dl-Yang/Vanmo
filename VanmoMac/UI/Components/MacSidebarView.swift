@@ -160,6 +160,8 @@ struct MacSidebarView: View {
     @Environment(\.openSettings) private var openSettings
     @Query(sort: \SavedConnection.name) private var connections: [SavedConnection]
     @Query private var tombstones: [ConnectionTombstone]
+    @Query(filter: #Predicate<MediaItem> { $0.sourceConnectionId == nil })
+    private var connectionlessItems: [MediaItem]
 
     @State private var dragStartWidth: CGFloat?
     @State private var liveSidebarWidth: CGFloat?
@@ -167,6 +169,10 @@ struct MacSidebarView: View {
 
     private var displayedSidebarWidth: CGFloat {
         liveSidebarWidth ?? appState.sidebarWidth
+    }
+
+    private var showsDirectLinksRow: Bool {
+        appState.contentRoute == .directLinks || connectionlessItems.contains(where: DirectLinkLibrary.isDirectLink)
     }
 
     private var visibleConnections: [SavedConnection] {
@@ -211,16 +217,27 @@ struct MacSidebarView: View {
 
                         Spacer(minLength: 0)
 
-                        Button {
-                            appState.presentAddConnection()
+                        Menu {
+                            Button {
+                                appState.presentAddConnection()
+                            } label: {
+                                Label(L10n.tr("添加连接…"), systemImage: "server.rack")
+                            }
+                            Button {
+                                appState.openDirectLinks()
+                            } label: {
+                                Label(L10n.tr("打开 URL 链接…"), systemImage: "link")
+                            }
                         } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(theme.sectionHeader)
                                 .frame(width: 20, height: 20)
                         }
-                        .buttonStyle(.plain)
-                        .help(L10n.tr("添加连接"))
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .help(L10n.tr("添加"))
                     }
                     .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding + 4)
                     .padding(.top, 24)
@@ -270,6 +287,16 @@ struct MacSidebarView: View {
                             } label: {
                                 Label(L10n.tr("删除"), systemImage: "trash")
                             }
+                        }
+                    }
+
+                    if showsDirectLinksRow {
+                        MacSidebarRow(
+                            title: L10n.tr("URL 链接"),
+                            systemImage: "link",
+                            isSelected: appState.contentRoute == .directLinks && appState.selectedMediaItem == nil
+                        ) {
+                            appState.openDirectLinks()
                         }
                     }
                 }

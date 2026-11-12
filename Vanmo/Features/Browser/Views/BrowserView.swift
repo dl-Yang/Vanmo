@@ -12,6 +12,7 @@ struct ConnectionsView: View {
     /// 非 nil = 进入该连接的文件 / 文件夹浏览页（Files-Folders(-Videos)-Light）。
     @State private var enteredConnectionID: UUID?
     @State private var editingConnection: SavedConnection?
+    @State private var showDirectLinks = false
     @AppStorage("files.browserLayout") private var layoutRaw = FilesBrowserLayout.grid.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 正在打开的文件夹路径：保留旧内容并在该条目上显示打开态，加载完成后再做展开过渡。
@@ -83,6 +84,9 @@ struct ConnectionsView: View {
         .sheet(item: $editingConnection) { connection in
             AddConnectionView(viewModel: viewModel, editingConnection: connection)
         }
+        .navigationDestination(isPresented: $showDirectLinks) {
+            DirectLinkView()
+        }
     }
 
     // MARK: - 根页：连接列表（Files-Light）
@@ -90,10 +94,7 @@ struct ConnectionsView: View {
     private var connectionsRoot: some View {
         VStack(spacing: 0) {
             FilesHeader(title: L10n.tr("文件")) {
-                FilesCircleButton(asset: nil, systemName: "plus", tint: FilesDesign.accent, background: FilesDesign.addButtonBackground) {
-                    viewModel.showAddConnection = true
-                }
-                .accessibilityIdentifier("files.addConnection")
+                addMenu
             }
 
             if viewModel.savedConnections.isEmpty {
@@ -119,6 +120,32 @@ struct ConnectionsView: View {
                 }
             }
         }
+    }
+
+    private var addMenu: some View {
+        Menu {
+            Button {
+                viewModel.showAddConnection = true
+            } label: {
+                Label(L10n.tr("添加连接"), systemImage: "server.rack")
+            }
+            .accessibilityIdentifier("files.addConnection")
+            Button {
+                showDirectLinks = true
+            } label: {
+                Label(L10n.tr("打开 URL 链接"), systemImage: "link")
+            }
+            .accessibilityIdentifier("files.openURL")
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(FilesDesign.accent)
+                .frame(width: 32, height: 32)
+                .background(FilesDesign.addButtonBackground, in: Circle())
+                .contentShape(Circle())
+        }
+        .accessibilityLabel(L10n.tr("添加"))
+        .accessibilityIdentifier("files.addMenu")
     }
 
     private func connectionRow(_ connection: SavedConnection) -> some View {
@@ -472,6 +499,7 @@ struct ConnectionsView: View {
 
     private var browserTitle: String {
         guard let connection = viewModel.selectedConnection else { return L10n.tr("文件") }
+        if let name = viewModel.displayName(forPath: viewModel.currentPath) { return name }
         if viewModel.pathStack.isEmpty { return connection.name }
         let last = (viewModel.currentPath as NSString).lastPathComponent
         return last.isEmpty || last == "/" ? connection.name : last
@@ -713,7 +741,7 @@ struct ConnectionsView: View {
 
 /// 严格取自 Figma `File` 页 Light / Dark 设计稿。动态色随有效 ColorScheme
 /// （受 App 主题 `.preferredColorScheme` 驱动）自动在浅 / 深色间切换。
-private enum FilesDesign {
+enum FilesDesign {
     static let background        = dyn("#F4F4F5", "#000000")          // 页面背景
     static let headerBorder      = dyn("#E4E4E7", "#27272A")          // 头部底分割线（用时 0.5 透明）
     static let title             = dyn("#18181B", "#FFFFFF")          // 主文字 / 返回箭头
@@ -743,7 +771,7 @@ private enum FilesDesign {
 
 // MARK: - 顶部头部
 
-private struct FilesHeader<Trailing: View>: View {
+struct FilesHeader<Trailing: View>: View {
     let title: String
     var onBack: (() -> Void)?
     @ViewBuilder let trailing: () -> Trailing
@@ -790,7 +818,7 @@ private struct FilesHeader<Trailing: View>: View {
     }
 }
 
-private struct FilesSectionHeader: View {
+struct FilesSectionHeader: View {
     let title: String
 
     var body: some View {
@@ -798,39 +826,6 @@ private struct FilesSectionHeader: View {
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(FilesDesign.sectionHeader)
             .padding(.horizontal, 8)
-    }
-}
-
-// MARK: - 头部按钮
-
-private struct FilesCircleButton: View {
-    let asset: String?
-    var systemName: String?
-    let tint: Color
-    var background: Color = .clear
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            iconImage
-                .frame(width: 20, height: 20)
-                .frame(width: 32, height: 32)
-                .background(background, in: Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var iconImage: some View {
-        if let asset {
-            Image(asset).renderingMode(.template).resizable().scaledToFit()
-                .foregroundStyle(tint)
-        } else if let systemName {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(tint)
-        }
     }
 }
 
@@ -1318,7 +1313,7 @@ private struct IPTVChannelCard: View {
 
 // MARK: - 公共子组件
 
-private struct FilesIconBox<Content: View>: View {
+struct FilesIconBox<Content: View>: View {
     let background: Color
     @ViewBuilder let content: () -> Content
 

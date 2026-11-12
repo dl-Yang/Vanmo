@@ -437,6 +437,8 @@ struct VanmoMacRootView: View {
         switch appState.contentRoute {
         case .connectionBrowser:
             MacConnectionsBrowseView()
+        case .directLinks:
+            MacDirectLinkView()
         case .search:
             MacSearchResultsView()
         default:

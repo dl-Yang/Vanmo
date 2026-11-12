@@ -225,6 +225,7 @@ public struct MediaServerConnectionSnapshot: Sendable {
 
     public var config: ConnectionConfig {
         ConnectionConfig(
+            connectionId: id,
             type: type,
             host: host,
             port: port,

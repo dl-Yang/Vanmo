@@ -2,14 +2,15 @@ import Foundation
 
 /// 国际网盘 OAuth 开发者凭据配置中心。
 ///
-/// **重要：以下 clientID / clientSecret 全部留空占位，需要用户在对应开发者后台手动申请后填入，**
-/// **否则对应网盘的"登录"入口会保持禁用状态并提示未配置。**
+/// 凭据不写在源码里：构建者在仓库根目录未跟踪的 `Local.xcconfig` 中填写（模板 `Local.xcconfig.example`），
+/// `Config/Secrets.xcconfig` 引入后经 App `Info.plist` 的 `VanmoOAuthCredentials` 注入，运行时从主 Bundle 读取。
+/// 未填写的网盘"登录"入口保持禁用并提示未配置。
 ///
 /// | 网盘 | 需要申请的凭据 | 申请入口 |
 /// |---|---|---|
 /// | Google Drive | Client ID（iOS 类型 OAuth 客户端，无需 Secret，走 PKCE） | https://console.cloud.google.com/apis/credentials |
 /// | OneDrive | Application (client) ID（公共客户端，无需 Secret，走 PKCE） | https://portal.azure.com （Microsoft Entra ID → 应用注册） |
-/// | Box | Client ID + Client Secret | https://app.box.com/developers/console |
+/// | Box | Client ID + Client Secret（Box 不支持 PKCE，Secret 只在本机构建时填入，禁止提交） | https://app.box.com/developers/console |
 /// | pCloud | Client ID + Client Secret | https://docs.pcloud.com/my_apps/ |
 /// | Yandex.Disk | Client ID（iOS 走 YandexLoginSDK，macOS 走 PKCE，均无需 Secret） | https://oauth.yandex.com |
 /// | 百度网盘 | AppKey（简化模式，无需 Secret） | https://pan.baidu.com/union/console/applist |
@@ -55,38 +56,53 @@ public enum OAuthProviderConfiguration {
             components.path == "/\(type.rawValue)"
     }
 
-    /// TODO(User)：在下方对应 case 中填入开发者后台申请到的 Client ID。
-    public static func clientID(for type: ConnectionType) -> String {
-        switch type {
-        case .googleDrive:
-            return "311522710381-42mtgv9v8kbjm6dqtta9e2ntmane387g.apps.googleusercontent.com"
-        case .oneDrive:
-            return "4f24ca70-48e9-4a63-8e51-e35647350e64"
-        case .box:
-            return ""
-        case .pCloudDrive:
-            return ""
-        case .yandexDisk:
-            // 更换时须同步 iOS `Info.plist` 的 `yx{Client ID}` scheme 与 project.yml 的 Associated Domain。
-            return "4cbf02a3c61e404a89d3af6c83e71a64"
-        case .baiduNetdisk:
-            return "j5nV46HZKiRzYq5TuHdsYN9DYfvk76AL"
-        default:
-            return ""
-        }
+    static let credentialsInfoKey = "VanmoOAuthCredentials"
+
+    /// App `Info.plist` 注入的凭据；单元测试进程没有该字典，全部视为未配置。
+    static var bundledCredentials: [String: Any] {
+        Bundle.main.object(forInfoDictionaryKey: credentialsInfoKey) as? [String: Any] ?? [:]
     }
 
-    /// TODO(User)：Google Drive / OneDrive / Yandex.Disk 走 PKCE 公共客户端，不需要 Secret；
-    /// Box / pCloud 需要在下方填入开发者后台申请到的 Client Secret。
-    public static func clientSecret(for type: ConnectionType) -> String? {
+    public static func clientID(for type: ConnectionType) -> String {
+        clientID(for: type, in: bundledCredentials)
+    }
+
+    static func clientID(for type: ConnectionType, in credentials: [String: Any]) -> String {
+        let key: String
         switch type {
-        case .box:
-            return nil
-        case .pCloudDrive:
-            return nil
-        default:
-            return nil
+        case .googleDrive: key = "GoogleDriveClientID"
+        case .oneDrive: key = "OneDriveClientID"
+        case .box: key = "BoxClientID"
+        case .pCloudDrive: key = "PCloudClientID"
+        // 同时驱动 iOS `yx{Client ID}` scheme 与 Associated Domain（均由同一个 xcconfig 变量展开）。
+        case .yandexDisk: key = "YandexDiskClientID"
+        case .baiduNetdisk: key = "BaiduNetdiskAppKey"
+        default: return ""
         }
+        return credential(key, in: credentials)
+    }
+
+    /// Google Drive / OneDrive / Yandex.Disk 走 PKCE、百度走简化模式，均无 Secret。
+    /// Box 没有 PKCE（authorize 不接受 `code_challenge`），token 交换必须带 Secret；pCloud 同理。
+    public static func clientSecret(for type: ConnectionType) -> String? {
+        clientSecret(for: type, in: bundledCredentials)
+    }
+
+    static func clientSecret(for type: ConnectionType, in credentials: [String: Any]) -> String? {
+        let key: String
+        switch type {
+        case .box: key = "BoxClientSecret"
+        case .pCloudDrive: key = "PCloudClientSecret"
+        default: return nil
+        }
+        let value = credential(key, in: credentials)
+        return value.isEmpty ? nil : value
+    }
+
+    /// 未定义的构建变量会原样留下 `$(NAME)`，按未配置处理。
+    static func credential(_ key: String, in credentials: [String: Any]) -> String {
+        let value = (credentials[key] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.hasPrefix("$(") ? "" : value
     }
 
     public static func scope(for type: ConnectionType) -> String {
@@ -96,7 +112,11 @@ public enum OAuthProviderConfiguration {
         case .oneDrive:
             return "Files.Read.All offline_access"
         case .box:
-            return ""
+            // Box 的 scope 由 Developer Console 的 Application Scopes 决定。这里不能降权到
+            // `root_readonly`: 2026-11-01 iOS Simulator 验收中,只读 token 列表正常但请求
+            // `/files/{id}/content` 返回 403 insufficient permission;因此这里请求读写 scope。
+            // Vanmo 只调用读取类接口,不会写用户内容;console 侧仍需勾选 Read and write 权限。
+            return "root_readwrite"
         case .pCloudDrive:
             return ""
         case .yandexDisk:
@@ -110,6 +130,7 @@ public enum OAuthProviderConfiguration {
     }
 
     /// 是否使用 PKCE（code_verifier / code_challenge），公共客户端优先选择，避免在 App 内嵌 Client Secret。
+    /// Box 不支持 PKCE，即使启用也会退化为 Secret 模式，因此这里显式返回 false。
     public static func usesPKCE(for type: ConnectionType) -> Bool {
         switch type {
         case .googleDrive, .oneDrive, .yandexDisk:
@@ -167,15 +188,20 @@ public enum OAuthProviderConfiguration {
     }
 
     public static func isConfigured(for type: ConnectionType) -> Bool {
-        guard !clientID(for: type).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        isConfigured(clientID: clientID(for: type), clientSecret: clientSecret(for: type), type: type)
+    }
+
+    /// 纯函数形式，便于在不依赖真实凭据的情况下固定“Secret 模式必须同时有 ID + Secret”的契约。
+    static func isConfigured(clientID: String, clientSecret: String?, type: ConnectionType) -> Bool {
+        guard !clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return false
         }
         // PKCE 公共客户端（Google/OneDrive/Yandex.Disk）与简化模式（百度网盘）不需要 secret；
-        // 其余走 client secret 模式的网盘必须同时配置好 secret，否则 token exchange 必然失败。
+        // 其余走 client secret 模式的网盘（Box/pCloud）必须同时配置好 secret，否则 token exchange 必然失败。
         if usesPKCE(for: type) || usesImplicitGrant(for: type) {
             return true
         }
-        return !(clientSecret(for: type) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return !(clientSecret ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// 未配置时展示给用户的提示，指引去哪里申请。
@@ -186,7 +212,7 @@ public enum OAuthProviderConfiguration {
         case .oneDrive:
             return "需要先在 Microsoft Entra 管理中心注册应用（公共客户端）并填入 Application (client) ID。"
         case .box:
-            return "需要先在 Box Developer Console 创建自定义 App 并填入 Client ID / Client Secret。"
+            return "需要先在 Box Developer Console 创建 User Authentication (OAuth 2.0) 应用，回调登记为 vanmo://oauth/box，并在本机填入 Client ID / Client Secret（Secret 不要提交）。"
         case .pCloudDrive:
             return "需要先在 pCloud 开发者后台注册 App 并填入 Client ID / Client Secret。"
         case .yandexDisk:

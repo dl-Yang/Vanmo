@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class YandexDiskOAuthTests: XCTestCase {
     func testYandexDiskIsConfiguredAsPKCEPublicClient() {
-        XCTAssertTrue(OAuthProviderConfiguration.isConfigured(for: .yandexDisk))
+        XCTAssertTrue(OAuthProviderConfiguration.isConfigured(clientID: "id", clientSecret: nil, type: .yandexDisk))
         XCTAssertTrue(OAuthProviderConfiguration.usesPKCE(for: .yandexDisk))
         XCTAssertNil(OAuthProviderConfiguration.clientSecret(for: .yandexDisk))
         XCTAssertEqual(OAuthProviderConfiguration.scope(for: .yandexDisk), "cloud_api:disk.read")
@@ -18,6 +18,7 @@ final class YandexDiskOAuthTests: XCTestCase {
         let coordinator = OAuthCoordinator()
         let stub = StubAuthenticator()
         coordinator.externalAuthenticators[.yandexDisk] = stub
+        coordinator.isProviderConfigured = { _ in true }
 
         let credential = try await coordinator.authenticate(type: .yandexDisk)
 

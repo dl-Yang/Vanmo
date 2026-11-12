@@ -45,6 +45,9 @@ targets:
   Vanmo:
     type: application
     platform: iOS
+    configFiles:
+      Debug: Config/Secrets.xcconfig
+      Release: Config/Secrets.xcconfig
     dependencies:
       - package: VanmoCore
       - package: SWXMLHash
@@ -102,7 +105,7 @@ targets:
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.vanmo.app
         com.apple.developer.associated-domains:
-          - applinks:yx4cbf02a3c61e404a89d3af6c83e71a64.oauth.yandex.com
+          - applinks:yx$(VANMO_YANDEX_DISK_CLIENT_ID).oauth.yandex.com
     postBuildScripts:
       - name: Fix KSPlayer Framework Plist
         basedOnDependencyAnalysis: false
@@ -150,6 +153,9 @@ targets:
   Vanmo-macOS:
     type: application
     platform: macOS
+    configFiles:
+      Debug: Config/Secrets.xcconfig
+      Release: Config/Secrets.xcconfig
     dependencies:
       - package: VanmoCore
       - package: Kingfisher
