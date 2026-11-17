@@ -40,7 +40,7 @@ STANDARD COMMANDS
   ./run_device.sh --macos
 - Select a configuration:
   ./run_device.sh --configuration Debug|Release
-- Clean the script-managed DerivedData before building:
+- Delete the Vanmo DerivedData shared with Xcode before building:
   ./run_device.sh --clean
 - Launch an already built app without rebuilding:
   ./run_device.sh --launch-only

@@ -42,9 +42,11 @@ These commands compile only. They do not install, launch, test, or archive. Evid
 - DerivedData: `build/app-build-evidence/DerivedData/ios-simulator` or `.../macos`
 - Swift package checkout: `build/app-build-evidence/SourcePackages`
 
-Xcode's Incremental Build uses `~/Library/Developer/Xcode/DerivedData` and the IDE package cache. That path is usually already warm. The script path often starts with Resolve Package Graph and remote package updates, so a first script run can sit on `Updating from …` for a long time before it compiles Vanmo sources.
+Xcode's Incremental Build uses `~/Library/Developer/Xcode/DerivedData` and the IDE package cache. That path is usually already warm. The `check-app-build.sh` path often starts with Resolve Package Graph and remote package updates, so a first script run can sit on `Updating from …` for a long time before it compiles Vanmo sources.
 
 An Xcode Incremental Build does not replace this script. The isolated caches exist so the recorded `.app` path, command line, and package checkout stay independent of the operator's IDE DerivedData.
+
+`run_device.sh` is not an evidence script. It resolves Xcode's default `Vanmo-<hash>` DerivedData through `xcodebuild -showBuildSettings` and builds into it, so the IDE and the launch script keep one build and package cache. Do not run it while Xcode is building the same project, because both use the shared build database. Quit a running Vanmo-macOS before `./run_device.sh --macos`; otherwise `open` only activates the old process. `--clean` deletes the shared Vanmo DerivedData, including Xcode's copy. If the settings query itself fails, delete `~/Library/Developer/Xcode/DerivedData/Vanmo-*` manually.
 
 Follow these two rules:
 

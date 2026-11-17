@@ -263,10 +263,11 @@ struct MacPlayerView: View {
 
 private struct ScreenEdgeLoadingLight: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var startDate = Date()
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
-            let phase = reduceMotion ? 0.08 : Self.phase(at: timeline.date)
+            let phase = reduceMotion ? 0 : Self.phase(since: startDate, at: timeline.date)
             EdgeCometStroke(phase: phase, cornerRadius: 16)
         }
         .ignoresSafeArea()
@@ -274,9 +275,9 @@ private struct ScreenEdgeLoadingLight: View {
         .accessibilityHidden(true)
     }
 
-    private static func phase(at date: Date) -> CGFloat {
+    private static func phase(since start: Date, at date: Date) -> CGFloat {
         let period: TimeInterval = 2
-        return CGFloat(date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period)
+        return CGFloat(date.timeIntervalSince(start).truncatingRemainder(dividingBy: period) / period)
     }
 }
 
@@ -285,7 +286,13 @@ private struct EdgeCometStroke: View {
     var cornerRadius: CGFloat
 
     private let cometLength: CGFloat = 0.14
-    private let coreWidth: CGFloat = 3
+    private let coreWidth: CGFloat = 3.5
+    /// Outermost first, so each brighter layer draws over the wider bloom beneath it.
+    private static let glowLayers: [(lineWidth: CGFloat, opacity: Double, blur: CGFloat)] = [
+        (28, 0.3, 12),
+        (13, 0.5, 4.5),
+        (6.5, 0.85, 1.2)
+    ]
 
     var body: some View {
         Canvas { context, size in
@@ -293,16 +300,61 @@ private struct EdgeCometStroke: View {
             let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
             guard rect.width > 4, rect.height > 4 else { return }
             let radius = min(cornerRadius, min(rect.width, rect.height) / 2)
-            let path = Path(roundedRect: rect, cornerRadius: radius, style: .continuous)
-            strokeComet(context: &context, path: path, lineWidth: 7, color: Color.white.opacity(0.55), blur: 1.2)
-            strokeComet(context: &context, path: path, lineWidth: coreWidth, color: .white, blur: 0)
+            let path = Self.pathStartingAtTopLeft(Path(roundedRect: rect, cornerRadius: radius, style: .continuous))
+            var comet = path.trimmedPath(from: phase, to: min(phase + cometLength, 1))
+            if phase + cometLength > 1 {
+                comet.addPath(path.trimmedPath(from: 0, to: phase + cometLength - 1))
+            }
+            for glow in Self.glowLayers {
+                strokeComet(context: &context, comet: comet, lineWidth: glow.lineWidth, color: Color.white.opacity(glow.opacity), blur: glow.blur)
+            }
+            strokeComet(context: &context, comet: comet, lineWidth: coreWidth, color: .white, blur: 0)
         }
         .allowsHitTesting(false)
     }
 
+    /// `Path(roundedRect:)` starts at the middle of the right edge; the comet must enter through the top-left corner instead.
+    /// Falls back to the original path if the left edge has no straight segment.
+    private static func pathStartingAtTopLeft(_ path: Path) -> Path {
+        var origin: CGPoint?
+        var segments: [Path.Element] = []
+        path.forEach { element in
+            switch element {
+            case .move(let point):
+                origin = point
+            case .closeSubpath:
+                if let origin { segments.append(.line(to: origin)) }
+            default:
+                segments.append(element)
+            }
+        }
+        let bounds = path.boundingRect
+        guard let pivot = segments.firstIndex(where: { element in
+            guard case .line(let end) = element else { return false }
+            return abs(end.x - bounds.minX) < 0.5 && end.y < bounds.midY
+        }), case .line(let cornerStart) = segments[pivot] else { return path }
+
+        var anchored = Path()
+        anchored.move(to: cornerStart)
+        for element in segments[(pivot + 1)...] + segments[...pivot] {
+            switch element {
+            case .line(let end):
+                anchored.addLine(to: end)
+            case .quadCurve(let end, let control):
+                anchored.addQuadCurve(to: end, control: control)
+            case .curve(let end, let control1, let control2):
+                anchored.addCurve(to: end, control1: control1, control2: control2)
+            case .move, .closeSubpath:
+                break
+            }
+        }
+        anchored.closeSubpath()
+        return anchored
+    }
+
     private func strokeComet(
         context: inout GraphicsContext,
-        path: Path,
+        comet: Path,
         lineWidth: CGFloat,
         color: Color,
         blur: CGFloat
@@ -312,10 +364,7 @@ private struct EdgeCometStroke: View {
             if blur > 0 {
                 layer.addFilter(.blur(radius: blur))
             }
-            layer.stroke(path.trimmedPath(from: phase, to: min(phase + cometLength, 1)), with: .color(color), style: style)
-            if phase + cometLength > 1 {
-                layer.stroke(path.trimmedPath(from: 0, to: phase + cometLength - 1), with: .color(color), style: style)
-            }
+            layer.stroke(comet, with: .color(color), style: style)
         }
     }
 }

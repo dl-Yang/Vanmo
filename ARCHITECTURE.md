@@ -620,7 +620,7 @@ Other verification entry points:
 ./scripts/check-app-build.sh ios-simulator
 ./scripts/check-app-build.sh macos
 
-# Build and run on an iOS device, simulator, or macOS
+# Build and run on an iOS device, simulator, or macOS (shares Xcode's default DerivedData)
 ./run_device.sh
 ./run_device.sh --simulator
 ./run_device.sh --macos

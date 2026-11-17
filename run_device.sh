@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_NAME="Vanmo"
 CONFIGURATION="Debug"
-DERIVED_DATA="$(pwd)/build/DerivedData"
+DERIVED_DATA=""
 
 # ios-device | ios-simulator | macos
 RUN_TARGET="ios-device"
@@ -34,7 +34,7 @@ usage() {
   -s, --simulator [名称|UDID]         在 iOS 模拟器上运行（默认选已启动或首个 iPhone 模拟器）
   -m, --macos                         构建并运行原生 macOS App（Vanmo-macOS）
   -c, --configuration Debug|Release   构建配置（默认 Debug）
-  --clean                             清理 DerivedData 后再构建（SPM 卡住时用）
+  --clean                             清理与 Xcode 共用的 Vanmo DerivedData 后再构建（SPM 卡住时用）
   --install-only                      只安装，不启动
   --launch-only                       只启动已安装的 App（跳过构建）
   --team TEAM                         Development Team；仅真机，默认读取 VANMO_DEVELOPMENT_TEAM
@@ -81,6 +81,26 @@ configure_target() {
             exit 1
             ;;
     esac
+}
+
+# Share Xcode's default DerivedData so the IDE and this script keep a single build and package cache.
+# --clean deletes this directory, so anything other than a Vanmo-<hash> folder outside the repository is rejected.
+resolve_derived_data() {
+    local build_dir settings_log
+    settings_log="$(mktemp -t vanmo-build-settings)"
+    build_dir="$(xcodebuild -project "${PROJECT_NAME}.xcodeproj" -scheme "${SCHEME}" -configuration "${CONFIGURATION}" \
+        -showBuildSettings -skipPackageUpdates 2>"$settings_log" \
+        | awk -F ' = ' '/^ *BUILD_DIR = / && !found { print $2; found = 1 }' || true)"
+    DERIVED_DATA="${build_dir%/Build/Products}"
+    if [[ "$build_dir" != */Build/Products \
+        || "$(basename "$DERIVED_DATA")" != "${PROJECT_NAME}"-* \
+        || "$(pwd)/" == "${DERIVED_DATA}/"* ]]; then
+        echo "❌ 无法解析 Xcode 的 ${PROJECT_NAME}-<hash> DerivedData 路径: ${build_dir:-<empty>}" >&2
+        tail -n 5 "$settings_log" >&2
+        rm -f "$settings_log"
+        exit 1
+    fi
+    rm -f "$settings_log"
 }
 
 update_app_path() {
@@ -147,7 +167,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 configure_target
-update_app_path
 
 if [[ "$RUN_TARGET" != "ios-device" && "$TEAM_OPTION_SET" == true ]]; then
     echo "❌ 仅 iOS 真机构建支持 --team。" >&2
@@ -167,6 +186,12 @@ fi
 if [[ "$INSTALL_ONLY" == true && "$LAUNCH_ONLY" == true ]]; then
     echo "❌ --install-only 与 --launch-only 不能同时使用" >&2
     exit 1
+fi
+
+# iOS --launch-only starts the installed app by bundle ID and never reads APP_PATH.
+if [[ "$LAUNCH_ONLY" == false || "$RUN_TARGET" == "macos" ]]; then
+    resolve_derived_data
+    update_app_path
 fi
 
 is_udid() {
@@ -581,7 +606,6 @@ if [[ "$LAUNCH_ONLY" == false ]]; then
         -scheme "${SCHEME}"
         -configuration "${CONFIGURATION}"
         -destination "${DESTINATION}"
-        -derivedDataPath "${DERIVED_DATA}"
     )
 
     if [[ -n "$TEAM_XCCONFIG" ]]; then
