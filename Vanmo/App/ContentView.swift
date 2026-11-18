@@ -9,60 +9,63 @@ struct ContentView: View {
     @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
     @ObservedObject private var islandHandoff = DownloadIslandHandoff.shared
+    @State private var isTabBarHidden = false
 #if DEBUG
     /// 关闭播放器后 `.task` 会随根视图重新出现而重跑；调试起播每个进程只触发一次。
     private static var didOpenDebugPlayFile = false
 #endif
 
     var body: some View {
-        TabView(selection: $appState.selectedTab) {
-            NavigationStack {
-                LibraryView()
-            }
-            .accessibilityIdentifier("screen.library")
-            .tabItem {
-                Label(AppTab.library.title, systemImage: AppTab.library.icon)
-                    .accessibilityIdentifier("tab.library")
-            }
-            .tag(AppTab.library)
+        ZStack(alignment: .bottom) {
+            TabView(selection: $appState.selectedTab) {
+                NavigationStack {
+                    LibraryView()
+                }
+                .accessibilityIdentifier("screen.library")
+                .toolbar(.hidden, for: .tabBar)
+                .tag(AppTab.library)
 
-            NavigationStack {
-                ConnectionsView()
-            }
-            .accessibilityIdentifier("screen.files")
-            .tabItem {
-                Label(AppTab.connections.title, systemImage: AppTab.connections.icon)
-                    .accessibilityIdentifier("tab.connections")
-            }
-            .tag(AppTab.connections)
+                NavigationStack {
+                    ConnectionsView()
+                }
+                .accessibilityIdentifier("screen.files")
+                .toolbar(.hidden, for: .tabBar)
+                .tag(AppTab.connections)
 
-            NavigationStack {
-                SearchView()
-            }
-            .tabItem {
-                Label(AppTab.search.title, systemImage: AppTab.search.icon)
-            }
-            .tag(AppTab.search)
+                NavigationStack {
+                    SearchView()
+                }
+                .toolbar(.hidden, for: .tabBar)
+                .tag(AppTab.search)
 
-            NavigationStack(path: $appState.settingsPath) {
-                SettingsView()
-                    .navigationDestination(for: SettingsRoute.self) { route in
-                        switch route {
-                        case .appearance:
-                            AppearanceSettingsView()
-                        case .downloads:
-                            DownloadManagementView()
+                NavigationStack(path: $appState.settingsPath) {
+                    SettingsView()
+                        .navigationDestination(for: SettingsRoute.self) { route in
+                            settingsDestination(for: route)
                         }
-                    }
+                }
+                .accessibilityIdentifier("screen.settings")
+                .toolbar(.hidden, for: .tabBar)
+                .tag(AppTab.settings)
             }
-            .accessibilityIdentifier("screen.settings")
-            .tabItem {
-                Label(AppTab.settings.title, systemImage: AppTab.settings.icon)
-                    .accessibilityIdentifier("tab.settings")
+            .tint(CatDesign.accentAmber)
+
+            if !isTabBarHidden {
+                ZStack(alignment: .bottom) {
+                    CatBottomBarScrim()
+                        .transition(.opacity)
+                    CatGlassTabBar(selectedTab: $appState.selectedTab)
+                        .padding(.bottom, 10)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .ignoresSafeArea(.keyboard, edges: .bottom)
             }
-            .tag(AppTab.settings)
         }
-        .tint(.vanmoPrimary)
+        .onPreferenceChange(CatTabBarHiddenPreferenceKey.self) { hidden in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isTabBarHidden = hidden
+            }
+        }
         .statusBarHidden(islandHandoff.hidesStatusBar)
         .modifier(PlayerPresentationModifier())
         .overlay {
@@ -101,6 +104,7 @@ struct ContentView: View {
             appState.purgeMediaState(for: connectionId)
         }
         .onAppear {
+            UITabBar.appearance().isHidden = true
             DownloadIslandHandoff.shared.applyStatusBarPolicy()
 #if DEBUG
             IslandDebugDarwin.shared.openDownloadsHandler = { appState.openDownloads() }
@@ -192,6 +196,30 @@ struct ContentView: View {
         }
         .sheet(item: $connectionsViewModel.pendingMissingCredentialConnection) { connection in
             AddConnectionView(viewModel: connectionsViewModel, editingConnection: connection)
+        }
+    }
+
+    @ViewBuilder
+    private func settingsDestination(for route: SettingsRoute) -> some View {
+        switch route {
+        case .iCloudSync:
+            ICloudSyncSettingsView()
+        case .playback:
+            PlaybackSettingsView()
+        case .audio:
+            AudioSettingsView()
+        case .subtitles:
+            SubtitlesSettingsView()
+        case .libraryScan:
+            LibraryScanSettingsView()
+        case .metadataCache:
+            MetadataCacheSettingsView()
+        case .appearance:
+            AppearanceSettingsView()
+        case .storage:
+            StorageDownloadsSettingsView()
+        case .downloads:
+            DownloadManagementView()
         }
     }
 }

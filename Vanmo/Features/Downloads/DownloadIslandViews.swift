@@ -76,24 +76,18 @@ struct DownloadIslandCompactView: View {
     var onResume: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
             Button(action: { onExpand?() }) {
-                DownloadIslandPoster(url: chrome.posterURL, size: 23, cornerRadius: 11.5)
+                DownloadIslandPoster(url: chrome.posterURL, size: 24, cornerRadius: 12)
             }
             .buttonStyle(.plain)
 
             Button(action: { onExpand?() }) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(chrome.title)
-                        .font(.system(size: 8.3, weight: .medium))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    Text(chrome.statusText)
-                        .font(.system(size: 6.4, weight: .regular))
-                        .foregroundStyle(Color.white.opacity(0.47))
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(chrome.title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(DownloadIslandPalette.ivory)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
 
@@ -114,14 +108,17 @@ struct DownloadIslandCompactView: View {
     private var compactTrailing: some View {
         if chrome.isPaused, !chrome.isCompleted {
             Button(action: { onResume?() }) {
-                DownloadIslandPauseGlyph(color: DownloadIslandPalette.ringText, height: 11)
-                    .frame(width: 23, height: 23)
+                Image("CatEarPause")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+                    .frame(width: 24, height: 24)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.tr("继续"))
             .accessibilityIdentifier("download.island.compact.resume")
         } else {
-            DownloadIslandProgressRing(progress: chrome.progress, percent: chrome.percent)
+            DownloadIslandProgressRing(progress: chrome.isCompleted ? 1 : chrome.progress, percent: chrome.percent)
                 .allowsHitTesting(false)
         }
     }
@@ -133,57 +130,48 @@ struct DownloadIslandExpandedView: View {
     var onCollapse: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 13) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 Button(action: onCollapse) {
-                    DownloadIslandPoster(url: chrome.posterURL, size: nil, cornerRadius: 12)
-                        .frame(width: 94, height: 56)
+                    DownloadIslandPoster(url: chrome.posterURL, size: nil, cornerRadius: 11)
+                        .frame(width: 44, height: 60)
                 }
                 .buttonStyle(.plain)
 
                 Button(action: onCollapse) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(chrome.title)
-                            .font(.system(size: 15, weight: .semibold))
-                            .tracking(-0.3)
-                            .foregroundStyle(.white)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(DownloadIslandPalette.ivory)
                             .lineLimit(1)
-                        Text("\(chrome.statusText)  •  \(chrome.percent)%")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.49))
+                        Text(chrome.isCompleted ? "100% · \(L10n.tr("离线就绪"))" : "\(chrome.statusText) · \(chrome.percent)%")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(chrome.isCompleted ? DownloadIslandPalette.ring : DownloadIslandPalette.muted)
+                            .lineLimit(1)
+                        Text(chrome.byteLine)
+                            .font(.system(size: 10))
+                            .foregroundStyle(DownloadIslandPalette.dim)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
+
+                trailingButton
             }
             .padding(.top, DownloadIslandCapability.expandedContentTopInset)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
 
-            DownloadIslandProgressBar(progress: chrome.progress)
-                .padding(.top, 20)
-                .padding(.horizontal, 16)
+            HStack(alignment: .bottom, spacing: 10) {
+                DownloadIslandProgressBar(progress: chrome.isCompleted ? 1 : chrome.progress)
+                    .frame(height: 10)
 
-            HStack {
-                Text(chrome.byteLine)
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.38))
-                Spacer()
-                Button(action: onToggle) {
-                    DownloadIslandPauseGlyph(
-                        color: DownloadIslandPalette.ink,
-                        height: 14,
-                        isPlay: chrome.isPaused
-                    )
-                    .frame(width: 108, height: 36)
-                    .background(Color.white, in: Capsule())
-                }
-                .buttonStyle(DownloadIslandPauseButtonStyle())
-                .accessibilityLabel(chrome.isPaused ? L10n.tr("继续") : L10n.tr("暂停"))
-                .accessibilityIdentifier("download.island.expanded.toggle")
+                Image(chrome.isCompleted ? "CatPerkedCompletedIsland" : "CatCurledNappingIsland")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 38, height: chrome.isCompleted ? 24 : 20)
             }
-            .padding(.top, 14)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 18)
             .padding(.bottom, 16)
         }
         .frame(
@@ -194,6 +182,58 @@ struct DownloadIslandExpandedView: View {
         .accessibilityIdentifier("download.island.expanded")
         .animation(nil, value: chrome.isPaused)
         .animation(nil, value: chrome.progress)
+    }
+
+    @Environment(\.openURL) private var openURL
+
+    @ViewBuilder
+    private var trailingButton: some View {
+        if chrome.isCompleted {
+            Button {
+                onCollapse()
+                if let url = URL(string: "vanmo://downloads") {
+                    openURL(url)
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image("CatPlaySmall")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 14, height: 14)
+                    Text(L10n.tr("离线库"))
+                        .font(.system(size: 11.5, weight: .bold))
+                        .foregroundStyle(DownloadIslandPalette.ring)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 34)
+                .background(DownloadIslandPalette.ring.opacity(0.15), in: Capsule())
+                .overlay(Capsule().strokeBorder(DownloadIslandPalette.amberStroke, lineWidth: 0.9))
+            }
+            .buttonStyle(DownloadIslandPauseButtonStyle())
+            .accessibilityLabel(L10n.tr("打开离线下载管理"))
+        } else {
+            Button(action: onToggle) {
+                Group {
+                    if chrome.isPaused {
+                        Image("CatPlaySmall")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 14, height: 14)
+                    } else {
+                        Image("CatEarPause")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
+                    }
+                }
+                .frame(width: 36, height: 36)
+                .background(DownloadIslandPalette.ring.opacity(0.12), in: Circle())
+                .overlay(Circle().strokeBorder(DownloadIslandPalette.amberStroke, lineWidth: 0.9))
+            }
+            .buttonStyle(DownloadIslandPauseButtonStyle())
+            .accessibilityLabel(chrome.isPaused ? L10n.tr("继续") : L10n.tr("暂停"))
+            .accessibilityIdentifier("download.island.expanded.toggle")
+        }
     }
 }
 
@@ -213,7 +253,7 @@ struct DownloadIslandPoster: View {
                     .overlay {
                         Image(systemName: "arrow.down")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(DownloadIslandPalette.ring)
                     }
             }
         }
@@ -221,7 +261,7 @@ struct DownloadIslandPoster: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.64)
+                .strokeBorder(DownloadIslandPalette.glassStroke, lineWidth: 0.75)
         )
     }
 }
@@ -229,23 +269,36 @@ struct DownloadIslandPoster: View {
 struct DownloadIslandProgressRing: View {
     let progress: Double
     let percent: Int
-    var size: CGFloat = 23
+    var size: CGFloat = 26
     var lineWidth: CGFloat = 2
-    var percentSize: CGFloat = 5.8
 
     var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.12), lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: min(max(progress, 0.02), 1))
-                .stroke(DownloadIslandPalette.ring, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text("\(percent)")
-                .font(.system(size: percentSize, weight: .semibold))
-                .foregroundStyle(DownloadIslandPalette.ringText)
+        VStack(spacing: -2) {
+            ZStack {
+                Image("CatEarRingEarsFill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 12.4, height: 5)
+                Image("CatEarRingEarsStroke")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 12.4, height: 5)
+            }
+
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.14), lineWidth: lineWidth)
+                Circle()
+                    .trim(from: 0, to: min(max(progress, 0.04), 1))
+                    .stroke(DownloadIslandPalette.ring, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text("\(percent)")
+                    .font(.system(size: 6.5, weight: .bold).monospacedDigit())
+                    .foregroundStyle(DownloadIslandPalette.ringText)
+            }
+            .frame(width: 17, height: 17)
         }
-        .frame(width: size, height: size)
+        .frame(width: size, height: 28)
         .accessibilityHidden(true)
     }
 }
@@ -257,14 +310,14 @@ struct DownloadIslandProgressBar: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.11))
+                    .fill(Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.14))
                 Capsule()
-                    .fill(DownloadIslandPalette.barFill)
+                    .fill(DownloadIslandPalette.ring)
                     .frame(width: max(geo.size.width * min(max(progress, 0), 1), 4))
-                    .shadow(color: Color(red: 126 / 255, green: 197 / 255, blue: 1).opacity(0.85), radius: 6)
+                    .shadow(color: DownloadIslandPalette.ring.opacity(0.65), radius: 4)
             }
         }
-        .frame(height: 6)
+        .frame(height: 4)
     }
 }
 
@@ -374,6 +427,13 @@ struct DownloadIslandMorphChrome: View {
         }
         .frame(width: width, height: height, alignment: .top)
         .background(DownloadIslandPalette.background, in: RoundedRectangle(cornerRadius: corner, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: corner, style: .continuous)
+                .strokeBorder(
+                    isExpanded && chrome.isCompleted ? DownloadIslandPalette.amberStroke : DownloadIslandPalette.glassStroke,
+                    lineWidth: 0.9
+                )
+        )
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
     }
@@ -389,16 +449,13 @@ private struct DownloadIslandPauseButtonStyle: ButtonStyle {
 }
 
 enum DownloadIslandPalette {
-    static let background = Color.black
+    static let background = Color(red: 5 / 255, green: 5 / 255, blue: 7 / 255)
     static let ink = Color(red: 9 / 255, green: 10 / 255, blue: 12 / 255)
-    static let ring = Color(red: 116 / 255, green: 212 / 255, blue: 1)
-    static let ringText = Color(red: 223 / 255, green: 242 / 255, blue: 254 / 255)
-    static let barFill = LinearGradient(
-        colors: [
-            Color(red: 116 / 255, green: 212 / 255, blue: 1),
-            Color(red: 185 / 255, green: 220 / 255, blue: 1)
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    static let ring = Color(red: 255 / 255, green: 181 / 255, blue: 71 / 255)
+    static let ringText = Color(red: 255 / 255, green: 181 / 255, blue: 71 / 255)
+    static let ivory = Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255)
+    static let muted = Color(red: 168 / 255, green: 165 / 255, blue: 158 / 255)
+    static let dim = Color(red: 114 / 255, green: 112 / 255, blue: 107 / 255)
+    static let glassStroke = Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.12)
+    static let amberStroke = Color(red: 255 / 255, green: 181 / 255, blue: 71 / 255).opacity(0.45)
 }

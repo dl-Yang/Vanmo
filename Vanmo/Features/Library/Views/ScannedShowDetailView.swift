@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
+import Kingfisher
 import VanmoCore
 
 struct ScannedShowDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
 
     let connection: SavedConnection
@@ -16,76 +18,86 @@ struct ScannedShowDetailView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        Group {
-            if isLoading {
-                ScannedShowLoadingView()
-            } else if let errorMessage {
-                EmptyStateView(
-                    icon: "exclamationmark.triangle",
-                    title: L10n.tr("无法加载分集"),
-                    message: errorMessage
-                )
-            } else if episodes.isEmpty {
-                EmptyStateView(
-                    icon: "tv",
-                    title: L10n.tr("暂无分集"),
-                    message: L10n.tr("此剧集下没有可显示的分集")
-                )
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 10) {
-                        header
+        ZStack(alignment: .top) {
+            CatDesign.bgObsidian.ignoresSafeArea()
 
-                        ForEach(episodes) { episode in
-                            Button {
-                                appState.play(episode)
-                            } label: {
-                                MediaListRow(item: episode)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
-                }
+            CatAmberHalo(width: 180, height: 70, opacity: 0.22)
+                .padding(.top, 12)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                header
+                stateContent
             }
         }
-        .background(Color.vanmoBackground)
-        .navigationTitle(showTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .catTabBarHidden(true)
         .task(id: taskID) {
             loadEpisodes()
         }
     }
 
-    private var taskID: String {
-        "\(connection.id.uuidString)-\(parentDirectory)-\(showTitle)"
-    }
-
     private var header: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "tv")
-                .font(.headline)
-                .foregroundStyle(Color.vanmoPrimary)
-                .frame(width: 34, height: 34)
-                .background(Color.vanmoPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        HStack(spacing: 11) {
+            CatBackButton { dismiss() }
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(showTitle)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .lineLimit(2)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
 
-                Text("\(connection.name) · \(episodes.count) 集")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("\(connection.name) · \(L10n.tr("%d 集", episodes.count))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
+            CatStretchingDivider()
         }
-        .padding(.horizontal)
-        .padding(.bottom, 6)
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+    }
+
+    @ViewBuilder
+    private var stateContent: some View {
+        if isLoading {
+            ScannedShowLoadingView()
+        } else if let errorMessage {
+            EmptyStateView(
+                icon: "exclamationmark.triangle",
+                title: L10n.tr("无法加载分集"),
+                message: errorMessage
+            )
+        } else if episodes.isEmpty {
+            EmptyStateView(
+                icon: "tv",
+                title: L10n.tr("暂无分集"),
+                message: L10n.tr("此剧集下没有可显示的分集")
+            )
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(episodes) { episode in
+                        Button {
+                            appState.play(episode)
+                        } label: {
+                            ScannedEpisodeRowCard(episode: episode)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, CatDesign.horizontalMargin)
+                .padding(.bottom, 28)
+            }
+        }
+    }
+
+    private var taskID: String {
+        "\(connection.id.uuidString)-\(parentDirectory)-\(showTitle)"
     }
 
     private func loadEpisodes() {
@@ -115,39 +127,96 @@ struct ScannedShowDetailView: View {
 
         isLoading = false
     }
+}
 
+private struct ScannedEpisodeRowCard: View {
+    let episode: MediaItem
+
+    private var badgeText: String {
+        if let ep = episode.episodeNumber {
+            return String(format: "E%02d", ep)
+        }
+        return L10n.tr("分集")
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack(alignment: .topLeading) {
+                KFImage(episode.backdropURL ?? episode.posterURL)
+                    .placeholder {
+                        ZStack {
+                            CatDesign.mediaPlaceholder
+                            Image(systemName: "play.rectangle")
+                                .foregroundStyle(CatDesign.textMuted.opacity(0.45))
+                        }
+                    }
+                    .fade(duration: 0.2)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 112, height: 64)
+                    .clipped()
+
+                Text(badgeText)
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundStyle(CatDesign.Cinema.textIvory)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
+                    .padding(5)
+            }
+            .frame(width: 112, height: 64)
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 0.8)
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(episode.episodeTitle ?? episode.displayTitle)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+
+                if episode.duration > 0 {
+                    Text(episode.duration.shortDuration)
+                        .font(.system(size: 11))
+                        .foregroundStyle(CatDesign.textMuted)
+                }
+
+                if episode.playbackProgress > 0, !episode.isWatched {
+                    CatPawProgressBar(progress: episode.playbackProgress, showPawDot: false)
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            if episode.isWatched {
+                CatSleepingPillBadge()
+            } else {
+                Image("CatPlaySmall")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
+                    .padding(7)
+                    .background(CatDesign.amberTintFill, in: Circle())
+                    .overlay(Circle().strokeBorder(CatDesign.strokeAmber, lineWidth: 0.8))
+            }
+        }
+        .padding(10)
+        .catGlassCard(cornerRadius: 16)
+    }
 }
 
 private struct ScannedShowLoadingView: View {
     var body: some View {
         VStack(spacing: 10) {
-            ForEach(0..<8, id: \.self) { _ in
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.vanmoSurface)
-                        .frame(width: 60, height: 90)
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.vanmoSurface)
-                            .frame(height: 13)
-
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.vanmoSurface.opacity(0.72))
-                            .frame(width: 150, height: 10)
-
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.vanmoSurface.opacity(0.58))
-                            .frame(width: 90, height: 10)
-                    }
-
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+            ForEach(0..<6, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(CatDesign.surfacePill)
+                    .frame(height: 84)
             }
         }
-        .padding(.top, 8)
+        .padding(.horizontal, CatDesign.horizontalMargin)
         .redacted(reason: .placeholder)
     }
 }

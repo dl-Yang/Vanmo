@@ -85,6 +85,8 @@ struct SubtitleOverlayView: View {
                         .fontWeight(.medium)
                         .foregroundStyle(style.textColor)
                         .multilineTextAlignment(.center)
+                        .shadow(color: outlineColor, radius: outlineRadius, x: 0, y: 0)
+                        .shadow(color: outlineColor, radius: outlineRadius, x: 0, y: 0)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(style.backgroundColor)
@@ -94,6 +96,14 @@ struct SubtitleOverlayView: View {
             .transition(.opacity)
             .animation(.easeInOut(duration: 0.15), value: content.text)
         }
+    }
+
+    private var outlineColor: Color {
+        style.outlineWeight == .none ? .clear : Color.black.opacity(0.92)
+    }
+
+    private var outlineRadius: CGFloat {
+        style.outlineWeight.shadowRadius
     }
 
     private func attributedSubtitleLabel(_ attributedText: NSAttributedString) -> some View {
@@ -209,9 +219,40 @@ struct SubtitleStyle {
     var backgroundColor: Color = Color.black.opacity(0.6)
     var bottomPadding: CGFloat = 40
     var position: SubtitlePosition = .bottom
+    var outlineWeight: SubtitleOutlineWeight = .medium
 
     enum SubtitlePosition: String {
         case top, bottom
+    }
+
+    enum SubtitleOutlineWeight: String, CaseIterable, Identifiable {
+        case none, light, medium, heavy
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .none: return L10n.tr("无")
+            case .light: return L10n.tr("细")
+            case .medium: return L10n.tr("中")
+            case .heavy: return L10n.tr("粗")
+            }
+        }
+
+        var shadowRadius: CGFloat {
+            switch self {
+            case .none: return 0
+            case .light: return 0.9
+            case .medium: return 1.8
+            case .heavy: return 3.0
+            }
+        }
+
+        var next: SubtitleOutlineWeight {
+            let all = Self.allCases
+            guard let idx = all.firstIndex(of: self) else { return .medium }
+            return all[(idx + 1) % all.count]
+        }
     }
 }
 
@@ -221,6 +262,7 @@ enum SubtitleStylePreferences {
     static let textColorKey = "subtitle.textColorHex"
     static let backgroundColorKey = "subtitle.backgroundColorHex"
     static let positionKey = "subtitle.position"
+    static let outlineWeightKey = "subtitle.outlineWeight"
 
     static func load() -> SubtitleStyle {
         let defaults = UserDefaults.standard
@@ -238,6 +280,10 @@ enum SubtitleStylePreferences {
            let position = SubtitleStyle.SubtitlePosition(rawValue: raw) {
             style.position = position
         }
+        if let raw = defaults.string(forKey: outlineWeightKey),
+           let weight = SubtitleStyle.SubtitleOutlineWeight(rawValue: raw) {
+            style.outlineWeight = weight
+        }
         return style
     }
 
@@ -247,6 +293,7 @@ enum SubtitleStylePreferences {
         defaults.set(style.textColor.rgbaHex, forKey: textColorKey)
         defaults.set(style.backgroundColor.rgbaHex, forKey: backgroundColorKey)
         defaults.set(style.position.rawValue, forKey: positionKey)
+        defaults.set(style.outlineWeight.rawValue, forKey: outlineWeightKey)
     }
 }
 
@@ -310,6 +357,12 @@ struct SubtitleSettingsSections: View {
             }
 
             ColorPicker(L10n.tr("文字颜色"), selection: $style.textColor)
+
+            Picker(L10n.tr("描边"), selection: $style.outlineWeight) {
+                ForEach(SubtitleStyle.SubtitleOutlineWeight.allCases) { weight in
+                    Text(weight.displayName).tag(weight)
+                }
+            }
         }
 
         Section(L10n.tr("背景")) {

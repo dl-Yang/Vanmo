@@ -126,7 +126,6 @@ struct MacConnectionSidebarRow: View {
         }
         .buttonStyle(.plain)
         .opacity(status == .failed ? 0.72 : 1)
-        .help(failureHelpText)
     }
 
     @ViewBuilder
@@ -135,12 +134,19 @@ struct MacConnectionSidebarRow: View {
         case .connecting:
             ProgressView()
                 .controlSize(.small)
+        case .connected:
+            Image("MacCatEyeStatus")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 13, height: 7)
+                .accessibilityLabel(L10n.tr("已连接"))
+                .help(L10n.tr("已连接"))
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.orange)
                 .help(failureHelpText)
-        default:
+        case .idle:
             EmptyView()
         }
     }

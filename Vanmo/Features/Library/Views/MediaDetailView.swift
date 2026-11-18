@@ -80,7 +80,7 @@ struct MediaDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
+        .catTabBarHidden(true)
         .task(id: metadataTaskID) {
             let loadTask = Task {
                 await store.load(
@@ -177,42 +177,52 @@ struct MediaDetailView: View {
 
     private func topNavBar(topPadding: CGFloat) -> some View {
         HStack {
-            Button {
+            CatBackButton(size: 40, cinemaStyle: true) {
                 dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .frame(width: 24, height: 24)
-                    .frame(width: 40, height: 40)
-                    .background(detailNavigationButtonBackground)
             }
-            .buttonStyle(DetailNavigationButtonStyle())
-            .contentShape(Circle())
-            .accessibilityLabel(L10n.tr("返回"))
 
             Spacer()
 
-            favoriteButton
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, topPadding > 0 ? topPadding + 8 : 48)
-    }
-
-    private var detailNavigationButtonBackground: some View {
-        let shape = Circle()
-
-        return Group {
-            if #available(iOS 26.0, *) {
-                Color.clear
-                    .glassEffect(.regular.tint(Color.black.opacity(0.12)), in: shape)
-            } else {
-                shape
-                    .fill(Color.black.opacity(0.12))
-                    .background(.ultraThinMaterial, in: shape)
+            if store.supportsMetadataRefresh(for: item, in: modelContext) {
+                observedRefreshButton
             }
         }
-        .overlay(shape.strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .padding(.top, topPadding > 0 ? topPadding + 4 : 48)
+    }
+
+    private var observedRefreshButton: some View {
+        MediaDetailObservedObject(state: store.actionState) { actionState in
+            Button {
+                Task {
+                    await store.refreshMetadata(for: item, modelContext: modelContext, force: true)
+                }
+            } label: {
+                ZStack {
+                    if actionState.isRefreshingMetadata {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(CatDesign.glowAmber)
+                            .scaleEffect(0.75)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(CatDesign.Cinema.textIvory)
+                    }
+                }
+                .frame(width: 40, height: 40)
+                .background {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Circle().fill(CatDesign.Cinema.surfaceGlass))
+                }
+                .overlay(Circle().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 1))
+                .contentShape(Circle())
+            }
+            .buttonStyle(DetailNavigationButtonStyle())
+            .disabled(actionState.isRefreshingMetadata)
+            .accessibilityLabel(L10n.tr("刷新"))
+        }
     }
 
     // MARK: - 收起态前景
@@ -288,66 +298,55 @@ struct MediaDetailView: View {
     // MARK: - 媒体信息面板
 
     private func mediaInfoPanel(panelHeight: CGFloat, isScrollEnabled: Bool) -> some View {
-        VStack(spacing: 0) {
-            // 拖拽抓手（始终接管拖拽手势）
-            VStack(spacing: 0) {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.5))
-                    .frame(width: 48, height: 6)
-                    .padding(.top, 16)
-                    .padding(.bottom, 18)
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-            .gesture(panelDrag())
+        ZStack(alignment: .topLeading) {
+            CatAmberHalo(width: 180, height: 80, opacity: 0.16)
+                .padding(.top, 90)
+                .padding(.leading, 24)
 
-            // 媒体信息内容（展开后内部滚动）
-            ScrollView {
-                Group {
-                    if item.mediaType == .tvShow {
-                        tvShowPanelContent
-                    } else {
-                        moviePanelContent
-                    }
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    Capsule()
+                        .fill(CatDesign.grabberFill)
+                        .frame(width: 44, height: 4)
+                        .padding(.top, 12)
+                        .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .gesture(panelDrag())
+
+                ScrollView {
+                    Group {
+                        if item.mediaType == .tvShow {
+                            tvShowPanelContent
+                        } else {
+                            moviePanelContent
+                        }
+                    }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                    .padding(.bottom, 44)
+                }
+                .scrollDisabled(!isScrollEnabled)
+                .scrollIndicators(.hidden)
             }
-            .scrollDisabled(!isScrollEnabled)
-            .scrollIndicators(.hidden)
         }
         .frame(height: panelHeight, alignment: .top)
         .background(panelGlassBackground)
     }
 
-    /// 媒体信息布局的液态玻璃背景（顶部圆角矩形 + Liquid Glass 质感 + 顶部高光边）
-    /// iOS 26+ 使用系统液态玻璃 `glassEffect`，更低版本回退到毛玻璃材质。
     private var panelGlassBackground: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28, style: .continuous)
-        let isDark = colorScheme == .dark
-        let tintColor = isDark ? Color(red: 9/255, green: 9/255, blue: 11/255).opacity(0.2) : Color.white.opacity(0.2)
-        let borderColor = isDark ? Color.white.opacity(0.1) : Color.white.opacity(0.2)
-        let shadowColor = isDark ? Color.black.opacity(0.5) : Color.black.opacity(0.15)
+        let shape = UnevenRoundedRectangle(topLeadingRadius: CatDesign.radiusSheetTop, topTrailingRadius: CatDesign.radiusSheetTop, style: .continuous)
 
-        return Group {
-            if #available(iOS 26.0, *) {
-                Color.clear
-                    .glassEffect(.regular.tint(tintColor), in: shape)
-            } else {
-                shape
-                    .fill(tintColor)
-                    .background(.ultraThinMaterial, in: shape)
-            }
-        }
-        .overlay(
-            shape.strokeBorder(borderColor, lineWidth: 1)
-        )
-        .shadow(color: shadowColor, radius: 28, y: -8)
-        .ignoresSafeArea(edges: .bottom)
+        return shape
+            .fill(.ultraThinMaterial)
+            .overlay(shape.fill(CatDesign.surfacePanel))
+            .overlay(shape.strokeBorder(CatDesign.strokeGlass, lineWidth: 1))
+            .shadow(color: CatDesign.cardShadow, radius: 28, y: -10)
+            .ignoresSafeArea(edges: .bottom)
     }
 
     private var moviePanelContent: some View {
-        VStack(alignment: .leading, spacing: 32) {
+        VStack(alignment: .leading, spacing: 18) {
             observedPanelHeader(title: item.displayTitle)
             observedPanelActions(play: { appState.play(item) })
             observedSynopsis
@@ -358,7 +357,7 @@ struct MediaDetailView: View {
     }
 
     private var tvShowPanelContent: some View {
-        VStack(alignment: .leading, spacing: 32) {
+        VStack(alignment: .leading, spacing: 18) {
             observedPanelHeader(title: item.showTitle ?? item.title)
             observedPanelActions(play: {
                 if let ep = store.nextEpisodeToPlay { playEpisode(ep) }
@@ -388,8 +387,7 @@ struct MediaDetailView: View {
                         tags: capabilityTags(
                             summaryState: summaryState,
                             technicalState: technicalState
-                        ),
-                        starYellow: starYellow
+                        )
                     )
                 }
             }
@@ -503,36 +501,44 @@ struct MediaDetailView: View {
         }
     }
 
-    private func tagView(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
-            )
-    }
-
     private func observedPanelActions(play: @escaping () -> Void) -> some View {
-        MediaDetailObservedObject(state: store.actionState) { actionState in
+        MediaDetailObservedObject(state: store.summaryState) { summaryState in
             MediaDetailPanelActions(
-                accentBlue: accentBlue,
-                isRefreshing: actionState.isRefreshingMetadata,
-                supportsMetadataRefresh: store.supportsMetadataRefresh(for: item, in: modelContext),
                 isTVShow: item.mediaType == .tvShow,
+                isFavorite: item.isFavorite,
+                isUpdatingFavorite: isUpdatingFavorite,
+                resumeLabel: resumeCueText,
+                shareText: shareSummaryText(from: summaryState),
                 isRelatedDownload: isRelatedDownloadRequest,
                 isEnqueueingDownload: isEnqueueingDownload,
                 play: play,
-                download: handleDownloadButtonTap,
-                refresh: {
-                    Task {
-                        await store.refreshMetadata(for: item, modelContext: modelContext, force: true)
-                    }
-                }
+                toggleFavorite: { Task { await setFavorite(!item.isFavorite) } },
+                download: handleDownloadButtonTap
             )
         }
+    }
+
+    private var resumeCueText: String? {
+        if item.mediaType == .tvShow {
+            if let ep = store.nextEpisodeToPlay {
+                return String(format: "S%02d E%02d", ep.seasonNumber, ep.episodeNumber)
+            }
+            return nil
+        }
+        guard item.lastPlaybackPosition > 0, !item.isWatched, item.duration > item.lastPlaybackPosition else {
+            return nil
+        }
+        return LocalizedFormat.remainingDuration(position: item.lastPlaybackPosition, total: item.duration)
+    }
+
+    private func shareSummaryText(from summaryState: MediaDetailSummaryState) -> String {
+        let title = collapsedTitle
+        let year = item.year.map { " (\($0))" } ?? ""
+        let overview = displayOverview(from: summaryState)
+        if let overview, !overview.isEmpty {
+            return "\(title)\(year)\n\(overview)"
+        }
+        return "\(title)\(year)"
     }
 
     // MARK: - 状态逻辑
@@ -543,33 +549,6 @@ struct MediaDetailView: View {
 
     private var collapsedTitle: String {
         item.mediaType == .tvShow ? (item.showTitle ?? item.title) : item.displayTitle
-    }
-
-    private var favoriteButton: some View {
-        Button {
-            Task { await setFavorite(!item.isFavorite) }
-        } label: {
-            ZStack {
-                if isUpdatingFavorite {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(.white)
-                        .scaleEffect(0.72)
-                } else {
-                    Image(systemName: item.isFavorite ? "heart.fill" : "heart")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(item.isFavorite ? .red : .white.opacity(0.95))
-                        .frame(width: 24, height: 24)
-                }
-            }
-            .frame(width: 40, height: 40)
-            .background(detailNavigationButtonBackground)
-        }
-        .buttonStyle(DetailNavigationButtonStyle())
-        .contentShape(Circle())
-        .disabled(isUpdatingFavorite)
-        .accessibilityLabel(item.isFavorite ? L10n.tr("取消收藏") : L10n.tr("收藏"))
-        .accessibilityValue(isUpdatingFavorite ? L10n.tr("正在更新") : "")
     }
 
     private var favoriteErrorBinding: Binding<Bool> {
@@ -863,45 +842,49 @@ struct MediaDetailView: View {
 
     private func modalOverlay(for sheet: MediaDetailSheet) -> some View {
         ZStack {
-            Color.black.opacity(0.55)
+            Color.black.opacity(0.65)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { activeSheet = nil }
                 .transition(.opacity)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text(sheet == .synopsis ? L10n.tr("简介") : L10n.tr("详情"))
-                    .font(.system(size: 22, weight: .black))
-                    .foregroundStyle(.primary)
-                    .padding(.top, 20)
+                HStack {
+                    Text(sheet == .synopsis ? L10n.tr("简介") : L10n.tr("详情"))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(CatDesign.textIvory)
+
+                    Spacer()
+
+                    Button { activeSheet = nil } label: {
+                        Image("CatClearCircle")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 20)
 
                 if sheet == .synopsis {
                     ScrollView {
                         MediaDetailObservedObject(state: store.summaryState) { summaryState in
                             Text(displayOverview(from: summaryState) ?? L10n.tr("暂无简介"))
                                 .font(.system(size: 14))
-                                .lineSpacing(8)
-                                .foregroundStyle(.secondary)
+                                .lineSpacing(7)
+                                .foregroundStyle(CatDesign.textMuted)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 18)
+                                .padding(.top, 16)
                         }
                     }
                     .frame(maxHeight: 360)
                 }
             }
-            .padding(.horizontal, 23)
+            .padding(.horizontal, 22)
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 28))
+            .catGlassCard(cornerRadius: 24, elevated: true)
             .padding(.horizontal, 24)
-            .overlay(alignment: .topTrailing) {
-                Button { activeSheet = nil } label: {
-                    Image(systemName: "xmark")
-                        .foregroundStyle(.secondary)
-                        .padding(24)
-                }
-            }
         }
     }
 }
@@ -935,8 +918,8 @@ private struct MediaDetailHeroBackdrop: View {
     @State private var loadedHeroPosterURL: URL?
 
     var body: some View {
-        let blurRadius = 22.0 * reveal
-        let scale = 1.0 - (0.06 * reveal) + (pullDown / 2600)
+        let blurRadius = 4.0 * reveal
+        let scale = 1.0 - (0.04 * reveal) + (pullDown / 2600)
 
         ZStack {
             dominantColor
@@ -947,9 +930,10 @@ private struct MediaDetailHeroBackdrop: View {
 
             LinearGradient(
                 stops: [
-                    .init(color: Color.black.opacity(0.35), location: 0.0),
-                    .init(color: Color.black.opacity(0.10), location: 0.45),
-                    .init(color: Color.black.opacity(0.55), location: 1.0),
+                    .init(color: CatDesign.bgObsidian.opacity(0.45), location: 0.0),
+                    .init(color: CatDesign.bgObsidian.opacity(0.10), location: 0.32),
+                    .init(color: CatDesign.bgObsidian.opacity(0.80), location: 0.65),
+                    .init(color: CatDesign.bgObsidian, location: 1.0),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -1718,60 +1702,56 @@ private struct MediaDetailPanelHeader: View {
     let logoURL: URL?
     let metaValues: [String]
     let tags: [String]
-    let starYellow: Color
 
     var body: some View {
-        VStack(alignment: .center, spacing: 10) {
-            MediaDetailTitleLogoView(
+        VStack(alignment: .leading, spacing: 8) {
+            MediaTitleLogoView(
                 title: title,
                 logoURL: logoURL,
-                maxLogoHeight: 72
+                titleFont: .system(size: 26, weight: .bold),
+                maxLogoHeight: 60,
+                contentAlignment: .leading
             )
 
-            MediaDetailMetaRow(values: metaValues, style: .header)
+            HStack(spacing: 8) {
+                if let rating {
+                    Text(String(format: "★ %.1f", rating))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
 
-            if rating != nil || !tags.isEmpty {
-                HStack(spacing: 8) {
-                    MediaDetailRatingRow(rating: rating, starYellow: starYellow)
+                if !metaValues.isEmpty {
+                    Text(metaValues.joined(separator: " · "))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .lineLimit(1)
+                }
+            }
 
-                    ForEach(Array(tags.enumerated()), id: \.offset) { _, tag in
-                        tagView(tag)
+            if !tags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(tags.enumerated()), id: \.offset) { _, tag in
+                            tagView(tag)
+                        }
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func tagView(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(CatDesign.textIvory)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
+            .background(CatDesign.surfacePill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75)
             )
-    }
-}
-
-private struct MediaDetailRatingRow: View {
-    let rating: Double?
-    let starYellow: Color
-
-    var body: some View {
-        if let rating {
-            HStack(spacing: 6) {
-                Image(systemName: "star.fill")
-                    .foregroundStyle(starYellow)
-                    .font(.system(size: 16))
-                Text(String(format: "%.1f", rating))
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.primary)
-            }
-            .animation(.easeInOut(duration: 0.25), value: rating)
-        }
     }
 }
 
@@ -1801,15 +1781,16 @@ private func mediaDetailDisplayedTask(
 
 private struct MediaDetailPanelActions: View {
     @EnvironmentObject private var downloadManager: DownloadManager
-    let accentBlue: Color
-    let isRefreshing: Bool
-    let supportsMetadataRefresh: Bool
     let isTVShow: Bool
+    let isFavorite: Bool
+    let isUpdatingFavorite: Bool
+    let resumeLabel: String?
+    let shareText: String
     let isRelatedDownload: (DownloadRequest) -> Bool
     let isEnqueueingDownload: Bool
     let play: () -> Void
+    let toggleFavorite: () -> Void
     let download: () -> Void
-    let refresh: () -> Void
 
     private var displayedDownloadTask: DownloadTaskSnapshot? {
         mediaDetailDisplayedTask(in: downloadManager.tasks, matching: isRelatedDownload)
@@ -1822,84 +1803,122 @@ private struct MediaDetailPanelActions: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: play) {
-                HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 18, weight: .bold))
-                    Text(L10n.tr("播放"))
-                        .font(.system(size: 18, weight: .bold))
+        VStack(spacing: 12) {
+            playButtonWithCat
+            actionRow
+        }
+    }
+
+    private var playButtonWithCat: some View {
+        Button(action: play) {
+            HStack(spacing: 9) {
+                Image("CatPlaySmall")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+
+                Text(isTVShow ? L10n.tr("播放剧集") : L10n.tr("播放影片"))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+
+                Spacer(minLength: 8)
+
+                if let resumeLabel {
+                    Text(resumeLabel)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CatDesign.accentAmber)
+                        .lineLimit(1)
                 }
-                .foregroundStyle(.white)
+            }
+            .padding(.leading, 54)
+            .padding(.trailing, 20)
+            .frame(height: 54)
+            .frame(maxWidth: .infinity)
+            .catGlassCard(cornerRadius: 27, elevated: true, amberStroke: true, strokeWidth: 1.15)
+            .shadow(color: CatDesign.amberGlowShadow, radius: 14, y: 6)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 18)
+        .overlay(alignment: .topLeading) {
+            Image("CatPerchingPlay")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 88, height: 76)
+                .offset(x: -14, y: -14)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            favoriteStampButton
+
+            ShareLink(item: shareText) {
+                HStack(spacing: 8) {
+                    Image("CatShareFeline")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+                        .foregroundStyle(CatDesign.textIvory)
+
+                    Text(L10n.tr("分享"))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                }
                 .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(accentBlue)
-                .clipShape(Capsule())
-                .shadow(color: accentBlue.opacity(0.25), radius: 8, y: 6)
+                .frame(height: 46)
+                .catGlassCard(cornerRadius: CatDesign.radiusPill)
             }
             .buttonStyle(.plain)
 
             Button(action: download) {
-                MediaDetailDownloadButtonContent(
+                MediaDetailDownloadPillContent(
                     taskID: displayedDownloadTask?.id,
-                    isEnqueueing: isEnqueueingDownload,
-                    accentBlue: accentBlue
+                    isEnqueueing: isEnqueueingDownload
                 )
             }
             .buttonStyle(.plain)
             .disabled(isDownloadDisabled)
             .downloadHeroFrame("source")
             .accessibilityIdentifier("download.detail.button")
-
-            if supportsMetadataRefresh {
-                Button(action: refresh) {
-                    if isRefreshing {
-                        ProgressView()
-                            .tint(.primary)
-                            .frame(width: 56, height: 56)
-                            .background(Circle().fill(Color(.secondarySystemBackground)))
-                    } else {
-                        circleActionLabel(icon: "arrow.clockwise")
-                    }
-                }
-                .buttonStyle(.plain)
-                .disabled(isRefreshing)
-                .accessibilityLabel(L10n.tr("刷新"))
-            }
         }
     }
 
-    private func circleActionLabel(icon: String, isSystem: Bool = true) -> some View {
-        Group {
-            if isSystem {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-            } else {
-                Image(icon)
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
+    private var favoriteStampButton: some View {
+        Button(action: toggleFavorite) {
+            ZStack {
+                if isUpdatingFavorite {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(CatDesign.accentAmber)
+                } else if isFavorite {
+                    Image("CatPawStamp")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
+                } else {
+                    Image("CatPawStamp")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
+                        .foregroundStyle(CatDesign.textMuted)
+                }
             }
+            .frame(width: 46, height: 46)
+            .catGlassCard(cornerRadius: CatDesign.radiusPill, amberStroke: isFavorite)
         }
-        .foregroundStyle(.primary)
-        .frame(width: 56, height: 56)
-        .background(
-            Circle()
-                .fill(Color(.secondarySystemBackground))
-        )
-        .overlay(
-            Circle()
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
+        .disabled(isUpdatingFavorite)
+        .accessibilityLabel(isFavorite ? L10n.tr("取消收藏") : L10n.tr("收藏"))
     }
 }
 
-private struct MediaDetailDownloadButtonContent: View {
+private struct MediaDetailDownloadPillContent: View {
     @EnvironmentObject private var downloadManager: DownloadManager
     let taskID: UUID?
     let isEnqueueing: Bool
-    let accentBlue: Color
 
     private var task: DownloadTaskSnapshot? {
         guard let taskID else { return nil }
@@ -1907,68 +1926,70 @@ private struct MediaDetailDownloadButtonContent: View {
     }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color(.secondarySystemBackground))
-            Circle()
-                .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
-
-            if let task {
-                taskGlyph(task)
-            } else if isEnqueueing {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Image("icon_download")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(.primary)
-            }
+        HStack(spacing: 8) {
+            iconContent
+            Text(labelText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(task?.status == .completed ? CatDesign.accentAmber : CatDesign.textIvory)
+                .lineLimit(1)
         }
-        .frame(width: 56, height: 56)
+        .frame(maxWidth: .infinity)
+        .frame(height: 46)
+        .catGlassCard(
+            cornerRadius: CatDesign.radiusPill,
+            amberStroke: task?.status == .downloading || task?.status == .completed
+        )
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)
     }
 
     @ViewBuilder
-    private func taskGlyph(_ task: DownloadTaskSnapshot) -> some View {
-        let measurable = task.totalBytes > 0 ? task.progress : nil
-        switch task.status {
-        case .queued:
-            MediaDetailDownloadProgressRing(progress: nil, tint: accentBlue)
-            Image(systemName: "stop.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(accentBlue)
-        case .downloading:
-            MediaDetailDownloadProgressRing(progress: measurable, tint: accentBlue)
-            if let measurable {
-                Text("\(Int(measurable * 100))")
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(accentBlue)
-            } else {
-                Image(systemName: "stop.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(accentBlue)
+    private var iconContent: some View {
+        if let task {
+            switch task.status {
+            case .queued:
+                MediaDetailDownloadProgressRing(progress: nil, tint: CatDesign.accentAmber)
+                    .frame(width: 20, height: 20)
+            case .downloading:
+                MediaDetailDownloadProgressRing(progress: task.totalBytes > 0 ? task.progress : nil, tint: CatDesign.accentAmber)
+                    .frame(width: 20, height: 20)
+            case .paused:
+                Image("CatPlaySmall")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
+            case .completed:
+                Image("CatEarCheck")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+            case .failed:
+                Image("CatDownloadFeline")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
             }
-        case .paused:
-            MediaDetailDownloadProgressRing(progress: measurable ?? 0, tint: accentBlue)
-            Image(systemName: "play.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(accentBlue)
-                .offset(x: 1)
-        case .completed:
-            Image(systemName: "checkmark")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.green)
-        case .failed:
-            Image("icon_download")
-                .renderingMode(.template)
+        } else if isEnqueueing {
+            ProgressView()
+                .controlSize(.small)
+                .tint(CatDesign.accentAmber)
+        } else {
+            Image("CatDownloadFeline")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 24, height: 24)
-                .foregroundStyle(.primary)
+                .frame(width: 18, height: 18)
+        }
+    }
+
+    private var labelText: String {
+        guard let task else { return L10n.tr("下载") }
+        switch task.status {
+        case .queued: return L10n.tr("等待中")
+        case .downloading:
+            return task.totalBytes > 0 ? "\(Int(task.progress * 100))%" : L10n.tr("下载中")
+        case .paused: return L10n.tr("继续")
+        case .completed: return L10n.tr("已下载")
+        case .failed: return L10n.tr("重试")
         }
     }
 
@@ -1998,20 +2019,19 @@ private struct MediaDetailDownloadProgressRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(tint.opacity(0.2), lineWidth: 3)
+                .stroke(tint.opacity(0.22), lineWidth: 2.4)
             if let progress {
                 Circle()
                     .trim(from: 0, to: min(max(progress, 0.02), 1))
-                    .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(tint, style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             } else {
                 Circle()
                     .trim(from: 0.05, to: 0.32)
-                    .stroke(tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(tint, style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
                     .rotationEffect(.degrees(rotation - 90))
             }
         }
-        .padding(8)
         .onAppear(perform: startAnimatingIfNeeded)
         .onChange(of: progress == nil) { _, _ in
             startAnimatingIfNeeded()
@@ -2055,6 +2075,7 @@ private struct EpisodeDownloadPicker: View {
                     Button(allCurrentSeasonSelected ? L10n.tr("取消全选本季") : L10n.tr("全选本季")) {
                         toggleCurrentSeason()
                     }
+                    .foregroundStyle(CatDesign.accentAmber)
                     .accessibilityIdentifier("download.picker.selectAll")
                 }
 
@@ -2065,14 +2086,14 @@ private struct EpisodeDownloadPicker: View {
                         } label: {
                             HStack {
                                 Image(systemName: selectedEpisodes[episode.id] == nil ? "circle" : "checkmark.circle.fill")
-                                    .foregroundStyle(selectedEpisodes[episode.id] == nil ? .secondary : Color.vanmoAccent)
+                                    .foregroundStyle(selectedEpisodes[episode.id] == nil ? CatDesign.textMuted : CatDesign.accentAmber)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("\(LocalizedFormat.episodeLabel(episode.episodeNumber)) · \(episode.title)")
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(CatDesign.textIvory)
                                     if episode.duration > 0 {
                                         Text(episode.duration.shortDuration)
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(CatDesign.textMuted)
                                     }
                                 }
                             }
@@ -2081,19 +2102,23 @@ private struct EpisodeDownloadPicker: View {
                     if isLoading {
                         HStack {
                             Spacer()
-                            ProgressView()
+                            ProgressView().tint(CatDesign.accentAmber)
                             Spacer()
                         }
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(CatDesign.bgObsidian)
             .navigationTitle(L10n.tr("选择下载剧集"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(L10n.tr("取消")) { dismiss() }
+                        .foregroundStyle(CatDesign.textMuted)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("下载 \(selectedEpisodes.count) 集", action: onConfirm)
+                        .foregroundStyle(CatDesign.accentAmber)
                         .disabled(selectedEpisodes.isEmpty || isLoading)
                         .accessibilityIdentifier("download.picker.confirm")
                 }
@@ -2127,20 +2152,20 @@ private struct MediaDetailCastSection: View {
 
     var body: some View {
         if !members.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(L10n.tr("主演"))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 14) {
                         ForEach(members) { member in
                             MediaDetailCastAvatar(member: member)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, CatDesign.horizontalMargin)
                 }
-                .padding(.horizontal, -24)
+                .padding(.horizontal, -CatDesign.horizontalMargin)
             }
         }
     }
@@ -2150,36 +2175,37 @@ private struct MediaDetailCastAvatar: View {
     let member: CastMemberDisplay
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 7) {
             ZStack {
                 Circle()
-                    .fill(Color(.secondarySystemBackground))
+                    .fill(CatDesign.surfacePill)
 
                 if let profileURL = member.profileURL {
                     KFImage(profileURL)
                         .placeholder {
                             Text(initial(for: member.name))
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundStyle(CatDesign.textMuted)
                         }
                         .fade(duration: 0.2)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 80, height: 80)
+                        .frame(width: 72, height: 72)
                         .clipShape(Circle())
                 } else {
                     Text(initial(for: member.name))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(CatDesign.textMuted)
                 }
             }
-            .frame(width: 80, height: 80)
+            .frame(width: 72, height: 72)
+            .overlay(Circle().strokeBorder(CatDesign.strokeGlass, lineWidth: 1))
 
             Text(member.name)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.primary)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(CatDesign.textIvory)
                 .lineLimit(1)
-                .frame(width: 80)
+                .frame(width: 72)
         }
     }
 
@@ -2194,10 +2220,10 @@ private struct MediaDetailCollectionsSection: View {
 
     var body: some View {
         if !collections.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(L10n.tr("合集"))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -2210,9 +2236,9 @@ private struct MediaDetailCollectionsSection: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, CatDesign.horizontalMargin)
                 }
-                .padding(.horizontal, -24)
+                .padding(.horizontal, -CatDesign.horizontalMargin)
             }
         }
     }
@@ -2222,10 +2248,10 @@ private struct MediaDetailCollectionCard: View {
     let collection: ServerMediaItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(CatDesign.mediaPlaceholder)
 
                 if let posterURL = collection.posterURL {
                     KFImage(posterURL)
@@ -2234,18 +2260,22 @@ private struct MediaDetailCollectionCard: View {
                         .scaledToFill()
                 } else {
                     Image(systemName: "rectangle.stack.fill")
-                        .font(.system(size: 30, weight: .semibold))
-                        .foregroundStyle(Color.vanmoPrimary)
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
                 }
             }
-            .frame(width: 120, height: 72)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .frame(width: 124, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+            )
 
             Text(collection.title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.primary)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CatDesign.textIvory)
                 .lineLimit(2)
-                .frame(width: 120, alignment: .leading)
+                .frame(width: 124, alignment: .leading)
         }
     }
 }
@@ -2262,15 +2292,15 @@ private struct MediaDetailMetaRow: View {
                 ForEach(Array(values.enumerated()), id: \.offset) { index, value in
                     if index > 0 {
                         Circle()
-                            .fill(style == .collapsed ? Color.white.opacity(0.5) : Color.secondary.opacity(0.5))
+                            .fill(style == .collapsed ? Color.white.opacity(0.5) : CatDesign.textMuted.opacity(0.5))
                             .frame(width: 4, height: 4)
                     }
                     Text(value)
                         .font(.system(size: style == .collapsed ? 14 : 12,
                                       weight: style == .collapsed ? .medium : .semibold))
                         .foregroundStyle(style == .collapsed
-                            ? AnyShapeStyle(Color.white.opacity(0.85))
-                            : AnyShapeStyle(.secondary))
+                            ? CatDesign.Cinema.textIvory.opacity(0.85)
+                            : CatDesign.textMuted)
                 }
             }
         }
@@ -2282,14 +2312,27 @@ private struct MediaDetailSynopsisSection: View {
     let onTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.tr("简介"))
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(L10n.tr("简介"))
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+
+                Spacer()
+
+                Button(action: onTap) {
+                    Text(L10n.tr("更多 ›"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+                .buttonStyle(.plain)
+            }
+
             Text(overview ?? L10n.tr("暂无简介"))
-                .font(.system(size: 15))
+                .font(.system(size: 12.5))
                 .lineSpacing(4)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CatDesign.textMuted)
+                .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .onTapGesture { onTap() }
@@ -2303,35 +2346,42 @@ private struct MediaDetailDetailsSection: View {
     let directorLabel: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.tr("详情"))
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-                .padding(.bottom, 8)
+        if director != nil || !genres.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L10n.tr("详情"))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
 
-            if let director {
-                detailRow(title: directorLabel, value: director)
-            }
-            if !genres.isEmpty {
-                detailRow(title: L10n.tr("类型"), value: genres.joined(separator: " / "))
+                VStack(spacing: 10) {
+                    if let director {
+                        detailRow(title: directorLabel, value: director)
+                    }
+                    if director != nil && !genres.isEmpty {
+                        Rectangle()
+                            .fill(CatDesign.hairSeparator)
+                            .frame(height: 0.75)
+                    }
+                    if !genres.isEmpty {
+                        detailRow(title: L10n.tr("类型"), value: genres.joined(separator: " / "))
+                    }
+                }
+                .padding(14)
+                .catGlassCard(cornerRadius: CatDesign.radiusSquircleMd)
             }
         }
     }
 
     private func detailRow(title: String, value: String) -> some View {
-        VStack(spacing: 12) {
-            HStack(alignment: .top) {
-                Text(title)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 80, alignment: .leading)
-                Text(value)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .multilineTextAlignment(.trailing)
-            }
-            Divider()
+        HStack(alignment: .top) {
+            Text(title)
+                .font(.system(size: 12.5))
+                .foregroundStyle(CatDesign.textMuted)
+                .frame(width: 72, alignment: .leading)
+            Text(value)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(CatDesign.textIvory)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .multilineTextAlignment(.trailing)
         }
     }
 }
@@ -2348,77 +2398,89 @@ private struct MediaDetailEpisodesSection: View {
     var onLoadMore: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(L10n.tr("剧集"))
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.primary)
-
-                if seasonNumbers.count > 1 {
-                    Spacer()
-                    Menu {
-                        ForEach(seasonNumbers, id: \.self) { season in
-                            Button(LocalizedFormat.seasonLabel(season)) { selectedSeason = season }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(LocalizedFormat.seasonLabel(selectedSeason ?? seasonNumbers.first ?? 1))
-                                .font(.system(size: 14, weight: .semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color(.secondarySystemBackground), in: Capsule())
-                    }
-                }
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            headerRow
 
             if isLoadingEpisodes && episodes.isEmpty {
                 ProgressView()
+                    .tint(CatDesign.accentAmber)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
             } else if episodes.isEmpty {
                 Text(L10n.tr("暂无剧集"))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(CatDesign.textMuted)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
+                    .padding(.vertical, 20)
             } else {
-                LazyVStack(spacing: 16) {
-                    ForEach(episodes) { episode in
-                        episodeRow(episode)
-                            .id(episode.id)
-                    }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(episodes) { episode in
+                            episodeHorizontalCard(episode)
+                                .id(episode.id)
+                        }
 
-                    if hasMoreEpisodes || isLoadingMore {
-                        Group {
-                            if isLoadingMore {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                            } else {
-                                Color.clear
-                                    .frame(height: 1)
-                                    .frame(maxWidth: .infinity)
+                        if hasMoreEpisodes || isLoadingMore {
+                            Group {
+                                if isLoadingMore {
+                                    ProgressView()
+                                        .tint(CatDesign.accentAmber)
+                                        .frame(width: 48, height: 98)
+                                } else {
+                                    Color.clear
+                                        .frame(width: 1, height: 98)
+                                }
                             }
-                        }
-                        .onAppear {
-                            onLoadMore?()
+                            .onAppear { onLoadMore?() }
                         }
                     }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
                 }
+                .padding(.horizontal, -CatDesign.horizontalMargin)
+                .scrollClipDisabled()
             }
         }
     }
 
-    private func episodeRow(_ episode: EpisodeInfo) -> some View {
+    private var headerRow: some View {
+        HStack(spacing: 8) {
+            Text(L10n.tr("剧集"))
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
+
+            CatStretchingDivider()
+
+            Spacer(minLength: 8)
+
+            if !seasonNumbers.isEmpty {
+                Menu {
+                    ForEach(seasonNumbers, id: \.self) { season in
+                        Button(LocalizedFormat.seasonLabel(season)) { selectedSeason = season }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(LocalizedFormat.seasonLabel(selectedSeason ?? seasonNumbers.first ?? 1))
+                            .font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundStyle(CatDesign.textIvory)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 5)
+                    .background(CatDesign.surfacePill, in: Capsule())
+                    .overlay(Capsule().strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75))
+                }
+                .disabled(seasonNumbers.count <= 1)
+            }
+        }
+    }
+
+    private func episodeHorizontalCard(_ episode: EpisodeInfo) -> some View {
         Button {
             onPlay(episode)
         } label: {
-            HStack(alignment: .top, spacing: 16) {
-                ZStack {
+            VStack(alignment: .leading, spacing: 7) {
+                ZStack(alignment: .topLeading) {
                     if let backdropURL = episode.backdropURL {
                         KFImage(backdropURL)
                             .placeholder { thumbnailPlaceholder }
@@ -2430,42 +2492,54 @@ private struct MediaDetailEpisodesSection: View {
                         thumbnailPlaceholder
                     }
 
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(accentColor, in: Circle())
-                }
-                .frame(width: 128, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                    LinearGradient(
+                        colors: [.clear, CatDesign.catSilhouette.opacity(0.92)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 58)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top) {
-                        Text("\(episode.episodeNumber). \(episode.title.isEmpty ? LocalizedFormat.episodeLabel(episode.episodeNumber) : episode.title)")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(episode.duration > 0 ? episode.duration.shortDuration : LocalizedFormat.unknownDuration())
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text(episode.overview ?? L10n.tr("暂无简介"))
-                        .font(.system(size: 12))
-                        .lineSpacing(3)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                    Text(String(format: "E%02d", episode.episodeNumber))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CatDesign.Cinema.textIvory)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
+                        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.75))
+                        .padding(7)
                 }
-                .padding(.top, 2)
+                .frame(width: 174, height: 98)
+                .clipShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                        .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+                )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(episode.title.isEmpty ? LocalizedFormat.episodeLabel(episode.episodeNumber) : episode.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                        .lineLimit(1)
+
+                    Text(episode.duration > 0 ? episode.duration.shortDuration : LocalizedFormat.unknownDuration())
+                        .font(.system(size: 11))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .lineLimit(1)
+                }
+                .frame(width: 174, alignment: .leading)
             }
         }
         .buttonStyle(.plain)
     }
 
     private var thumbnailPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 14)
-            .fill(Color(.secondarySystemBackground))
+        ZStack {
+            CatDesign.mediaPlaceholder
+            Image(systemName: "play.rectangle")
+                .font(.title3)
+                .foregroundStyle(CatDesign.textMuted.opacity(0.45))
+        }
     }
 }
 

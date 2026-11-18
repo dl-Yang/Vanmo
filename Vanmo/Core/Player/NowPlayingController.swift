@@ -86,12 +86,12 @@ final class NowPlayingController {
             }
         }
         add(center.skipForwardCommand) { [weak self] event in
-            let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? 10
+            let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? 15
             self?.logRemote("skipForward")
             self?.onSkip?(interval)
         }
         add(center.skipBackwardCommand) { [weak self] event in
-            let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? 10
+            let interval = (event as? MPSkipIntervalCommandEvent)?.interval ?? 15
             self?.logRemote("skipBackward")
             self?.onSkip?(-interval)
         }
@@ -100,8 +100,8 @@ final class NowPlayingController {
             self?.logRemote("seek")
             self?.onSeek?(position)
         }
-        center.skipForwardCommand.preferredIntervals = [10]
-        center.skipBackwardCommand.preferredIntervals = [10]
+        center.skipForwardCommand.preferredIntervals = [15]
+        center.skipBackwardCommand.preferredIntervals = [15]
     }
 
     private func applyCommandAvailability() {

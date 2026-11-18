@@ -6,6 +6,7 @@ import VanmoCore
 struct EmbyFolderBrowseView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     let container: MediaItem
 
@@ -14,40 +15,81 @@ struct EmbyFolderBrowseView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        Group {
-            if isLoading {
-                LoadingView(L10n.tr("加载中..."))
-            } else if let errorMessage {
-                EmptyStateView(
-                    icon: "exclamationmark.triangle",
-                    title: L10n.tr("无法加载内容"),
-                    message: errorMessage
-                )
-            } else if children.isEmpty {
-                EmptyStateView(
-                    icon: container.mediaType.icon,
-                    title: L10n.tr("文件夹为空"),
-                    message: L10n.tr("此目录下没有可显示的项目")
-                )
-            } else {
-                List(children, id: \.serverId) { child in
-                    NavigationLink {
-                        LibraryItemDestination(item: makeChildItem(child))
-                    } label: {
-                        EmbyChildListRow(serverItem: child)
-                    }
-                    .contextMenu {
-                        childContextMenu(child)
-                    }
-                }
-                .listStyle(.plain)
+        ZStack(alignment: .top) {
+            CatDesign.bgObsidian.ignoresSafeArea()
+
+            CatAmberHalo(width: 180, height: 70, opacity: 0.22)
+                .padding(.top, 12)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                navHeader
+                stateContent
             }
         }
-        .background(Color.vanmoBackground)
-        .navigationTitle(container.title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .catTabBarHidden(true)
         .task(id: container.serverId) {
             await loadChildren()
+        }
+    }
+
+    private var navHeader: some View {
+        HStack(spacing: 11) {
+            CatBackButton { dismiss() }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(container.title)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+
+                Text(L10n.tr("%d 项", children.count))
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+            }
+
+            Spacer(minLength: 8)
+            CatStretchingDivider()
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+    }
+
+    @ViewBuilder
+    private var stateContent: some View {
+        if isLoading {
+            LoadingView(L10n.tr("加载中..."))
+        } else if let errorMessage {
+            EmptyStateView(
+                icon: "exclamationmark.triangle",
+                title: L10n.tr("无法加载内容"),
+                message: errorMessage
+            )
+        } else if children.isEmpty {
+            EmptyStateView(
+                icon: container.mediaType.icon,
+                title: L10n.tr("文件夹为空"),
+                message: L10n.tr("此目录下没有可显示的项目")
+            )
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 10) {
+                    ForEach(children, id: \.serverId) { child in
+                        NavigationLink {
+                            LibraryItemDestination(item: makeChildItem(child))
+                        } label: {
+                            EmbyChildListRow(serverItem: child)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu { childContextMenu(child) }
+                    }
+                }
+                .padding(.horizontal, CatDesign.horizontalMargin)
+                .padding(.bottom, 28)
+            }
         }
     }
 
@@ -117,40 +159,41 @@ private struct EmbyChildListRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: serverItem.mediaType.icon)
-                .font(.title3)
-                .foregroundStyle(Color.vanmoPrimary)
-                .frame(width: 36, height: 36)
-                .background(Color.vanmoPrimary.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(CatDesign.accentAmber)
+                .frame(width: 38, height: 38)
+                .background(CatDesign.amberTintFill, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .strokeBorder(CatDesign.strokeAmber, lineWidth: 0.75)
+                )
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(serverItem.title)
-                    .font(.body)
-                    .fontWeight(.medium)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
                     .lineLimit(2)
 
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Text(serverItem.mediaType.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
                     if let year = serverItem.year {
-                        Text("\(year)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                        Text("· \(year)")
                     }
                 }
+                .font(.system(size: 11.5))
+                .foregroundStyle(CatDesign.textMuted)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             if serverItem.mediaType.isBrowsable {
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CatDesign.textDim)
             }
         }
-        .padding(.vertical, 4)
+        .padding(12)
+        .catGlassCard(cornerRadius: 18)
     }
 }
 

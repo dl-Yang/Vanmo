@@ -23,12 +23,36 @@ final class SearchViewModel: ObservableObject {
     @Published private(set) var sections: [SearchResultSection] = []
     @Published private(set) var isSearching = false
     @Published private(set) var searchedSourceCount = 0
+    @Published private(set) var recentSearches: [String] = []
 
     private var modelContext: ModelContext?
     private var connectionSnapshots: [SearchConnectionSnapshot] = []
     private var searchTask: Task<Void, Never>?
     private var searchGeneration = UUID()
     private let maxConcurrentRemoteSearches = 4
+    private static let recentSearchesKey = "search.recentQueries"
+    private static let maxRecentSearches = 8
+
+    init() {
+        recentSearches = UserDefaults.standard.stringArray(forKey: Self.recentSearchesKey) ?? []
+    }
+
+    func recordRecentSearch(_ rawQuery: String) {
+        let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+        var updated = recentSearches.filter { $0.caseInsensitiveCompare(query) != .orderedSame }
+        updated.insert(query, at: 0)
+        if updated.count > Self.maxRecentSearches {
+            updated = Array(updated.prefix(Self.maxRecentSearches))
+        }
+        recentSearches = updated
+        UserDefaults.standard.set(updated, forKey: Self.recentSearchesKey)
+    }
+
+    func clearRecentSearches() {
+        recentSearches = []
+        UserDefaults.standard.removeObject(forKey: Self.recentSearchesKey)
+    }
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context

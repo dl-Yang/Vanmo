@@ -66,7 +66,14 @@ final class AppState: ObservableObject {
 
 /// Settings tab 内的导航路由。
 enum SettingsRoute: Hashable {
+    case iCloudSync
+    case playback
+    case audio
+    case subtitles
+    case libraryScan
+    case metadataCache
     case appearance
+    case storage
     case downloads
 }
 

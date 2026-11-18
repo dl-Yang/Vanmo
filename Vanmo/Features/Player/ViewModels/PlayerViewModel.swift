@@ -140,6 +140,48 @@ final class PlayerViewModel: ObservableObject {
         !episodeGroups.isEmpty
     }
 
+    var playerDisplayTitle: String {
+        item.mediaType == .tvEpisode ? (item.showTitle ?? item.title) : item.displayTitle
+    }
+
+    var playerEpisodeBadge: String? {
+        guard let season = item.seasonNumber, let episode = item.episodeNumber else {
+            return nil
+        }
+        return String(format: "S%02d E%02d", season, episode)
+    }
+
+    var playerTechnicalBadge: String? {
+        let tags = MediaCapabilityTags.displayTags(
+            contentRating: nil,
+            width: item.videoWidth,
+            height: item.videoHeight,
+            dynamicRange: item.dynamicRange,
+            audioTracks: audioTracks,
+            fileName: [item.originalFileName, item.title, item.fileURL.lastPathComponent]
+                .compactMap { $0 }
+                .joined(separator: " ")
+        )
+        let filtered = tags.filter { !$0.isEmpty }
+        guard !filtered.isEmpty else { return nil }
+        return filtered.prefix(2).joined(separator: " · ")
+    }
+
+    var nextPlayableEpisode: PlayerEpisode? {
+        let all = episodeGroups.flatMap(\.episodes)
+        guard !all.isEmpty, let currentEpisodeID,
+              let index = all.firstIndex(where: { $0.id == currentEpisodeID }),
+              index + 1 < all.count else {
+            return nil
+        }
+        return all[index + 1]
+    }
+
+    func playNextEpisode() async {
+        guard let next = nextPlayableEpisode else { return }
+        await playEpisode(next)
+    }
+
     var hasEmbeddedSubtitleTracks: Bool {
         subtitleTracks.contains { $0.isEmbedded }
     }
@@ -913,14 +955,14 @@ final class PlayerViewModel: ObservableObject {
         }
     }
 
-    func skipForward(_ seconds: TimeInterval = 10) {
+    func skipForward(_ seconds: TimeInterval = 15) {
         let target = currentTime + seconds
         seek(to: target)
         seekOverlay = seconds
         dismissOverlay(\.seekOverlay)
     }
 
-    func skipBackward(_ seconds: TimeInterval = 10) {
+    func skipBackward(_ seconds: TimeInterval = 15) {
         let target = currentTime - seconds
         seek(to: target)
         seekOverlay = -seconds

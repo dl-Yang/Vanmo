@@ -8,6 +8,7 @@ This document defines stable UI expectations for Vanmo's SwiftUI applications.
 - If a required screen or state is absent, design it in Figma before coding it.
 - Match the repository's existing components, assets, typography, spacing, color tokens, and motion before introducing a new pattern.
 - Record visual verification against the relevant Figma frame; code existence is not design-fidelity evidence.
+- For the iOS "Black Cat Redesign" (Figma `miM6YTQAnerz6SgkkYZMjo`, node `656:2`), all 16 iOS screens share the `CatDesign` obsidian/amber glass token set (`Vanmo/Shared/Theme/CatDesignTokens.swift`), custom Figma SVG assets in `Vanmo/Resources/Assets.xcassets/` (including updated `CatEyeStatus.svg` from `659:9`), and the floating `CatGlassTabBar` (`Vanmo/Shared/Components/CatUIComponents.swift`), with warm cream Day Mode derivation (`#FAF7F2` / `#E5DEC9` / `#18181B`) and `Outline` subtitle weight support (`SubtitleStyle.SubtitleOutlineWeight`). macOS (`VanmoMac/`) and shared macOS components (`MediaTitleLogoView.swift`, `LoadingIndicatorView.swift`) remain isolated per Platform Separation, with `MacCatEyeStatus.svg` (`O75W1XT1Q0btSrepDwEx39`, node `146:69`) applied only to the `.connected` indicator in `VanmoMac/UI/Components/MacSidebarView.swift`.
 
 ## Design Guidance
 

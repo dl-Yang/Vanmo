@@ -758,13 +758,13 @@ struct DownloadHeroFlightCapsule: View {
         .background {
             ZStack {
                 Capsule().fill(.ultraThinMaterial).opacity(1 - morphProgress)
-                Capsule().fill(Color.black).opacity(morphProgress)
+                Capsule().fill(DownloadIslandPalette.background).opacity(morphProgress)
             }
         }
         .overlay {
-            Capsule().strokeBorder(Color.primary.opacity(0.08 * (1 - morphProgress)), lineWidth: 1)
+            Capsule().strokeBorder(DownloadIslandPalette.amberStroke.opacity(0.6), lineWidth: 1)
         }
-        .shadow(color: .black.opacity(0.16 * Double(1 - morphProgress)), radius: 10, y: 4)
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
         .clipShape(Capsule())
     }
 
@@ -776,17 +776,18 @@ struct DownloadHeroFlightCapsule: View {
                         .resizable()
                         .scaledToFill()
                 } else {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    Image("CatDownloadFeline")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
                 }
             }
             .frame(width: 24, height: 24)
             .clipShape(Circle())
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
-                .foregroundStyle(.primary)
+                .foregroundStyle(DownloadIslandPalette.ivory)
         }
         .padding(.leading, 6)
         .padding(.trailing, 12)
@@ -801,16 +802,16 @@ struct DownloadHeroCapsule: View {
         HStack(spacing: 8) {
             poster
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12.5, weight: .semibold))
                 .lineLimit(1)
-                .foregroundStyle(.primary)
+                .foregroundStyle(CatDesign.textIvory)
         }
         .padding(.leading, 6)
         .padding(.trailing, 12)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
+        .background(CatDesign.surfaceGlassElevated, in: Capsule())
+        .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 1))
+        .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
         .frame(maxWidth: 220)
     }
 
@@ -821,9 +822,10 @@ struct DownloadHeroCapsule: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                Image("CatDownloadFeline")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
             }
         }
         .frame(width: 24, height: 24)
@@ -847,8 +849,10 @@ struct DownloadFallbackProgressBar: View {
                             .resizable()
                             .scaledToFill()
                     } else {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundStyle(.secondary)
+                        Image("CatDownloadFeline")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
                     }
                 }
                 .frame(width: 28, height: 28)
@@ -856,18 +860,16 @@ struct DownloadFallbackProgressBar: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .lineLimit(1)
-                        .foregroundStyle(.primary)
-                    ProgressView(value: min(max(progress, 0), 1))
-                        .tint(Color.vanmoAccent)
+                        .foregroundStyle(CatDesign.textIvory)
+                    CatPawProgressBar(progress: min(max(progress, 0), 1), showPawDot: false)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .downloadChromeCapsuleBackground()
-            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-            .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+            .catGlassCard(cornerRadius: CatDesign.radiusPill, elevated: true, amberStroke: true)
+            .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
         }
         .buttonStyle(.plain)
         .scaleEffect(scale)

@@ -4,9 +4,9 @@
 
 ## Subtitle Appearance
 
-Settings and the in-player subtitle sheet show the same live preview while the user changes subtitle size, text color, or background color. The player persists those values as the global subtitle style.
+Settings and the in-player subtitle sheet show the same live preview while the user changes subtitle size, text color, background opacity/color, outline weight (`SubtitleOutlineWeight`: `None / Light / Medium / Heavy`), or position (`Top / Bottom`). The player persists those values as the global subtitle style (`SubtitleStylePreferences`).
 
-Plain text subtitles and attributed text subtitles, including ASS/SSA text, apply the selected size, text color, and background color immediately. Basic attributed font traits should remain when the size is replaced. Attributed subtitles containing real text take precedence over an accompanying image. An attributed attachment containing only the object-replacement placeholder does not outrank the bitmap path. PGS, VobSub, and other bitmap subtitles apply the size control as image scaling; text and background color controls do not recolor bitmap pixels.
+Plain text subtitles and attributed text subtitles, including ASS/SSA text, apply the selected size, text color, outline shadow, and background color immediately. Basic attributed font traits should remain when the size is replaced. Attributed subtitles containing real text take precedence over an accompanying image. An attributed attachment containing only the object-replacement placeholder does not outrank the bitmap path. PGS, VobSub, and other bitmap subtitles apply the size control as image scaling; text and background color controls do not recolor bitmap pixels.
 
 Bitmap subtitles first fit proportionally within the available subtitle area and then apply the user's size scale. The 12-, 18-, and 36-point settings must produce visibly different sizes without changing the image aspect ratio or exceeding the safe display width.
 
@@ -31,10 +31,10 @@ For KSPlayer content, returning Home while video is playing automatically starts
 iOS offers exactly three appearance choices:
 
 - Follow System
-- Day
-- Night
+- Day (`#FAF7F2` warm cream surface with `#B86A08` deep amber accents)
+- Night (`#0B0C0E` obsidian surface with `#FFB547` amber glow accents)
 
-Removed light-only custom themes migrate to Day. The migration writes a valid stored value so Settings and the app root share one source of truth. macOS appearance is unchanged.
+Removed light-only custom themes migrate to Day. The migration writes a valid stored value so Settings and the app root share one source of truth. Settings main (`13`) routes into dedicated obsidian/cream glass subpages for iCloud Sync, Playback, Audio, Subtitles (including OpenSubtitles), Library & Scan, Metadata Cache, Appearance & Subtitles (`14`), and Storage & Downloads. macOS appearance is unchanged (aside from the connected sidebar indicator `MacCatEyeStatus`).
 
 ## Acceptance
 

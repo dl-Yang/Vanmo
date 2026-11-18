@@ -10,9 +10,7 @@ struct PlayerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: PlayerViewModel
     @StateObject private var pictureInPicture = PlayerPictureInPictureController()
-    @State private var showSpeedPicker = false
-    @State private var showScaleModePicker = false
-    @State private var showQualityPicker = false
+    @State private var activePopoverTab: PlayerPopoverTab?
     @State private var debugHoldLoading = false
     @State private var playbackStalled = false
     @State private var lastPlaybackAdvance = Date()
@@ -36,15 +34,6 @@ struct PlayerView: View {
         playerSurface()
     }
 
-    private var iPhoneLandscapeHorizontalSafeArea: CGFloat {
-        let insets = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)?
-            .safeAreaInsets ?? .zero
-        return max(insets.left, insets.right)
-    }
-
     private func playerSurface() -> some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -58,18 +47,7 @@ struct PlayerView: View {
             }
 
             if case .error(let message) = viewModel.playbackState {
-                VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 28, weight: .medium))
-                    Text(L10n.tr("无法播放"))
-                        .font(.headline)
-                    Text(message)
-                        .font(.footnote)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 32)
+                errorStateOverlay(message: message)
             }
 
             SubtitleOverlayView(
@@ -82,15 +60,13 @@ struct PlayerView: View {
             gestureLayer
                 .allowsHitTesting(!viewModel.controlsVisible)
 
-            if showSpeedPicker || showScaleModePicker || showQualityPicker {
+            if activePopoverTab != nil {
                 Color.clear
                     .contentShape(Rectangle())
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showSpeedPicker = false
-                            showScaleModePicker = false
-                            showQualityPicker = false
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            activePopoverTab = nil
                         }
                     }
             }
@@ -111,15 +87,6 @@ struct PlayerView: View {
             if viewModel.isRateBoosting {
                 rateBoostIndicator
             }
-
-            if showSpeedPicker {
-                speedPickerPanel
-            }
-
-            if showScaleModePicker {
-                scalePickerPanel
-            }
-
         }
         .overlay {
             if showsLoadingChrome {
@@ -127,19 +94,26 @@ struct PlayerView: View {
                     .allowsHitTesting(false)
             }
         }
-        .overlayPreferenceValue(QualityButtonAnchorKey.self) { anchor in
-            if showQualityPicker, let anchor {
-                GeometryReader { proxy in
-                    let rect = proxy[anchor]
-                    ZStack(alignment: .topLeading) {
-                        Color.clear
-                            .allowsHitTesting(false)
-                        qualityPickerCard
-                            .fixedSize()
-                            .offset(x: rect.minX, y: rect.maxY + 8)
-                    }
-                }
-                .ignoresSafeArea()
+        .overlay(alignment: .topTrailing) {
+            if let tab = activePopoverTab, viewModel.controlsVisible {
+                PlayerTracksPopover(
+                    viewModel: viewModel,
+                    selectedTab: Binding(
+                        get: { tab },
+                        set: { activePopoverTab = $0 }
+                    ),
+                    onClosePopover: {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            activePopoverTab = nil
+                        }
+                    },
+                    onOpenSubtitleTools: { viewModel.showSubtitleSelector = true },
+                    onOpenChapters: { viewModel.showChapterList = true },
+                    onOpenEpisodes: { viewModel.showEpisodeSelector = true }
+                )
+                .padding(.top, 60)
+                .padding(.trailing, 28)
+                .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
             }
         }
         .statusBarHidden(true)
@@ -176,14 +150,10 @@ struct PlayerView: View {
 #if DEBUG
             let phaseName: String
             switch scenePhase {
-            case .active:
-                phaseName = "active"
-            case .inactive:
-                phaseName = "inactive"
-            case .background:
-                phaseName = "background"
-            @unknown default:
-                phaseName = "unknown"
+            case .active: phaseName = "active"
+            case .inactive: phaseName = "inactive"
+            case .background: phaseName = "background"
+            @unknown default: phaseName = "unknown"
             }
             VanmoLogger.player.info(
                 "[Debug][PiP] playerDisappear scenePhase=\(phaseName, privacy: .public) keepPlayback=\(keepPlaybackActive, privacy: .public) closing=\(isClosingPlayer, privacy: .public)"
@@ -235,11 +205,31 @@ struct PlayerView: View {
         }
         .onChange(of: viewModel.controlsVisible) { _, visible in
             if !visible {
-                showSpeedPicker = false
-                showScaleModePicker = false
-                showQualityPicker = false
+                activePopoverTab = nil
             }
         }
+    }
+
+    private func errorStateOverlay(message: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(CatDesign.glowAmber)
+            Text(L10n.tr("无法播放"))
+                .font(.headline)
+            Text(message)
+                .font(.footnote)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(CatDesign.Cinema.textMuted)
+        }
+        .foregroundStyle(CatDesign.Cinema.textIvory)
+        .padding(.horizontal, 28)
+        .padding(.vertical, 20)
+        .background(CatDesign.Cinema.surfaceGlass, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 1)
+        )
     }
 
     // MARK: - Video Layer
@@ -343,199 +333,189 @@ struct PlayerView: View {
 
     private func controlsOverlay() -> some View {
         ZStack {
-            LinearGradient(
-                stops: [
-                    .init(color: .black.opacity(0.3), location: 0),
-                    .init(color: .black.opacity(0), location: 0.45),
-                    .init(color: .black.opacity(0.6), location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [CatDesign.catSilhouette.opacity(0.65), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 74)
+
+                Spacer()
+
+                LinearGradient(
+                    colors: [.clear, CatDesign.catSilhouette.opacity(0.80)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 116)
+            }
             .ignoresSafeArea()
             .allowsHitTesting(false)
 
-            ZStack {
-                VStack(spacing: 0) {
-                    topBar
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if showQualityPicker || showSpeedPicker || showScaleModePicker {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showQualityPicker = false
-                                    showSpeedPicker = false
-                                    showScaleModePicker = false
-                                }
-                            } else {
-                                viewModel.toggleControls()
+            VStack(spacing: 0) {
+                topBar
+
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if activePopoverTab != nil {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                activePopoverTab = nil
                             }
+                        } else {
+                            viewModel.toggleControls()
                         }
-                    bottomBar
-                }
-                centerControls
+                    }
+
+                bottomFloatingDeck
             }
-            .safeAreaPadding(.horizontal, 16)
-            .safeAreaPadding(.top, 8)
-            .safeAreaPadding(.bottom, 6)
+            .padding(.horizontal, 28)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transition(.opacity)
     }
 
+    // MARK: - Top Floating Bar (`684:714`)
+
     private var topBar: some View {
-        GeometryReader { proxy in
-            let compact = proxy.size.width < 480
-            topBarContent(
-                diameter: compact ? 44 : 48,
-                spacing: compact ? 8 : 20,
-                volumeWidth: compact ? 112 : 192,
-                sliderWidth: compact ? 48 : 114
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        }
-        .frame(height: 48)
-    }
-
-    private func topBarContent(
-        diameter: CGFloat,
-        spacing: CGFloat,
-        volumeWidth: CGFloat,
-        sliderWidth: CGFloat
-    ) -> some View {
-        HStack(alignment: .center, spacing: spacing) {
-            HStack(spacing: spacing) {
-                Button(action: closePlayer) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: diameter, height: diameter)
-                        .playerGlassCircle()
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(L10n.tr("关闭"))
-
-                pictureInPictureButton(diameter: diameter)
-                AirPlayRouteButton()
-                    .frame(width: 24, height: 24)
-                    .frame(width: diameter, height: diameter)
-                    .playerGlassCircle()
-                    .accessibilityLabel(L10n.tr("投屏"))
-                qualityButton(diameter: diameter)
-            }
-            .contextMenu {
-                extraPlayerActions
-            }
+        HStack(spacing: 12) {
+            topLeftTitlePill
 
             Spacer(minLength: 8)
 
-            volumePill(width: volumeWidth, sliderWidth: sliderWidth, height: diameter)
+            topRightActionGroup
         }
+        .frame(height: 42)
     }
 
-    private func qualityButton(diameter: CGFloat) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showQualityPicker.toggle()
-                showSpeedPicker = false
-                showScaleModePicker = false
+    private var topLeftTitlePill: some View {
+        HStack(spacing: 10) {
+            Button(action: closePlayer) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CatDesign.Cinema.textIvory)
+                    .frame(width: 28, height: 28)
+                    .background(CatDesign.Cinema.surfacePill, in: Circle())
             }
-        } label: {
-            Text(qualityShortLabel)
-                .font(.system(size: diameter < 48 ? 11 : 12, weight: .semibold))
-                .foregroundStyle(.white)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-                .frame(width: diameter, height: diameter)
-                .playerGlassCircle()
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(L10n.tr("画质"))
-        .anchorPreference(key: QualityButtonAnchorKey.self, value: .bounds) { $0 }
-    }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("关闭"))
 
-    private var qualityShortLabel: String {
-        switch viewModel.videoQuality {
-        case .p360: return "360"
-        case .p480: return "480"
-        case .p720: return "720"
-        case .p1080: return "HD"
-        case .original: return L10n.tr("原画")
-        }
-    }
+            HStack(spacing: 8) {
+                Text(viewModel.playerDisplayTitle)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(CatDesign.Cinema.textIvory)
+                    .lineLimit(1)
 
-    private func pictureInPictureButton(diameter: CGFloat) -> some View {
-        Button {
-            if viewModel.avPlayer != nil {
-                pictureInPicture.toggle()
-            } else {
-                viewModel.toggleKSPictureInPicture()
-            }
-        } label: {
-            Image(systemName: (pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "pip.exit" : "pip.enter")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: diameter, height: diameter)
-                .playerGlassCircle()
-        }
-        .buttonStyle(.plain)
-        .disabled(!(pictureInPicture.isSupported && viewModel.canShowPictureInPictureButton))
-        .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? L10n.tr("退出画中画") : L10n.tr("进入画中画"))
-    }
-
-    private func volumePill(width: CGFloat, sliderWidth: CGFloat, height: CGFloat) -> some View {
-        HStack(spacing: 12) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.2))
-                    Capsule()
-                        .fill(.white)
-                        .frame(width: max(0, proxy.size.width * CGFloat(viewModel.config.volume)))
+                if let epBadge = viewModel.playerEpisodeBadge {
+                    Text(epBadge)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(CatDesign.glowAmber)
+                        .lineLimit(1)
                 }
-                .frame(height: 8)
-                .frame(maxHeight: .infinity, alignment: .center)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            let fraction = value.location.x / max(proxy.size.width, 1)
-                            viewModel.setVolume(Float(fraction))
+            }
+
+            if let techBadge = viewModel.playerTechnicalBadge {
+                Text(techBadge)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(CatDesign.Cinema.textIvory)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(CatDesign.Cinema.surfacePill, in: Capsule())
+                    .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.75))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 14)
+        .frame(height: 40)
+        .background {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(Capsule().fill(CatDesign.Cinema.surfaceGlass))
+        }
+        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9))
+    }
+
+    private var topRightActionGroup: some View {
+        HStack(spacing: 8) {
+            if pictureInPicture.isSupported && viewModel.canShowPictureInPictureButton {
+                Button {
+                    if viewModel.avPlayer != nil {
+                        pictureInPicture.toggle()
+                    } else {
+                        viewModel.toggleKSPictureInPicture()
+                    }
+                } label: {
+                    Image(systemName: (pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "pip.exit" : "pip.enter")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(CatDesign.Cinema.textIvory)
+                        .frame(width: 38, height: 38)
+                        .background {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay(Circle().fill(CatDesign.Cinema.surfaceGlass))
                         }
+                        .overlay(Circle().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? L10n.tr("退出画中画") : L10n.tr("进入画中画"))
+            }
+
+            AirPlayRouteButton()
+                .frame(width: 22, height: 22)
+                .frame(width: 38, height: 38)
+                .background {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Circle().fill(CatDesign.Cinema.surfaceGlass))
+                }
+                .overlay(Circle().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9))
+                .accessibilityLabel(L10n.tr("投屏"))
+
+            let isTracksActive = activePopoverTab != nil
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    activePopoverTab = isTracksActive ? nil : .subtitles
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image("CatTrackSliders")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(isTracksActive ? CatDesign.glowAmber : CatDesign.Cinema.textIvory)
+
+                    Text(L10n.tr("轨道"))
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(isTracksActive ? CatDesign.glowAmber : CatDesign.Cinema.textIvory)
+                }
+                .padding(.leading, 12)
+                .padding(.trailing, 13)
+                .frame(height: 38)
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule().fill(isTracksActive ? CatDesign.Cinema.surfaceGlassElevated : CatDesign.Cinema.surfaceGlass)
+                        )
+                }
+                .overlay(
+                    Capsule().strokeBorder(
+                        isTracksActive ? CatDesign.Cinema.strokeAmber : CatDesign.Cinema.strokeGlass,
+                        lineWidth: 0.9
+                    )
                 )
             }
-            .frame(width: sliderWidth, height: height)
-
-            Image(systemName: viewModel.config.volume > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 20, height: 20)
-        }
-        .padding(.horizontal, 16)
-        .frame(width: width, height: height)
-        .playerGlassCapsule()
-    }
-
-    @ViewBuilder
-    private var extraPlayerActions: some View {
-        if viewModel.canSelectEpisode {
-            Button(L10n.tr("选集")) { viewModel.showEpisodeSelector = true }
-        }
-        Button(L10n.tr("章节与片头")) { viewModel.showChapterList = true }
-        Button(L10n.tr("画质")) {
-            showQualityPicker = true
-            showSpeedPicker = false
-            showScaleModePicker = false
-        }
-        Button(L10n.tr("倍速")) {
-            showSpeedPicker = true
-            showQualityPicker = false
-            showScaleModePicker = false
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("轨道设置"))
         }
     }
 
 #if DEBUG
-    /// `VANMO_DEBUG_PLAYER_SCRIPT=seek:0.6,seek:0.2,pause,resume,wait:10,close`：首次进入 playing 后每步间隔 4 秒执行。
-    /// `close` 走与关闭按钮相同的 `closePlayer()`。
     private func runDebugPlayerScriptIfNeeded() async {
         guard let script = ProcessInfo.processInfo.environment["VANMO_DEBUG_PLAYER_SCRIPT"] else { return }
         let steps = script.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -574,91 +554,17 @@ struct PlayerView: View {
         }
     }
 
-    private var centerControls: some View {
-        ViewThatFits(in: .horizontal) {
-            centerControlsContent(play: 96, skip: 64, spacing: 64, playIcon: 34, skipIcon: 22)
-            centerControlsContent(play: 72, skip: 48, spacing: 20, playIcon: 28, skipIcon: 18)
-        }
-    }
-
-    private func centerControlsContent(
-        play: CGFloat,
-        skip: CGFloat,
-        spacing: CGFloat,
-        playIcon: CGFloat,
-        skipIcon: CGFloat
-    ) -> some View {
-        HStack(spacing: spacing) {
-            skipGlassButton(forward: false, diameter: skip, icon: skipIcon)
-            Button { viewModel.togglePlayPause() } label: {
-                Group {
-                    if showsLoadingChrome {
-                        PlayerLoadingArc()
-                    } else {
-                        Image(systemName: viewModel.playbackState == .playing ? "pause.fill" : "play.fill")
-                            .font(.system(size: playIcon, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .frame(width: play, height: play)
-                .playerGlassCircle()
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                showsLoadingChrome
-                    ? L10n.tr("正在加载")
-                    : (viewModel.playbackState == .playing ? L10n.tr("暂停") : L10n.tr("播放"))
-            )
-            skipGlassButton(forward: true, diameter: skip, icon: skipIcon)
-        }
-    }
-
-    private func skipGlassButton(forward: Bool, diameter: CGFloat, icon: CGFloat) -> some View {
-        Button {
-            if forward {
-                viewModel.skipForward()
-            } else {
-                viewModel.skipBackward()
-            }
-        } label: {
-            Image(systemName: forward ? "goforward.10" : "gobackward.10")
-                .font(.system(size: icon, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: diameter, height: diameter)
-                .playerGlassCircle()
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(forward ? L10n.tr("快进") : L10n.tr("快退"))
-    }
+    // MARK: - Bottom Floating Control Deck (`684:749`)
 
     @ViewBuilder
-    private var bottomBar: some View {
+    private var bottomFloatingDeck: some View {
         if viewModel.isLiveStream {
             HStack {
                 liveBadge
                 Spacer()
             }
         } else {
-            VStack(spacing: 16) {
-                HStack(alignment: .center) {
-                    if viewModel.canSkipIntro {
-                        Button {
-                            viewModel.skipIntro()
-                        } label: {
-                            Text(L10n.tr("跳过片头"))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .frame(height: 36)
-                                .playerGlassCapsule()
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(L10n.tr("跳过片头"))
-                    }
-                    Spacer()
-                    mediaActionCapsule
-                }
-
+            VStack(spacing: 10) {
                 PlayerProgressBar(
                     progress: viewModel.progress,
                     cacheStart: viewModel.cacheStart,
@@ -671,48 +577,192 @@ struct PlayerView: View {
                         viewModel.seek(to: fraction * viewModel.duration)
                     }
                 )
+
+                controlsRow
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(CatDesign.Cinema.surfaceGlass)
+                    )
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9)
+            )
+            .overlay(alignment: .topLeading) {
+                if viewModel.seekPreviewActive {
+                    anchoredScrubPreview
+                }
             }
         }
     }
 
-    /// Figma `619:2`：右下角胶囊组，「选集」只在有剧集时出现在最左侧。
-    private var mediaActionCapsule: some View {
-        HStack(spacing: 0) {
-            if viewModel.canSelectEpisode {
-                capsuleActionButton("rectangle.stack", label: L10n.tr("选集")) {
+    private var anchoredScrubPreview: some View {
+        GeometryReader { proxy in
+            let deckWidth = max(proxy.size.width, 138)
+            let fraction = viewModel.duration > 0 ? min(max(viewModel.seekTime / viewModel.duration, 0), 1) : 0
+            let rawX = fraction * deckWidth
+            let clampedX = min(max(rawX, 69), max(deckWidth - 69, 69))
+
+            scrubPreviewCard
+                .position(x: clampedX, y: -56)
+        }
+        .frame(height: 1)
+        .allowsHitTesting(false)
+    }
+
+    private var controlsRow: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 16) {
+                Text("\(viewModel.displayTime.formattedDuration) / \(viewModel.duration.formattedDuration)")
+                    .font(.system(size: 11.5, weight: .medium).monospacedDigit())
+                    .foregroundStyle(CatDesign.Cinema.textMuted)
+                    .lineLimit(1)
+
+                transportButtons
+            }
+
+            Spacer(minLength: 8)
+
+            quickActionPills
+        }
+    }
+
+    private var transportButtons: some View {
+        HStack(spacing: 14) {
+            Button { viewModel.skipBackward() } label: {
+                Image("CatSkipBack15")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("快退"))
+
+            Button { viewModel.togglePlayPause() } label: {
+                Group {
+                    if showsLoadingChrome {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(CatDesign.glowAmber)
+                    } else if viewModel.playbackState == .playing {
+                        Image("CatPlayerPause")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(CatDesign.Cinema.textIvory)
+                    }
+                }
+                .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                showsLoadingChrome
+                    ? L10n.tr("正在加载")
+                    : (viewModel.playbackState == .playing ? L10n.tr("暂停") : L10n.tr("播放"))
+            )
+
+            Button { viewModel.skipForward() } label: {
+                Image("CatSkipForward15")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("快进"))
+
+            Button {
+                if viewModel.nextPlayableEpisode != nil {
+                    Task { await viewModel.playNextEpisode() }
+                } else if viewModel.canSelectEpisode {
                     viewModel.showEpisodeSelector = true
                 }
-                .accessibilityIdentifier("player.episodes")
+            } label: {
+                Image("CatNextEpisode")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .opacity(viewModel.canSelectEpisode ? 1 : 0.35)
             }
-            capsuleActionButton("text.bubble", label: L10n.tr("字幕")) {
-                viewModel.showSubtitleSelector = true
-            }
-            capsuleActionButton("waveform", label: L10n.tr("音轨")) {
-                viewModel.showAudioSelector = true
-            }
-            capsuleActionButton("arrow.triangle.2.circlepath", label: L10n.tr("缩放")) {
-                viewModel.cycleScaleMode()
-            }
+            .buttonStyle(.plain)
+            .disabled(!viewModel.canSelectEpisode)
+            .accessibilityLabel(L10n.tr("下一集"))
         }
-        .padding(.horizontal, 8)
-        .frame(height: 48)
-        .playerGlassCapsule()
     }
 
-    private func capsuleActionButton(
-        _ systemName: String,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
+    private var quickActionPills: some View {
+        HStack(spacing: 8) {
+            if viewModel.canSkipIntro {
+                Button {
+                    viewModel.skipIntro()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image("CatLeapingEar")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 18, height: 14)
+
+                        Text(L10n.tr("跳过片头"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(CatDesign.glowAmber)
+                    }
+                    .padding(.leading, 10)
+                    .padding(.trailing, 11)
+                    .frame(height: 28)
+                    .background(CatDesign.glowAmber.opacity(0.12), in: Capsule())
+                    .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeAmber, lineWidth: 0.85))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("跳过片头"))
+            }
+
+            quickPill(String(format: "%.2gx", viewModel.config.playbackRate), isActive: activePopoverTab == .speed) {
+                togglePopoverTab(.speed)
+            }
+
+            quickPill(L10n.tr("音轨"), isActive: activePopoverTab == .audio) {
+                togglePopoverTab(.audio)
+            }
+
+            quickPill(L10n.tr("字幕"), isActive: activePopoverTab == .subtitles) {
+                togglePopoverTab(.subtitles)
+            }
+        }
+    }
+
+    private func togglePopoverTab(_ tab: PlayerPopoverTab) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            activePopoverTab = activePopoverTab == tab ? nil : tab
+        }
+    }
+
+    private func quickPill(_ title: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 48)
-                .contentShape(Rectangle())
+            Text(title)
+                .font(.system(size: 11, weight: isActive ? .semibold : .medium))
+                .foregroundStyle(isActive ? CatDesign.glowAmber : CatDesign.Cinema.textIvory)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background(
+                    isActive ? CatDesign.glowAmber.opacity(0.14) : CatDesign.Cinema.surfacePill,
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule().strokeBorder(
+                        isActive ? CatDesign.Cinema.strokeAmber : CatDesign.Cinema.strokeGlass,
+                        lineWidth: 0.75
+                    )
+                )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
     }
 
     private var liveBadge: some View {
@@ -754,19 +804,20 @@ struct PlayerView: View {
                 VStack(spacing: 4) {
                     Image(systemName: isForward ? "goforward" : "gobackward")
                         .font(.title2)
+                        .foregroundStyle(CatDesign.glowAmber)
                     Text("\(isForward ? "+" : "")\(Int(seekDelta))s")
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(CatDesign.Cinema.textIvory)
                 }
-                .foregroundStyle(.white)
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(16)
+                .background(CatDesign.Cinema.surfaceGlassElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.8))
                 .transition(.scale.combined(with: .opacity))
             }
 
-            if viewModel.seekPreviewActive {
-                seekPreviewOverlay
+            if viewModel.seekPreviewActive && !viewModel.controlsVisible {
+                scrubPreviewCard
+                    .transition(.scale.combined(with: .opacity))
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.brightnessOverlay)
@@ -775,171 +826,75 @@ struct PlayerView: View {
         .animation(.easeInOut(duration: 0.15), value: viewModel.seekPreviewActive)
     }
 
-    private var seekPreviewOverlay: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.white.opacity(0.08))
+    private var scrubPreviewCard: some View {
+        ZStack(alignment: .bottom) {
+            Group {
                 if let image = viewModel.seekPreviewImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                 } else {
-                    Image(systemName: viewModel.seekPreviewForward ? "forward.fill" : "backward.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
+                    ZStack {
+                        CatDesign.mediaPlaceholder
+                        Image(systemName: viewModel.seekPreviewForward ? "forward.fill" : "backward.fill")
+                            .font(.title3)
+                            .foregroundStyle(CatDesign.glowAmber)
+                    }
                 }
             }
-            .frame(width: 160, height: 90)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .frame(width: 138, height: 78)
+            .clipped()
 
-            HStack(spacing: 4) {
-                Text(viewModel.seekTime.formattedDuration)
-                    .foregroundStyle(.white)
-                Text("/")
-                    .foregroundStyle(.white.opacity(0.5))
-                Text(viewModel.duration.formattedDuration)
-                    .foregroundStyle(.white.opacity(0.6))
-            }
-            .font(.title3)
-            .fontWeight(.semibold)
-            .monospacedDigit()
+            LinearGradient(
+                colors: [.clear, CatDesign.catSilhouette.opacity(0.90)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 36)
+
+            Text(viewModel.seekTime.formattedDuration)
+                .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+                .foregroundStyle(CatDesign.glowAmber)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
+                .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
+                .padding(.bottom, 6)
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .transition(.scale.combined(with: .opacity))
+        .frame(width: 138, height: 78)
+        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                .strokeBorder(CatDesign.Cinema.strokeAmber, lineWidth: 1.1)
+        )
+        .shadow(color: .black.opacity(0.75), radius: 14, y: 8)
+        .overlay(alignment: .top) {
+            Image("CatLeaningPreview")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 46, height: 30)
+                .offset(x: 6, y: -25)
+                .allowsHitTesting(false)
+        }
     }
 
     private var rateBoostIndicator: some View {
         HStack(spacing: 6) {
             Image(systemName: "forward.fill")
                 .font(.subheadline)
+                .foregroundStyle(CatDesign.glowAmber)
             Text(L10n.tr("%@x 倍速播放中", String(format: "%.1f", PlayerConfig.maximumRate)))
-                .font(.subheadline)
-                .fontWeight(.semibold)
+                .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
+                .foregroundStyle(CatDesign.Cinema.textIvory)
         }
-        .foregroundStyle(.white)
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
+        .background(CatDesign.Cinema.surfaceGlassElevated, in: Capsule())
+        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeAmber, lineWidth: 0.9))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.top, 44)
         .transition(.move(edge: .top).combined(with: .opacity))
         .animation(.easeInOut(duration: 0.2), value: viewModel.isRateBoosting)
-    }
-
-    // MARK: - Picker Panels
-
-    private var speedPickerPanel: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(PlayerConfig.availableRates.enumerated()), id: \.element) { index, rate in
-                Button {
-                    viewModel.setRate(rate)
-                    withAnimation(.easeInOut(duration: 0.2)) { showSpeedPicker = false }
-                } label: {
-                    HStack {
-                        Text("\(rate, specifier: "%.1f")x")
-                        Spacer()
-                        if viewModel.config.playbackRate == rate {
-                            Image(systemName: "checkmark")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
-                }
-                if index < PlayerConfig.availableRates.count - 1 {
-                    Divider().overlay(.white.opacity(0.15))
-                }
-            }
-        }
-        .frame(width: 150)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .padding(.top, 56)
-        .padding(.trailing, 16 + iPhoneLandscapeHorizontalSafeArea)
-        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
-    }
-
-    private var scalePickerPanel: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(VideoScaleMode.allCases.enumerated()), id: \.element) { index, mode in
-                Button {
-                    viewModel.setScaleMode(mode)
-                    withAnimation(.easeInOut(duration: 0.2)) { showScaleModePicker = false }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: mode.icon)
-                            .frame(width: 20)
-                        Text(mode.displayName)
-                        Spacer()
-                        if viewModel.config.scaleMode == mode {
-                            Image(systemName: "checkmark")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
-                }
-                if index < VideoScaleMode.allCases.count - 1 {
-                    Divider().overlay(.white.opacity(0.15))
-                }
-            }
-        }
-        .frame(width: 160)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .padding(.top, 56)
-        .padding(.trailing, 16 + iPhoneLandscapeHorizontalSafeArea)
-        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)))
-    }
-
-    private var qualityPickerCard: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(viewModel.availableVideoQualities.enumerated()), id: \.element) { index, quality in
-                Button {
-                    viewModel.setVideoQuality(quality)
-                    withAnimation(.easeInOut(duration: 0.2)) { showQualityPicker = false }
-                } label: {
-                    HStack {
-                        Text(quality.displayName)
-                        Spacer()
-                        if viewModel.videoQuality == quality {
-                            Image(systemName: "checkmark")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                if index < viewModel.availableVideoQualities.count - 1 {
-                    Divider().overlay(.white.opacity(0.15))
-                }
-            }
-        }
-        .frame(width: 150)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
     }
 }
 
@@ -982,17 +937,20 @@ struct GaugeOverlay: View {
         VStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title2)
+                .foregroundStyle(CatDesign.glowAmber)
             ProgressView(value: value)
                 .frame(width: 100)
-                .tint(.white)
+                .tint(CatDesign.glowAmber)
             Text(label)
-                .font(.caption)
-                .fontWeight(.medium)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(CatDesign.Cinema.textIvory)
         }
-        .foregroundStyle(.white)
         .padding(16)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(CatDesign.Cinema.surfaceGlassElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9)
+        )
     }
 }
 
@@ -1220,16 +1178,20 @@ struct EpisodeSelectorView: View {
                         .tint(.primary)
                     }
                 }
-                .listStyle(.plain)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(CatDesign.bgObsidian)
+        }
+        .padding(.top, 12)
+        .background(CatDesign.bgObsidian)
+        .navigationTitle(L10n.tr("选集"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(L10n.tr("完成")) { dismiss() }
+                    .foregroundStyle(CatDesign.accentAmber)
             }
-            .padding(.top, 12)
-            .navigationTitle(L10n.tr("选集"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.tr("完成")) { dismiss() }
-                }
-            }
+        }
         }
     }
 
@@ -1359,13 +1321,17 @@ struct ChapterListView: View {
                     dismiss()
                 } label: {
                     Text(L10n.tr("将当前时间设为片头结束"))
+                        .foregroundStyle(CatDesign.accentAmber)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(CatDesign.bgObsidian)
             .navigationTitle(L10n.tr("章节与片头"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(L10n.tr("完成")) { dismiss() }
+                        .foregroundStyle(CatDesign.accentAmber)
                 }
             }
         }
@@ -1374,63 +1340,6 @@ struct ChapterListView: View {
     private func isCurrentChapter(_ chapter: Chapter) -> Bool {
         let current = viewModel.currentTime
         return current >= chapter.startTime.seconds && current < chapter.endTime.seconds
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func playerGlassCircle() -> some View {
-        if #available(iOS 26.0, *) {
-            self.contentShape(Circle())
-                .glassEffect(.clear, in: .circle)
-        } else {
-            self.contentShape(Circle())
-                .background {
-                    Circle().fill(.ultraThinMaterial).opacity(0.22)
-                }
-                .overlay {
-                    Circle().strokeBorder(.white.opacity(0.28), lineWidth: 1)
-                }
-        }
-    }
-
-    @ViewBuilder
-    func playerGlassCapsule() -> some View {
-        if #available(iOS 26.0, *) {
-            self.contentShape(Capsule())
-                .glassEffect(.clear, in: .capsule)
-        } else {
-            self.contentShape(Capsule())
-                .background {
-                    Capsule().fill(.ultraThinMaterial).opacity(0.22)
-                }
-                .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 1)
-                }
-        }
-    }
-}
-
-private struct QualityButtonAnchorKey: PreferenceKey {
-    static var defaultValue: Anchor<CGRect>? = nil
-    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
-        value = nextValue() ?? value
-    }
-}
-
-private struct PlayerLoadingArc: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
-            let turns = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1)
-            Circle()
-                .trim(from: 0.08, to: 0.38)
-                .stroke(.white, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                .frame(width: 36, height: 36)
-                .rotationEffect(.degrees(reduceMotion ? -90 : turns * 360 - 90))
-        }
-        .accessibilityLabel(L10n.tr("正在加载"))
     }
 }
 

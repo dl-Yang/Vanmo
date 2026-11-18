@@ -3,7 +3,7 @@ import SwiftData
 import UIKit
 import VanmoCore
 
-/// 「打开 URL 链接」：粘贴 http(s) 直链串流或下载。对齐 Figma `File` 页 `DirectLink-Light` / `-Dark` / `-States`。
+/// 「打开 URL 链接」：粘贴 http(s) 直链串流或下载。对齐 Figma `10 · Sheet — Open Direct Link` (`690:906`)。
 struct DirectLinkView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -15,12 +15,16 @@ struct DirectLinkView: View {
     @FocusState private var isFieldFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            FilesHeader(title: L10n.tr("打开 URL 链接"), onBack: { dismiss() }) { EmptyView() }
-            content
+        ZStack(alignment: .top) {
+            CatDesign.surfaceSheet.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                sheetHeader
+                content
+            }
         }
-        .background(FilesDesign.background.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
+        .presentationDragIndicator(.hidden)
+        .presentationBackground(CatDesign.surfaceSheet)
         .task {
             model.configure(modelContext: modelContext)
             refreshClipboardState()
@@ -41,16 +45,60 @@ struct DirectLinkView: View {
         }
     }
 
+    private var sheetHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Capsule()
+                .fill(CatDesign.grabberFill)
+                .frame(width: 44, height: 4)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
+                .padding(.bottom, 14)
+
+            HStack {
+                HStack(spacing: 10) {
+                    Text(L10n.tr("打开直链"))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(CatDesign.textIvory)
+
+                    Image("CatTailFlourish")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 38, height: 14)
+                }
+
+                Spacer()
+
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .frame(width: 28, height: 28)
+                        .background(CatDesign.surfacePill, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("关闭"))
+            }
+
+            Text(L10n.tr("支持 MP4、MKV、MOV 与 HLS 流媒体 · HTTPS"))
+                .font(.system(size: 12))
+                .foregroundStyle(CatDesign.textMuted)
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.bottom, 16)
+    }
+
     private var content: some View {
         List {
-            DirectLinkInputCard(
-                model: model,
-                hasClipboardLink: hasClipboardLink,
-                isFieldFocused: $isFieldFocused,
-                onPlay: playInput,
-                onDownload: downloadInput
-            )
-            .directLinkListRow(top: 16, bottom: 12)
+            urlInputBar
+                .directLinkListRow(top: 0, bottom: 12)
+
+            if let error = model.inputError {
+                DirectLinkFieldMessage(text: error)
+                    .directLinkListRow(top: 0, bottom: 8)
+            }
+
+            primaryActionsRow
+                .directLinkListRow(top: 0, bottom: 18)
 
             if model.entries.isEmpty {
                 DirectLinkEmptyHint()
@@ -61,10 +109,13 @@ struct DirectLinkView: View {
                         DirectLinkRow(
                             item: item,
                             task: DirectLinkLibrary.downloadTask(for: item.fileURL, in: downloadManager.tasks),
-                            onPlay: { appState.play(item) },
+                            onPlay: {
+                                dismiss()
+                                appState.play(item)
+                            },
                             onDownloadAction: { task in Task { await handleDownloadAction(for: item, task: task) } }
                         )
-                        .directLinkListRow(top: 2, bottom: 2)
+                        .directLinkListRow(top: 4, bottom: 4)
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 model.remove(item)
@@ -80,31 +131,125 @@ struct DirectLinkView: View {
             }
 
             DirectLinkFootnote()
-                .directLinkListRow(top: 16, bottom: 24)
+                .directLinkListRow(top: 14, bottom: 28)
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.interactively)
     }
 
+    private var urlInputBar: some View {
+        HStack(spacing: 10) {
+            Image("CatWhiskerLink")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 22, height: 18)
+
+            TextField(
+                "",
+                text: $model.input,
+                prompt: Text(verbatim: "https://cdn.cinema.io/video.mkv").foregroundStyle(CatDesign.textDim)
+            )
+            .font(.system(size: 12.5, weight: .medium))
+            .foregroundStyle(CatDesign.textIvory)
+            .keyboardType(.URL)
+            .textContentType(.URL)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.go)
+            .focused($isFieldFocused)
+            .onSubmit(playInput)
+            .accessibilityLabel(L10n.tr("视频链接"))
+            .accessibilityIdentifier("directLink.field")
+
+            PasteButton(payloadType: String.self) { strings in
+                guard let text = strings.first else { return }
+                Task { @MainActor in model.input = text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
+            .labelStyle(.titleAndIcon)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
+            .tint(hasClipboardLink ? CatDesign.accentAmber : CatDesign.textMuted)
+            .accessibilityIdentifier("directLink.paste")
+        }
+        .padding(.leading, 13)
+        .padding(.trailing, 8)
+        .frame(height: 48)
+        .catGlassCard(cornerRadius: 16, elevated: true, amberStroke: model.inputError == nil)
+        .overlay {
+            if model.inputError != nil {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(CatDesign.dangerRed, lineWidth: 1.4)
+            }
+        }
+    }
+
+    private var isInputEmpty: Bool {
+        model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var primaryActionsRow: some View {
+        HStack(spacing: 10) {
+            Button(action: playInput) {
+                HStack(spacing: 8) {
+                    Image("CatPlaySmall")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 14, height: 14)
+
+                    Text(L10n.tr("立即串流"))
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .background(CatDesign.amberTintStrong, in: Capsule())
+                .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 1))
+            }
+            .accessibilityIdentifier("directLink.play")
+
+            Button(action: downloadInput) {
+                HStack(spacing: 8) {
+                    Image("CatDownloadFeline")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+
+                    Text(L10n.tr("加入下载队列"))
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .catGlassCard(cornerRadius: CatDesign.radiusPill)
+            }
+            .accessibilityIdentifier("directLink.download")
+        }
+        .buttonStyle(.plain)
+        .disabled(isInputEmpty)
+        .opacity(isInputEmpty ? 0.45 : 1)
+        .animation(.easeOut(duration: 0.2), value: isInputEmpty)
+    }
+
     private var recentHeader: some View {
         HStack {
-            FilesSectionHeader(title: L10n.tr("最近链接"))
+            Text(L10n.tr("最近链接 · %d", model.entries.count))
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(CatDesign.textMuted)
             Spacer()
-            Text("\(model.entries.count)")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(FilesDesign.connectionDot)
-                .padding(.horizontal, 8)
+            CatStretchingDivider()
         }
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-        .background(FilesDesign.background)
+        .padding(.top, 6)
+        .padding(.bottom, 6)
+        .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24))
+        .background(CatDesign.surfaceSheet)
     }
 
     @ViewBuilder
     private func rowMenu(for item: MediaItem) -> some View {
         Button {
+            dismiss()
             appState.play(item)
         } label: {
             Label(L10n.tr("播放"), systemImage: "play")
@@ -139,6 +284,7 @@ struct DirectLinkView: View {
     private func playInput() {
         guard let item = model.addInput() else { return }
         isFieldFocused = false
+        dismiss()
         appState.play(item)
     }
 
@@ -164,7 +310,6 @@ struct DirectLinkView: View {
         }
     }
 
-    /// `hasURLs` 与模式探测都不读取内容，不会触发系统粘贴提示。
     private func refreshClipboardState() {
         Task { @MainActor in
             let pasteboard = UIPasteboard.general
@@ -178,155 +323,24 @@ struct DirectLinkView: View {
     }
 }
 
-// MARK: - 设计 Token
-
-enum DirectLinkDesign {
-    static let card          = FilesDesign.dyn("#FFFFFF", "#18181B")
-    static let cardBorder    = FilesDesign.dyn("#E4E4E7", "#27272A")
-    static let field         = FilesDesign.dyn("#F4F4F5", "#27272A")
-    static let fieldBorder   = FilesDesign.dyn("#E4E4E7", "#3F3F47")
-    static let placeholder   = FilesDesign.dyn("#9F9FA9", "#71717B")
-    static let error         = FilesDesign.dyn("#E7000B", "#FF6467")
-    static let formatBox     = Color.vanmoAccent.opacity(0.08)
-    static let tintedFill    = Color.vanmoAccent.opacity(0.12)
-    static let streamOnlyFill = FilesDesign.dyn("#E4E4E7", "#27272A")
-}
-
-// MARK: - 链接输入卡
-
-private struct DirectLinkInputCard: View {
-    @ObservedObject var model: DirectLinkListModel
-    let hasClipboardLink: Bool
-    var isFieldFocused: FocusState<Bool>.Binding
-    let onPlay: () -> Void
-    let onDownload: () -> Void
-
-    private var isInputEmpty: Bool {
-        model.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            intro
-            field
-            if let error = model.inputError {
-                DirectLinkFieldMessage(text: error)
-            }
-            actions
-        }
-        .padding(16)
-        .background(DirectLinkDesign.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(DirectLinkDesign.cardBorder, lineWidth: 1)
-        }
-    }
-
-    private var intro: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "link")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(FilesDesign.accent)
-                .frame(width: 40, height: 40)
-                .background(DirectLinkDesign.tintedFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(L10n.tr("串流或保存视频链接"))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(FilesDesign.title)
-                Text(L10n.tr("支持 MP4、MKV、MOV、HLS 等格式"))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(FilesDesign.subtitle)
-            }
-        }
-    }
-
-    private var field: some View {
-        HStack(spacing: 8) {
-            TextField(
-                "",
-                text: $model.input,
-                prompt: Text(verbatim: "https://").foregroundStyle(DirectLinkDesign.placeholder)
-            )
-            .font(.system(size: 15))
-            .foregroundStyle(FilesDesign.title)
-            .keyboardType(.URL)
-            .textContentType(.URL)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .submitLabel(.go)
-            .focused(isFieldFocused)
-            .onSubmit(onPlay)
-            .accessibilityLabel(L10n.tr("视频链接"))
-            .accessibilityIdentifier("directLink.field")
-
-            PasteButton(payloadType: String.self) { strings in
-                guard let text = strings.first else { return }
-                Task { @MainActor in model.input = text.trimmingCharacters(in: .whitespacesAndNewlines) }
-            }
-            .labelStyle(.titleAndIcon)
-            .buttonBorderShape(.roundedRectangle(radius: 10))
-            .controlSize(.small)
-            .tint(hasClipboardLink ? FilesDesign.accent : FilesDesign.secondaryIcon)
-            .accessibilityIdentifier("directLink.paste")
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, 6)
-        .frame(height: 48)
-        .background(DirectLinkDesign.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(
-                    model.inputError == nil ? DirectLinkDesign.fieldBorder : DirectLinkDesign.error,
-                    lineWidth: model.inputError == nil ? 1 : 1.5
-                )
-        }
-    }
-
-    private var actions: some View {
-        HStack(spacing: 10) {
-            Button(action: onPlay) {
-                Label(L10n.tr("播放"), systemImage: "play.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(FilesDesign.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-            .accessibilityIdentifier("directLink.play")
-            Button(action: onDownload) {
-                Label(L10n.tr("下载"), systemImage: "arrow.down.to.line")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(FilesDesign.accent)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .background(DirectLinkDesign.tintedFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-            .accessibilityIdentifier("directLink.download")
-        }
-        .buttonStyle(.plain)
-        .disabled(isInputEmpty)
-        .opacity(isInputEmpty ? 0.5 : 1)
-        .animation(.easeOut(duration: 0.2), value: isInputEmpty)
-    }
-}
-
 private struct DirectLinkFieldMessage: View {
     let text: String
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "exclamationmark.circle")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12.5, weight: .semibold))
             Text(text)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .foregroundStyle(DirectLinkDesign.error)
+        .foregroundStyle(CatDesign.dangerRed)
         .padding(.leading, 4)
         .accessibilityElement(children: .combine)
     }
 }
 
-// MARK: - 列表行
+// MARK: - 列表行 (`Row / Recent Direct Link`)
 
 private struct DirectLinkRow: View {
     let item: MediaItem
@@ -334,109 +348,85 @@ private struct DirectLinkRow: View {
     let onPlay: () -> Void
     let onDownloadAction: (DownloadTaskSnapshot?) -> Void
 
-    var body: some View {
-        HStack(spacing: 0) {
-            Button(action: onPlay) {
-                HStack(spacing: 0) {
-                    FilesIconBox(background: DirectLinkDesign.formatBox) {
-                        Text(DirectLinkLibrary.formatLabel(for: item.fileURL))
-                            .font(.system(size: 12, weight: .bold))
-                            .tracking(0.4)
-                            .foregroundStyle(FilesDesign.accent)
-                    }
-                    textColumn
-                    Spacer(minLength: 8)
-                }
-                .padding(.vertical, 12)
-                .padding(.leading, 12)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(L10n.tr("播放"))
-
-            DirectLinkDownloadControl(
-                isStreamOnly: DirectLinkLibrary.isStreamOnly(item.fileURL),
-                task: task,
-                action: { onDownloadAction(task) }
-            )
-            .padding(.trailing, 12)
-        }
-    }
-
-    private var textColumn: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(item.title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(FilesDesign.title)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            HStack(spacing: 6) {
-                Text(item.fileURL.host ?? "")
-                    .foregroundStyle(FilesDesign.subtitle)
-                    .lineLimit(1)
-                if let meta {
-                    Circle()
-                        .fill(FilesDesign.videoDot)
-                        .frame(width: 4, height: 4)
-                    Text(meta.text)
-                        .foregroundStyle(meta.color)
-                        .lineLimit(1)
-                }
-            }
-            .font(.system(size: 13, weight: .medium))
-            .padding(.top, 2)
-            if showsResumeBar {
-                ResumeBar(fraction: item.playbackProgress)
-                    .padding(.top, 6)
-            }
-        }
-        .padding(.leading, 16)
-    }
-
     private var showsResumeBar: Bool {
         task == nil && !item.isWatched && item.lastPlaybackPosition > 0 && item.duration > 0
     }
 
-    private var meta: (text: String, color: Color)? {
+    private var metaLine: String {
+        let format = DirectLinkLibrary.formatLabel(for: item.fileURL)
+        let host = item.fileURL.host ?? ""
+        if DirectLinkLibrary.isStreamOnly(item.fileURL) {
+            return "\(format) · \(L10n.tr("仅串流")) · \(host)"
+        }
         if let task {
             let percent = Int((task.progress * 100).rounded())
             switch task.status {
-            case .queued:
-                return (L10n.tr("等待下载"), FilesDesign.subtitle)
-            case .downloading:
-                return (L10n.tr("下载中 %d%%", percent), FilesDesign.accent)
-            case .paused:
-                return (L10n.tr("已暂停 %d%%", percent), FilesDesign.subtitle)
-            case .completed:
-                return (L10n.tr("已下载"), FilesDesign.statusConnected)
-            case .failed:
-                return (L10n.tr("下载失败"), DirectLinkDesign.error)
+            case .queued: return "\(format) · \(host) · \(L10n.tr("等待下载"))"
+            case .downloading: return "\(format) · \(host) · \(L10n.tr("下载中 %d%%", percent))"
+            case .paused: return "\(format) · \(host) · \(L10n.tr("已暂停 %d%%", percent))"
+            case .completed: return "\(format) · \(host) · \(L10n.tr("已下载"))"
+            case .failed: return "\(format) · \(host) · \(L10n.tr("下载失败"))"
             }
         }
-        if showsResumeBar {
-            return (
-                LocalizedFormat.remainingDuration(position: item.lastPlaybackPosition, total: item.duration),
-                FilesDesign.subtitle
-            )
-        }
-        return nil
+        return "\(format) · \(host)"
     }
-}
-
-private struct ResumeBar: View {
-    let fraction: Double
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule().fill(FilesDesign.iconBoxGray)
-                Capsule()
-                    .fill(FilesDesign.accent)
-                    .frame(width: proxy.size.width * min(max(fraction, 0), 1))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(metaLine)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(task?.status == .failed ? CatDesign.dangerRed : CatDesign.textMuted)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+
+                DirectLinkDownloadControl(
+                    isStreamOnly: DirectLinkLibrary.isStreamOnly(item.fileURL),
+                    task: task,
+                    action: { onDownloadAction(task) }
+                )
+
+                Button(action: onPlay) {
+                    Image("CatPlaySmall")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 14, height: 14)
+                        .frame(width: 30, height: 30)
+                        .background(CatDesign.surfacePill, in: Circle())
+                        .overlay(
+                            Circle().strokeBorder(
+                                showsResumeBar ? CatDesign.strokeAmber : CatDesign.strokeGlass,
+                                lineWidth: 0.85
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("播放"))
+            }
+
+            if showsResumeBar {
+                HStack(spacing: 10) {
+                    CatPawProgressBar(progress: item.playbackProgress)
+
+                    Text(LocalizedFormat.remainingDuration(position: item.lastPlaybackPosition, total: item.duration))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(CatDesign.accentAmber)
+                        .lineLimit(1)
+                }
             }
         }
-        .frame(height: 3)
-        .accessibilityHidden(true)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .catGlassCard(cornerRadius: 16)
     }
 }
 
@@ -447,18 +437,13 @@ private struct DirectLinkDownloadControl: View {
 
     var body: some View {
         if isStreamOnly {
-            Text(L10n.tr("仅串流"))
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(FilesDesign.secondaryIcon)
-                .padding(.horizontal, 8)
-                .frame(height: 24)
-                .background(DirectLinkDesign.streamOnlyFill, in: Capsule())
+            EmptyView()
         } else if task?.status == .completed {
-            Image(systemName: "checkmark")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(FilesDesign.statusConnected)
-                .frame(width: 36, height: 36)
-                .background(FilesDesign.statusConnected.opacity(0.12), in: Circle())
+            Image("CatEarCheck")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .frame(width: 30, height: 30)
                 .accessibilityLabel(L10n.tr("已下载"))
         } else {
             Button(action: action) { glyph }
@@ -473,31 +458,31 @@ private struct DirectLinkDownloadControl: View {
         case .queued, .downloading, .paused:
             ZStack {
                 Circle()
-                    .stroke(FilesDesign.accent.opacity(0.16), lineWidth: 3)
+                    .stroke(CatDesign.accentAmber.opacity(0.20), lineWidth: 2.5)
                 Circle()
-                    .trim(from: 0, to: max(task?.progress ?? 0, 0.02))
-                    .stroke(FilesDesign.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .trim(from: 0, to: max(task?.progress ?? 0, 0.05))
+                    .stroke(CatDesign.accentAmber, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.2), value: task?.progress)
                 Image(systemName: task?.status == .paused ? "arrow.down" : "stop.fill")
-                    .font(.system(size: task?.status == .paused ? 13 : 9, weight: .bold))
-                    .foregroundStyle(FilesDesign.accent)
+                    .font(.system(size: task?.status == .paused ? 11 : 8, weight: .bold))
+                    .foregroundStyle(CatDesign.accentAmber)
             }
-            .frame(width: 30, height: 30)
-            .frame(width: 36, height: 36)
+            .frame(width: 28, height: 28)
         case .failed:
-            circleGlyph("arrow.clockwise", tint: DirectLinkDesign.error, fill: DirectLinkDesign.error.opacity(0.1))
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CatDesign.dangerRed)
+                .frame(width: 30, height: 30)
+                .background(CatDesign.dangerRed.opacity(0.14), in: Circle())
         default:
-            circleGlyph("arrow.down.to.line", tint: FilesDesign.accent, fill: DirectLinkDesign.tintedFill)
+            Image("CatDownloadFeline")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 15, height: 15)
+                .frame(width: 30, height: 30)
+                .background(CatDesign.surfacePill, in: Circle())
+                .overlay(Circle().strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75))
         }
-    }
-
-    private func circleGlyph(_ name: String, tint: Color, fill: Color) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(tint)
-            .frame(width: 36, height: 36)
-            .background(fill, in: Circle())
     }
 
     private var accessibilityLabel: String {
@@ -510,27 +495,24 @@ private struct DirectLinkDownloadControl: View {
     }
 }
 
-// MARK: - 空态 / 脚注
-
 private struct DirectLinkEmptyHint: View {
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "link")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(FilesDesign.secondaryIcon)
-                .frame(width: 48, height: 48)
-                .background(FilesDesign.iconBoxGray, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .accessibilityHidden(true)
+        VStack(spacing: 10) {
+            Image("CatSittingInFolderBox")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 78, height: 60)
             Text(L10n.tr("还没有链接"))
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(FilesDesign.title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(CatDesign.textIvory)
             Text(L10n.tr("播放或下载过的链接会出现在这里，并保留续播进度。"))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(FilesDesign.subtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(CatDesign.textMuted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
+        .padding(.vertical, 24)
+        .catGlassCard(cornerRadius: 18)
     }
 }
 
@@ -538,32 +520,31 @@ private struct DirectLinkFootnote: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "lock")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(FilesDesign.connectionDot)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(CatDesign.textDim)
                 .padding(.top, 2)
                 .accessibilityHidden(true)
             Text(L10n.tr("链接只保存在本机。需要账号密码的地址请改用 WebDAV 连接。"))
-                .font(.system(size: 12))
-                .foregroundStyle(FilesDesign.subtitle)
+                .font(.system(size: 11.5))
+                .foregroundStyle(CatDesign.textDim)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 4)
     }
 }
 
 private extension View {
     func directLinkListRow(top: CGFloat, bottom: CGFloat) -> some View {
-        listRowInsets(EdgeInsets(top: top, leading: 16, bottom: bottom, trailing: 16))
+        listRowInsets(EdgeInsets(top: top, leading: 24, bottom: bottom, trailing: 24))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
     }
 }
 
 #Preview {
-    NavigationStack {
-        DirectLinkView()
-    }
-    .environmentObject(AppState())
-    .environmentObject(DownloadManager.shared)
-    .modelContainer(for: MediaItem.self, inMemory: true)
+    DirectLinkView()
+        .environmentObject(AppState())
+        .environmentObject(DownloadManager.shared)
+        .modelContainer(for: MediaItem.self, inMemory: true)
+        .preferredColorScheme(.dark)
 }

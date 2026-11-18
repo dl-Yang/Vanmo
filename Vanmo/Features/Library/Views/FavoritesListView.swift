@@ -11,43 +11,65 @@ struct FavoritesListView: View {
     @State private var isSearching = false
     @State private var searchText = ""
     @State private var isEditing = false
+    @State private var filter4KOnly = false
+    @State private var filterUnwatchedOnly = false
+    @State private var isRefreshingToast = false
+
+    private let gridColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 12, alignment: .top),
+        count: 3
+    )
 
     private var displayItems: [MediaItem] {
-        guard isSearching, !searchText.isEmpty else { return viewModel.items }
-        return viewModel.items.filter {
-            $0.title.localizedCaseInsensitiveContains(searchText)
+        viewModel.items.filter { item in
+            if isSearching, !searchText.isEmpty,
+               !item.title.localizedCaseInsensitiveContains(searchText) {
+                return false
+            }
+            if filter4KOnly && !item.is4KVideo {
+                return false
+            }
+            if filterUnwatchedOnly && item.isWatched {
+                return false
+            }
+            return true
         }
     }
 
     var body: some View {
         ZStack(alignment: .top) {
-            FavoritesDesign.screenBackground
+            CatDesign.bgObsidian
+                .ignoresSafeArea()
+
+            CatAmberHalo(width: 180, height: 70, opacity: 0.22)
+                .padding(.top, 12)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header
-
                 if isSearching {
                     searchField
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
-
+                filterChipsRow
                 stateContent
             }
+
+            if isRefreshingToast {
+                CatSyncToastPill(kind: .syncing, message: L10n.tr("正在同步媒体库"))
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(5)
+            }
         }
-        .animation(.smooth(duration: 0.3), value: viewModel.scope)
-        .animation(.smooth(duration: 0.3), value: viewModel.items.isEmpty)
-        .animation(.smooth(duration: 0.3), value: viewModel.isLoading)
+        .animation(.smooth(duration: 0.28), value: viewModel.scope)
         .animation(.smooth(duration: 0.25), value: isSearching)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
+        .catTabBarHidden(true)
         .task {
             viewModel.setModelContext(modelContext)
             await viewModel.loadInitialPage()
-        }
-        .refreshable {
-            await viewModel.reload()
         }
         .onChange(of: viewModel.scope) { _, _ in
             Task { await viewModel.reload() }
@@ -59,156 +81,192 @@ struct FavoritesListView: View {
         }
     }
 
+    // MARK: - Header (`16 · Favorites & Collections`)
+
+    private var header: some View {
+        HStack(spacing: 11) {
+            CatBackButton { dismiss() }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(L10n.tr("收藏"))
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+
+                Text(subtitleSummary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 6)
+
+            CatStretchingDivider()
+
+            headerActionButtons
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 14)
+        .padding(.bottom, 4)
+    }
+
+    private var headerActionButtons: some View {
+        HStack(spacing: 6) {
+            Button {
+                isSearching.toggle()
+                if !isSearching { searchText = "" }
+            } label: {
+                Image(systemName: isSearching ? "xmark" : "magnifyingglass")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isSearching ? CatDesign.accentAmber : CatDesign.textMuted)
+                    .frame(width: 30, height: 30)
+                    .catGlassCard(cornerRadius: CatDesign.radiusPill, amberStroke: isSearching)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isSearching ? L10n.tr("关闭搜索") : L10n.tr("搜索"))
+
+            if !viewModel.items.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isEditing.toggle()
+                    }
+                } label: {
+                    Text(isEditing ? L10n.tr("完成") : L10n.tr("编辑"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(isEditing ? CatDesign.accentAmber : CatDesign.textMuted)
+                        .padding(.horizontal, 10)
+                        .frame(height: 30)
+                        .catGlassCard(cornerRadius: CatDesign.radiusPill, amberStroke: isEditing)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var subtitleSummary: String {
+        var tags: [String] = [L10n.tr("%d 项", displayItems.count)]
+        if filter4KOnly { tags.append("4K") }
+        if filterUnwatchedOnly { tags.append(L10n.tr("未观看")) }
+        return tags.joined(separator: " · ")
+    }
+
+    // MARK: - Search & Filter Chips
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image("CatSearchIcon")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(CatDesign.accentAmber)
+
+            TextField(L10n.tr("搜索收藏"), text: $searchText)
+                .font(.system(size: 13.5))
+                .foregroundStyle(CatDesign.textIvory)
+                .autocorrectionDisabled()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 40)
+        .catGlassCard(cornerRadius: CatDesign.radiusPill, elevated: true, amberStroke: true)
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 10)
+    }
+
+    private var filterChipsRow: some View {
+        let isAllActive = viewModel.scope == .all && !filter4KOnly && !filterUnwatchedOnly
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                CatFilterChipPill(title: L10n.tr("全部"), isActive: isAllActive) {
+                    viewModel.scope = .all
+                    filter4KOnly = false
+                    filterUnwatchedOnly = false
+                }
+
+                CatFilterChipPill(title: L10n.tr("电影"), isActive: viewModel.scope == .movie) {
+                    viewModel.scope = viewModel.scope == .movie ? .all : .movie
+                }
+
+                CatFilterChipPill(title: L10n.tr("电视剧"), isActive: viewModel.scope == .tvShow) {
+                    viewModel.scope = viewModel.scope == .tvShow ? .all : .tvShow
+                }
+
+                CatFilterChipPill(title: "4K", isActive: filter4KOnly) {
+                    filter4KOnly.toggle()
+                }
+
+                CatFilterChipPill(title: L10n.tr("未观看"), isActive: filterUnwatchedOnly) {
+                    filterUnwatchedOnly.toggle()
+                }
+            }
+            .padding(.horizontal, CatDesign.horizontalMargin)
+            .padding(.top, 12)
+            .padding(.bottom, 14)
+        }
+    }
+
     // MARK: - State Switch
 
     @ViewBuilder
     private var stateContent: some View {
         if viewModel.isLoading && viewModel.items.isEmpty {
             FavoritesLoadingView()
-                .transition(.opacity)
-        } else if viewModel.items.isEmpty {
-            FavoritesEmptyView { dismiss() }
-                .transition(.opacity)
+        } else if displayItems.isEmpty {
+            FavoritesEmptyView(
+                hasRawItems: !viewModel.items.isEmpty,
+                onResetFilters: {
+                    viewModel.scope = .all
+                    filter4KOnly = false
+                    filterUnwatchedOnly = false
+                    searchText = ""
+                },
+                onBrowse: { dismiss() }
+            )
         } else {
-            content
-                .transition(.opacity)
+            contentGrid
         }
     }
 
-    // MARK: - Header
-
-    private var header: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(FavoritesDesign.textPrimary)
-                        .frame(width: 24, height: 32)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(L10n.tr("返回"))
-
-                Text(L10n.tr("收藏"))
-                    .font(.system(size: 24, weight: .bold))
-                    .tracking(-0.53)
-                    .foregroundStyle(FavoritesDesign.textPrimary)
-            }
-
-            Spacer(minLength: 8)
-
-            HStack(spacing: 8) {
-                filterButton
-                searchButton
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 4)
-        .padding(.bottom, 17)
-        .background(
-            FavoritesDesign.screenBackground.opacity(0.92)
-                .ignoresSafeArea(edges: .top)
-        )
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(FavoritesDesign.separator)
-                .frame(height: 0.5)
-        }
-    }
-
-    private var filterButton: some View {
-        Menu {
-            Picker(L10n.tr("收藏类型"), selection: $viewModel.scope) {
-                ForEach(FavoriteLibraryScope.allCases) { scope in
-                    Text(scope.title).tag(scope)
-                }
-            }
-        } label: {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(FavoritesDesign.accent)
-                .frame(width: 32, height: 32)
-                .background(FavoritesDesign.accentSoft, in: Circle())
-        }
-        .accessibilityLabel(L10n.tr("筛选"))
-    }
-
-    private var searchButton: some View {
-        Button {
-            isSearching.toggle()
-            if !isSearching { searchText = "" }
-        } label: {
-            Image(systemName: isSearching ? "xmark" : "magnifyingglass")
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(FavoritesDesign.textPrimary)
-                .frame(width: 32, height: 32)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isSearching ? L10n.tr("关闭搜索") : L10n.tr("搜索"))
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(FavoritesDesign.textSecondary)
-            TextField(L10n.tr("搜索收藏"), text: $searchText)
-                .font(.system(size: 15))
-                .foregroundStyle(FavoritesDesign.textPrimary)
-                .autocorrectionDisabled()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(FavoritesDesign.fieldBackground, in: RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(FavoritesDesign.separator, lineWidth: 1)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-    }
-
-    // MARK: - Content Grid
-
-    private var content: some View {
+    private var contentGrid: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                itemsCountRow
-                    .padding(.horizontal, 24)
-                    .padding(.top, 24)
-
-                LazyVGrid(columns: FavoritesDesign.gridColumns, spacing: 16) {
-                    ForEach(displayItems) { item in
-                        posterCell(for: item)
-                    }
+            LazyVGrid(columns: gridColumns, spacing: 14) {
+                ForEach(displayItems) { item in
+                    posterCell(for: item)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-
-                paginationFooter
             }
-            .padding(.bottom, 48)
+            .padding(.horizontal, CatDesign.horizontalMargin)
+            .padding(.bottom, 32)
+
+            paginationFooter
+        }
+        .refreshable {
+            isRefreshingToast = true
+            await viewModel.reload()
+            try? await Task.sleep(for: .milliseconds(450))
+            isRefreshingToast = false
         }
     }
 
     @ViewBuilder
     private func posterCell(for item: MediaItem) -> some View {
-        let card = FavoritePosterCard(
-            item: item,
-            isEditing: isEditing,
-            isUpdating: viewModel.isUpdatingFavorite(item)
-        ) {
-            await viewModel.unfavorite(item)
-        }
+        let subtitle = item.posterBadgeSubtitle
+        let card = CatMediaPosterCard(item: item, subtitle: subtitle, width: nil)
+            .overlay(alignment: .topLeading) {
+                if isEditing {
+                    deleteBadge(for: item)
+                }
+            }
+            .overlay {
+                if viewModel.isUpdatingFavorite(item) {
+                    RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                        .fill(Color.black.opacity(0.35))
+                        .overlay { ProgressView().tint(CatDesign.glowAmber) }
+                }
+            }
 
         if isEditing {
             card
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                .onAppear {
-                    Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
-                }
+                .onAppear { Task { await viewModel.loadNextPageIfNeeded(currentItem: item) } }
         } else {
             NavigationLink {
                 MediaDetailView(item: item)
@@ -224,32 +282,26 @@ struct FavoritesListView: View {
                 }
                 .disabled(viewModel.isUpdatingFavorite(item))
             }
-            .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            .onAppear {
-                Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
-            }
+            .onAppear { Task { await viewModel.loadNextPageIfNeeded(currentItem: item) } }
         }
     }
 
-    private var itemsCountRow: some View {
-        HStack {
-            Text("共 \(displayItems.count) 项")
-                .font(.system(size: 14, weight: .semibold))
-                .tracking(0.55)
-                .foregroundStyle(FavoritesDesign.textSecondary)
-
-            Spacer()
-
-            Button {
-                isEditing.toggle()
-            } label: {
-                Text(isEditing ? L10n.tr("完成") : L10n.tr("编辑"))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(FavoritesDesign.editBlue)
-            }
-            .buttonStyle(.plain)
+    private func deleteBadge(for item: MediaItem) -> some View {
+        Button {
+            Task { await viewModel.unfavorite(item) }
+        } label: {
+            Image(systemName: "minus")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(CatDesign.dangerRed, in: Circle())
+                .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                .padding(8)
+                .contentShape(Rectangle())
         }
-        .padding(.horizontal, 8)
+        .buttonStyle(.plain)
+        .disabled(viewModel.isUpdatingFavorite(item))
+        .accessibilityLabel(L10n.tr("取消收藏"))
     }
 
     @ViewBuilder
@@ -258,192 +310,54 @@ struct FavoritesListView: View {
             HStack {
                 Spacer()
                 ProgressView()
-                    .tint(FavoritesDesign.accent)
+                    .tint(CatDesign.accentAmber)
                     .padding(.vertical, 16)
                 Spacer()
             }
-        } else if !viewModel.hasMore && !viewModel.items.isEmpty {
+        } else if !viewModel.hasMore && !displayItems.isEmpty {
             Text(L10n.tr("已加载全部收藏"))
-                .font(.system(size: 12))
-                .foregroundStyle(FavoritesDesign.textSecondary.opacity(0.7))
+                .font(.system(size: 11))
+                .foregroundStyle(CatDesign.textDim)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+                .padding(.vertical, 14)
         }
     }
 }
 
-// MARK: - Poster Card
-
-private struct FavoritePosterCard: View {
-    let item: MediaItem
-    let isEditing: Bool
-    let isUpdating: Bool
-    let unfavorite: () async -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            poster
-            info
-        }
-    }
-
-    private var poster: some View {
-        ZStack {
-            Rectangle()
-                .fill(FavoritesDesign.cardPlaceholder)
-            KFImage(item.posterURL)
-                .placeholder {
-                    Image(systemName: item.mediaType.icon)
-                        .font(.system(size: 28))
-                        .foregroundStyle(FavoritesDesign.textSecondary.opacity(0.5))
-                }
-                .fade(duration: 0.25)
-                .resizable()
-                .scaledToFill()
-            Rectangle()
-                .fill(Color.black.opacity(0.1))
-        }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(159.0 / 238.5, contentMode: .fit)
-        .clipped()
-        .overlay(alignment: .topTrailing) { yearBadge }
-        .overlay(alignment: .bottomLeading) { qualityBadge }
-        .overlay(alignment: .topLeading) { deleteBadge }
-        .overlay { updatingOverlay }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 4)
-    }
-
-    @ViewBuilder
-    private var yearBadge: some View {
-        if let year = item.year {
-            Text(String(year))
-                .font(.system(size: 10, weight: .bold))
-                .tracking(0.6)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 4))
-                .padding(8)
-        }
-    }
-
-    @ViewBuilder
-    private var qualityBadge: some View {
-        if let text = item.qualityBadgeText {
-            Text(text)
-                .font(.system(size: 9, weight: .bold))
-                .tracking(0.6)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(Color.white.opacity(0.5), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.1), radius: 1.5, x: 0, y: 1)
-                .padding(8)
-        }
-    }
-
-    @ViewBuilder
-    private var deleteBadge: some View {
-        if isEditing {
-            Button {
-                Task { await unfavorite() }
-            } label: {
-                ZStack {
-                    if isUpdating {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.white)
-                            .scaleEffect(0.6)
-                    } else {
-                        Image(systemName: "minus")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                }
-                .frame(width: 26, height: 26)
-                .background(Color.red, in: Circle())
-                .overlay { Circle().stroke(.white, lineWidth: 1.5) }
-            }
-            .buttonStyle(.plain)
-            .disabled(isUpdating)
-            .padding(6)
-            .accessibilityLabel(L10n.tr("取消收藏"))
-        }
-    }
-
-    @ViewBuilder
-    private var updatingOverlay: some View {
-        if isUpdating {
-            Color.black.opacity(0.24)
-                .allowsHitTesting(false)
-        }
-    }
-
-    private var info: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(item.title)
-                .font(.system(size: 14, weight: .semibold))
-                .tracking(-0.15)
-                .foregroundStyle(FavoritesDesign.textPrimary)
-                .lineLimit(1)
-
-            Text(item.mediaType.displayName)
-                .font(.system(size: 12))
-                .foregroundStyle(FavoritesDesign.textSecondary)
-                .lineLimit(1)
-                .padding(.top, 2)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 4)
-    }
-}
-
-// MARK: - Empty State
+// MARK: - Empty / Loading
 
 private struct FavoritesEmptyView: View {
+    let hasRawItems: Bool
+    let onResetFilters: () -> Void
     let onBrowse: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack {
-                Circle()
-                    .fill(FavoritesDesign.accentCircleSoft)
-                    .frame(width: 80, height: 80)
-                Image(systemName: "bookmark.slash")
-                    .font(.system(size: 34, weight: .regular))
-                    .foregroundStyle(FavoritesDesign.accent)
-            }
-            .padding(.bottom, 24)
+        VStack(spacing: 16) {
+            Image(hasRawItems ? "CatLyingYarnBall" : "CatDoorwayLookingBack")
+                .resizable()
+                .scaledToFit()
+                .frame(width: hasRawItems ? 110 : 140, height: hasRawItems ? 56 : 160)
 
-            Text(L10n.tr("还没有收藏"))
-                .font(.system(size: 20, weight: .bold))
-                .tracking(-0.45)
-                .foregroundStyle(FavoritesDesign.textPrimary)
-                .padding(.bottom, 8)
+            Text(hasRawItems ? L10n.tr("没有匹配的媒体") : L10n.tr("还没有收藏"))
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
 
-            Text("你标记收藏的电影和电视剧会出现在这里，方便快速访问。")
-                .font(.system(size: 14))
-                .tracking(-0.15)
-                .foregroundStyle(FavoritesDesign.textSecondary)
+            Text(hasRawItems
+                 ? L10n.tr("尝试调整筛选条件或搜索关键词。")
+                 : L10n.tr("你标记收藏的电影和电视剧会出现在这里，方便快速访问。"))
+                .font(.system(size: 13))
+                .foregroundStyle(CatDesign.textMuted)
                 .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .frame(width: 250)
-                .padding(.bottom, 32)
+                .frame(maxWidth: 260)
 
-            Button(action: onBrowse) {
-                Text(L10n.tr("浏览文件"))
-                    .font(.system(size: 16, weight: .semibold))
-                    .tracking(-0.31)
-                    .foregroundStyle(FavoritesDesign.browseButtonForeground)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(FavoritesDesign.browseButtonBackground, in: Capsule())
-                    .shadow(color: FavoritesDesign.browseButtonShadow, radius: 5, x: 0, y: 6)
+            Button(action: hasRawItems ? onResetFilters : onBrowse) {
+                Text(hasRawItems ? L10n.tr("重置筛选") : L10n.tr("浏览文件"))
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(CatDesign.accentAmber)
+                    .padding(.horizontal, 20)
+                    .frame(height: 40)
+                    .background(CatDesign.amberTintFill, in: Capsule())
+                    .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 1))
             }
             .buttonStyle(.plain)
         }
@@ -452,82 +366,49 @@ private struct FavoritesEmptyView: View {
     }
 }
 
-// MARK: - Loading State
-
 private struct FavoritesLoadingView: View {
     var body: some View {
-        VStack(spacing: 16) {
-            FavoritesSpinner()
+        VStack(spacing: 14) {
+            ProgressView()
+                .tint(CatDesign.accentAmber)
             Text(L10n.tr("正在加载收藏…"))
-                .font(.system(size: 14, weight: .medium))
-                .tracking(-0.15)
-                .foregroundStyle(FavoritesDesign.textSecondary)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(CatDesign.textMuted)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-private struct FavoritesSpinner: View {
-    @State private var isAnimating = false
-
-    var body: some View {
-        Circle()
-            .trim(from: 0, to: 0.7)
-            .stroke(FavoritesDesign.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-            .frame(width: 32, height: 32)
-            .rotationEffect(.degrees(isAnimating ? 360 : 0))
-            .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: isAnimating)
-            .onAppear { isAnimating = true }
-            .accessibilityLabel(L10n.tr("加载中"))
-    }
-}
-
-// MARK: - Design Tokens (Light / Dark)
-
-private enum FavoritesDesign {
-    static let screenBackground = dynamic(light: Color(hex: "#F4F4F5")!, dark: .black)
-    static let separator = dynamic(light: Color(hex: "#E4E4E7")!.opacity(0.6),
-                                   dark: Color(hex: "#27272A")!.opacity(0.5))
-    static let textPrimary = dynamic(light: Color(hex: "#18181B")!, dark: .white)
-    static let textSecondary = dynamic(light: Color(hex: "#71717B")!, dark: Color(hex: "#9F9FA9")!)
-    static let accent = Color.vanmoAccent
-    /// 筛选按钮圆形底色
-    static let accentSoft = Color.vanmoAccent.opacity(0.12)
-    /// 空状态 80pt 圆形底色（深色下更淡）
-    static let accentCircleSoft = Color.vanmoAccent.opacity(0.10)
-    static let editBlue = Color.vanmoAccent
-    static let cardPlaceholder = dynamic(light: Color(hex: "#E4E4E7")!, dark: Color(hex: "#27272A")!)
-    static let fieldBackground = dynamic(light: .white, dark: Color(hex: "#27272A")!)
-    /// 「浏览文件」按钮在深色下反相为白底黑字
-    static let browseButtonBackground = dynamic(light: Color(hex: "#18181B")!, dark: .white)
-    static let browseButtonForeground = dynamic(light: .white, dark: .black)
-    static let browseButtonShadow = dynamic(light: .black.opacity(0.1), dark: .white.opacity(0.12))
-
-    static let gridColumns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
-    ]
-
-    private static func dynamic(light: Color, dark: Color) -> Color {
-        Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor(dark) : UIColor(light)
-        })
-    }
-}
-
-// MARK: - Quality Badge Helper
+// MARK: - Quality Helpers
 
 private extension MediaItem {
+    var is4KVideo: Bool {
+        if let videoWidth, videoWidth >= 3600 { return true }
+        let source = (originalFileName ?? originalTitle ?? title).uppercased()
+        return source.contains("2160") || source.contains("4K") || source.contains("UHD")
+    }
+
+    var posterBadgeSubtitle: String {
+        let typeText = mediaType.displayName
+        if let badge = qualityBadgeText {
+            return "\(typeText) · \(badge)"
+        }
+        if let year {
+            return "\(typeText) · \(year)"
+        }
+        return typeText
+    }
+
     var qualityBadgeText: String? {
         let source = (originalFileName ?? originalTitle ?? title).uppercased()
 
         var resolution: String?
-        if source.contains("2160") || source.contains("4K") || source.contains("UHD") {
+        if (videoWidth ?? 0) >= 3600 || source.contains("2160") || source.contains("4K") || source.contains("UHD") {
             resolution = "4K"
-        } else if source.contains("1080") {
-            resolution = "HD"
+        } else if (videoWidth ?? 0) >= 1800 || source.contains("1080") {
+            resolution = "1080p"
         } else if source.contains("720") {
-            resolution = "HD"
+            resolution = "720p"
         }
 
         let hdrBadge = resolvedDynamicRange.compactBadge
@@ -714,14 +595,6 @@ enum FavoriteLibraryScope: String, CaseIterable, Identifiable, Sendable {
         case .all: return L10n.tr("全部")
         case .movie: return L10n.tr("电影")
         case .tvShow: return L10n.tr("电视剧")
-        }
-    }
-
-    var emptyTitle: String {
-        switch self {
-        case .all: return L10n.tr("还没有收藏")
-        case .movie: return "还没有收藏电影"
-        case .tvShow: return "还没有收藏电视剧"
         }
     }
 

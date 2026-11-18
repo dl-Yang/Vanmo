@@ -81,39 +81,33 @@ enum ColorTheme: String, CaseIterable, Identifiable {
         case .system:
             return Color(uiColor: UIColor { trait in
                 trait.userInterfaceStyle == .dark
-                    ? UIColor(red: 0xA7 / 255, green: 0x84 / 255, blue: 0x82 / 255, alpha: 1)
-                    : UIColor(red: 0x5C / 255, green: 0x44 / 255, blue: 0x44 / 255, alpha: 1)
+                    ? UIColor(red: 0xFF / 255, green: 0xB5 / 255, blue: 0x47 / 255, alpha: 1)
+                    : UIColor(red: 0xB8 / 255, green: 0x6A / 255, blue: 0x08 / 255, alpha: 1)
             })
-        case .light: return Color(hex: "#5C4444")!
-        case .dark: return Color(hex: "#A78482")!
+        case .light: return Color(hex: "#B86A08")!
+        case .dark: return Color(hex: "#FFB547")!
         }
     }
 
     var background: Color {
         switch self {
         case .system:
-            return Color(uiColor: .systemBackground)
+            return CatDesign.bgObsidian
         case .light:
-            return Color(uiColor: UIColor { _ in .white })
+            return Color(hex: "#FAF7F2")!
         case .dark:
-            return Color(uiColor: UIColor { _ in
-                UIColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1)
-            })
+            return Color(hex: "#0B0C0E")!
         }
     }
 
     var surface: Color {
         switch self {
         case .system:
-            return Color(uiColor: .secondarySystemBackground)
+            return CatDesign.surfaceGlass
         case .light:
-            return Color(uiColor: UIColor { _ in
-                UIColor(red: 0.95, green: 0.95, blue: 0.97, alpha: 1)
-            })
+            return .white
         case .dark:
-            return Color(uiColor: UIColor { _ in
-                UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)
-            })
+            return Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255)
         }
     }
 
@@ -150,10 +144,10 @@ enum ColorTheme: String, CaseIterable, Identifiable {
 // MARK: - Vanmo 全局色
 
 extension Color {
-    /// 全局蓝色强调色：Navigation Tab / 播放钮 / 进度 / 服务器图标 / 类型药丸等统一使用。
-    static let vanmoAccent = Color(red: 0x14 / 255, green: 0x5C / 255, blue: 0xFF / 255)
+    /// 全局琥珀强调色：Navigation Tab / 播放钮 / 进度 / 焦点描边等统一使用。
+    static let vanmoAccent = CatDesign.accentAmber
 
-    /// 主品牌色统一使用蓝色强调色，背景与表面仍按当前主题动态变化。
+    /// 主品牌色统一使用黑猫琥珀金，背景与表面仍按当前主题动态变化。
     static var vanmoPrimary: Color { vanmoAccent }
 
     /// 整体页面背景色，按当前主题动态变化
@@ -162,8 +156,8 @@ extension Color {
     /// 卡片 / 控件背景色，按当前主题动态变化
     static var vanmoSurface: Color { ColorTheme.current.surface }
 
-    /// 次级文本色，跟随系统
-    static let vanmoSubtext = Color(.secondaryLabel)
+    /// 次级文本色，跟随黑猫设计体系
+    static let vanmoSubtext = CatDesign.textMuted
 
     /// 半透明遮罩
     static let vanmoOverlay = Color.black.opacity(0.6)

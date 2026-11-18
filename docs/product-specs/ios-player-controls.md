@@ -12,7 +12,7 @@ KSPlayer scrubbing keeps the playing picture running. The first drag starts a se
 
 The progress-bar gray span is locally cached media, not a loading percentage. Loading chrome appears for every playback state other than playing and paused, including idle, loading, and buffering, and also while playback reports playing but the playhead has not moved for about 1.2 seconds. The center play button becomes a spinning arc, and a glowing white dash travels clockwise along the inside of the screen edge above the controls, entering through the top-left corner each time loading chrome appears. With Reduce Motion the dash rests still across the top-left corner. The dash stays visible when the controls are hidden and disappears when playback or pause resumes. The played portion of the track is white. iPhone playback is presented after the scene is landscape.
 
-A seek while paused, including Skip Intro and the 10-second buttons, stays paused and shows the frame at the new position once it decodes (verified on a local file; remote sources not yet walked).
+A seek while paused, including Skip Intro and the 15-second buttons, stays paused and shows the frame at the new position once it decodes (verified on a local file; remote sources not yet walked).
 
 Preview generation must not open a second libavformat context for SMB, FTP, or SFTP while that file is already playing.
 
@@ -34,13 +34,13 @@ A Skip Intro capsule appears above the progress bar when the current time is ins
 
 The chapter sheet is always available and includes the mark action even when no chapters exist. The mark is local only and does not change the CloudKit schema.
 
-## Episode Selector
+## Episode Selector & Tracks Popover
 
-The bottom-right media capsule holds subtitle, audio track, and scale buttons. When the current item belongs to a series with at least one loaded episode group, an episode button (`rectangle.stack`, 选集) appears at the left of that capsule and opens the episode sheet. Episodes come from the local library when it has more than one, otherwise from Emby/Jellyfin or Plex by `seriesId`. Items opened from the Files tab carry no series metadata, so they do not show the button. The long-press menu on the top-left button group keeps the same 选集 entry.
+The top-right bar pairs PiP with AirPlay and the `Tracks` (`轨道`) popover toggle, while the bottom-right capsule holds speed, audio, and subtitle pills. When the current item belongs to a series with at least one loaded episode group, an episode action (`选集`) is accessible from the `Tracks` popover toolbar and opens the episode sheet alongside Picture in Picture, video scale mode, chapters/skip-intro marking, online subtitle search, and subtitle style/delay settings. Episodes come from the local library when it has more than one, otherwise from Emby/Jellyfin or Plex by `seriesId`. Items opened from the Files tab carry no series metadata, so they do not show the episode action.
 
 ## Now Playing
 
-While a video is open, the system Now Playing card shows the item title, poster when it loads, elapsed time, and duration. Play, pause, a 10-second skip, and a position scrub from the lock screen, Control Center, or headphones control playback. Live streams show as live and do not offer skip or scrub. Closing the player clears the card.
+While a video is open, the system Now Playing card shows the item title, poster when it loads, elapsed time, and duration. Play, pause, a 15-second skip, and a position scrub from the lock screen, Control Center, or headphones control playback. Live streams show as live and do not offer skip or scrub. Closing the player clears the card.
 
 ## AirPlay
 
@@ -48,7 +48,7 @@ The top bar includes a system AirPlay route picker. HTTP(S) progressive MP4/MOV/
 
 ## Figma
 
-iOS Player chrome follows Vanmo iOS file `miM6YTQAnerz6SgkkYZMjo`, page `Player`, component `iOS Video Player UI` (`606:6`); the episode-button state is `iOS Video Player UI / Episodes` (`619:2`). macOS uses the same glass control layout inside the player window.
+iOS Player chrome follows Vanmo iOS file `miM6YTQAnerz6SgkkYZMjo`, page `Black Cat Redesign` (`656:2`) frames `07 · Player Scrubbing` and `08 · Player Tracks Popover` (superseding the earlier `606:6` / `619:2` layouts). macOS keeps its existing glass control layout inside the player window.
 
 ## Acceptance
 

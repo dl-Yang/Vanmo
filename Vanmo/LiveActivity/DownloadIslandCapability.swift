@@ -65,7 +65,7 @@ enum DownloadIslandCapability {
     /// Pushes poster/title below the hardware island; Figma internal gaps stay the same.
     static let expandedContentTopInset: CGFloat = islandHeight + expandedIslandGap
     static let expandedHeight: CGFloat = expandedFigmaHeight + (expandedContentTopInset - expandedFigmaContentTop)
-    static let expandedCornerRadius: CGFloat = 30
+    static let expandedCornerRadius: CGFloat = 38
     /// Extra tap strip below the hardware island, which owns the exclusive hit region.
     static let compactHitExtension: CGFloat = 28
 

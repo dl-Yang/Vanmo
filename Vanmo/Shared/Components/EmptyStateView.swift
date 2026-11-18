@@ -20,35 +20,34 @@ struct EmptyStateView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 18) {
             Image(systemName: icon)
-                .font(.system(size: 56))
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 46, weight: .light))
+                .foregroundStyle(CatDesign.accentAmber)
 
             VStack(spacing: 8) {
                 Text(title)
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
 
                 Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(CatDesign.textMuted)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, 36)
             }
 
             if let action {
                 Button(action: action) {
                     Text(L10n.tr("添加媒体源"))
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 10)
-                        .background(Color.vanmoPrimary)
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                        .padding(.horizontal, 22)
+                        .frame(height: 44)
+                        .catGlassCard(cornerRadius: CatDesign.radiusPill, elevated: true, amberStroke: true)
                 }
-                .padding(.top, 8)
+                .buttonStyle(.plain)
+                .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -62,5 +61,6 @@ struct EmptyStateView: View {
         message: "添加网络共享或本地文件以开始浏览",
         action: {}
     )
+    .background(CatDesign.bgObsidian)
     .preferredColorScheme(.dark)
 }

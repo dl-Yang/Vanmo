@@ -2,7 +2,7 @@
 
 **Status:** Completed  
 **Platforms:** iOS (`Vanmo`) and macOS (`Vanmo-macOS`)  
-**Design source:** iOS Figma `File` page frames `Files-Grid-Light` (`630:2`), `Files-Grid-Dark` (`630:56`), and `Files-Grid-States` (`631:2`); macOS Figma `Files` page frames `Files-Grid-Light` (`116:407`), `Files-Grid-Dark` (`116:493`), and `Files-Grid-States` (`116:579`)  
+**Design source:** iOS Figma `Black Cat Redesign` (`656:2`) frames `03 · Files Sources Hub`, `04 · Media Folder Browser`, and `16 · Favorites & Collections` (updating earlier `File` `630:2`/`630:56` with obsidian/cream glass styling, `CatEyeStatus` online indicators, and `4K` / `未观看` secondary list filters); macOS Figma `Files` page frames `Files-Grid-Light` (`116:407`), `Files-Grid-Dark` (`116:493`), and `Files-Grid-States` (`116:579`)  
 **Execution plan:** [`../exec-plans/completed/2026-10-28-files-browser-grid-and-transition.md`](../exec-plans/completed/2026-10-28-files-browser-grid-and-transition.md)
 
 ## Behavior

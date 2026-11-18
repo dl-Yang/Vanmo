@@ -17,6 +17,7 @@ final class SettingsViewModel: ObservableObject {
     @AppStorage(SubtitleStylePreferences.textColorKey) var subtitleTextColorHex = "#FFFFFFFF"
     @AppStorage(SubtitleStylePreferences.backgroundColorKey) var subtitleBackgroundColorHex = "#00000099"
     @AppStorage(SubtitleStylePreferences.positionKey) var subtitlePositionRaw = SubtitleStyle.SubtitlePosition.bottom.rawValue
+    @AppStorage(SubtitleStylePreferences.outlineWeightKey) var subtitleOutlineRaw = SubtitleStyle.SubtitleOutlineWeight.medium.rawValue
 
     var subtitleTextColor: Color {
         get { Color(rgbaHex: subtitleTextColorHex) ?? .white }
@@ -26,6 +27,30 @@ final class SettingsViewModel: ObservableObject {
     var subtitleBackgroundColor: Color {
         get { Color(rgbaHex: subtitleBackgroundColorHex) ?? Color.black.opacity(0.6) }
         set { subtitleBackgroundColorHex = newValue.rgbaHex }
+    }
+
+    var subtitleOutlineWeight: SubtitleStyle.SubtitleOutlineWeight {
+        get { SubtitleStyle.SubtitleOutlineWeight(rawValue: subtitleOutlineRaw) ?? .medium }
+        set { subtitleOutlineRaw = newValue.rawValue }
+    }
+
+    var subtitleBackgroundOpacity: Double {
+        get {
+            let trimmed = subtitleBackgroundColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+            let raw = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+            guard raw.count == 8, let alphaByte = UInt64(raw.suffix(2), radix: 16) else {
+                return 0.6
+            }
+            return Double(alphaByte) / 255.0
+        }
+        set {
+            let clamped = min(max(newValue, 0), 1)
+            let alphaByte = Int((clamped * 255).rounded())
+            let trimmed = subtitleBackgroundColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
+            let raw = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+            let rgbPrefix = raw.count >= 6 ? String(raw.prefix(6)) : "000000"
+            subtitleBackgroundColorHex = String(format: "#%@%02X", rgbPrefix, alphaByte)
+        }
     }
 
     @AppStorage("library.autoScan") var libraryAutoScan = true
@@ -178,6 +203,7 @@ final class SettingsViewModel: ObservableObject {
         subtitleTextColorHex = "#FFFFFFFF"
         subtitleBackgroundColorHex = "#00000099"
         subtitlePositionRaw = SubtitleStyle.SubtitlePosition.bottom.rawValue
+        subtitleOutlineRaw = SubtitleStyle.SubtitleOutlineWeight.medium.rawValue
         libraryAutoScan = true
         showUnwatchedBadge = true
         metadataAutoDownload = true

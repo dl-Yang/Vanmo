@@ -57,6 +57,29 @@ final class LibraryViewModel: ObservableObject {
         }
     }
 
+    var featuredHeroItem: MediaItem? {
+        for connection in orderedEmbyConnections {
+            for folder in homeVisibleFolders(for: connection.id) {
+                if let first = previewItems(for: folder).first {
+                    return first
+                }
+            }
+        }
+        for connection in orderedScannedConnections {
+            for folder in homeVisibleScannedFolders(for: connection.id) {
+                if let first = previewItems(for: folder).first {
+                    return first
+                }
+            }
+        }
+        return recentlyPlayed.first ?? favorites.first
+    }
+
+    func connectionName(for item: MediaItem) -> String? {
+        guard let id = item.sourceConnectionId else { return nil }
+        return embyConnectionsById[id]?.name ?? scannedConnectionsById[id]?.name
+    }
+
     var hasActiveFilters: Bool {
         !selectedGenres.isEmpty || !selectedRegions.isEmpty
     }

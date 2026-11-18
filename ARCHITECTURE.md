@@ -46,11 +46,11 @@ flowchart TB
 ```text
 Vanmo/
 ├── Vanmo/                       # iOS application
-│   ├── App/                     # App entry point, global state, tabs, navigation
+│   ├── App/                     # App entry point, global state, tabs, navigation (floating CatGlassTabBar)
 │   ├── Core/                    # iOS player engines, probe bootstrap, subtitle UI
-│   ├── Features/                # Library / Browser / Player / Search / Settings
-│   ├── Shared/                  # iOS components, extensions, UIKit OAuth bridge
-│   ├── Resources/               # Info.plist, assets, Lottie resources
+│   ├── Features/                # Library / Browser / Player / Search / Settings / Downloads
+│   ├── Shared/                  # iOS Theme (CatDesignTokens), CatUIComponents, extensions, UIKit OAuth bridge
+│   ├── Resources/               # Info.plist, assets (incl. Black Cat SVG imagesets), Lottie resources
 │   └── Frameworks/FFmpeg/       # Ignored leftover local output; not a build input
 ├── VanmoMac/                    # macOS application
 │   ├── App/                     # App entry point, routing, window coordination
@@ -184,12 +184,12 @@ When the app enters the foreground, it resumes downloads, performs synchronizati
   - `ConnectionsViewModel` manages connection CRUD, Keychain credentials, OAuth, local bookmarks, directory browsing, scanning, and media-server synchronization.
   - `ScanCoordinator` publishes scan progress and pause, resume, and cancellation controls.
 - `Features/Player`
-  - `PlayerViewModel` orchestrates playback URL resolution, prefetching, dual engines, subtitles, chapters, episode switching, progress persistence, and Emby playback reporting. On iOS it also publishes the title, artwork, elapsed time, and rate to `MPNowPlayingInfoCenter`, and handles lock-screen and Control Center play, pause, 10-second skip, and scrub commands until playback stops.
+  - `PlayerViewModel` orchestrates playback URL resolution, prefetching, dual engines, subtitles, chapters, episode switching, progress persistence, and Emby playback reporting. On iOS it also publishes the title, artwork, elapsed time, and rate to `MPNowPlayingInfoCenter`, and handles lock-screen and Control Center play, pause, 15-second skip, and scrub commands until playback stops.
 - `Features/Search`
-  - `SearchViewModel` searches both the local SwiftData library and remote connections.
+  - `SearchViewModel` searches both the local SwiftData library and remote connections, persisting recent search history locally via `UserDefaults`.
   - Remote searches are limited to four concurrent sources. Media servers use server-side search when available; file services use bounded recursive search.
 - `Features/Settings`
-  - Settings cover playback, subtitles, downloads, library behavior, appearance (including interface language), metadata, and iCloud synchronization.
+  - Settings cover iCloud sync, playback, audio, subtitles (including OpenSubtitles & `SubtitleOutlineWeight` styling), library/scan, metadata cache, appearance (Follow System / Day / Night + interface language), storage/downloads, and reset controls across dedicated subpages (`SettingsView.swift` & `SettingsSubpages.swift`).
 
 ## 5. macOS Application Architecture
 

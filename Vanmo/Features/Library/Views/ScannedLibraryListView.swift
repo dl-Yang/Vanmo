@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
+import Kingfisher
 import VanmoCore
 
 struct ScannedLibraryListView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
 
     let connection: SavedConnection
@@ -17,41 +19,27 @@ struct ScannedLibraryListView: View {
     @State private var selectedMovieID: UUID?
     @State private var selectedShowKey: ScannedShowGroupKey?
 
-    private let gridColumns = [
-        GridItem(.adaptive(minimum: 112, maximum: 160), spacing: 14)
-    ]
+    private let gridColumns = Array(
+        repeating: GridItem(.flexible(), spacing: 12, alignment: .top),
+        count: 3
+    )
 
     var body: some View {
-        Group {
-            if isLoading {
-                ScannedLibraryLoadingView(title: collectionType.displayName)
-            } else if let errorMessage {
-                EmptyStateView(
-                    icon: "exclamationmark.triangle",
-                    title: L10n.tr("无法加载内容"),
-                    message: errorMessage
-                )
-            } else if isEmpty {
-                EmptyStateView(
-                    icon: collectionType.icon,
-                    title: L10n.tr("媒体库为空"),
-                    message: "此连接下没有可显示的\(collectionType.displayName)"
-                )
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        header
-                        contentGrid
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
-                }
-                .scrollClipDisabled()
+        ZStack(alignment: .top) {
+            CatDesign.bgObsidian.ignoresSafeArea()
+
+            CatAmberHalo(width: 180, height: 70, opacity: 0.22)
+                .padding(.top, 12)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                header
+                stateContent
             }
         }
-        .background(Color.vanmoBackground)
-        .navigationTitle(collectionType.displayName)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .catTabBarHidden(true)
         .navigationDestination(item: $selectedMovieID) { itemID in
             movieDestination(for: itemID)
         }
@@ -68,80 +56,117 @@ struct ScannedLibraryListView: View {
         }
     }
 
+    private var header: some View {
+        HStack(spacing: 11) {
+            CatBackButton { dismiss() }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(collectionType.displayName)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+
+                Text("\(connection.name) · \(L10n.tr("%d 项", loadedCount))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            CatStretchingDivider()
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+    }
+
+    @ViewBuilder
+    private var stateContent: some View {
+        if isLoading {
+            ScannedLibraryLoadingView(gridColumns: gridColumns)
+        } else if let errorMessage {
+            EmptyStateView(
+                icon: "exclamationmark.triangle",
+                title: L10n.tr("无法加载内容"),
+                message: errorMessage
+            )
+        } else if isEmpty {
+            EmptyStateView(
+                icon: collectionType.icon,
+                title: L10n.tr("媒体库为空"),
+                message: L10n.tr("此连接下没有可显示的 %@", collectionType.displayName)
+            )
+        } else {
+            ScrollView {
+                contentGrid
+                    .padding(.bottom, 28)
+            }
+        }
+    }
+
     private var taskID: String {
         "\(connection.id.uuidString)-\(collectionType.rawValue)"
     }
 
     private var isEmpty: Bool {
         switch collectionType {
-        case .movies:
-            return movies.isEmpty
-        case .tvshows:
-            return shows.isEmpty
-        case .playlists:
-            return true
+        case .movies: return movies.isEmpty
+        case .tvshows: return shows.isEmpty
+        case .playlists: return true
         }
     }
 
     private var loadedCount: Int {
         switch collectionType {
-        case .movies:
-            return movies.count
-        case .tvshows:
-            return shows.count
-        case .playlists:
-            return 0
+        case .movies: return movies.count
+        case .tvshows: return shows.count
+        case .playlists: return 0
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Image(systemName: collectionType.icon)
-                    .font(.headline)
-                    .foregroundStyle(Color.vanmoPrimary)
-                    .frame(width: 34, height: 34)
-                    .background(Color.vanmoPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(collectionType.displayName)
-                        .font(.title2)
-                        .fontWeight(.bold)
-
-                    Text("\(connection.name) · \(loadedCount) 项")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    @ViewBuilder
     private var contentGrid: some View {
-        LazyVGrid(columns: gridColumns, spacing: 18) {
+        LazyVGrid(columns: gridColumns, spacing: 14) {
             switch collectionType {
             case .movies:
                 ForEach(movies, id: \.id) { item in
-                    ScannedMovieNavButton(item: item) { itemID in
-                        selectedMovieID = itemID
-                    } onPlay: { movie in
-                        appState.play(movie)
+                    Button {
+                        selectedMovieID = item.id
+                    } label: {
+                        CatMediaPosterCard(item: item, subtitle: movieSubtitle(item), width: nil)
                     }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button {
+                            appState.play(item)
+                        } label: {
+                            Label(L10n.tr("播放"), systemImage: "play.fill")
+                        }
+                    }
+                    .id(item.id)
                 }
             case .tvshows:
                 ForEach(shows, id: \.id) { show in
-                    ScannedShowNavButton(show: show) { key in
-                        selectedShowKey = key
+                    Button {
+                        selectedShowKey = show.groupKey
+                    } label: {
+                        ScannedShowPosterCard(show: show)
                     }
+                    .buttonStyle(.plain)
+                    .id(show.id)
                 }
             case .playlists:
                 EmptyView()
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, CatDesign.horizontalMargin)
+    }
+
+    private func movieSubtitle(_ item: MediaItem) -> String {
+        if let year = item.year {
+            return "\(item.mediaType.displayName) · \(year)"
+        }
+        return item.mediaType.displayName
     }
 
     @ViewBuilder
@@ -198,125 +223,83 @@ struct ScannedLibraryListView: View {
             loadItems()
         }
     }
+}
 
+private struct ScannedShowPosterCard: View {
+    let show: ScannedShowSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ZStack(alignment: .bottom) {
+                Color.clear
+                    .overlay {
+                        KFImage(show.posterURL)
+                            .placeholder {
+                                ZStack {
+                                    CatDesign.mediaPlaceholder
+                                    Image(systemName: "tv")
+                                        .font(.title3)
+                                        .foregroundStyle(CatDesign.textMuted.opacity(0.45))
+                                }
+                            }
+                            .fade(duration: 0.25)
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .clipped()
+
+                LinearGradient(
+                    colors: [.clear, CatDesign.catSilhouette.opacity(0.85)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 50)
+            }
+            .aspectRatio(106.0 / 150.0, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(show.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+
+                Text(L10n.tr("%d 集", show.episodeCount))
+                    .font(.system(size: 10))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(1)
+            }
+        }
+    }
 }
 
 private struct ScannedLibraryLoadingView: View {
-    let title: String
-
-    private let gridColumns = [
-        GridItem(.adaptive(minimum: 112, maximum: 160), spacing: 14)
-    ]
+    let gridColumns: [GridItem]
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(Color.vanmoSurface)
-                        .frame(width: 120, height: 22)
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.vanmoSurface.opacity(0.72))
-                        .frame(width: 160, height: 12)
-                }
-                .padding(.horizontal)
-
-                LazyVGrid(columns: gridColumns, spacing: 18) {
-                    ForEach(0..<8, id: \.self) { _ in
-                        ScannedLibraryPosterPlaceholder()
+            LazyVGrid(columns: gridColumns, spacing: 14) {
+                ForEach(0..<9, id: \.self) { _ in
+                    VStack(alignment: .leading, spacing: 7) {
+                        RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                            .fill(CatDesign.surfacePill)
+                            .aspectRatio(106.0 / 150.0, contentMode: .fit)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(CatDesign.surfacePill)
+                            .frame(height: 12)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(CatDesign.surfacePill.opacity(0.6))
+                            .frame(width: 58, height: 10)
                     }
                 }
-                .padding(.horizontal)
             }
-            .padding(.top, 8)
-            .padding(.bottom, 24)
+            .padding(.horizontal, CatDesign.horizontalMargin)
         }
-        .scrollClipDisabled()
         .redacted(reason: .placeholder)
-    }
-}
-
-private struct ScannedLibraryPosterPlaceholder: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.vanmoSurface)
-                .aspectRatio(2 / 3, contentMode: .fit)
-
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.vanmoSurface)
-                    .frame(height: 10)
-
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.vanmoSurface.opacity(0.72))
-                    .frame(width: 58, height: 8)
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 44)
-            .background(.ultraThinMaterial)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-private struct ScannedMovieNavButton: View {
-    let item: MediaItem
-    let onSelect: (UUID) -> Void
-    let onPlay: (MediaItem) -> Void
-
-    var body: some View {
-        Button {
-            onSelect(item.id)
-        } label: {
-            PosterCard(
-                title: item.displayTitle,
-                posterURL: item.posterURL,
-                subtitle: movieSubtitle(item),
-                rating: item.rating,
-                progress: item.playbackProgress > 0 ? item.playbackProgress : nil
-            )
-        }
-        .buttonStyle(.plain)
-        .contentShape(RoundedRectangle(cornerRadius: 12))
-        .contextMenu {
-            Button {
-                onPlay(item)
-            } label: {
-                Label(L10n.tr("播放"), systemImage: "play.fill")
-            }
-        }
-        .id(item.id)
-    }
-
-    private func movieSubtitle(_ item: MediaItem) -> String? {
-        if let year = item.year {
-            return "\(item.mediaType.displayName) · \(year)"
-        }
-        return item.mediaType.displayName
-    }
-}
-
-private struct ScannedShowNavButton: View {
-    let show: ScannedShowSummary
-    let onSelect: (ScannedShowGroupKey) -> Void
-
-    var body: some View {
-        Button {
-            onSelect(show.groupKey)
-        } label: {
-            PosterCard(
-                title: show.title,
-                posterURL: show.posterURL,
-                subtitle: "\(show.episodeCount) 集",
-                rating: show.rating
-            )
-        }
-        .buttonStyle(.plain)
-        .contentShape(RoundedRectangle(cornerRadius: 12))
-        .id(show.id)
     }
 }
 

@@ -77,7 +77,8 @@ struct PlexSignInView: View {
                 content
             }
             .scrollContentBackground(.hidden)
-            .background(Color.vanmoBackground)
+            .background(CatDesign.surfaceSheet)
+            .tint(CatDesign.accentAmber)
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

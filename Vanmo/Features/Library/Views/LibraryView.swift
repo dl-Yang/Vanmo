@@ -12,33 +12,33 @@ struct LibraryView: View {
 
     @State private var syncToastMessage: String?
     @State private var selectedMediaItemID: UUID?
+    @State private var showAllHistory = false
 
     var body: some View {
         ZStack(alignment: .top) {
-            HomeDesign.base
+            CatDesign.bgObsidian
                 .ignoresSafeArea()
 
-            backdropLayer
-
-            if viewModel.isLibraryEmpty {
-                emptyState
+            if !viewModel.isLibraryEmpty {
+                ambientBackdropLayer
             } else {
-                ScrollView {
-                    libraryContent
-                }
-                .scrollIndicators(.hidden)
+                emptyAmbientHalo
             }
 
-            if let syncToastMessage {
-                LibrarySyncToast(message: syncToastMessage)
-                    .padding(.top, 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(4)
-            }
+            mainContentLayer
+
+            syncToastOverlay
         }
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(item: $selectedMediaItemID) { itemID in
             libraryNavigationDestination(for: itemID)
+        }
+        .navigationDestination(isPresented: $showAllHistory) {
+            LibraryContinueWatchingListView(
+                items: viewModel.recentlyPlayed,
+                onPlay: { appState.play($0) },
+                onInspect: { selectedMediaItemID = $0.id }
+            )
         }
         .task {
             viewModel.setModelContext(modelContext)
@@ -62,7 +62,6 @@ struct LibraryView: View {
             guard newValue == .library else { return }
             viewModel.refreshFolderBookmarks(connections: connectionsViewModel.savedConnections)
             Task {
-                // 兜底：若 LibraryView 此前未挂载而错过收藏通知，切回本 tab 时补一次轻量刷新。
                 await viewModel.refreshFavoritesAfterChange(connections: connectionsViewModel.savedConnections)
             }
         }
@@ -78,38 +77,76 @@ struct LibraryView: View {
 #endif
     }
 
-    // MARK: - Backdrop
+    @ViewBuilder
+    private var mainContentLayer: some View {
+        if viewModel.isLibraryEmpty {
+            emptyState
+        } else {
+            ScrollView {
+                libraryContent
+            }
+            .scrollIndicators(.hidden)
+            .refreshable {
+                await viewModel.refreshEmbyHome(connections: connectionsViewModel.savedConnections)
+            }
+        }
+    }
 
-    /// 模糊海报背景层 + 深色渐变遮罩，对应设计稿 `Blurred poster backdrop` / `Page dark overlay`
-    private var backdropLayer: some View {
+    @ViewBuilder
+    private var syncToastOverlay: some View {
+        if let syncToastMessage {
+            CatSyncToastPill(kind: .synced, message: syncToastMessage)
+                .padding(.top, 60)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(5)
+        }
+    }
+
+    // MARK: - Ambient Backdrop (`01 · Home Media Library` & `15 · Empty Library State`)
+
+    private var ambientBackdropLayer: some View {
         GeometryReader { geo in
-            ZStack {
-                heroBackdropFill(size: geo.size)
+            ZStack(alignment: .topTrailing) {
+                heroBackdropFill(width: geo.size.width)
 
                 LinearGradient(
                     stops: [
-                        .init(color: HomeDesign.base.opacity(0.30), location: 0),
-                        .init(color: HomeDesign.base.opacity(0.80), location: 0.42),
-                        .init(color: HomeDesign.base.opacity(0.98), location: 1),
+                        .init(color: CatDesign.bgObsidian.opacity(0.25), location: 0),
+                        .init(color: CatDesign.bgObsidian.opacity(0.90), location: 0.65),
+                        .init(color: CatDesign.bgObsidian, location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
+                .frame(height: 420)
+
+                CatAmberHalo(width: 170, height: 110, opacity: 0.20)
+                    .padding(.top, 86)
+                    .padding(.trailing, 30)
             }
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
     }
 
-    private var heroBackdropURL: URL? {
-        if let item = viewModel.recentlyPlayed.first {
-            return item.backdropURL ?? item.posterURL
+    private var emptyAmbientHalo: some View {
+        VStack {
+            Spacer().frame(height: 180)
+            CatAmberHalo(width: 260, height: 240, opacity: 0.24)
+            Spacer()
         }
-        return viewModel.favorites.first?.posterURL
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 
-    @ViewBuilder
-    private func heroBackdropFill(size: CGSize) -> some View {
+    private var heroBackdropURL: URL? {
+        if let hero = viewModel.featuredHeroItem {
+            return hero.backdropURL ?? hero.posterURL
+        }
+        return viewModel.recentlyPlayed.first?.backdropURL ?? viewModel.favorites.first?.posterURL
+    }
+
+    private func heroBackdropFill(width: CGFloat) -> some View {
         Group {
             if let url = heroBackdropURL {
                 KFImage(url)
@@ -121,18 +158,23 @@ struct LibraryView: View {
                     .scaledToFill()
             }
         }
-        .frame(width: size.width, height: size.height)
+        .frame(width: width, height: 380)
         .clipped()
-        .blur(radius: 21)
-        .opacity(0.45)
+        .blur(radius: 20)
+        .opacity(0.24)
     }
 
-    // MARK: - Library Content
+    // MARK: - Library Content (`01 · Home Media Library`)
 
     private var libraryContent: some View {
-        LazyVStack(alignment: .leading, spacing: 28) {
-            headerSection
-                .padding(.top, 8)
+        LazyVStack(alignment: .leading, spacing: 22) {
+            topSearchAndStatusBar
+                .padding(.top, 10)
+
+            if let heroItem = viewModel.featuredHeroItem {
+                heroSection(item: heroItem)
+                    .padding(.top, 10)
+            }
 
             if !viewModel.recentlyPlayed.isEmpty {
                 continueWatchingSection
@@ -152,7 +194,7 @@ struct LibraryView: View {
 
             scannedLibrarySections
         }
-        .padding(.bottom, 44)
+        .padding(.bottom, 110)
     }
 
     private var hasEmbyConnectionsConfigured: Bool {
@@ -164,169 +206,182 @@ struct LibraryView: View {
     }
 
     private var posterWidth: CGFloat {
-        isRegularWidth ? 120 : 104
+        isRegularWidth ? 120 : 106
     }
 
     private func usesServerCollectionAPI(_ connection: SavedConnection) -> Bool {
         connection.type == .emby || connection.type == .jellyfin
     }
 
-    // MARK: - Header
+    // MARK: - Top Bar
 
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(L10n.tr("首页"))
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(HomeDesign.onSurface)
+    private var topSearchAndStatusBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                appState.selectedTab = .search
+            } label: {
+                HStack(spacing: 9) {
+                    Image("CatSearchIcon")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+                        .foregroundStyle(CatDesign.textMuted)
 
-            if let message = connectionsViewModel.librarySyncMessage {
-                headerSyncStatus(message: message)
-                    .padding(.top, 10)
-            }
+                    Text(L10n.tr("搜索媒体库、文件..."))
+                        .font(.system(size: 13))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .lineLimit(1)
 
-            Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
-                .font(.system(size: 13))
-                .foregroundStyle(HomeDesign.subtitle)
-                .padding(.top, 8)
-
-            if let syncPillText {
-                syncPill(syncPillText)
-                    .padding(.top, 14)
-            }
-        }
-        .padding(.horizontal, 24)
-    }
-
-    private var searchButton: some View {
-        Button {
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
-            appState.selectedTab = .search
-        } label: {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(HomeDesign.onSurface.opacity(0.9))
-                .frame(width: 40, height: 40)
-                .background(HomeDesign.glassDark, in: Circle())
-                .overlay {
-                    Circle().stroke(HomeDesign.cardStroke, lineWidth: 1)
+                    Spacer(minLength: 0)
                 }
-                .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+                .padding(.horizontal, 14)
+                .frame(height: 42)
+                .catGlassCard(cornerRadius: CatDesign.radiusPill)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("搜索"))
+
+            serverStatusPill
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(L10n.tr("搜索"))
+        .padding(.horizontal, CatDesign.horizontalMargin)
     }
 
-    private var syncPillText: String? {
-        guard connectionsViewModel.librarySyncMessage == nil else { return nil }
-
-        let syncedCount = connectionsViewModel.savedConnections.filter { connection in
+    private var syncedServerCount: Int {
+        connectionsViewModel.savedConnections.filter { connection in
             guard serverErrorMessage(for: connection) == nil else { return false }
             if usesServerCollectionAPI(connection) {
                 return !viewModel.homeVisibleFolders(for: connection.id).isEmpty
             }
             return !viewModel.homeVisibleScannedFolders(for: connection.id).isEmpty
         }.count
-
-        guard syncedCount >= 1 else { return nil }
-        return L10n.tr("已同步 · %d 个服务器", syncedCount)
     }
 
-    private func syncPill(_ text: String) -> some View {
-        HStack(spacing: 9) {
-            Circle()
-                .fill(HomeDesign.syncGreen)
-                .frame(width: 7, height: 7)
+    private var serverStatusPill: some View {
+        let isSyncing = connectionsViewModel.librarySyncMessage != nil
+        let isActive = isSyncing || syncedServerCount > 0
+        let labelText = isSyncing
+            ? L10n.tr("同步中")
+            : L10n.tr("%d 已同步", syncedServerCount)
 
-            Text(text)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(HomeDesign.onSurface.opacity(0.82))
-                .lineLimit(1)
+        return Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Task { await viewModel.refreshEmbyHome(connections: connectionsViewModel.savedConnections) }
+        } label: {
+            HStack(spacing: 8) {
+                if isActive {
+                    Image("CatEyeStatus")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 8)
+                        .shadow(color: CatDesign.glowAmber.opacity(0.7), radius: 2.5)
+                } else {
+                    Circle()
+                        .fill(CatDesign.textDim)
+                        .frame(width: 6, height: 6)
+                }
+
+                Text(labelText)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 13)
+            .frame(height: 42)
+            .catGlassCard(cornerRadius: CatDesign.radiusPill, amberStroke: isActive)
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 8)
-        .background(HomeDesign.syncPillFill, in: Capsule())
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(text)
+        .buttonStyle(.plain)
+        .accessibilityLabel(labelText)
     }
 
-    // MARK: - Continue Watching
+    // MARK: - Hero Section (`664:74`)
 
-    @ViewBuilder
+    private func heroSection(item: MediaItem) -> some View {
+        let sourceLabel = viewModel.connectionName(for: item) ?? L10n.tr("本地库")
+        let featuredText = "\(L10n.tr("精选")) · \(sourceLabel.uppercased())"
+
+        return Button {
+            selectedMediaItemID = item.id
+        } label: {
+            CatHeroCard(
+                item: item,
+                featuredTag: featuredText
+            )
+        }
+        .buttonStyle(CatScaleButtonStyle())
+        .padding(.top, 32)
+        .overlay(alignment: .topTrailing) {
+            Image("CatHeroLounging")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 144, height: 64)
+                .offset(x: -14, y: -4)
+                .allowsHitTesting(false)
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+    }
+
+    // MARK: - Continue Watching (`664:95`)
+
     private var continueWatchingSection: some View {
-        if !viewModel.recentlyPlayed.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(L10n.tr("历史记录"))
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
-                    .padding(.horizontal, 24)
+        VStack(alignment: .leading, spacing: 12) {
+            CatSectionHeader(title: L10n.tr("继续观看"), showSeeAll: true) {
+                showAllHistory = true
+            }
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 16) {
-                        ForEach(viewModel.recentlyPlayed) { item in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 14) {
+                    ForEach(viewModel.recentlyPlayed) { item in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            appState.play(item)
+                        } label: {
+                            CatContinueWatchingCard(item: item)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
                             Button {
-                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                generator.impactOccurred()
-                                appState.play(item)
+                                selectedMediaItemID = item.id
                             } label: {
-                                ContinueWatchingCard(item: item)
+                                Label(L10n.tr("查看详情"), systemImage: "info.circle")
                             }
-                            .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 8)
                 }
-                .scrollClipDisabled()
+                .padding(.horizontal, CatDesign.horizontalMargin)
+                .padding(.bottom, 4)
             }
+            .scrollClipDisabled()
         }
     }
 
-    // MARK: - Favorites
+    // MARK: - Favorites Stacked Section
 
     private var favoritesStackedSection: some View {
         NavigationLink {
             FavoritesListView()
         } label: {
-            HomeFavoritesCard(
+            CatHomeFavoritesCard(
                 entries: viewModel.favorites.prefix(3).map(\.posterURL),
                 totalCount: viewModel.totalFavoritesCount,
                 movieCount: viewModel.favoriteMovieCount,
                 tvShowCount: viewModel.favoriteTVShowCount
             )
         }
-        .buttonStyle(FavoritesCardButtonStyle())
-        .padding(.horizontal, 24)
+        .buttonStyle(CatScaleButtonStyle())
+        .padding(.horizontal, CatDesign.horizontalMargin)
     }
 
     // MARK: - Folder Bookmarks
 
     private var folderBookmarksSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(HomeDesign.serverIconFill)
-
-                    Image(systemName: "bookmark.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(HomeDesign.accent)
-                }
-                .frame(width: 42, height: 42)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L10n.tr("文件夹书签"))
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(HomeDesign.onSurface)
-
-                    Text(L10n.tr("%d 个快捷入口", viewModel.folderBookmarks.count))
-                        .font(.system(size: 12))
-                        .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
-                }
-
-                Spacer(minLength: 12)
-            }
-            .padding(.horizontal, 24)
+        VStack(alignment: .leading, spacing: 12) {
+            CatSectionHeader(
+                title: L10n.tr("文件夹书签"),
+                badgeText: "\(viewModel.folderBookmarks.count)",
+                showSeeAll: false
+            )
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
@@ -334,12 +389,12 @@ struct LibraryView: View {
                         Button {
                             openFolderBookmark(bookmark)
                         } label: {
-                            FolderBookmarkCard(bookmark: bookmark)
+                            CatFolderBookmarkCard(bookmark: bookmark)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(CatScaleButtonStyle())
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, CatDesign.horizontalMargin)
                 .padding(.bottom, 4)
             }
             .scrollClipDisabled()
@@ -347,18 +402,17 @@ struct LibraryView: View {
     }
 
     private func openFolderBookmark(_ bookmark: FolderBookmark) {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         connectionsViewModel.requestOpenFolderBookmark(bookmark)
         appState.selectedTab = .connections
     }
 
-    // MARK: - Collection Folder Sections
+    // MARK: - Collection & Scanned Sections (`664:150`)
 
     @ViewBuilder
     private var collectionFolderSections: some View {
         if viewModel.isLoadingEmbyHome && viewModel.serverCollectionFolders.isEmpty {
-            CollectionFolderLoadingSection()
+            CatCollectionLoadingSection(posterWidth: posterWidth)
         } else {
             ForEach(viewModel.orderedEmbyConnections) { connection in
                 if let errorMessage = serverErrorMessage(for: connection) {
@@ -391,9 +445,7 @@ struct LibraryView: View {
         folders: [CollectionFolder],
         connection: SavedConnection
     ) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            serverSectionHeader(connection: connection, folderCount: folders.count)
-
+        VStack(alignment: .leading, spacing: 18) {
             ForEach(folders) { folder in
                 folderRow(folder: folder, connection: connection)
             }
@@ -405,130 +457,75 @@ struct LibraryView: View {
     }
 
     private func serverErrorSection(connection: SavedConnection, message: String) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            serverErrorHeader(connection: connection)
+        HStack(alignment: .top, spacing: 12) {
+            Image("CatEyeStatus")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 9)
+                .padding(8)
+                .background(CatDesign.amberTintFill, in: Circle())
 
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.vanmoAccent)
-                    .frame(width: 28, height: 28)
-                    .background(Color.vanmoAccent.opacity(0.14), in: Circle())
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L10n.tr("连接服务器失败"))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(connection.name)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(HomeDesign.onSurface)
-
-                    Text(message)
-                        .font(.system(size: 12))
-                        .foregroundStyle(HomeDesign.onSurface.opacity(0.68))
-                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(CatDesign.textIvory)
+                    Text(L10n.tr("连接异常"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(CatDesign.amberTintFill, in: Capsule())
                 }
 
-                Spacer(minLength: 0)
-            }
-            .padding(14)
-            .background(HomeDesign.syncPillFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(HomeDesign.cardStroke, lineWidth: 1)
-            }
-            .padding(.horizontal, 24)
-        }
-    }
-
-    private func serverErrorHeader(connection: SavedConnection) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.vanmoAccent.opacity(0.14))
-
-                ConnectionProviderIcon(type: connection.type, size: 22, fallbackTint: Color.vanmoAccent)
-            }
-            .frame(width: 42, height: 42)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(connection.name)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
-                    .lineLimit(1)
-
-                Text(L10n.tr("连接异常"))
+                Text(message)
                     .font(.system(size: 12))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Spacer(minLength: 12)
-
-            Text(L10n.tr("失败"))
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.vanmoAccent)
-                .frame(minWidth: 42, minHeight: 28)
-                .background(Color.vanmoAccent.opacity(0.14), in: Capsule())
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 24)
-    }
-
-    private func serverSectionHeader(connection: SavedConnection, folderCount: Int) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(.white)
-
-                ConnectionProviderIcon(type: connection.type, size: 22, fallbackTint: HomeDesign.accent)
-            }
-            .frame(width: 42, height: 42)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(connection.name)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
-                    .lineLimit(1)
-
-                Text(L10n.tr("%d 个媒体库", folderCount))
-                    .font(.system(size: 12))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
-            }
-
-            Spacer(minLength: 12)
-
-            Text("\(folderCount)")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(HomeDesign.onSurface.opacity(0.78))
-                .frame(minWidth: 42, minHeight: 28)
-                .background(HomeDesign.neutralPill, in: Capsule())
-        }
-        .padding(.horizontal, 24)
+        .padding(14)
+        .catGlassCard(cornerRadius: CatDesign.radiusSquircleMd, amberStroke: true)
+        .padding(.horizontal, CatDesign.horizontalMargin)
     }
 
     private func folderRow(folder: CollectionFolder, connection: SavedConnection) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+            HStack(spacing: 8) {
                 Text(folder.name)
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
+                    .foregroundStyle(CatDesign.textIvory)
                     .lineLimit(1)
 
-                folderTypePill(folder.collectionType)
+                Text(connection.name)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(CatDesign.surfacePill, in: Capsule())
+                    .lineLimit(1)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
+
+                CatStretchingDivider()
 
                 NavigationLink {
                     folderDestination(folder: folder, connection: connection)
                 } label: {
                     Text(L10n.tr("查看全部"))
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(HomeDesign.onSurface.opacity(0.84))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(HomeDesign.neutralPill, in: Capsule())
+                        .foregroundStyle(CatDesign.textMuted)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(CatDesign.surfacePill, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, CatDesign.horizontalMargin)
 
-            folderPreviewContent(folder: folder, connection: connection)
+            folderPreviewContent(folder: folder)
         }
     }
 
@@ -545,10 +542,7 @@ struct LibraryView: View {
     }
 
     @ViewBuilder
-    private func folderPreviewContent(
-        folder: CollectionFolder,
-        connection: SavedConnection
-    ) -> some View {
+    private func folderPreviewContent(folder: CollectionFolder) -> some View {
         let previewItems = viewModel.previewItems(for: folder)
         let isLoaded = viewModel.isFolderPreviewLoaded(folder)
 
@@ -556,23 +550,47 @@ struct LibraryView: View {
             folderPreviewSkeletonRow
         } else if !previewItems.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                LazyHStack(spacing: 12) {
                     ForEach(previewItems, id: \.id) { item in
-                        LibraryHomePreviewButton(
-                            item: item,
-                            subtitle: folderPreviewSubtitle(item),
-                            width: posterWidth
-                        ) { itemID in
-                            selectedMediaItemID = itemID
+                        Button {
+                            selectedMediaItemID = item.id
+                        } label: {
+                            CatMediaPosterCard(
+                                item: item,
+                                subtitle: folderPreviewSubtitle(item),
+                                width: posterWidth
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, CatDesign.horizontalMargin)
                 .padding(.bottom, 4)
             }
             .scrollClipDisabled()
         }
     }
+
+    private var folderPreviewSkeletonRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<4, id: \.self) { _ in
+                    CatPosterPlaceholder(width: posterWidth)
+                }
+            }
+            .padding(.horizontal, CatDesign.horizontalMargin)
+        }
+        .redacted(reason: .placeholder)
+    }
+
+    private func folderPreviewSubtitle(_ item: MediaItem) -> String {
+        if let year = item.year {
+            return "\(item.mediaType.displayName) · \(year)"
+        }
+        return item.mediaType.displayName
+    }
+
+    // MARK: - Navigation Destination
 
     @ViewBuilder
     private func libraryNavigationDestination(for itemID: UUID) -> some View {
@@ -627,101 +645,54 @@ struct LibraryView: View {
         }
     }
 
-    private var folderPreviewSkeletonRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(0..<5, id: \.self) { _ in
-                    FolderPreviewPosterPlaceholder(width: posterWidth)
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 4)
-        }
-        .scrollClipDisabled()
-        .redacted(reason: .placeholder)
-    }
+    // MARK: - Empty State (`15 · Empty Library State`)
 
-    private func folderTypePill(_ type: EmbyCollectionType) -> some View {
-        Text(type.displayName)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(HomeDesign.typePillText.opacity(0.9))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background(HomeDesign.typePillFill, in: Capsule())
-    }
-
-    private func folderPreviewSubtitle(_ item: MediaItem) -> String? {
-        if let year = item.year {
-            return "\(item.mediaType.displayName) · \(year)"
-        }
-        return item.mediaType.displayName
-    }
-
-    // MARK: - Sync Status / Toast
-
-    private func headerSyncStatus(message: String) -> some View {
-        HStack(spacing: 8) {
-            SyncActivityIndicator()
-                .frame(width: 18, height: 18)
-
-            Text(message)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(HomeDesign.onSurface.opacity(0.7))
-                .lineLimit(2)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(L10n.tr("正在同步数据"))
-        .accessibilityValue(message)
-    }
-
-    // MARK: - Empty State
-
-    /// 对应设计稿 `LibraryHome-Empty`：顶部沿用首页标题与「未连接到媒体库」药丸，
-    /// 下方区域垂直居中展示数据库图标徽章、提示文案与「添加服务器」主按钮。
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            emptyHeaderSection
-                .padding(.top, 8)
+        VStack(spacing: 0) {
+            emptyHeader
+                .padding(.top, 12)
 
-            LibraryEmptyContentView {
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
+            Spacer()
+
+            CatEmptyLibraryCanvas {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 appState.selectedTab = .connections
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Spacer()
+            Spacer().frame(height: 76)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var emptyHeaderSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(L10n.tr("首页"))
-                .font(.system(size: 34, weight: .bold))
-                .foregroundStyle(HomeDesign.onSurface)
+    private var emptyHeader: some View {
+        HStack {
+            Text(L10n.tr("媒体库"))
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
 
-            if let message = connectionsViewModel.librarySyncMessage {
-                headerSyncStatus(message: message)
-                    .padding(.top, 10)
+            Spacer()
+
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(CatDesign.textDim)
+                    .frame(width: 6, height: 6)
+
+                Text(L10n.tr("没有来源"))
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(CatDesign.textMuted)
             }
-
-            Text(L10n.tr("继续观看、收藏和你的全部媒体库"))
-                .font(.system(size: 13))
-                .foregroundStyle(HomeDesign.subtitle)
-                .padding(.top, 8)
-
-            if connectionsViewModel.librarySyncMessage == nil {
-                syncPill(L10n.tr("未连接到媒体库"))
-                    .padding(.top, 14)
-            }
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .catGlassCard(cornerRadius: CatDesign.radiusPill)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, CatDesign.horizontalMargin)
     }
 
     private func showSyncToast(_ message: String) {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
             syncToastMessage = message
         }
-
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             guard syncToastMessage == message else { return }
             withAnimation(.easeOut(duration: 0.25)) {
@@ -731,727 +702,645 @@ struct LibraryView: View {
     }
 }
 
-// MARK: - Design Tokens
+// MARK: - Subviews
 
-/// 「LibraryHome」设计稿专用色板，随明暗模式自动切换：
-/// 深色对应 Figma `LibraryHome-Dark`，浅色对应 `LibraryHome-Light`。
-/// 蓝色强调色 `Color.vanmoAccent` 与同步绿点在两种模式下保持一致；其余表面 / 文本 / 玻璃
-/// 颜色通过 `UIColor { trait in }` 动态解析，跟随环境 `colorScheme`。
-private enum HomeDesign {
-    /// 构造一个随明暗模式切换的动态色
-    private static func dyn(light: UIColor, dark: UIColor) -> Color {
-        Color(uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? dark : light
-        })
-    }
-
-    private static func rgba(_ r: Double, _ g: Double, _ b: Double, _ a: Double = 1) -> UIColor {
-        UIColor(red: r, green: g, blue: b, alpha: a)
-    }
-
-    /// 屏幕基底：浅色 #f3f6f9 / 深色 #050608
-    static let base = dyn(
-        light: rgba(0.953, 0.965, 0.976),
-        dark: rgba(0x05 / 255, 0x06 / 255, 0x08 / 255)
-    )
-    /// 蓝色强调色 #145cff（播放钮 / 进度 / 服务器图标 / 类型药丸），明暗一致
-    static let accent = Color.vanmoAccent
-    /// 同步绿点 #3dd97a，明暗一致
-    static let syncGreen = Color(red: 0x3D / 255, green: 0xD9 / 255, blue: 0x7A / 255)
-
-    /// 表面上的主文本：浅色近黑 #12161d / 深色纯白。配合 `.opacity()` 表达层级
-    static let onSurface = dyn(
-        light: rgba(0.071, 0.086, 0.114),
-        dark: .white
-    )
-    /// 副标题灰：浅色 #5c666f / 深色 #b2b2bf
-    static let subtitle = dyn(
-        light: rgba(0.36, 0.40, 0.45),
-        dark: rgba(0xB2 / 255, 0xB2 / 255, 0xBF / 255)
-    )
-
-    /// 深色玻璃（搜索按钮）：浅色白玻璃 / 深色 rgba(14,15,18,0.72)
-    static let glassDark = dyn(
-        light: rgba(1, 1, 1, 0.6),
-        dark: rgba(0x0E / 255, 0x0F / 255, 0x12 / 255, 0.72)
-    )
-    /// 海报卡底色：浅色 #e6ebf0 / 深色 rgba(18,19,22,0.82)
-    static let posterBase = dyn(
-        light: rgba(0.901, 0.921, 0.941),
-        dark: rgba(0x12 / 255, 0x13 / 255, 0x16 / 255, 0.82)
-    )
-    /// 收藏玻璃卡填充：浅色 white@0.62 / 深色 white@0.16
-    static let favoritesCardFill = dyn(
-        light: rgba(1, 1, 1, 0.62),
-        dark: rgba(1, 1, 1, 0.16)
-    )
-    /// 同步药丸填充：浅色 white@0.72 / 深色 white@0.14
-    static let syncPillFill = dyn(
-        light: rgba(1, 1, 1, 0.72),
-        dark: rgba(1, 1, 1, 0.14)
-    )
-    /// 中性药丸填充（查看全部 / 数量徽标）：浅色 black@0.05 / 深色 white@0.10
-    static let neutralPill = dyn(
-        light: rgba(0, 0, 0, 0.05),
-        dark: rgba(1, 1, 1, 0.10)
-    )
-    /// 服务器图标块底色：浅色蓝调 accent@0.10 / 深色 white@0.10
-    static let serverIconFill = dyn(
-        light: rgba(0x14 / 255, 0x5C / 255, 0xFF / 255, 0.10),
-        dark: rgba(1, 1, 1, 0.10)
-    )
-    /// 类型药丸填充：浅色 accent@0.12 / 深色 accent@0.18
-    static let typePillFill = dyn(
-        light: rgba(0x14 / 255, 0x5C / 255, 0xFF / 255, 0.12),
-        dark: rgba(0x14 / 255, 0x5C / 255, 0xFF / 255, 0.18)
-    )
-    /// 类型药丸文本：浅色蓝色强调 / 深色白色
-    static let typePillText = dyn(
-        light: rgba(0x14 / 255, 0x5C / 255, 0xFF / 255, 1),
-        dark: .white
-    )
-    /// 卡片描边：浅色 black@0.06 / 深色 white@0.14
-    static let cardStroke = dyn(
-        light: rgba(0, 0, 0, 0.06),
-        dark: rgba(1, 1, 1, 0.14)
-    )
-    /// 骨架占位填充：浅色 black@0.06 / 深色 white@0.10
-    static let skeletonFill = dyn(
-        light: rgba(0, 0, 0, 0.06),
-        dark: rgba(1, 1, 1, 0.10)
-    )
-
-    // MARK: Empty State（对应 `LibraryHome-Empty` 设计稿）
-
-    /// 空状态标题：浅色 #18181b / 深色纯白
-    static let emptyHeading = dyn(
-        light: rgba(0x18 / 255, 0x18 / 255, 0x1B / 255),
-        dark: .white
-    )
-    /// 空状态正文灰：浅色 #71717b / 深色 #9f9fa9
-    static let emptyParagraph = dyn(
-        light: rgba(0x71 / 255, 0x71 / 255, 0x7B / 255),
-        dark: rgba(0x9F / 255, 0x9F / 255, 0xA9 / 255)
-    )
-    /// 图标徽章背后的蓝色光晕：浅色 accent@0.10 / 深色 accent@0.20
-    static let emptyIconGlow = dyn(
-        light: rgba(0x14 / 255, 0x5C / 255, 0xFF / 255, 0.10),
-        dark: rgba(0x14 / 255, 0x5C / 255, 0xFF / 255, 0.20)
-    )
-    /// 图标玻璃卡片填充：浅色 white@0.60 / 深色 white@0.05
-    static let emptyIconCardFill = dyn(
-        light: rgba(1, 1, 1, 0.60),
-        dark: rgba(1, 1, 1, 0.05)
-    )
-    /// 图标玻璃卡片描边：浅色 black@0.05 / 深色 white@0.10
-    static let emptyIconCardStroke = dyn(
-        light: rgba(0, 0, 0, 0.05),
-        dark: rgba(1, 1, 1, 0.10)
-    )
-    /// 数据库图标描边色：浅色 accent@0.80 / 深色 white@0.40
-    static let emptyIconTint = dyn(
-        light: rgba(0x14 / 255, 0x5C / 255, 0xFF / 255, 0.80),
-        dark: rgba(1, 1, 1, 0.40)
-    )
-}
-
-// MARK: - Empty State Content
-
-/// 「LibraryHome-Empty」中心内容：蓝色光晕 + 旋转玻璃卡数据库图标、
-/// 标题「没有找到媒体内容」、说明文案与「添加服务器」主按钮，整体水平居中。
-private struct LibraryEmptyContentView: View {
-    let action: () -> Void
+private struct CatEmptyLibraryCanvas: View {
+    let connectAction: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            iconBadge
-                .padding(.bottom, 24)
+        VStack(spacing: 18) {
+            Image("CatDoorwayLookingBack")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 160, height: 184)
 
-            Text(L10n.tr("没有找到媒体内容"))
-                .font(.system(size: 22, weight: .bold))
-                .tracking(-0.55)
-                .foregroundStyle(HomeDesign.emptyHeading)
-                .padding(.bottom, 12)
+            VStack(spacing: 8) {
+                Text(L10n.tr("你的媒体库还是空的"))
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .multilineTextAlignment(.center)
 
-            Text(L10n.tr("您的媒体库目前空空如也。\n请先连接您的 NAS 或 Emby 服务器以同步您的媒体库内容。"))
-                .font(.system(size: 14))
-                .foregroundStyle(HomeDesign.emptyParagraph)
-                .multilineTextAlignment(.center)
-                .lineSpacing(6)
-                .frame(width: 260)
-                .padding(.bottom, 32)
+                Text(L10n.tr("连接 Emby、Jellyfin、Plex 或 SMB 服务器，或挂载本地文件夹即可开始观看。"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+            }
 
-            addServerButton
-        }
-        .padding(.horizontal, 32)
-    }
-
-    private var iconBadge: some View {
-        ZStack {
-            Circle()
-                .fill(HomeDesign.emptyIconGlow)
-                .frame(width: 160, height: 160)
-                .blur(radius: 40)
-
-            RoundedRectangle(cornerRadius: 40, style: .continuous)
-                .fill(HomeDesign.emptyIconCardFill)
-                .frame(width: 160, height: 160)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 40, style: .continuous)
-                        .stroke(HomeDesign.emptyIconCardStroke, lineWidth: 1)
-                }
-                .overlay {
-                    Image("EmptyStateDatabase")
-                        .renderingMode(.template)
+            Button(action: connectAction) {
+                HStack(spacing: 8) {
+                    Image("CatAddSourceIcon")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 60, height: 60)
-                        .foregroundStyle(HomeDesign.emptyIconTint)
+                        .frame(width: 16, height: 16)
+
+                    Text(L10n.tr("连接服务器或文件夹"))
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(CatDesign.glowAmber)
                 }
-                .shadow(color: .black.opacity(0.10), radius: 12.5, x: 0, y: 20)
-                .shadow(color: .black.opacity(0.10), radius: 5, x: 0, y: 8)
-                .rotationEffect(.degrees(3))
-        }
-        .frame(width: 160, height: 160)
-    }
-
-    private var addServerButton: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Text(L10n.tr("添加服务器"))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-
-                ZStack {
-                    Circle()
-                        .fill(.white.opacity(0.2))
-                        .frame(width: 20, height: 20)
-
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
+                .padding(.leading, 20)
+                .padding(.trailing, 22)
+                .frame(height: 50)
+                .background {
+                    Capsule()
+                        .fill(CatDesign.catSilhouette.opacity(0.88))
                 }
+                .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 1.15))
+                .shadow(color: CatDesign.amberGlowShadow, radius: 14, y: 8)
             }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 14)
-            .background(HomeDesign.accent, in: Capsule())
-            .shadow(
-                color: HomeDesign.accent.opacity(0.25),
-                radius: 5,
-                x: 0,
-                y: 10
-            )
+            .buttonStyle(CatScaleButtonStyle())
+            .accessibilityLabel(L10n.tr("连接服务器或文件夹"))
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(L10n.tr("添加服务器"))
+        .padding(.horizontal, 24)
     }
 }
 
-// MARK: - Continue Watching Card
-
-private struct ContinueWatchingCard: View {
+private struct CatHeroCard: View {
     let item: MediaItem
-    
+    let featuredTag: String
+
+    private var metaLine: String {
+        var parts: [String] = []
+        if let year = item.year { parts.append("\(year)") }
+        if let genre = item.genres.first { parts.append(genre) }
+        if item.duration > 0 { parts.append(item.duration.shortDuration) }
+        if let dr = item.dynamicRange, !dr.isEmpty { parts.append(dr) }
+        return parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            heroArtwork
+
+            LinearGradient(
+                stops: [
+                    .init(color: CatDesign.catSilhouette.opacity(0.13), location: 0),
+                    .init(color: CatDesign.catSilhouette.opacity(0.50), location: 0.45),
+                    .init(color: CatDesign.catSilhouette.opacity(0.95), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            VStack(alignment: .leading, spacing: 0) {
+                featuredPill
+                Spacer(minLength: 0)
+                heroFooter
+            }
+            .padding(16)
+        }
+        .frame(height: 190)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleLg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: CatDesign.radiusSquircleLg, style: .continuous)
+                .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.45), radius: 18, y: 12)
+    }
+
+    private var heroArtwork: some View {
+        GeometryReader { proxy in
+            KFImage(item.backdropURL ?? item.posterURL)
+                .placeholder {
+                    ZStack {
+                        CatDesign.mediaPlaceholder
+                        Image(systemName: item.mediaType.icon)
+                            .font(.largeTitle)
+                            .foregroundStyle(CatDesign.Cinema.textMuted.opacity(0.35))
+                    }
+                }
+                .fade(duration: 0.25)
+                .resizable()
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
+        }
+    }
+
+    private var featuredPill: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(CatDesign.glowAmber)
+                .frame(width: 6, height: 6)
+
+            Text(featuredTag)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CatDesign.Cinema.textIvory)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
+        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.75))
+    }
+
+    private var heroFooter: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.displayTitle)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(CatDesign.Cinema.textIvory)
+                    .lineLimit(1)
+
+                if !metaLine.isEmpty {
+                    Text(metaLine)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(CatDesign.Cinema.textMuted)
+                        .lineLimit(1)
+                }
+
+                HStack(spacing: 6) {
+                    if let rating = item.rating, rating > 0 {
+                        Text(String(format: "★ %.1f", rating))
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(CatDesign.glowAmber)
+
+                        Text(L10n.tr("· 点击查看详情"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(CatDesign.Cinema.textMuted)
+                            .lineLimit(1)
+                    } else {
+                        Text(L10n.tr("点击查看详情"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(CatDesign.Cinema.textMuted)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Text(L10n.tr("详情 ›"))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(CatDesign.glowAmber)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
+                .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeAmber, lineWidth: 1))
+        }
+    }
+}
+
+private struct CatSectionHeader: View {
+    let title: String
+    var badgeText: String? = nil
+    var showSeeAll: Bool = true
+    var onSeeAll: (() -> Void)? = nil
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
+                .lineLimit(1)
+
+            if let badgeText {
+                Text(badgeText)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(CatDesign.surfacePill, in: Capsule())
+            }
+
+            Spacer(minLength: 6)
+
+            CatStretchingDivider()
+
+            if showSeeAll, let onSeeAll {
+                Button(action: onSeeAll) {
+                    Text(L10n.tr("查看全部"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(CatDesign.surfacePill, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+    }
+}
+
+private struct CatContinueWatchingCard: View {
+    let item: MediaItem
+
     private var progress: Double {
         min(max(item.playbackProgress, 0), 1)
     }
-    
+
+    private var subtitleLine: String {
+        if item.isWatched {
+            return item.duration > 0
+                ? L10n.tr("已看完 · %@", item.duration.shortDuration)
+                : L10n.tr("已看完")
+        }
+        if item.duration > 0 {
+            return "\(item.lastPlaybackPosition.shortDuration) · \(item.duration.shortDuration)"
+        }
+        return item.lastPlaybackPosition.shortDuration
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomLeading) {
+            ZStack(alignment: .bottom) {
                 KFImage(item.backdropURL ?? item.posterURL)
                     .placeholder {
                         ZStack {
-                            HomeDesign.posterBase
+                            CatDesign.mediaPlaceholder
                             Image(systemName: item.mediaType.icon)
-                                .font(.title2)
-                                .foregroundStyle(.white.opacity(0.4))
+                                .font(.title3)
+                                .foregroundStyle(CatDesign.textMuted.opacity(0.45))
                         }
                     }
                     .fade(duration: 0.2)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 160, height: 90)
+                    .frame(width: 164, height: 92)
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                if progress > 0 {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(.white.opacity(0.3))
-                                .frame(height: 4)
-                            
-                            Capsule()
-                                .fill(HomeDesign.accent) // Usually light blue
-                                .frame(width: max(0, geo.size.width * progress), height: 4)
-                        }
+
+                LinearGradient(
+                    colors: [.clear, CatDesign.catSilhouette.opacity(0.91)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 56)
+
+                if item.isWatched {
+                    HStack {
+                        Spacer()
+                        CatWatchedEarBadge(padding: 4)
+                            .padding(7)
                     }
-                    .frame(height: 4)
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 6)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                } else if progress > 0 {
+                    CatPawProgressBar(progress: progress, trackColor: Color.white.opacity(0.22))
+                        .padding(.horizontal, 9)
+                        .padding(.bottom, 7)
                 }
             }
-            .frame(width: 160, height: 90)
-            
+            .frame(width: 164, height: 92)
+            .clipShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+            )
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayTitle)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
                     .lineLimit(1)
-                
-                Text(L10n.tr("%@ · 共 %@", item.lastPlaybackPosition.shortDuration, item.duration.shortDuration))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.7))
+
+                Text(subtitleLine)
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
                     .lineLimit(1)
             }
-            .frame(width: 160, alignment: .leading)
+            .frame(width: 164, alignment: .leading)
         }
     }
 }
 
-// MARK: - Favorites Glass Card
+struct CatMediaPosterCard: View {
+    let item: MediaItem
+    let subtitle: String?
+    var width: CGFloat? = 106
 
-/// 对应设计稿 `Favorites stacked glass card`：左侧三张旋转海报，
-/// 中部「收藏」标题 + 查看全部药丸，右侧收藏统计，末尾 chevron。
-private struct HomeFavoritesCard: View {
+    private var progress: Double? {
+        item.playbackProgress > 0 ? item.playbackProgress : nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            posterFrame
+            infoBlock
+        }
+        .frame(width: width, alignment: .leading)
+        .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous))
+    }
+
+    private var posterFrame: some View {
+        ZStack(alignment: .bottom) {
+            Color.clear
+                .overlay {
+                    KFImage(item.posterURL)
+                        .placeholder {
+                            ZStack {
+                                CatDesign.mediaPlaceholder
+                                Image(systemName: item.mediaType.icon)
+                                    .font(.title3)
+                                    .foregroundStyle(CatDesign.textMuted.opacity(0.45))
+                            }
+                        }
+                        .fade(duration: 0.25)
+                        .resizable()
+                        .scaledToFill()
+                }
+                .clipped()
+
+            LinearGradient(
+                colors: [.clear, CatDesign.catSilhouette.opacity(0.85)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 50)
+
+            if item.isWatched {
+                HStack {
+                    Spacer()
+                    CatWatchedEarBadge(padding: 3)
+                        .padding(7)
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+            } else if let progress, progress > 0, progress < 1 {
+                CatPawProgressBar(
+                    progress: progress,
+                    trackHeight: 3,
+                    showPawDot: false,
+                    trackColor: Color.white.opacity(0.22)
+                )
+                .padding(.horizontal, 7)
+                .padding(.bottom, 8)
+            }
+        }
+        .aspectRatio(106.0 / 150.0, contentMode: .fit)
+        .frame(width: width)
+        .clipShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+        )
+    }
+
+    private var infoBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(item.displayTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CatDesign.textIvory)
+                .lineLimit(1)
+
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+private struct CatHomeFavoritesCard: View {
     let entries: [URL?]
     let totalCount: Int
     let movieCount: Int
     let tvShowCount: Int
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 12) {
             posterStack
-                .frame(width: 138, height: 84)
+                .frame(width: 118, height: 78)
 
-            Spacer(minLength: 5)
-            VStack(alignment: .leading, spacing: 10) {
-                Text(L10n.tr("收藏"))
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image("CatPawStamp")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(CatDesign.accentAmber)
 
-                viewAllPill
+                    Text(L10n.tr("收藏"))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(CatDesign.textIvory)
+                }
+
+                Text("\(L10n.tr("%d · 电影", movieCount)) · \(L10n.tr("%d · 剧集", tvShowCount))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(1)
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
 
-            VStack(alignment: .trailing, spacing: 5) {
-                Text(L10n.tr("%d 部收藏", totalCount))
-                    .font(.system(size: 12))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.76))
+            HStack(spacing: 6) {
+                Text("\(totalCount)")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(CatDesign.accentAmber)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(CatDesign.amberTintFill, in: Capsule())
+                    .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 0.75))
 
-                Text(L10n.tr("%d · 电影", movieCount))
-                    .font(.system(size: 12))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.76))
-
-                Text(L10n.tr("%d · 剧集", tvShowCount))
-                    .font(.system(size: 12))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.76))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CatDesign.textMuted)
             }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(HomeDesign.onSurface.opacity(0.7))
-                .padding(.leading, 12)
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .frame(height: 112)
-        .background(HomeDesign.favoritesCardFill, in: RoundedRectangle(cornerRadius: 26))
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26))
-//        .overlay {
-//            RoundedRectangle(cornerRadius: 26)
-//                .stroke(HomeDesign.cardStroke, lineWidth: 1)
-//        }
+        .catGlassCard(cornerRadius: CatDesign.radiusSquircleLg, elevated: true)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L10n.tr("收藏，共 %d 部", totalCount))
-    }
-
-    private var viewAllPill: some View {
-        Text(L10n.tr("查看全部"))
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(HomeDesign.onSurface.opacity(0.94))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
-            .background(HomeDesign.neutralPill, in: Capsule())
     }
 
     @ViewBuilder
     private var posterStack: some View {
         let urls = Array(entries.prefix(3))
-        switch urls.count {
-        case 0:
-            EmptyView()
-        case 1:
-            favoritePoster(urls[0], width: 64, height: 80)
-        case 2:
-            ZStack {
-                favoritePoster(urls[0])
-                    .rotationEffect(.degrees(-6))
-                    .offset(x: -22, y: 2)
-                favoritePoster(urls[1])
-                    .rotationEffect(.degrees(6))
-                    .offset(x: 22, y: -2)
-            }
-        default:
-            ZStack {
-                favoritePoster(urls[0])
-                    .rotationEffect(.degrees(6))
-                    .offset(x: -34, y: 2)
-
-                favoritePoster(urls[2])
-                    .rotationEffect(.degrees(-6))
-                    .offset(x: 34, y: -2)
-
-                favoritePoster(urls[1])
-                    .offset(x: 0, y: -4)
+        ZStack {
+            if urls.count >= 3 {
+                miniPoster(urls[2]).rotationEffect(.degrees(-8)).offset(x: -24, y: 2)
+                miniPoster(urls[1]).rotationEffect(.degrees(8)).offset(x: 24, y: 2)
+                miniPoster(urls[0]).offset(y: -2)
+            } else if urls.count == 2 {
+                miniPoster(urls[1]).rotationEffect(.degrees(-6)).offset(x: -16, y: 2)
+                miniPoster(urls[0]).rotationEffect(.degrees(5)).offset(x: 16, y: -2)
+            } else {
+                miniPoster(urls.first ?? nil)
             }
         }
     }
 
-    private func favoritePoster(_ url: URL?, width: CGFloat = 58, height: CGFloat = 76) -> some View {
+    private func miniPoster(_ url: URL?) -> some View {
         KFImage(url)
             .placeholder {
                 ZStack {
-                    HomeDesign.posterBase
+                    CatDesign.mediaPlaceholder
                     Image(systemName: "film")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(HomeDesign.onSurface.opacity(0.4))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(CatDesign.textMuted.opacity(0.5))
                 }
             }
             .fade(duration: 0.2)
             .resizable()
             .scaledToFill()
-            .frame(width: width, height: height)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 8)
+            .frame(width: 50, height: 70)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 0.8)
+            )
+            .shadow(color: .black.opacity(0.35), radius: 6, y: 4)
     }
 }
 
-private struct FolderBookmarkCard: View {
+private struct CatFolderBookmarkCard: View {
     let bookmark: FolderBookmark
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(HomeDesign.serverIconFill)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image("CatFolderTileAmber")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 20)
 
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(HomeDesign.accent)
-                }
-                .frame(width: 38, height: 38)
-
-                Spacer(minLength: 8)
+                Spacer(minLength: 4)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.42))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CatDesign.textDim)
             }
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(bookmark.title)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(HomeDesign.onSurface)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
                     .lineLimit(1)
 
-                Text(bookmark.connectionName)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.72))
-                    .lineLimit(1)
-
-                Text(bookmark.path)
+                Text("\(bookmark.connectionName) · \(bookmark.path)")
                     .font(.system(size: 11))
-                    .foregroundStyle(HomeDesign.onSurface.opacity(0.52))
+                    .foregroundStyle(CatDesign.textMuted)
                     .lineLimit(1)
             }
         }
         .padding(14)
-        .frame(width: 190, alignment: .leading)
-        .background(HomeDesign.favoritesCardFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(HomeDesign.cardStroke, lineWidth: 1)
-        }
+        .frame(width: 184, alignment: .leading)
+        .catGlassCard(cornerRadius: CatDesign.radiusSquircleMd)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(bookmark.title)，\(bookmark.connectionName)")
     }
 }
 
-private struct LibraryHomePreviewButton: View {
-    let item: MediaItem
-    let subtitle: String?
-    let width: CGFloat
-    let onSelect: (UUID) -> Void
-
-    var body: some View {
-        Button {
-            onSelect(item.id)
-        } label: {
-            LibraryPosterCard(
-                title: item.displayTitle,
-                subtitle: subtitle,
-                posterURL: item.posterURL,
-                progress: item.playbackProgress > 0 ? item.playbackProgress : nil,
-                width: width
-            )
-        }
-        .buttonStyle(.plain)
-        .contentShape(RoundedRectangle(cornerRadius: 14))
-        .id(item.id)
-    }
-}
-
-// MARK: - Library Poster Card
-
-/// 对应设计稿电影区海报卡：海报图 + 底部渐隐 + 蓝色进度条，下方标题/副标题。
-private struct LibraryPosterCard: View {
-    let title: String
-    let subtitle: String?
-    let posterURL: URL?
-    let progress: Double?
+private struct CatPosterPlaceholder: View {
     let width: CGFloat
 
     private var imageHeight: CGFloat {
-        width * 124 / 88
+        (width * 150 / 106).rounded()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottom) {
-                KFImage(posterURL)
-                    .placeholder {
-                        ZStack {
-                            HomeDesign.posterBase
-                            Image(systemName: "film")
-                                .font(.title3)
-                                .foregroundStyle(HomeDesign.onSurface.opacity(0.4))
-                        }
-                    }
-                    .fade(duration: 0.25)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: width, height: imageHeight)
-                    .clipped()
-                    .contentShape(Rectangle())
-
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.72)],
-                    startPoint: .center,
-                    endPoint: .bottom
-                )
-                .frame(height: 32)
-
-                if let progress, progress > 0, progress < 1 {
-                    GeometryReader { geo in
-                        VStack {
-                            Spacer()
-                            HStack {
-                                Capsule()
-                                    .fill(HomeDesign.accent)
-                                    .frame(width: max(4, geo.size.width * progress), height: 3)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 6)
-                            .padding(.bottom, 8)
-                        }
-                    }
-                }
-            }
-            .frame(width: width, height: imageHeight)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(HomeDesign.onSurface)
-                    .lineLimit(1)
-
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 10))
-                        .foregroundStyle(HomeDesign.onSurface.opacity(0.62))
-                        .lineLimit(1)
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 8)
-            .frame(width: width, alignment: .leading)
-        }
-        .background(HomeDesign.posterBase)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .contentShape(RoundedRectangle(cornerRadius: 14))
-    }
-}
-
-// MARK: - Loading Skeletons
-
-private struct FolderPreviewPosterPlaceholder: View {
-    var width: CGFloat = 104
-
-    private var imageHeight: CGFloat {
-        width * 124 / 88
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            RoundedRectangle(cornerRadius: 0)
-                .fill(HomeDesign.skeletonFill)
+        VStack(alignment: .leading, spacing: 7) {
+            RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                .fill(CatDesign.surfacePill)
                 .frame(width: width, height: imageHeight)
 
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(HomeDesign.skeletonFill)
-                    .frame(height: 10)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(CatDesign.surfacePill)
+                .frame(width: width * 0.78, height: 12)
 
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(HomeDesign.skeletonFill.opacity(0.6))
-                    .frame(width: 48, height: 8)
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 8)
-            .frame(width: width, alignment: .leading)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(CatDesign.surfacePill.opacity(0.65))
+                .frame(width: width * 0.48, height: 10)
         }
-        .background(HomeDesign.posterBase)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 }
 
-private struct CollectionFolderLoadingSection: View {
+private struct CatCollectionLoadingSection: View {
+    let posterWidth: CGFloat
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(HomeDesign.skeletonFill)
-                    .frame(width: 42, height: 42)
+        VStack(alignment: .leading, spacing: 12) {
+            RoundedRectangle(cornerRadius: 5)
+                .fill(CatDesign.surfacePill)
+                .frame(width: 140, height: 18)
+                .padding(.horizontal, CatDesign.horizontalMargin)
 
-                VStack(alignment: .leading, spacing: 7) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(HomeDesign.skeletonFill)
-                        .frame(width: 120, height: 14)
-
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(HomeDesign.skeletonFill.opacity(0.6))
-                        .frame(width: 86, height: 10)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        CatPosterPlaceholder(width: posterWidth)
+                    }
                 }
-
-                Spacer()
-            }
-            .padding(.horizontal, 24)
-
-            ForEach(0..<2, id: \.self) { _ in
-                CollectionFolderLoadingRow()
+                .padding(.horizontal, CatDesign.horizontalMargin)
             }
         }
         .redacted(reason: .placeholder)
     }
 }
 
-private struct CollectionFolderLoadingRow: View {
+private struct CatScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.975 : 1)
+            .opacity(configuration.isPressed ? 0.90 : 1)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+}
+
+private struct LibraryContinueWatchingListView: View {
+    @Environment(\.dismiss) private var dismiss
+    let items: [MediaItem]
+    let onPlay: (MediaItem) -> Void
+    let onInspect: (MediaItem) -> Void
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(HomeDesign.skeletonFill)
-                    .frame(width: 80, height: 16)
+        ZStack(alignment: .top) {
+            CatDesign.bgObsidian.ignoresSafeArea()
 
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(HomeDesign.skeletonFill.opacity(0.7))
-                    .frame(width: 48, height: 22)
+            VStack(spacing: 0) {
+                HStack(spacing: 11) {
+                    CatBackButton { dismiss() }
 
-                Spacer()
-
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(HomeDesign.skeletonFill.opacity(0.7))
-                    .frame(width: 72, height: 28)
-            }
-            .padding(.horizontal, 24)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        FolderPreviewPosterPlaceholder()
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L10n.tr("继续观看"))
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(CatDesign.textIvory)
+                        Text(L10n.tr("%d 项", items.count))
+                            .font(.system(size: 11))
+                            .foregroundStyle(CatDesign.textMuted)
                     }
+
+                    Spacer()
+                    CatStretchingDivider()
                 }
-                .padding(.horizontal, 24)
-            }
-            .scrollClipDisabled()
-        }
-    }
-}
+                .padding(.horizontal, CatDesign.horizontalMargin)
+                .padding(.vertical, 12)
 
-// MARK: - Sync Indicator / Toast
-
-private struct SyncActivityIndicator: View {
-    private let cycleDuration = 1.05
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: false)) { context in
-            let elapsed = context.date.timeIntervalSinceReferenceDate
-            let rotation = (elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration) * 360
-
-            ZStack {
-                Circle()
-                    .stroke(
-                        HomeDesign.accent.opacity(0.18),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round)
-                    )
-
-                Circle()
-                    .trim(from: 0.12, to: 0.88)
-                    .stroke(
-                        HomeDesign.accent,
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(rotation))
-
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 7.5, weight: .semibold))
-                    .foregroundStyle(HomeDesign.accent)
-                    .symbolEffect(.pulse.byLayer, options: .repeating.speed(0.85))
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(items) { item in
+                            Button {
+                                onPlay(item)
+                            } label: {
+                                CatContinueWatchingCard(item: item)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button {
+                                    dismiss()
+                                    onInspect(item)
+                                } label: {
+                                    Label(L10n.tr("查看详情"), systemImage: "info.circle")
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                    .padding(.vertical, 12)
+                }
             }
         }
-        .frame(width: 18, height: 18)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct LibrarySyncToast: View {
-    let message: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.body)
-                .foregroundStyle(HomeDesign.accent)
-                .symbolEffect(.bounce, value: message)
-
-            Text(message)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(HomeDesign.onSurface)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            HomeDesign.accent.opacity(0.28),
-                            .white.opacity(0.08),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        }
-        .shadow(color: HomeDesign.accent.opacity(0.1), radius: 12, y: 5)
-        .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
+        .toolbar(.hidden, for: .navigationBar)
+        .catTabBarHidden(true)
     }
 }
 

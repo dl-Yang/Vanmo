@@ -9,13 +9,14 @@ struct AddConnectionView: View {
     let editingConnection: SavedConnection?
 
     @State private var name = ""
-    @State private var selectedType: ConnectionType = .localFolder
+    @State private var selectedType: ConnectionType = .emby
     @State private var host = ""
     @State private var port = ""
     @State private var useHTTPS = true
     @State private var username = ""
     @State private var password = ""
     @State private var path = ""
+    @State private var showAllProtocols = false
 
     @State private var folderURL: URL?
     @State private var folderBookmark: Data?
@@ -28,16 +29,20 @@ struct AddConnectionView: View {
     @State private var saveErrorMessage: String?
     @State private var workTask: Task<Void, Never>?
 
-    /// Plex PIN 登录 sheet；创建连接完全由该流程完成，本页只负责改名。
     @State private var showPlexSignIn = false
     @State private var plexFlowCompleted = false
     @State private var isRenamingPlex = false
+
+    private static let featuredProtocols: [ConnectionType] = [
+        .emby, .jellyfin, .plex, .smb,
+        .ftp, .googleDrive, .baiduNetdisk, .localFolder
+    ]
 
     init(viewModel: BrowserViewModel, editingConnection: SavedConnection? = nil) {
         self.viewModel = viewModel
         self.editingConnection = editingConnection
 
-        let type = editingConnection?.type ?? .localFolder
+        let type = editingConnection?.type ?? .emby
         let localFolderURL = editingConnection.flatMap { connection -> URL? in
             guard connection.type.isLocal else { return nil }
             let path = connection.path ?? connection.host
@@ -56,85 +61,119 @@ struct AddConnectionView: View {
         _path = State(initialValue: editingConnection?.path ?? "")
         _folderURL = State(initialValue: localFolderURL)
         _folderBookmark = State(initialValue: editingConnection?.bookmarkData)
+        _showAllProtocols = State(initialValue: !Self.featuredProtocols.contains(type))
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                typeSection
+        ZStack(alignment: .bottom) {
+            CatDesign.surfaceSheet.ignoresSafeArea()
 
-                if selectedType.isLocal {
-                    localFolderSection
-                } else if selectedType.supportsOAuthLogin {
-                    oauthCloudDriveSection
-                } else if selectedType == .plex {
-                    plexSignInSection
-                } else {
-                    remoteServerSection
-
-                    if selectedType.requiresAuth {
-                        authSection
+            VStack(spacing: 0) {
+                sheetHeader
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        protocolSelectorSection
+                        dynamicFormSection
                     }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                    .padding(.bottom, 96)
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.vanmoBackground)
-            .navigationTitle(isEditing ? L10n.tr("编辑连接") : L10n.tr("添加连接"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.tr("取消")) { cancelAndClose() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("保存")) { save() }
-                        .disabled(!isValid || isBlocking || isRenamingPlex)
-                }
-            }
-            .onAppear {
-                guard !isEditing else { return }
-                useHTTPS = inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: selectedType))
-                port = "\(defaultPort(for: selectedType, useHTTPS: useHTTPS))"
-                applyDefaults(for: selectedType)
-            }
-            .fileImporter(
-                isPresented: $showFolderPicker,
-                allowedContentTypes: [.folder],
-                allowsMultipleSelection: false
-            ) { result in
-                handleFolderImport(result)
-            }
-            .sheet(isPresented: $showPlexSignIn, onDismiss: handlePlexSheetDismiss) {
-                PlexSignInView(
-                    viewModel: viewModel,
-                    editingConnection: editingConnection,
-                    suggestedName: trimmedName.isEmpty ? nil : trimmedName
-                ) {
-                    plexFlowCompleted = true
-                }
+
+            bottomConnectButton
+        }
+        .presentationDragIndicator(.hidden)
+        .presentationBackground(CatDesign.surfaceSheet)
+        .onAppear {
+            guard !isEditing else { return }
+            useHTTPS = inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: selectedType))
+            port = "\(defaultPort(for: selectedType, useHTTPS: useHTTPS))"
+            applyDefaults(for: selectedType)
+        }
+        .fileImporter(
+            isPresented: $showFolderPicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            handleFolderImport(result)
+        }
+        .sheet(isPresented: $showPlexSignIn, onDismiss: handlePlexSheetDismiss) {
+            PlexSignInView(
+                viewModel: viewModel,
+                editingConnection: editingConnection,
+                suggestedName: trimmedName.isEmpty ? nil : trimmedName
+            ) {
+                plexFlowCompleted = true
             }
         }
         .overlay {
-            if isBlocking {
-                ConnectionStatusDialog(
-                    kind: .connecting(
-                        title: isSaving ? L10n.tr("正在连接...") : L10n.tr("正在登录..."),
-                        message: isSaving
-                            ? L10n.tr("正在与服务器协商安全连接。")
-                            : L10n.tr("完成登录后才会保存此连接")
-                    ),
-                    onCancel: cancelAndClose,
-                    onRetry: nil
-                )
-            } else if let message = saveErrorMessage ?? oauthErrorMessage {
-                ConnectionStatusDialog(
-                    kind: .failed(message: message),
-                    onCancel: dismissConnectionError,
-                    onRetry: retryAfterError
-                )
-            }
+            statusOverlay
         }
         .onDisappear {
             workTask?.cancel()
+        }
+    }
+
+    // MARK: - Header (`09 · Sheet — Add Storage Connection`)
+
+    private var sheetHeader: some View {
+        VStack(spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                Capsule()
+                    .fill(CatDesign.grabberFill)
+                    .frame(width: 44, height: 4)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 10)
+
+                Image("CatSheetGrabberPeeking")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 72, height: 38)
+                    .padding(.trailing, 46)
+                    .allowsHitTesting(false)
+            }
+
+            HStack {
+                Text(isEditing ? L10n.tr("编辑连接") : L10n.tr("添加连接"))
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+
+                Spacer()
+
+                Button { cancelAndClose() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .frame(width: 28, height: 28)
+                        .background(CatDesign.surfacePill, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L10n.tr("关闭"))
+            }
+            .padding(.horizontal, CatDesign.horizontalMargin)
+            .padding(.bottom, 12)
+        }
+    }
+
+    @ViewBuilder
+    private var statusOverlay: some View {
+        if isBlocking {
+            ConnectionStatusDialog(
+                kind: .connecting(
+                    title: isSaving ? L10n.tr("正在连接...") : L10n.tr("正在登录..."),
+                    message: isSaving
+                        ? L10n.tr("正在与服务器协商安全连接。")
+                        : L10n.tr("完成登录后才会保存此连接")
+                ),
+                onCancel: cancelAndClose,
+                onRetry: nil
+            )
+        } else if let message = saveErrorMessage ?? oauthErrorMessage {
+            ConnectionStatusDialog(
+                kind: .failed(message: message),
+                onCancel: dismissConnectionError,
+                onRetry: retryAfterError
+            )
         }
     }
 
@@ -165,233 +204,319 @@ struct AddConnectionView: View {
         isSaving || isAuthenticatingOAuth
     }
 
-    // MARK: - Sections
+    // MARK: - Protocol Selector
 
-    private var typeSection: some View {
-        Section(L10n.tr("连接类型")) {
-            if isEditing {
-                LabeledContent(L10n.tr("协议")) {
-                    HStack(spacing: 8) {
-                        ConnectionProviderIcon(type: selectedType, size: 18)
-                        Text(selectedType.displayName)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                LabeledContent(L10n.tr("协议")) {
-                    Picker(L10n.tr("协议"), selection: $selectedType) {
-                        ForEach(ConnectionType.availableConnectionTypes) { type in
-                            Label {
-                                Text(type.displayName)
-                            } icon: {
-                                ConnectionProviderIcon(type: type, size: 18)
-                            }
-                            .tag(type)
+    private var displayedProtocols: [ConnectionType] {
+        if isEditing {
+            return [selectedType]
+        }
+        if showAllProtocols {
+            let remaining = ConnectionType.availableConnectionTypes.filter { !Self.featuredProtocols.contains($0) }
+            return Self.featuredProtocols + remaining
+        }
+        return Self.featuredProtocols
+    }
+
+    private let protocolColumns = [
+        GridItem(.flexible(), spacing: 10),
+        GridItem(.flexible(), spacing: 10)
+    ]
+
+    private var protocolSelectorSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(L10n.tr("协议与来源类型"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(CatDesign.textMuted)
+
+                Spacer()
+
+                if !isEditing {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAllProtocols.toggle()
                         }
+                    } label: {
+                        Text(showAllProtocols ? L10n.tr("收起协议") : L10n.tr("全部协议 (%d)", ConnectionType.availableConnectionTypes.count))
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(CatDesign.accentAmber)
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
+                    .buttonStyle(.plain)
                 }
-                .onChange(of: selectedType) { _, newValue in
-                    useHTTPS = supportsHTTPS(for: newValue)
-                        ? inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: newValue))
-                        : false
-                    port = "\(defaultPort(for: newValue, useHTTPS: useHTTPS))"
-                    applyDefaults(for: newValue)
-                    // 若 host 已是带 scheme 无端口的完整 URL，重置默认端口后需重新套用标准端口，
-                    // 避免「先粘贴 https://host、后选择 Emby」时端口又被改回 8096。
-                    applyHostSchemeDefaults()
-                    if !newValue.isLocal {
-                        folderURL = nil
-                        folderBookmark = nil
+            }
+
+            LazyVGrid(columns: protocolColumns, spacing: 8) {
+                ForEach(displayedProtocols) { type in
+                    CatProtocolTile(
+                        type: type,
+                        isSelected: selectedType == type
+                    ) {
+                        guard !isEditing else { return }
+                        selectProtocol(type)
                     }
                 }
             }
         }
     }
 
+    private func selectProtocol(_ newValue: ConnectionType) {
+        selectedType = newValue
+        useHTTPS = supportsHTTPS(for: newValue)
+            ? inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: newValue))
+            : false
+        port = "\(defaultPort(for: newValue, useHTTPS: useHTTPS))"
+        applyDefaults(for: newValue)
+        applyHostSchemeDefaults()
+        if !newValue.isLocal {
+            folderURL = nil
+            folderBookmark = nil
+        }
+    }
+
+    // MARK: - Dynamic Form
+
+    @ViewBuilder
+    private var dynamicFormSection: some View {
+        if selectedType.isLocal {
+            localFolderSection
+        } else if selectedType.supportsOAuthLogin {
+            oauthCloudDriveSection
+        } else if selectedType == .plex {
+            plexSignInSection
+        } else if selectedType.isOfficialCloudDrive {
+            officialCloudDriveSection
+        } else {
+            remoteServerSection
+        }
+    }
+
     private var localFolderSection: some View {
-        Section(L10n.tr("本地文件夹")) {
-            TextField(L10n.tr("名称"), text: $name)
-                .textContentType(.name)
+        VStack(alignment: .leading, spacing: 10) {
+            CatGlassInputField(label: L10n.tr("名称"), placeholder: L10n.tr("例如：本地电影"), text: $name)
 
             Button {
                 showFolderPicker = true
             } label: {
-                HStack {
-                    Image(systemName: "folder.badge.plus")
+                HStack(spacing: 10) {
+                    Image("CatFolderTileAmber")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 22, height: 18)
+
                     Text(folderURL == nil ? L10n.tr("选择文件夹...") : L10n.tr("更换文件夹"))
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
+
                     Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CatDesign.textMuted)
                 }
+                .padding(.horizontal, 14)
+                .frame(height: 46)
+                .catGlassCard(cornerRadius: 14, amberStroke: folderURL == nil)
             }
+            .buttonStyle(.plain)
 
             if let folderURL {
-                LabeledContent(L10n.tr("已选目录")) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(folderURL.lastPathComponent)
-                        .lineLimit(1)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                    Text(folderURL.path)
+                        .font(.system(size: 11))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .lineLimit(2)
                         .truncationMode(.middle)
-                        .foregroundStyle(.secondary)
                 }
-                Text(folderURL.path)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(2)
-                    .truncationMode(.middle)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .catGlassCard(cornerRadius: 14)
             }
 
             if let folderPickerError {
                 Text(folderPickerError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(CatDesign.dangerRed)
             }
         }
     }
 
     private var remoteServerSection: some View {
-        Section(L10n.tr("服务器信息")) {
-            TextField(L10n.tr("名称"), text: $name)
-                .textContentType(.name)
+        VStack(alignment: .leading, spacing: 10) {
+            CatGlassInputField(label: L10n.tr("连接名称"), placeholder: selectedType.displayName, text: $name)
 
-            TextField(
-                hostPlaceholder,
-                text: $host
-            )
-            .textContentType(.URL)
-            .autocapitalization(.none)
-            .keyboardType(.URL)
-            .onChange(of: host) { _, _ in
-                applyHostSchemeDefaults()
+            HStack(spacing: 10) {
+                CatGlassInputField(
+                    label: L10n.tr("主机 / 服务器地址"),
+                    placeholder: hostPlaceholder,
+                    text: $host,
+                    keyboardType: .URL,
+                    autocapitalization: .never
+                )
+                .onChange(of: host) { _, _ in
+                    applyHostSchemeDefaults()
+                }
+
+                CatGlassInputField(
+                    label: L10n.tr("端口"),
+                    placeholder: "\(selectedType.defaultPort)",
+                    text: $port,
+                    keyboardType: .numberPad,
+                    autocapitalization: .never
+                )
+                .frame(width: 88)
             }
 
             if supportsHTTPS(for: selectedType) {
-                Toggle("HTTPS", isOn: $useHTTPS)
-                    .onChange(of: useHTTPS) { _, newValue in
-                        applyHTTPSPortDefault(newValue)
-                    }
+                HStack {
+                    Text("HTTPS")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                    Spacer()
+                    Toggle("HTTPS", isOn: $useHTTPS)
+                        .labelsHidden()
+                        .tint(CatDesign.accentAmber)
+                        .onChange(of: useHTTPS) { _, newValue in
+                            applyHTTPSPortDefault(newValue)
+                        }
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .catGlassCard(cornerRadius: 14)
             }
 
-            TextField(L10n.tr("端口"), text: $port)
-                .keyboardType(.numberPad)
+            CatGlassInputField(
+                label: L10n.tr("路径"),
+                placeholder: pathPlaceholder,
+                text: $path,
+                autocapitalization: .never
+            )
 
-            TextField(pathPlaceholder, text: $path)
-                .autocapitalization(.none)
+            if selectedType.requiresAuth {
+                CatGlassInputField(
+                    label: L10n.tr("用户名"),
+                    placeholder: L10n.tr("用户名"),
+                    text: $username,
+                    autocapitalization: .never
+                )
+
+                CatGlassInputField(
+                    label: L10n.tr("密码"),
+                    placeholder: isEditing ? editingPasswordHint : "••••••••",
+                    text: $password,
+                    isSecure: true,
+                    autocapitalization: .never
+                )
+            }
 
             if let formValidationMessage {
                 Text(formValidationMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(CatDesign.dangerRed)
             } else if let fnOSPortHint {
                 Text(fnOSPortHint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(CatDesign.textMuted)
             }
 
             if let caption = connectionTypeCaption {
                 Text(caption)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var authSection: some View {
-        Section(L10n.tr("认证")) {
-            TextField(L10n.tr("用户名"), text: $username)
-                .textContentType(.username)
-                .autocapitalization(.none)
-
-            SecureField(L10n.tr("密码"), text: $password)
-                .textContentType(.password)
-
-            if isEditing {
-                Text(editingPasswordHint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineSpacing(2)
             }
         }
     }
 
     private var officialCloudDriveSection: some View {
-        Section(L10n.tr("官方接入")) {
-            TextField(L10n.tr("名称"), text: $name)
-                .textContentType(.name)
-
-            TextField(hostPlaceholder, text: $host)
-                .textContentType(.URL)
-                .autocapitalization(.none)
-                .keyboardType(.URL)
-
-            TextField(pathPlaceholder, text: $path)
-                .autocapitalization(.none)
+        VStack(alignment: .leading, spacing: 10) {
+            CatGlassInputField(label: L10n.tr("名称"), placeholder: selectedType.displayName, text: $name)
+            CatGlassInputField(label: L10n.tr("主机地址"), placeholder: hostPlaceholder, text: $host, autocapitalization: .never)
+            CatGlassInputField(label: L10n.tr("路径"), placeholder: pathPlaceholder, text: $path, autocapitalization: .never)
 
             if let caption = connectionTypeCaption {
                 Text(caption)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineSpacing(2)
             }
         }
     }
 
     private var oauthCloudDriveSection: some View {
-        Section(L10n.tr("账号登录")) {
+        VStack(alignment: .leading, spacing: 10) {
             if isEditing {
-                TextField(L10n.tr("名称"), text: $name)
-                    .textContentType(.name)
+                CatGlassInputField(label: L10n.tr("名称"), placeholder: selectedType.displayName, text: $name)
             }
 
             if let caption = connectionTypeCaption {
                 Text(caption)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineSpacing(2)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .catGlassCard(cornerRadius: 14)
             }
 
             if !OAuthProviderConfiguration.isConfigured(for: selectedType) {
                 Text(OAuthProviderConfiguration.missingCredentialHint(for: selectedType))
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(CatDesign.dangerRed)
             }
 
             Button {
                 startOAuthLogin()
             } label: {
-                HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.badge.key.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
                     Text(isEditing ? "重新登录 \(selectedType.displayName)" : "使用 \(selectedType.displayName) 账号登录")
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
                     Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CatDesign.textMuted)
                 }
+                .padding(.horizontal, 14)
+                .frame(height: 46)
+                .catGlassCard(cornerRadius: 14, amberStroke: OAuthProviderConfiguration.isConfigured(for: selectedType))
             }
+            .buttonStyle(.plain)
             .disabled(!OAuthProviderConfiguration.isConfigured(for: selectedType) || isAuthenticatingOAuth)
-
-            if let oauthErrorMessage {
-                Text(oauthErrorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
         }
     }
 
     private var plexSignInSection: some View {
-        Section(L10n.tr("账号登录")) {
+        VStack(alignment: .leading, spacing: 10) {
             if let editingConnection {
-                TextField(L10n.tr("名称"), text: $name)
-                    .textContentType(.name)
+                CatGlassInputField(label: L10n.tr("名称"), placeholder: "Plex", text: $name)
 
-                LabeledContent(L10n.tr("Plex 服务器")) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L10n.tr("Plex 服务器"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CatDesign.textMuted)
                     Text(displayedPlexServer)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(CatDesign.textIvory)
+                    if let account = editingConnection.username, !account.isEmpty {
+                        Text(L10n.tr("已登录 Plex 账号：%@", account))
+                            .font(.system(size: 11))
+                            .foregroundStyle(CatDesign.textMuted)
+                    }
                 }
-
-                if let account = editingConnection.username, !account.isEmpty {
-                    Text(L10n.tr("已登录 Plex 账号：%@", account))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .catGlassCard(cornerRadius: 14)
 
                 if viewModel.plexConnectionNeedsReauthentication(editingConnection) {
                     Text(L10n.tr("Plex 登录状态已失效，请重新登录。"))
-                        .font(.caption)
-                        .foregroundStyle(.red)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(CatDesign.dangerRed)
                 }
 
                 Button {
@@ -399,35 +524,129 @@ struct AddConnectionView: View {
                 } label: {
                     HStack {
                         Text(L10n.tr("重新登录 Plex"))
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundStyle(CatDesign.accentAmber)
                         Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundStyle(CatDesign.textMuted)
                     }
+                    .padding(.horizontal, 14)
+                    .frame(height: 46)
+                    .catGlassCard(cornerRadius: 14, amberStroke: true)
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("connection.plex.relogin")
             } else {
+                CatGlassInputField(label: L10n.tr("可选名称"), placeholder: "Plex", text: $name)
+
                 Button {
                     showPlexSignIn = true
                 } label: {
-                    HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "key.fill")
+                            .foregroundStyle(CatDesign.accentAmber)
                         Text(L10n.tr("使用 Plex 账号登录"))
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundStyle(CatDesign.textIvory)
                         Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundStyle(CatDesign.textMuted)
                     }
+                    .padding(.horizontal, 14)
+                    .frame(height: 46)
+                    .catGlassCard(cornerRadius: 14, amberStroke: true)
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("connection.plex.signIn")
 
                 Text(L10n.tr("通过 Plex 账号登录后自动创建连接"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
             }
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Bottom CTA (`Connect Glass Pill`)
+
+    private var primaryButtonTitle: String {
+        if isEditing { return L10n.tr("保存连接") }
+        if selectedType.supportsOAuthLogin || selectedType == .plex {
+            return L10n.tr("继续登录")
+        }
+        return L10n.tr("连接服务器")
+    }
+
+    private var canTapPrimaryButton: Bool {
+        if isBlocking || isRenamingPlex { return false }
+        if !isEditing && selectedType.supportsOAuthLogin {
+            return OAuthProviderConfiguration.isConfigured(for: selectedType)
+        }
+        if !isEditing && selectedType == .plex {
+            return true
+        }
+        return isValid
+    }
+
+    private var bottomConnectButton: some View {
+        VStack(spacing: 0) {
+            Button {
+                handlePrimaryTap()
+            } label: {
+                HStack(spacing: 8) {
+                    Image("CatEyeStatus")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 8)
+
+                    Text(primaryButtonTitle)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Capsule().fill(CatDesign.amberTintStrong))
+                }
+                .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 1.2))
+                .shadow(color: CatDesign.amberGlowShadow, radius: 14, y: 6)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canTapPrimaryButton)
+            .opacity(canTapPrimaryButton ? 1 : 0.45)
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 12)
+        .padding(.bottom, 20)
+        .background(
+            LinearGradient(
+                colors: [CatDesign.surfaceSheet.opacity(0), CatDesign.surfaceSheet],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
+    }
+
+    private func handlePrimaryTap() {
+        if !isEditing && selectedType.supportsOAuthLogin {
+            startOAuthLogin()
+        } else if !isEditing && selectedType == .plex {
+            showPlexSignIn = true
+        } else {
+            save()
+        }
+    }
+
+    // MARK: - Helpers (原有业务与校验逻辑完整保留)
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Plex 连接存的是完整 endpoint URI；摘要里去掉 scheme，只显示 host:port。
     private var displayedPlexServer: String {
         guard let editingConnection else { return "" }
         if let url = URL(string: editingConnection.host),
@@ -441,7 +660,6 @@ struct AddConnectionView: View {
     private func handlePlexSheetDismiss() {
         guard plexFlowCompleted else { return }
         plexFlowCompleted = false
-        // 重新登录成功的 Plex 行保留原名称；用户在名称栏里改过名时补一次改名，避免内容被丢弃。
         if let editingConnection, !trimmedName.isEmpty, trimmedName != editingConnection.name {
             Task { _ = await viewModel.renameConnection(editingConnection, name: trimmedName) }
         }
@@ -463,7 +681,7 @@ struct AddConnectionView: View {
 
     private var hostPlaceholder: String {
         if selectedType.isMediaServer {
-            return "服务器地址（如 https://emby.example.com）"
+            return "https://emby.example.com"
         }
         if selectedType == .iptv {
             return L10n.tr("播放列表 URL 或主机地址")
@@ -471,7 +689,7 @@ struct AddConnectionView: View {
         if selectedType.isOfficialCloudDrive {
             return "开放平台域名或应用参数"
         }
-        return "主机地址"
+        return "192.168.1.10"
     }
 
     private var pathPlaceholder: String {
@@ -484,11 +702,10 @@ struct AddConnectionView: View {
         if selectedType == .smb {
             return L10n.tr("共享名，如 /Movies")
         }
-        return "路径 (可选)"
+        return L10n.tr("路径 (可选)")
     }
 
     private var isValid: Bool {
-        // Plex 新连接由 PIN 登录流程创建；本页「保存」只负责给既有 Plex 连接改名。
         if selectedType == .plex {
             return isEditing && !trimmedName.isEmpty
         }
@@ -497,7 +714,6 @@ struct AddConnectionView: View {
             return folderBookmark != nil
         }
         if selectedType.supportsOAuthLogin {
-            // 新建走登录按钮直接创建连接；编辑时允许通过L10n.tr("保存")改名。
             return isEditing
         }
         guard !host.isEmpty else { return false }
@@ -584,7 +800,7 @@ struct AddConnectionView: View {
     }
 
     private var resolvedPort: Int {
-        return Int(port) ?? selectedType.defaultPort
+        Int(port) ?? selectedType.defaultPort
     }
 
     private var normalizedRemoteInput: (host: String, port: Int, path: String?) {
@@ -640,7 +856,6 @@ struct AddConnectionView: View {
         )
     }
 
-    /// AList / fnOS 的 WebDAV 路径需以 `/` 开头，纠正用户漏填前导斜杠的情况（如 `dav` → `/dav`）。
     private func normalizedRemotePath(_ path: String) -> String? {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -673,9 +888,6 @@ struct AddConnectionView: View {
         if let componentPort = components.port {
             port = "\(componentPort)"
         } else if hasExplicitScheme {
-            // 用户粘贴了带 scheme 但不带端口的完整 URL（如 https://emby.example.com）：
-            // 应使用该 scheme 的标准端口（https→443 / http→80），而不是媒体服务器的
-            // 默认端口（如 Emby 8096），否则会拼出 https://host:8096 这类错误地址。
             port = components.scheme?.lowercased() == "http" ? "80" : "443"
         }
     }
@@ -702,21 +914,16 @@ struct AddConnectionView: View {
 
     private func defaultHTTPS(for type: ConnectionType) -> Bool {
         switch type {
-        case .fnos:
-            return false
-        default:
-            return true
+        case .fnos: return false
+        default: return true
         }
     }
 
     private func defaultPort(for type: ConnectionType, useHTTPS: Bool) -> Int {
         switch type {
-        case .fnos:
-            return useHTTPS ? 5006 : 5005
-        case .webdav:
-            return useHTTPS ? 443 : 80
-        default:
-            return type.defaultPort
+        case .fnos: return useHTTPS ? 5006 : 5005
+        case .webdav: return useHTTPS ? 443 : 80
+        default: return type.defaultPort
         }
     }
 
@@ -731,13 +938,9 @@ struct AddConnectionView: View {
     private func applyDefaults(for type: ConnectionType) {
         switch type {
         case .alist:
-            if path.isEmpty {
-                path = "/dav"
-            }
+            if path.isEmpty { path = "/dav" }
         case .fnos:
-            if path == "/dav" {
-                path = ""
-            }
+            if path == "/dav" { path = "" }
         default:
             break
         }
@@ -747,7 +950,6 @@ struct AddConnectionView: View {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-
             guard url.startAccessingSecurityScopedResource() else {
                 folderPickerError = L10n.tr("无法获取该文件夹的访问权限")
                 return
@@ -763,13 +965,10 @@ struct AddConnectionView: View {
                 folderURL = url
                 folderBookmark = bookmark
                 folderPickerError = nil
-                if name.isEmpty {
-                    name = url.lastPathComponent
-                }
+                if name.isEmpty { name = url.lastPathComponent }
             } catch {
                 folderPickerError = "保存文件夹书签失败: \(error.localizedDescription)"
             }
-
         case .failure(let error):
             folderPickerError = "选择文件夹失败: \(error.localizedDescription)"
         }
@@ -785,9 +984,7 @@ struct AddConnectionView: View {
         saveErrorMessage = nil
         workTask = Task {
             defer {
-                if !Task.isCancelled {
-                    isSaving = false
-                }
+                if !Task.isCancelled { isSaving = false }
             }
             let didConnect: Bool
             if selectedType.isLocal {
@@ -856,7 +1053,6 @@ struct AddConnectionView: View {
         }
     }
 
-    /// 既有 Plex 连接只改名：不重新授权、不重新连接扫描。
     private func savePlexRename() {
         guard let editingConnection, !trimmedName.isEmpty else { return }
         isRenamingPlex = true
@@ -905,6 +1101,102 @@ struct AddConnectionView: View {
     }
 }
 
+// MARK: - Cat Protocol Tile & Glass Input Field
+
+private struct CatProtocolTile: View {
+    let type: ConnectionType
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isSelected ? CatDesign.amberTintStrong : CatDesign.surfacePill)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(isSelected ? CatDesign.strokeAmber : CatDesign.strokeGlass, lineWidth: 0.75)
+
+                    Text(type.catShortCode)
+                        .font(.system(size: 8.5, weight: .bold))
+                        .foregroundStyle(isSelected ? CatDesign.accentAmber : CatDesign.textMuted)
+                }
+                .frame(width: 28, height: 28)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(type.displayName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                        .lineLimit(1)
+
+                    Text(type.catShortHint)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(isSelected ? CatDesign.accentAmber : CatDesign.textDim)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 46)
+            .background(
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .fill(isSelected ? CatDesign.amberTintFill : CatDesign.surfaceGlass)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? CatDesign.strokeAmber : CatDesign.strokeGlass,
+                        lineWidth: isSelected ? 1.1 : 0.9
+                    )
+            )
+            .shadow(color: isSelected ? CatDesign.amberGlowShadow : .clear, radius: 7, y: 4)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct CatGlassInputField: View {
+    let label: String
+    let placeholder: String
+    @Binding var text: String
+    var isSecure: Bool = false
+    var keyboardType: UIKeyboardType = .default
+    var autocapitalization: TextInputAutocapitalization = .sentences
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CatDesign.textMuted)
+
+            Group {
+                if isSecure {
+                    SecureField(
+                        "",
+                        text: $text,
+                        prompt: Text(placeholder).foregroundStyle(CatDesign.textDim)
+                    )
+                } else {
+                    TextField(
+                        "",
+                        text: $text,
+                        prompt: Text(placeholder).foregroundStyle(CatDesign.textDim)
+                    )
+                    .keyboardType(keyboardType)
+                    .textInputAutocapitalization(autocapitalization)
+                    .autocorrectionDisabled()
+                }
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(CatDesign.textIvory)
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .catGlassCard(cornerRadius: 14)
+        }
+    }
+}
+
 private struct ConnectionStatusDialog: View {
     enum Kind {
         case connecting(title: String, message: String)
@@ -915,12 +1207,9 @@ private struct ConnectionStatusDialog: View {
     let onCancel: () -> Void
     let onRetry: (() -> Void)?
 
-    private let accent = Color(red: 43 / 255, green: 127 / 255, blue: 255 / 255)
-    private let subtitleColor = Color(red: 115 / 255, green: 115 / 255, blue: 115 / 255)
-
     var body: some View {
         ZStack {
-            Color.black.opacity(0.2)
+            Color.black.opacity(0.55)
                 .ignoresSafeArea()
                 .allowsHitTesting(true)
 
@@ -931,26 +1220,23 @@ private struct ConnectionStatusDialog: View {
                     .frame(minHeight: 140)
 
                 Rectangle()
-                    .fill(Color.black.opacity(0.1))
-                    .frame(height: 0.6)
+                    .fill(CatDesign.hairSeparator)
+                    .frame(height: 0.75)
 
                 footer
-                    .frame(height: 53.5)
+                    .frame(height: 50)
             }
-            .frame(width: 270)
-            .background(
-                Color.white.opacity(0.9),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.6)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .shadow(color: Color.black.opacity(0.12), radius: 16, y: 8)
+            .frame(width: 280)
+            .catGlassCard(cornerRadius: 20, elevated: true, amberStroke: isConnecting)
+            .shadow(color: .black.opacity(0.45), radius: 18, y: 10)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityTitle)
+    }
+
+    private var isConnecting: Bool {
+        if case .connecting = kind { return true }
+        return false
     }
 
     @ViewBuilder
@@ -960,58 +1246,56 @@ private struct ConnectionStatusDialog: View {
             VStack(spacing: 0) {
                 ProgressView()
                     .controlSize(.large)
-                    .tint(accent)
+                    .tint(CatDesign.accentAmber)
                     .frame(width: 40, height: 40)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 14)
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.black)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 4)
                 Text(message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(subtitleColor)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(CatDesign.textMuted)
                     .multilineTextAlignment(.center)
-                    .frame(width: 221)
             }
         case .failed(let message):
             VStack(spacing: 0) {
                 Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(Color.red)
+                    .font(.system(size: 34))
+                    .foregroundStyle(CatDesign.dangerRed)
                     .frame(width: 40, height: 40)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 14)
                 Text(L10n.tr("连接失败"))
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.black)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 4)
                 Text(message.isEmpty ? L10n.tr("服务器无响应或地址不正确。") : message)
-                    .font(.system(size: 13))
-                    .foregroundStyle(subtitleColor)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(CatDesign.textMuted)
                     .multilineTextAlignment(.center)
-                    .frame(width: 221)
             }
         }
     }
 
     private var footer: some View {
         HStack(spacing: 0) {
-            dialogButton(L10n.tr("取消"), weight: .regular, action: onCancel)
+            dialogButton(L10n.tr("取消"), weight: .regular, tint: CatDesign.textMuted, action: onCancel)
             if let onRetry {
                 Rectangle()
-                    .fill(Color.black.opacity(0.1))
-                    .frame(width: 0.6)
-                dialogButton(L10n.tr("重试"), weight: .semibold, action: onRetry)
+                    .fill(CatDesign.hairSeparator)
+                    .frame(width: 0.75)
+                dialogButton(L10n.tr("重试"), weight: .semibold, tint: CatDesign.accentAmber, action: onRetry)
             }
         }
     }
 
-    private func dialogButton(_ title: String, weight: Font.Weight, action: @escaping () -> Void) -> some View {
+    private func dialogButton(_ title: String, weight: Font.Weight, tint: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 17, weight: weight))
-                .foregroundStyle(accent)
+                .font(.system(size: 15, weight: weight))
+                .foregroundStyle(tint)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .buttonStyle(.plain)
@@ -1019,14 +1303,13 @@ private struct ConnectionStatusDialog: View {
 
     private var accessibilityTitle: String {
         switch kind {
-        case .connecting(let title, _):
-            return title
-        case .failed:
-            return L10n.tr("连接失败")
+        case .connecting(let title, _): return title
+        case .failed: return L10n.tr("连接失败")
         }
     }
 }
 
 #Preview {
     AddConnectionView(viewModel: BrowserViewModel())
+        .preferredColorScheme(.dark)
 }

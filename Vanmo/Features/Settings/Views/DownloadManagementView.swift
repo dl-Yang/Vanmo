@@ -3,55 +3,82 @@ import SwiftUI
 import Kingfisher
 import VanmoCore
 
-/// iOS 下载管理页。视觉对齐 Figma Download Light `456:4` / Dark `456:254`。
+/// iOS 下载管理页。对齐 Figma `11 · Downloads Management` (`693:1041`)。
 struct DownloadManagementView: View {
     @EnvironmentObject private var downloadManager: DownloadManager
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
 
-    @State private var selection: Set<UUID> = []
-    @State private var isSelectionMode = false
-    @State private var deleteConfirmation = false
+    @State private var deleteTargetTask: DownloadTaskSnapshot?
     @State private var presentedSurface: PresentedDownloadSurface?
     @State private var lastLoggedTaskSignatures: [UUID: String] = [:]
+    @State private var currentSpeedBytesPerSecond: Double = 0
+    @State private var lastSampleBytes: Int64 = 0
+    @State private var lastSampleDate: Date?
+    @State private var storageStats = DeviceStorageStats.current()
 
-    private let actionBlue = Color(red: 10 / 255, green: 132 / 255, blue: 255 / 255)
-    private let secondaryGray = Color(red: 142 / 255, green: 142 / 255, blue: 147 / 255)
-    private let failRed = Color(red: 255 / 255, green: 59 / 255, blue: 48 / 255)
+    private var activeTasks: [DownloadTaskSnapshot] {
+        downloadManager.tasks.filter { $0.status != .completed }
+    }
+
+    private var completedTasks: [DownloadTaskSnapshot] {
+        downloadManager.tasks.filter { $0.status == .completed }
+    }
 
     var body: some View {
-        ZStack {
-            pageBackground.ignoresSafeArea()
+        ZStack(alignment: .top) {
+            CatDesign.bgObsidian.ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                actionRow
+            HStack {
+                CatAmberHalo(width: 180, height: 110, opacity: 0.20)
+                    .padding(.top, 90)
+                    .padding(.leading, 20)
+                Spacer()
+            }
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                navHeader
+
                 if downloadManager.tasks.isEmpty {
                     emptyState
                 } else {
-                    taskList
+                    downloadsScrollContent
                 }
             }
         }
         .accessibilityIdentifier("screen.downloads")
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(isSelectionMode ? .hidden : .automatic, for: .tabBar)
-        .confirmationDialog(L10n.tr("删除选中的下载？"), isPresented: $deleteConfirmation) {
-            Button(L10n.tr("删除文件和记录"), role: .destructive) {
-                Task {
-                    await downloadManager.delete(selection)
-                    selection.removeAll()
-                    isSelectionMode = false
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .catTabBarHidden(true)
+        .confirmationDialog(
+            L10n.tr("删除下载？"),
+            isPresented: Binding(
+                get: { deleteTargetTask != nil },
+                set: { if !$0 { deleteTargetTask = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let task = deleteTargetTask {
+                Button(L10n.tr("删除文件和记录"), role: .destructive) {
+                    Task {
+                        await downloadManager.delete([task.id])
+                        storageStats = DeviceStorageStats.current()
+                    }
+                    deleteTargetTask = nil
                 }
             }
-            Button(L10n.tr("取消"), role: .cancel) {}
+            Button(L10n.tr("取消"), role: .cancel) {
+                deleteTargetTask = nil
+            }
         }
         .onAppear {
+            storageStats = DeviceStorageStats.current()
             logTaskSnapshots(reason: "appear")
         }
         .onChange(of: downloadManager.tasks) { _, _ in
+            updateSpeedSample()
             logTaskSnapshots(reason: "update")
         }
         .onChange(of: appState.pendingDownloadDetailRequest, initial: true) { _, request in
@@ -66,207 +93,223 @@ struct DownloadManagementView: View {
         }
     }
 
-    private var pageBackground: Color {
-        colorScheme == .dark ? .black : .white
-    }
+    // MARK: - Nav Header
 
-    private var header: some View {
-        Text(L10n.tr("下载"))
-            .font(.system(size: 34, weight: .bold))
-            .tracking(-0.85)
-            .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-            .accessibilityAddTraits(.isHeader)
-    }
+    private var navHeader: some View {
+        HStack(spacing: 12) {
+            CatBackButton(size: 36) { dismiss() }
 
-    private var actionRow: some View {
-        HStack(spacing: 16) {
-            Spacer(minLength: 0)
-            if isSelectionMode {
-                let allSelected = !downloadManager.tasks.isEmpty
-                    && selection.count == downloadManager.tasks.count
-                if !selection.isEmpty {
-                    selectionAction(L10n.tr("删除"), role: .destructive) {
-                        deleteConfirmation = true
-                    }
-                    .accessibilityIdentifier("downloads.deleteSelected")
-                }
+            Text(L10n.tr("下载"))
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
 
-                selectionAction(allSelected ? L10n.tr("取消全选") : L10n.tr("全选")) {
-                    if allSelected {
-                        selection.removeAll()
-                    } else {
-                        selection = Set(downloadManager.tasks.map(\.id))
-                    }
-                }
+            Spacer(minLength: 8)
 
-                selectionAction(L10n.tr("取消")) {
-                    isSelectionMode = false
-                    selection.removeAll()
+            if downloadManager.hasPausableTasks {
+                Button {
+                    Task { await downloadManager.pauseAll() }
+                } label: {
+                    Text(L10n.tr("全部暂停"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .padding(.horizontal, 11)
+                        .frame(height: 30)
+                        .catGlassCard(cornerRadius: CatDesign.radiusPill)
                 }
-            } else if !downloadManager.tasks.isEmpty {
-                if downloadManager.hasPausableTasks {
-                    Button(L10n.tr("全部暂停")) {
-                        Task { await downloadManager.pauseAll() }
-                    }
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(actionBlue)
-                    .accessibilityIdentifier("downloads.pauseAll")
-                } else if downloadManager.hasResumableTasks {
-                    Button(L10n.tr("全部继续")) {
-                        Task { await downloadManager.resumeAll() }
-                    }
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(actionBlue)
-                    .accessibilityIdentifier("downloads.resumeAll")
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("downloads.pauseAll")
+            } else if downloadManager.hasResumableTasks {
+                Button {
+                    Task { await downloadManager.resumeAll() }
+                } label: {
+                    Text(L10n.tr("全部继续"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                        .padding(.horizontal, 11)
+                        .frame(height: 30)
+                        .catGlassCard(cornerRadius: CatDesign.radiusPill, amberStroke: true)
                 }
-
-                Button(L10n.tr("选择")) {
-                    isSelectionMode = true
-                }
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(actionBlue)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("downloads.resumeAll")
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
     }
 
-    @ViewBuilder
-    private func selectionAction(
-        _ title: String,
-        role: ButtonRole? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        if #available(iOS 26.0, *) {
-            Button(title, role: role, action: action)
-                .buttonStyle(.glass)
-                .controlSize(.small)
-        } else {
-            Button(title, role: role, action: action)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(role == .destructive ? failRed : actionBlue)
-        }
-    }
+    // MARK: - Scroll Content
 
-    private var taskList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                Text(summaryText)
-                    .font(.system(size: 13, weight: .medium))
-                    .tracking(-0.325)
-                    .foregroundStyle(secondaryGray)
-                    .padding(.leading, 4)
-                    .padding(.bottom, 8)
+    private var downloadsScrollContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 18) {
+                storageSummaryCard
+                    .padding(.top, 10)
 
-                ForEach(downloadManager.tasks) { task in
-                    DownloadTaskRow(
-                        task: task,
-                        isSelected: selection.contains(task.id),
-                        isSelectionMode: isSelectionMode,
-                        actionBlue: actionBlue,
-                        secondaryGray: secondaryGray,
-                        failRed: failRed,
-                        titleColor: colorScheme == .dark ? .white : .black,
-                        play: { play(task) },
-                        retry: { Task { await downloadManager.retry(task.id) } },
-                        pause: { Task { await downloadManager.pause(task.id) } },
-                        resume: { Task { await downloadManager.resume(task.id) } },
-                        openDetail: { appState.requestDownloadDetail(for: task.request) },
-                        toggleSelection: { toggleSelection(task.id) }
-                    )
+                if !activeTasks.isEmpty {
+                    activeSection
+                }
+
+                if !completedTasks.isEmpty {
+                    completedSection
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
+            .padding(.horizontal, CatDesign.horizontalMargin)
+            .padding(.bottom, 34)
         }
-        .scrollIndicators(.automatic)
+    }
+
+    private var storageSummaryCard: some View {
+        HStack(spacing: 12) {
+            CatStorageRingGauge(usedFraction: storageStats.usedFraction)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(storageStats.headline)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+
+                Text(summarySubline)
+                    .font(.system(size: 11))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 6)
+
+            speedPill
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .catGlassCard(cornerRadius: 20, elevated: true)
+    }
+
+    private var summarySubline: String {
+        L10n.tr("%d 进行中 · %d 已完成 · %@ 可用", activeTasks.count, completedTasks.count, storageStats.freeText)
+    }
+
+    private var speedPill: some View {
+        let isDownloading = downloadManager.tasks.contains { $0.status == .downloading }
+        let speedText: String = {
+            guard isDownloading else { return L10n.tr("空闲") }
+            if currentSpeedBytesPerSecond > 1024 {
+                return "\(ByteCountFormatter.string(fromByteCount: Int64(currentSpeedBytesPerSecond), countStyle: .file))/s"
+            }
+            return L10n.tr("下载中")
+        }()
+
+        return HStack(spacing: 5) {
+            Circle()
+                .fill(isDownloading ? CatDesign.glowAmber : CatDesign.textDim)
+                .frame(width: 5, height: 5)
+
+            Text(speedText)
+                .font(.system(size: 10.5, weight: .bold).monospacedDigit())
+                .foregroundStyle(isDownloading ? CatDesign.accentAmber : CatDesign.textMuted)
+                .lineLimit(1)
+        }
+        .padding(.leading, 9)
+        .padding(.trailing, 10)
+        .frame(height: 28)
+        .background(isDownloading ? CatDesign.amberTintFill : CatDesign.surfacePill, in: Capsule())
+        .overlay(Capsule().strokeBorder(isDownloading ? CatDesign.strokeAmber : CatDesign.strokeGlass, lineWidth: 0.85))
+    }
+
+    private var activeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(L10n.tr("正在下载 · %d", activeTasks.count))
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(CatDesign.textMuted)
+                Spacer()
+                CatStretchingDivider()
+            }
+
+            ForEach(activeTasks) { task in
+                CatActiveDownloadCard(
+                    task: task,
+                    onPause: { Task { await downloadManager.pause(task.id) } },
+                    onResume: { Task { await downloadManager.resume(task.id) } },
+                    onRetry: { Task { await downloadManager.retry(task.id) } },
+                    onDelete: { deleteTargetTask = task },
+                    onOpenDetail: { appState.requestDownloadDetail(for: task.request) }
+                )
+            }
+        }
+    }
+
+    private var completedSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.tr("已完成 · 离线媒体库"))
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(CatDesign.textMuted)
+                .padding(.top, 4)
+
+            ForEach(completedTasks) { task in
+                CatCompletedDownloadCard(
+                    task: task,
+                    onPlay: { play(task) },
+                    onDelete: { deleteTargetTask = task },
+                    onOpenDetail: { appState.requestDownloadDetail(for: task.request) }
+                )
+            }
+        }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             Spacer(minLength: 0)
-            Image(systemName: "arrow.down.circle")
-                .font(.system(size: 34, weight: .light))
-                .foregroundStyle(actionBlue)
+            Image("CatSittingInFolderBox")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 112, height: 86)
+
             Text(L10n.tr("暂无下载"))
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
+
             Text(L10n.tr("从媒体详情或文件浏览器发起下载后，任务会显示在这里。"))
                 .font(.system(size: 13))
-                .foregroundStyle(secondaryGray)
+                .foregroundStyle(CatDesign.textMuted)
                 .multilineTextAlignment(.center)
-                .frame(maxWidth: 280)
+                .frame(maxWidth: 260)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 24)
     }
 
-    private var summaryText: String {
-        let total = downloadManager.tasks.count
-        guard total > 0 else { return L10n.tr("暂无任务") }
-        let active = downloadManager.tasks.filter {
-            $0.status == .downloading || $0.status == .queued
-        }.count
-        let paused = downloadManager.tasks.filter { $0.status == .paused }.count
-        let failed = downloadManager.tasks.filter { $0.status == .failed }.count
-        var parts = [L10n.tr("%d 项", total)]
-        if active > 0 {
-            parts.append(L10n.tr("%d 进行中", active))
-        }
-        if paused > 0 {
-            parts.append(L10n.tr("%d 已暂停", paused))
-        }
-        if failed > 0 {
-            parts.append(L10n.tr("%d 失败", failed))
-        }
-        if parts.count == 1 {
-            parts.append(L10n.tr("全部完成"))
-        }
-        return parts.joined(separator: " · ")
-    }
+    // MARK: - Speed & Playback Helpers
 
-    private func toggleSelection(_ id: UUID) {
-        if selection.contains(id) {
-            selection.remove(id)
+    private func updateSpeedSample() {
+        let totalReceived = downloadManager.tasks
+            .filter { $0.status == .downloading }
+            .reduce(Int64(0)) { $0 + $1.receivedBytes }
+        let now = Date()
+        if let lastDate = lastSampleDate {
+            let dt = now.timeIntervalSince(lastDate)
+            if dt >= 0.4 {
+                let delta = max(0, totalReceived - lastSampleBytes)
+                currentSpeedBytesPerSecond = Double(delta) / dt
+                lastSampleBytes = totalReceived
+                lastSampleDate = now
+            }
         } else {
-            selection.insert(id)
+            lastSampleBytes = totalReceived
+            lastSampleDate = now
         }
     }
 
     private func play(_ task: DownloadTaskSnapshot) {
-        guard task.status == .completed else {
-#if DEBUG
-            VanmoLogger.storage.info("[Debug][Downloads] play skipped task=\(task.id.uuidString, privacy: .public) reason=status status=\(task.status.rawValue, privacy: .public)")
-#endif
-            return
-        }
+        guard task.status == .completed else { return }
         let resolvedURL: URL
         do {
             resolvedURL = try downloadManager.completedFileURL(for: task.id)
         } catch {
-#if DEBUG
-            VanmoLogger.storage.info("[Debug][Downloads] play skipped task=\(task.id.uuidString, privacy: .public) reason=resolve error=\(error.localizedDescription, privacy: .public)")
-#endif
             return
         }
-        guard FileManager.default.fileExists(atPath: resolvedURL.path) else {
-#if DEBUG
-            VanmoLogger.storage.info("[Debug][Downloads] play skipped task=\(task.id.uuidString, privacy: .public) reason=missing-file ext=\(resolvedURL.pathExtension.lowercased(), privacy: .public)")
-#endif
-            return
-        }
-        let url = resolvedURL
-#if DEBUG
-        VanmoLogger.storage.info("[Debug][Downloads] play completed task=\(task.id.uuidString, privacy: .public) ext=\(url.pathExtension.lowercased(), privacy: .public)")
-#endif
-        let fileURL = URL(fileURLWithPath: url.path, isDirectory: false)
+        guard FileManager.default.fileExists(atPath: resolvedURL.path) else { return }
+        let fileURL = URL(fileURLWithPath: resolvedURL.path, isDirectory: false)
         let item = MediaItem(
             title: task.request.displayTitle,
             fileURL: fileURL,
@@ -281,17 +324,11 @@ struct DownloadManagementView: View {
         item.container = fileURL.pathExtension.lowercased()
         item.originalFileName = task.request.fileName
         appState.play(item)
-#if DEBUG
-        VanmoLogger.storage.info("[Debug][Downloads] present player mediaType=\(item.mediaType.rawValue, privacy: .public) ext=\(fileURL.pathExtension.lowercased(), privacy: .public)")
-#endif
     }
 
     private func presentDetail(for request: DownloadRequest) {
         let stored = storedMediaItem(for: request)
         let item = stored ?? makeDownloadDetailFallback(for: request)
-#if DEBUG
-        VanmoLogger.storage.info("[Debug][Downloads] open detail mediaType=\(item.mediaType.rawValue, privacy: .public) resolved=\(stored == nil ? "fallback" : "stored", privacy: .public)")
-#endif
         presentedSurface = .detail(item)
     }
 
@@ -305,7 +342,7 @@ struct DownloadManagementView: View {
             let signature = "\(task.status.rawValue)|\(bucket)"
             guard lastLoggedTaskSignatures[task.id] != signature else { continue }
             lastLoggedTaskSignatures[task.id] = signature
-            VanmoLogger.storage.info("[Debug][Downloads] task=\(task.id.uuidString, privacy: .public) status=\(task.status.rawValue, privacy: .public) progress=\(percent, privacy: .public) received=\(task.receivedBytes, privacy: .public) total=\(task.totalBytes, privacy: .public) type=\(task.request.connectionType?.rawValue ?? "none", privacy: .public) media=\(task.request.mediaType.rawValue, privacy: .public)")
+            VanmoLogger.storage.info("[Debug][Downloads] task=\(task.id.uuidString, privacy: .public) status=\(task.status.rawValue, privacy: .public) progress=\(percent, privacy: .public) received=\(task.receivedBytes, privacy: .public) total=\(task.totalBytes, privacy: .public)")
         }
 #endif
     }
@@ -366,253 +403,311 @@ struct DownloadManagementView: View {
     }
 }
 
+// MARK: - Subviews
+
+private struct CatStorageRingGauge: View {
+    let usedFraction: Double
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(CatDesign.progressTrack, lineWidth: 3)
+            Circle()
+                .trim(from: 0, to: min(max(usedFraction, 0.04), 1))
+                .stroke(CatDesign.glowAmber, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Image("CatStorageRing")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 40, height: 40)
+        }
+        .frame(width: 40, height: 40)
+    }
+}
+
+private struct CatActiveDownloadCard: View {
+    let task: DownloadTaskSnapshot
+    let onPause: () -> Void
+    let onResume: () -> Void
+    let onRetry: () -> Void
+    let onDelete: () -> Void
+    let onOpenDetail: () -> Void
+
+    private var isDownloading: Bool {
+        task.status == .downloading || task.status == .queued
+    }
+
+    private var isPaused: Bool {
+        task.status == .paused
+    }
+
+    private var statsText: String {
+        let received = ByteCountFormatter.string(fromByteCount: task.receivedBytes, countStyle: .file)
+        let total = task.totalBytes > 0 ? ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file) : ""
+        let pct = Int((task.progress * 100).rounded())
+        switch task.status {
+        case .queued:
+            return L10n.tr("等待中 · 即将开始")
+        case .downloading:
+            return total.isEmpty ? L10n.tr("下载中") : "\(received) / \(total) · \(pct)%"
+        case .paused:
+            return total.isEmpty ? L10n.tr("已暂停") : L10n.tr("已暂停 · %@ / %@ (%d%%)", received, total, pct)
+        case .failed:
+            return task.errorMessage?.isEmpty == false ? "\(L10n.tr("下载失败")) · \(task.errorMessage!)" : L10n.tr("下载失败")
+        case .completed:
+            return total
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onOpenDetail) {
+                KFImage(task.request.postUrl)
+                    .placeholder {
+                        ZStack {
+                            CatDesign.mediaPlaceholder
+                            Image(systemName: "film")
+                                .foregroundStyle(CatDesign.textMuted)
+                        }
+                    }
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 48, height: 68)
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            .strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75)
+                    )
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 7) {
+                Button(action: onOpenDetail) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(task.request.displayTitle)
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundStyle(CatDesign.textIvory)
+                            .lineLimit(1)
+
+                        Text(statsText)
+                            .font(.system(size: 11))
+                            .foregroundStyle(
+                                task.status == .failed
+                                    ? CatDesign.dangerRed
+                                    : (isDownloading ? CatDesign.accentAmber : CatDesign.textMuted)
+                            )
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+
+                CatPawProgressBar(progress: task.progress, isPaused: isPaused)
+
+                HStack(spacing: 8) {
+                    primaryActionPill
+                    deleteActionPill
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(12)
+        .catGlassCard(cornerRadius: 20, amberStroke: isDownloading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(task.request.displayTitle)
+    }
+
+    private var primaryActionPill: some View {
+        Button {
+            switch task.status {
+            case .downloading, .queued: onPause()
+            case .paused: onResume()
+            case .failed: onRetry()
+            case .completed: break
+            }
+        } label: {
+            HStack(spacing: 5) {
+                if task.status == .downloading || task.status == .queued {
+                    Image("CatEarPause")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 15, height: 15)
+                    Text(L10n.tr("暂停"))
+                } else if task.status == .paused {
+                    Image("CatPlaySmall")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 13, height: 13)
+                    Text(L10n.tr("继续"))
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .bold))
+                    Text(L10n.tr("重试"))
+                }
+            }
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(CatDesign.accentAmber)
+            .padding(.leading, 10)
+            .padding(.trailing, 11)
+            .frame(height: 26)
+            .background(CatDesign.surfacePill, in: Capsule())
+            .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 0.75))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var deleteActionPill: some View {
+        Button(action: onDelete) {
+            HStack(spacing: 5) {
+                Image("CatTrashDelete")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 13, height: 13)
+                    .foregroundStyle(CatDesign.textMuted)
+
+                Text(L10n.tr("删除"))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(CatDesign.textMuted)
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 11)
+            .frame(height: 26)
+            .background(CatDesign.surfacePill, in: Capsule())
+            .overlay(Capsule().strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct CatCompletedDownloadCard: View {
+    let task: DownloadTaskSnapshot
+    let onPlay: () -> Void
+    let onDelete: () -> Void
+    let onOpenDetail: () -> Void
+
+    private var sizeLine: String {
+        let total = task.totalBytes > 0 ? ByteCountFormatter.string(fromByteCount: task.totalBytes, countStyle: .file) : ""
+        return total.isEmpty ? L10n.tr("离线就绪") : "\(total) · \(L10n.tr("离线就绪"))"
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onOpenDetail) {
+                HStack(spacing: 12) {
+                    KFImage(task.request.postUrl)
+                        .placeholder {
+                            ZStack {
+                                CatDesign.mediaPlaceholder
+                                Image(systemName: "film")
+                                    .foregroundStyle(CatDesign.textMuted)
+                            }
+                        }
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 44, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(task.request.displayTitle)
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundStyle(CatDesign.textIvory)
+                            .lineLimit(1)
+
+                        HStack(spacing: 7) {
+                            Text(sizeLine)
+                                .font(.system(size: 11))
+                                .foregroundStyle(CatDesign.textMuted)
+                                .lineLimit(1)
+
+                            Image("CatSleepingBadge")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 30, height: 18)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 6)
+
+            Button(action: onPlay) {
+                HStack(spacing: 5) {
+                    Image("CatPlaySmall")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 14, height: 14)
+
+                    Text(L10n.tr("离线播放"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+                .padding(.leading, 11)
+                .padding(.trailing, 12)
+                .frame(height: 32)
+                .background(CatDesign.amberTintFill, in: Capsule())
+                .overlay(Capsule().strokeBorder(CatDesign.strokeAmber, lineWidth: 0.9))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .catGlassCard(cornerRadius: 20)
+        .contextMenu {
+            Button(L10n.tr("查看详情"), action: onOpenDetail)
+            Button(L10n.tr("播放"), action: onPlay)
+            Button(L10n.tr("删除"), role: .destructive, action: onDelete)
+        }
+    }
+}
+
+private struct DeviceStorageStats {
+    let usedFraction: Double
+    let headline: String
+    let freeText: String
+
+    static func current() -> DeviceStorageStats {
+        let homeURL = URL(fileURLWithPath: NSHomeDirectory())
+        let values = try? homeURL.resourceValues(forKeys: [
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityForImportantUsageKey,
+            .volumeAvailableCapacityKey
+        ])
+        let total = Int64(values?.volumeTotalCapacity ?? 0)
+        let free = values?.volumeAvailableCapacityForImportantUsage ?? Int64(values?.volumeAvailableCapacity ?? 0)
+        let used = max(0, total - free)
+
+        let totalStr = ByteCountFormatter.string(fromByteCount: max(total, 1), countStyle: .file)
+        let usedStr = ByteCountFormatter.string(fromByteCount: used, countStyle: .file)
+        let freeStr = ByteCountFormatter.string(fromByteCount: free, countStyle: .file)
+        let fraction = total > 0 ? Double(used) / Double(total) : 0.35
+
+        return DeviceStorageStats(
+            usedFraction: fraction,
+            headline: L10n.tr("已用 %@ / 共 %@", usedStr, totalStr),
+            freeText: freeStr
+        )
+    }
+}
+
 private enum PresentedDownloadSurface: Identifiable {
     case detail(MediaItem)
 
     var id: String {
         switch self {
-        case .detail(let item):
-            return "detail-\(item.id.uuidString)"
+        case .detail(let item): return "detail-\(item.id.uuidString)"
         }
     }
 
     var item: MediaItem {
         switch self {
-        case .detail(let item):
-            return item
+        case .detail(let item): return item
         }
-    }
-}
-
-private struct DownloadTaskRow: View {
-    let task: DownloadTaskSnapshot
-    let isSelected: Bool
-    let isSelectionMode: Bool
-    let actionBlue: Color
-    let secondaryGray: Color
-    let failRed: Color
-    let titleColor: Color
-    let play: () -> Void
-    let retry: () -> Void
-    let pause: () -> Void
-    let resume: () -> Void
-    let openDetail: () -> Void
-    let toggleSelection: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            Button(action: isSelectionMode ? toggleSelection : openDetail) {
-                HStack(alignment: .center, spacing: 16) {
-                    if isSelectionMode {
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(isSelected ? actionBlue : secondaryGray.opacity(0.7))
-                    }
-
-                    poster
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.request.displayTitle)
-                            .font(.system(size: 16, weight: .semibold))
-                            .tracking(-0.4)
-                            .foregroundStyle(titleColor)
-                            .lineLimit(1)
-                        Text(statusText)
-                            .font(.system(size: 13, weight: .medium))
-                            .tracking(-0.325)
-                            .foregroundStyle(task.status == .failed ? failRed : secondaryGray)
-                            .lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .buttonStyle(.plain)
-
-            if !isSelectionMode {
-                DownloadCircularActionButton(
-                    task: task,
-                    actionBlue: actionBlue,
-                    play: play,
-                    retry: retry,
-                    pause: pause,
-                    resume: resume
-                )
-            }
-        }
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.primary.opacity(0.08))
-                .frame(height: 0.6)
-        }
-        .contextMenu {
-            Button(L10n.tr("查看详情"), action: openDetail)
-            if task.status == .queued || task.status == .downloading {
-                Button(L10n.tr("暂停"), action: pause)
-            } else if task.status == .paused {
-                Button(L10n.tr("继续"), action: resume)
-            } else if task.status == .completed {
-                Button(L10n.tr("播放"), action: play)
-            } else if task.status == .failed {
-                Button(L10n.tr("重新下载"), action: retry)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(task.request.displayTitle)
-        .accessibilityValue(statusText)
-    }
-
-    private var poster: some View {
-        KFImage(task.request.postUrl)
-            .placeholder {
-                LinearGradient(
-                    colors: [
-                        Color(red: 160 / 255, green: 176 / 255, blue: 200 / 255),
-                        Color(red: 96 / 255, green: 116 / 255, blue: 144 / 255)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-            .resizable()
-            .scaledToFill()
-            .frame(width: 96, height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private var statusText: String {
-        let total = formattedBytes(task.totalBytes)
-        let received = formattedBytes(task.receivedBytes)
-        switch task.status {
-        case .queued:
-            return L10n.tr("等待中 · 即将开始")
-        case .downloading:
-            if task.totalBytes > 0 {
-                return L10n.tr("下载中 %d%% · %@ / %@", Int(task.progress * 100), received, total)
-            }
-            return L10n.tr("下载中")
-        case .paused:
-            if task.totalBytes > 0 {
-                return L10n.tr("已暂停 · %@", "\(received) / \(total)")
-            }
-            return L10n.tr("已暂停")
-        case .completed:
-            return total.isEmpty ? L10n.tr("已完成") : L10n.tr("已完成 · %@", total)
-        case .failed:
-            let reason = task.errorMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let reason, !reason.isEmpty {
-                return L10n.tr("下载失败 · %@", reason)
-            }
-            return L10n.tr("下载失败")
-        }
-    }
-
-    private func formattedBytes(_ bytes: Int64) -> String {
-        guard bytes > 0 else { return "" }
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
-    }
-}
-
-private struct DownloadCircularActionButton: View {
-    let task: DownloadTaskSnapshot
-    let actionBlue: Color
-    let play: () -> Void
-    let retry: () -> Void
-    let pause: () -> Void
-    let resume: () -> Void
-
-    var body: some View {
-        Button(action: performAction) {
-            ZStack {
-                switch task.status {
-                case .downloading:
-                    progressRing(
-                        progress: task.totalBytes > 0 ? task.progress : nil,
-                        tint: actionBlue
-                    )
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(actionBlue)
-                case .queued:
-                    progressRing(progress: 0, tint: Color(white: 0.72))
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(Color(white: 0.55))
-                case .paused:
-                    progressRing(
-                        progress: task.totalBytes > 0 ? task.progress : 0,
-                        tint: Color(white: 0.72)
-                    )
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(white: 0.45))
-                        .offset(x: 1)
-                case .completed:
-                    Circle()
-                        .fill(Color.primary.opacity(0.06))
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .offset(x: 1)
-                case .failed:
-                    Circle()
-                        .fill(Color.primary.opacity(0.06))
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                }
-            }
-            .frame(width: 32, height: 32)
-        }
-        .buttonStyle(.plain)
-        .frame(width: 44, height: 44)
-        .contentShape(Rectangle())
-        .accessibilityLabel(actionLabel)
-    }
-
-    private func performAction() {
-#if DEBUG
-        VanmoLogger.storage.info("[Debug][Downloads] action status=\(task.status.rawValue, privacy: .public) task=\(task.id.uuidString, privacy: .public)")
-#endif
-        switch task.status {
-        case .queued, .downloading:
-            pause()
-        case .paused:
-            resume()
-        case .completed:
-            play()
-        case .failed:
-            retry()
-        }
-    }
-
-    private var actionLabel: String {
-        switch task.status {
-        case .queued, .downloading: return L10n.tr("暂停")
-        case .paused: return L10n.tr("继续")
-        case .completed: return L10n.tr("播放")
-        case .failed: return L10n.tr("重新下载")
-        }
-    }
-
-    private func progressRing(progress: Double?, tint: Color) -> some View {
-        ZStack {
-            Circle()
-                .stroke(tint.opacity(0.22), lineWidth: 2.4)
-            if let progress {
-                Circle()
-                    .trim(from: 0, to: min(max(progress, 0.02), 1))
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-            } else {
-                Circle()
-                    .trim(from: 0, to: 0.22)
-                    .stroke(tint, style: StrokeStyle(lineWidth: 2.4, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-            }
-        }
-        .frame(width: 32, height: 32)
     }
 }
 
@@ -622,4 +717,5 @@ private struct DownloadCircularActionButton: View {
     }
     .environmentObject(AppState())
     .environmentObject(DownloadManager.shared)
+    .preferredColorScheme(.dark)
 }

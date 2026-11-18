@@ -25,6 +25,7 @@ description: Enforce that every UI change in the Vanmo iOS/macOS app strictly re
   - `Icons`（图标合集）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=424-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=424-2)
   - `Download` (下载页面): [https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=455-3](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=455-3)
   - `Player`（全屏播放器）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=599-3](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=599-3)
+  - `Black Cat Redesign`（黑猫视觉系统总览，16 页高保真源）：[https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=656-2](https://www.figma.com/design/miM6YTQAnerz6SgkkYZMjo/Vanmo-Ios?node-id=656-2)
 
 ### macOS 设计稿
 
@@ -34,6 +35,7 @@ description: Enforce that every UI change in the Vanmo iOS/macOS app strictly re
   - `LibraryHome`（媒体库首页）：`https://www.figma.com/design/O75W1XT1Q0btSrepDwEx39/Vanmo-MacOS?node-id=0-1`
   - `MediaDetail`（媒体库首页）：`https://www.figma.com/design/O75W1XT1Q0btSrepDwEx39/Vanmo-MacOS?node-id=7-1126`
   - `Player`（媒体库首页）：`https://www.figma.com/design/O75W1XT1Q0btSrepDwEx39/Vanmo-MacOS?node-id=7-1536`
+  - `Black Cat Redesign`（黑猫视觉系统）：`https://www.figma.com/design/O75W1XT1Q0btSrepDwEx39/Vanmo-MacOS?node-id=144-2`
 
 任何 UI 改动开始前，先把对应页面/组件的 Figma 节点定位出来（节点 URL 形如 `...?node-id=1-23`，调用工具时把 `node-id` 的 `-` 转成 `:`）。
 

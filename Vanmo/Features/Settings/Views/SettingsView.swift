@@ -1,31 +1,40 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import VanmoCore
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @EnvironmentObject private var cloudSyncCoordinator: CloudSyncCoordinator
-    @State private var isChoosingDirectory = false
-    @State private var directoryError: String?
-    @State private var downloadDirectoryPath = DownloadManager.shared.destination.rootPath
+    @EnvironmentObject private var connectionsViewModel: ConnectionsViewModel
 
     var body: some View {
-        Form {
-            cloudSyncSection
-            playbackSection
-            audioSection
-            subtitleSection
-            librarySection
-            metadataSection
-            appearanceSection
-            storageSection
-            aboutSection
+        ZStack(alignment: .top) {
+            CatDesign.bgObsidian.ignoresSafeArea()
+
+            HStack {
+                Spacer()
+                CatAmberHalo(width: 170, height: 110, opacity: 0.18)
+                    .padding(.top, 95)
+                    .padding(.trailing, 18)
+            }
+            .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    iCloudSyncCard
+                    playbackAudioGroup
+                    systemStorageGroup
+                }
+                .padding(.horizontal, CatDesign.horizontalMargin)
+                .padding(.bottom, 110)
+            }
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.vanmoBackground)
-        .navigationTitle(L10n.tr("设置"))
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            downloadDirectoryPath = DownloadManager.shared.destination.rootPath
+            Task {
+                await viewModel.calculateCacheSize()
+                await viewModel.calculateMetadataCacheSize()
+            }
         }
         .task {
             await viewModel.calculateCacheSize()
@@ -38,539 +47,266 @@ struct SettingsView: View {
         .onChange(of: cloudSyncCoordinator.lastSyncAt) { _, _ in
             viewModel.bindCloudSyncCoordinator(cloudSyncCoordinator)
         }
-        .alert(L10n.tr("清除缓存"), isPresented: $viewModel.showClearCacheAlert) {
-            Button(L10n.tr("取消"), role: .cancel) {}
-            Button(L10n.tr("清除"), role: .destructive) {
-                Task { await viewModel.clearCache() }
-            }
-        } message: {
-            Text(L10n.tr("确定要清除所有缓存数据吗？这不会删除已下载的文件。"))
-        }
-        .alert(L10n.tr("删除元数据缓存"), isPresented: $viewModel.showClearMetadataCacheAlert) {
-            Button(L10n.tr("取消"), role: .cancel) {}
-            Button(L10n.tr("删除"), role: .destructive) {
-                Task { await viewModel.clearMetadataCache() }
-            }
-        } message: {
-            Text(L10n.tr("确定要删除所有元数据缓存吗？已保存的媒体信息不会被删除，但 Logo、演职人员头像和单集封面等缓存图片将被移除。"))
-        }
-        .alert(L10n.tr("重置设置"), isPresented: $viewModel.showResetAlert) {
-            Button(L10n.tr("取消"), role: .cancel) {}
-            Button(L10n.tr("重置"), role: .destructive) {
-                viewModel.resetAllSettings()
-            }
-        } message: {
-            Text(L10n.tr("确定要重置所有设置为默认值吗？"))
-        }
-        .fileImporter(
-            isPresented: $isChoosingDirectory,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            do {
-                guard let url = try result.get().first else { return }
-                try DownloadManager.shared.setCustomDirectory(url)
-                downloadDirectoryPath = DownloadManager.shared.destination.rootPath
-            } catch {
-                directoryError = error.localizedDescription
-            }
-        }
-        .alert(L10n.tr("无法修改下载目录"), isPresented: Binding(
-            get: { directoryError != nil },
-            set: { if !$0 { directoryError = nil } }
-        )) {
-            Button(L10n.tr("确定")) {}
-        } message: {
-            Text(directoryError ?? "")
-        }
     }
 
-    // MARK: - Sections
+    // MARK: - Header (`695:1198`)
 
-    private var cloudSyncSection: some View {
-        Section {
-            Toggle(L10n.tr("iCloud 同步"), isOn: Binding(
-                get: { viewModel.cloudSyncEnabled },
-                set: { viewModel.updateCloudSyncEnabled($0, coordinator: cloudSyncCoordinator) }
-            ))
-            .disabled(!CloudSyncAvailability.isCloudKitEnabled)
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(L10n.tr("设置"))
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
 
-            if !CloudSyncAvailability.isCloudKitEnabled {
-                Text(CloudSyncAvailability.unavailableMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Spacer()
 
-            HStack {
-                Text(L10n.tr("上次同步"))
-                Spacer()
-                Text(viewModel.cloudSyncLastUpdatedText)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let message = viewModel.cloudSyncStatusMessage ?? cloudSyncCoordinator.statusMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Label(L10n.tr("云同步"), systemImage: "icloud")
-        } footer: {
-            Text(L10n.tr("通过 CloudKit 同步服务器配置、非 Emby/Plex 播放进度、收藏和文件夹书签。密码与 OAuth 凭据仍保存在本机 Keychain，不会进入 iCloud。"))
+            Text("v\(viewModel.appVersion)")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(CatDesign.textDim)
         }
+        .padding(.top, 10)
     }
 
-    private var playbackSection: some View {
-        Section {
-            Toggle(L10n.tr("自动播放下一集"), isOn: $viewModel.autoPlayNext)
-            Toggle(L10n.tr("断点续播"), isOn: $viewModel.resumePlayback)
-            Toggle(L10n.tr("硬件解码优先"), isOn: $viewModel.hardwareDecoding)
+    // MARK: - iCloud Sync Card (`695:1202`)
 
-            HStack {
-                Text(L10n.tr("默认播放速度"))
-                Spacer()
-                Picker("", selection: $viewModel.defaultRate) {
-                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { rate in
-                        Text("\(rate, specifier: "%.2g")x").tag(rate)
+    private var isCloudActive: Bool {
+        CloudSyncAvailability.isCloudKitEnabled && viewModel.cloudSyncEnabled
+    }
+
+    private var iCloudSyncCard: some View {
+        NavigationLink(value: SettingsRoute.iCloudSync) {
+            ZStack(alignment: .bottomTrailing) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 8) {
+                        Image("CatSetCloud")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+
+                        Text(L10n.tr("iCloud 同步"))
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(CatDesign.textIvory)
+
+                        Text(isCloudActive ? L10n.tr("已开启") : L10n.tr("已关闭"))
+                            .font(.system(size: 9.5, weight: .semibold))
+                            .foregroundStyle(isCloudActive ? CatDesign.accentAmber : CatDesign.textMuted)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(
+                                isCloudActive ? CatDesign.amberTintFill : CatDesign.surfacePill,
+                                in: Capsule()
+                            )
+
+                        Spacer(minLength: 40)
                     }
+
+                    Text("\(viewModel.cloudSyncLastUpdatedText) · \(L10n.tr("%d 个连接", connectionsViewModel.savedConnections.count))")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isCloudActive ? CatDesign.accentAmber : CatDesign.textMuted)
+                        .lineLimit(1)
+
+                    Text(L10n.tr("密码与 OAuth 凭据加密保存在本机 Keychain"))
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .lineLimit(1)
                 }
-                .pickerStyle(.menu)
+                .padding(.leading, 15)
+                .padding(.trailing, 72)
+                .padding(.vertical, 15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image("CatCurledCircleSync")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .padding(.trailing, 13)
+                    .padding(.bottom, 12)
             }
-        } header: {
-            Label(L10n.tr("播放"), systemImage: "play.circle")
-        } footer: {
-            Text(L10n.tr("硬件解码优先仅影响 KSPlayer 播放路径，并在下一次加载视频时生效；如果硬解初始化失败，播放器会自动尝试软解。"))
+            .frame(minHeight: 102)
+            .catGlassCard(cornerRadius: 22, elevated: true)
         }
+        .buttonStyle(.plain)
     }
 
-    private var audioSection: some View {
-        Section {
-            Picker(L10n.tr("输出模式"), selection: $viewModel.audioOutputMode) {
-                ForEach(AudioOutputMode.allCases, id: \.self) { mode in
-                    Label(mode.displayName, systemImage: mode.icon).tag(mode)
-                }
-            }
-        } header: {
-            Label(L10n.tr("音频"), systemImage: "hifispeaker.2")
-        } footer: {
-            Text(L10n.tr("「自动」根据当前输出设备自动选择最佳音频模式。连接支持杜比的耳机或音箱时将启用空间音频。"))
-        }
-    }
+    // MARK: - Groups (`695:1220` & `695:1252`)
 
-    private var subtitleSection: some View {
-        Section {
-            Toggle(L10n.tr("自动加载字幕"), isOn: $viewModel.subtitleAutoLoad)
+    private var playbackAudioGroup: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(L10n.tr("播放与音频"))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CatDesign.textDim)
 
-            SubtitleStylePreview(style: subtitlePreviewStyle)
+            VStack(spacing: 0) {
+                CatSettingsNavRow(
+                    route: .playback,
+                    iconAsset: "CatSetFilm",
+                    title: L10n.tr("播放"),
+                    summary: "\(viewModel.hardwareDecoding ? L10n.tr("硬件解码") : L10n.tr("软解优先")) · \(String(format: "%.2gx", viewModel.defaultRate))"
+                )
 
-            HStack {
-                Text(L10n.tr("字幕大小"))
-                Spacer()
-                Stepper(
-                    "\(Int(viewModel.subtitleFontSize))pt",
-                    value: $viewModel.subtitleFontSize,
-                    in: 12...36,
-                    step: 2
+                groupSeparator
+
+                CatSettingsNavRow(
+                    route: .audio,
+                    iconAsset: "CatSetAudio",
+                    title: L10n.tr("音频"),
+                    summary: viewModel.audioOutputMode.displayName
+                )
+
+                groupSeparator
+
+                CatSettingsNavRow(
+                    route: .subtitles,
+                    iconAsset: "CatSetSubtitleTail",
+                    title: L10n.tr("字幕"),
+                    summary: "\(viewModel.subtitleAutoLoad ? L10n.tr("自动") : L10n.tr("手动")) · \(viewModel.subtitlePreferredLanguage.uppercased())"
                 )
             }
-
-            Picker(L10n.tr("首选语言"), selection: $viewModel.subtitlePreferredLanguage) {
-                Text(L10n.tr("中文")).tag("zh")
-                Text("English").tag("en")
-                Text("日本語").tag("ja")
-                Text("한국어").tag("ko")
-            }
-
-            ColorPicker(L10n.tr("文字颜色"), selection: Binding(
-                get: { viewModel.subtitleTextColor },
-                set: { viewModel.subtitleTextColor = $0 }
-            ))
-
-            ColorPicker(L10n.tr("背景颜色"), selection: Binding(
-                get: { viewModel.subtitleBackgroundColor },
-                set: { viewModel.subtitleBackgroundColor = $0 }
-            ), supportsOpacity: true)
-
-            Picker(L10n.tr("字幕位置"), selection: $viewModel.subtitlePositionRaw) {
-                Text(L10n.tr("顶部")).tag(SubtitleStyle.SubtitlePosition.top.rawValue)
-                Text(L10n.tr("底部")).tag(SubtitleStyle.SubtitlePosition.bottom.rawValue)
-            }
-
-            Toggle(L10n.tr("启用 OpenSubtitles"), isOn: $viewModel.openSubtitlesEnabled)
-
-            if viewModel.openSubtitlesEnabled {
-                TextField("OpenSubtitles API Key", text: $viewModel.openSubtitlesAPIKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-
-                TextField(L10n.tr("用户名"), text: $viewModel.openSubtitlesUsername)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-
-                SecureField(L10n.tr("密码"), text: $viewModel.openSubtitlesPassword)
-
-                HStack {
-                    Button(L10n.tr("保存配置")) {
-                        viewModel.saveOpenSubtitlesCredentials()
-                    }
-
-                    Spacer()
-
-                    Button {
-                        Task { await viewModel.testOpenSubtitlesLogin() }
-                    } label: {
-                        if viewModel.isTestingOpenSubtitles {
-                            ProgressView()
-                        } else {
-                            Text(L10n.tr("测试登录"))
-                        }
-                    }
-                    .disabled(viewModel.isTestingOpenSubtitles)
-                }
-
-                Button(L10n.tr("清除 OpenSubtitles 配置"), role: .destructive) {
-                    viewModel.clearOpenSubtitlesCredentials()
-                }
-
-                if let message = viewModel.openSubtitlesStatusMessage {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        } header: {
-            Label(L10n.tr("字幕"), systemImage: "captions.bubble")
-        } footer: {
-            Text(L10n.tr("字幕外观为全局默认值，进入播放器后仍可临时调整。OpenSubtitles 搜索使用官方 REST API；下载需要账户额度，API Key、用户名和密码会保存在 Keychain。"))
+            .catGlassCard(cornerRadius: 20)
         }
     }
 
-    private var subtitlePreviewStyle: SubtitleStyle {
-        SubtitleStyle(
-            fontSize: CGFloat(viewModel.subtitleFontSize),
-            textColor: viewModel.subtitleTextColor,
-            backgroundColor: viewModel.subtitleBackgroundColor,
-            position: SubtitleStyle.SubtitlePosition(rawValue: viewModel.subtitlePositionRaw) ?? .bottom
-        )
-    }
+    private var systemStorageGroup: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(L10n.tr("媒体库、外观与存储"))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CatDesign.textDim)
 
-    private var librarySection: some View {
-        Section {
-            Toggle(L10n.tr("自动扫描新文件"), isOn: $viewModel.libraryAutoScan)
-            Toggle(L10n.tr("显示未观看标记"), isOn: $viewModel.showUnwatchedBadge)
-        } header: {
-            Label(L10n.tr("媒体库"), systemImage: "film.stack")
+            VStack(spacing: 0) {
+                CatSettingsNavRow(
+                    route: .libraryScan,
+                    iconAsset: "CatSetScan",
+                    title: L10n.tr("媒体库与扫描"),
+                    summary: viewModel.libraryAutoScan ? L10n.tr("自动扫描开启") : L10n.tr("手动扫描")
+                )
+
+                groupSeparator
+
+                CatSettingsNavRow(
+                    route: .metadataCache,
+                    iconAsset: "CatSetCloud",
+                    title: L10n.tr("元数据缓存"),
+                    summary: viewModel.metadataCacheSize
+                )
+
+                groupSeparator
+
+                CatSettingsNavRow(
+                    route: .appearance,
+                    iconAsset: appearanceIconAsset,
+                    iconSize: 24,
+                    title: L10n.tr("外观与字幕"),
+                    summary: "\(viewModel.theme.displayName) · \(viewModel.languagePreference.displayName)"
+                )
+
+                groupSeparator
+
+                CatSettingsNavRow(
+                    route: .storage,
+                    iconAsset: "CatSetStorage",
+                    title: L10n.tr("存储与下载"),
+                    summary: viewModel.cacheSize
+                )
+            }
+            .catGlassCard(cornerRadius: 20)
         }
     }
 
-    private var metadataSection: some View {
-        Section {
-            Toggle(L10n.tr("自动从媒体服务器下载元数据"), isOn: $viewModel.metadataAutoDownload)
-
-            HStack {
-                Text(L10n.tr("元数据缓存大小"))
-                Spacer()
-                Text(viewModel.metadataCacheSize)
-                    .foregroundStyle(.secondary)
-            }
-
-            Button(L10n.tr("删除所有元数据缓存")) {
-                viewModel.showClearMetadataCacheAlert = true
-            }
-            .foregroundStyle(.red)
-        } header: {
-            Label(L10n.tr("元数据"), systemImage: "photo.on.rectangle.angled")
-        } footer: {
-            Text(L10n.tr("仅 Emby、Jellyfin、Plex 媒体条目支持元数据刷新。关闭自动下载后，仍可在详情页通过「更多 → 刷新」手动更新。"))
+    private var appearanceIconAsset: String {
+        switch viewModel.theme {
+        case .system: return "CatThemeSystem"
+        case .light: return "CatThemeDaySun"
+        case .dark: return "CatThemeNightMoon"
         }
     }
 
-    private var appearanceSection: some View {
-        Section {
-            NavigationLink(value: SettingsRoute.appearance) {
-                HStack(spacing: 12) {
-                    ThemeSwatch(theme: viewModel.theme)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.tr("外观"))
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        Text("\(viewModel.theme.displayName) · \(viewModel.languagePreference.displayName)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        } header: {
-            Label(L10n.tr("外观"), systemImage: "paintbrush")
-        }
-    }
-
-    private var storageSection: some View {
-        Section {
-            NavigationLink(value: SettingsRoute.downloads) {
-                Label(L10n.tr("下载管理"), systemImage: "arrow.down.circle")
-            }
-
-            LabeledContent(L10n.tr("下载目录"), value: downloadDirectoryPath)
-            Button(L10n.tr("选择下载文件夹")) {
-                isChoosingDirectory = true
-            }
-            Button(L10n.tr("恢复默认下载位置")) {
-                DownloadManager.shared.useDefaultDirectory()
-                downloadDirectoryPath = DownloadManager.shared.destination.rootPath
-            }
-
-            HStack {
-                Text(L10n.tr("缓存大小"))
-                Spacer()
-                Text(viewModel.cacheSize)
-                    .foregroundStyle(.secondary)
-            }
-
-            Button(L10n.tr("清除缓存")) {
-                viewModel.showClearCacheAlert = true
-            }
-            .foregroundStyle(.red)
-        } header: {
-            Label(L10n.tr("存储"), systemImage: "internaldrive")
-        }
-    }
-
-    private var aboutSection: some View {
-        Section {
-            HStack {
-                Text(L10n.tr("版本"))
-                Spacer()
-                Text(viewModel.appVersion)
-                    .foregroundStyle(.secondary)
-            }
-
-            Button(L10n.tr("重置所有设置")) {
-                viewModel.showResetAlert = true
-            }
-            .foregroundStyle(.red)
-        } header: {
-            Label(L10n.tr("关于"), systemImage: "info.circle")
-        }
+    private var groupSeparator: some View {
+        Rectangle()
+            .fill(CatDesign.hairSeparator)
+            .frame(height: 0.75)
     }
 }
 
-// MARK: - Theme Picker
-
-/// 设置页中的外观主题选择网格。
-/// 每个卡片以一张缩略卡片预览该主题下 background / surface / primary 三色搭配。
-///
-/// 使用手写的 `VStack + HStack` 而非 `LazyVGrid`：
-/// `LazyVGrid` 嵌入在 `Form` 的 `Section` row 内时，由于 row 不是滚动上下文，
-/// lazy 容器的纵向 spacing 经常算不准，会导致两行卡片视觉上重叠。
-struct ThemePickerGrid: View {
-    @Binding var selection: ColorTheme
-
-    private let columnCount = 2
-    private let rowSpacing: CGFloat = 12
-    private let columnSpacing: CGFloat = 12
+private struct CatSettingsNavRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let route: SettingsRoute
+    let iconAsset: String
+    var iconSize: CGFloat = 20
+    let title: String
+    let summary: String
 
     var body: some View {
-        VStack(spacing: rowSpacing) {
-            ForEach(rows.indices, id: \.self) { rowIndex in
-                HStack(spacing: columnSpacing) {
-                    ForEach(rows[rowIndex], id: \.self) { theme in
-                        cell(for: theme)
-                    }
-
-                    let missing = columnCount - rows[rowIndex].count
-                    if missing > 0 {
-                        ForEach(0..<missing, id: \.self) { _ in
-                            Color.clear
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
+        NavigationLink(value: route) {
+            HStack(spacing: 11) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(colorScheme == .light ? Color(red: 0x24 / 255, green: 0x27 / 255, blue: 0x30 / 255) : CatDesign.surfacePill)
+                    Image(iconAsset)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: iconSize, height: iconSize)
                 }
-            }
-        }
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity)
-    }
+                .frame(width: 30, height: 30)
 
-    private var rows: [[ColorTheme]] {
-        let all = ColorTheme.allCases
-        return stride(from: 0, to: all.count, by: columnCount).map { start in
-            Array(all[start..<min(start + columnCount, all.count)])
-        }
-    }
+                Text(title)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
 
-    private func cell(for theme: ColorTheme) -> some View {
-        Button {
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                selection = theme
+                Spacer(minLength: 8)
+
+                Text(summary)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CatDesign.textDim)
             }
-        } label: {
-            ThemePreviewCard(
-                theme: theme,
-                isSelected: selection == theme
-            )
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 14)
+            .frame(height: 52)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 }
 
-/// 单个主题的预览卡片：展示主色 / 背景 / 卡片三色搭配。
-struct ThemePreviewCard: View {
-    let theme: ColorTheme
-    let isSelected: Bool
+// MARK: - `14 · Appearance & Subtitles`
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            previewCanvas
-                .frame(height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(alignment: .topTrailing) {
-                    selectionBadge
-                        .padding(6)
-                }
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(theme.displayName)
-                    .font(.footnote)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(theme.subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(6)
-        .background {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(
-                    isSelected ? theme.primary : Color.clear,
-                    lineWidth: 2
-                )
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 14))
-    }
-
-    /// 仿照真实 App 缩影：背景 + 一张 surface 卡片 + primary 高亮按钮 + 文本占位条。
-    private var previewCanvas: some View {
-        ZStack(alignment: .topLeading) {
-            theme.background
-
-            VStack(alignment: .leading, spacing: 6) {
-                Capsule()
-                    .fill(theme.primary.opacity(0.85))
-                    .frame(width: 28, height: 5)
-
-                Capsule()
-                    .fill(theme.primary.opacity(0.45))
-                    .frame(width: 44, height: 4)
-
-                Spacer(minLength: 0)
-
-                HStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(theme.surface)
-                        .frame(width: 30, height: 30)
-                        .overlay {
-                            Circle()
-                                .fill(theme.primary)
-                                .frame(width: 11, height: 11)
-                        }
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Capsule()
-                            .fill(theme.primary.opacity(0.7))
-                            .frame(width: 38, height: 4)
-                        Capsule()
-                            .fill(theme.primary.opacity(0.35))
-                            .frame(width: 24, height: 3)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    Capsule()
-                        .fill(theme.primary)
-                        .frame(width: 18, height: 10)
-                }
-            }
-            .padding(8)
-        }
-    }
-
-    @ViewBuilder
-    private var selectionBadge: some View {
-        if isSelected {
-            ZStack {
-                Circle()
-                    .fill(theme.primary)
-                    .frame(width: 22, height: 22)
-                Image(systemName: "checkmark")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.white)
-            }
-            .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
-            .transition(.scale.combined(with: .opacity))
-        }
-    }
-}
-
-#Preview {
-    NavigationStack {
-        SettingsView()
-    }
-    .environmentObject(CloudSyncCoordinator.shared)
-    .environmentObject(DownloadManager.shared)
-    .preferredColorScheme(.dark)
-}
-
-// MARK: - Appearance 二级页
-
-/// 外观（配色主题）独立设置页。
-/// 进入该页后切换主题不会影响 `SettingsView` 在导航栈中的位置——
-/// `NavigationStack` 的 path 由 `AppState.settingsPath` 持有，跨
-/// `.id(theme)` 触发的 `ContentView` 重建依然保留。
 struct AppearanceSettingsView: View {
-    @AppStorage(ColorTheme.storageKey) private var theme: ColorTheme = .system
-    @AppStorage(AppLanguagePreference.storageKey) private var languagePreference: AppLanguagePreference = .chinese
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var viewModel = SettingsViewModel()
     @State private var showLanguageRestartAlert = false
 
-    var body: some View {
-        Form {
-            Section {
-                Picker(L10n.tr("语言"), selection: languageSelection) {
-                    ForEach(AppLanguagePreference.allCases, id: \.self) { preference in
-                        Text(preference.displayName).tag(preference)
-                    }
-                }
-            } footer: {
-                Text(L10n.tr("语言将在下次启动后生效"))
-            }
+    private let quickColors: [Color] = [
+        Color(red: 0xF4 / 255, green: 0xEF / 255, blue: 0xE6 / 255),
+        Color(red: 0xFF / 255, green: 0xB5 / 255, blue: 0x47 / 255),
+        Color(red: 0x60 / 255, green: 0xA5 / 255, blue: 0xFA / 255),
+        Color(red: 0xA8 / 255, green: 0xA5 / 255, blue: 0x9E / 255)
+    ]
 
-            Section {
-                ThemePickerGrid(selection: $theme)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-            } footer: {
-                Text(theme.subtitle)
+    var body: some View {
+        ZStack(alignment: .top) {
+            CatDesign.bgObsidian.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                topNav
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        liveSubtitlePreviewSection
+                        themeAppearanceSection
+                        subtitleControlsCard
+                        appLanguageCard
+                    }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                    .padding(.bottom, 34)
+                }
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(Color.vanmoBackground)
-        .navigationTitle(L10n.tr("外观"))
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .catTabBarHidden(true)
         .alert(L10n.tr("语言"), isPresented: $showLanguageRestartAlert) {
             Button(L10n.tr("确定"), role: .cancel) {}
         } message: {
@@ -578,41 +314,416 @@ struct AppearanceSettingsView: View {
         }
     }
 
-    private var languageSelection: Binding<AppLanguagePreference> {
-        Binding(
-            get: { languagePreference },
-            set: { newValue in
-                guard newValue != languagePreference else { return }
-                languagePreference = newValue
-                showLanguageRestartAlert = true
-            }
+    private var topNav: some View {
+        HStack(spacing: 12) {
+            CatBackButton(size: 36) { dismiss() }
+
+            Text(L10n.tr("外观与字幕"))
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
+
+            Spacer()
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+        .padding(.top, 10)
+        .padding(.bottom, 6)
+    }
+
+    // MARK: - Live Subtitle Preview
+
+    private var previewStyle: SubtitleStyle {
+        SubtitleStyle(
+            fontSize: CGFloat(viewModel.subtitleFontSize),
+            textColor: viewModel.subtitleTextColor,
+            backgroundColor: viewModel.subtitleBackgroundColor,
+            bottomPadding: 14,
+            position: SubtitleStyle.SubtitlePosition(rawValue: viewModel.subtitlePositionRaw) ?? .bottom,
+            outlineWeight: viewModel.subtitleOutlineWeight
         )
+    }
+
+    private var liveSubtitlePreviewSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.tr("实时字幕预览"))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CatDesign.textMuted)
+
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    Image("DefaultHeroBackdrop")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 166)
+                        .clipped()
+
+                    LinearGradient(
+                        colors: [.clear, CatDesign.catSilhouette.opacity(0.88)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+
+                    SubtitleOverlayView(
+                        content: SubtitleContent(text: L10n.tr("黑猫影院 · 00:42:18")),
+                        style: previewStyle
+                    )
+                }
+                .frame(height: 166)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+                )
+                .padding(.top, 18)
+
+                Image("CatSittingSubtitleWatcher")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 46, height: 38)
+                    .padding(.trailing, 22)
+                    .offset(y: -11)
+                    .allowsHitTesting(false)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Theme Appearance (`695:1362`)
+
+    private var themeAppearanceSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.tr("主题外观"))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(CatDesign.textMuted)
+
+            HStack(spacing: 12) {
+                themeCard(
+                    theme: .system,
+                    iconAsset: "CatThemeSystem",
+                    title: L10n.tr("跟随系统"),
+                    cardFill: CatDesign.surfaceGlass,
+                    border: CatDesign.strokeGlass,
+                    titleColor: CatDesign.textMuted,
+                    selectedTitleColor: CatDesign.accentAmber
+                )
+
+                themeCard(
+                    theme: .light,
+                    iconAsset: "CatThemeDaySun",
+                    title: L10n.tr("日间模式"),
+                    cardFill: Color(red: 0xFA / 255, green: 0xF7 / 255, blue: 0xF2 / 255),
+                    border: Color(red: 0xE5 / 255, green: 0xDE / 255, blue: 0xC9 / 255),
+                    titleColor: Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x1B / 255),
+                    selectedTitleColor: Color(red: 0xB8 / 255, green: 0x6A / 255, blue: 0x08 / 255)
+                )
+
+                themeCard(
+                    theme: .dark,
+                    iconAsset: "CatThemeNightMoon",
+                    title: L10n.tr("夜间模式"),
+                    cardFill: Color(red: 26 / 255, green: 28 / 255, blue: 33 / 255).opacity(0.92),
+                    border: Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.14),
+                    titleColor: Color(red: 0xF4 / 255, green: 0xEF / 255, blue: 0xE6 / 255),
+                    selectedTitleColor: Color(red: 0xFF / 255, green: 0xB5 / 255, blue: 0x47 / 255)
+                )
+            }
+        }
+    }
+
+    private func themeCard(
+        theme: ColorTheme,
+        iconAsset: String,
+        title: String,
+        cardFill: Color,
+        border: Color,
+        titleColor: Color,
+        selectedTitleColor: Color
+    ) -> some View {
+        let isSelected = viewModel.theme == theme
+        return Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                viewModel.theme = theme
+            }
+        } label: {
+            VStack(spacing: 7) {
+                ZStack {
+                    if theme == .system && colorScheme == .light {
+                        Circle()
+                            .fill(Color(red: 0x24 / 255, green: 0x27 / 255, blue: 0x30 / 255))
+                            .frame(width: 34, height: 34)
+                    }
+                    Image(iconAsset)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 28, height: 28)
+                }
+                .frame(height: 34)
+
+                Text(title)
+                    .font(.system(size: 11, weight: isSelected ? .bold : .semibold))
+                    .foregroundStyle(isSelected ? selectedTitleColor : titleColor)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 86)
+            .background(cardFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? CatDesign.strokeAmber : border,
+                        lineWidth: isSelected ? 1.3 : 1
+                    )
+            )
+            .shadow(color: isSelected ? CatDesign.amberGlowShadow : .clear, radius: 12, y: 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Subtitle Controls Card (`695:1386`)
+
+    private var subtitleControlsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(L10n.tr("字体大小"))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                    Spacer()
+                    Text("\(Int(viewModel.subtitleFontSize)) pt")
+                        .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+
+                CatAmberSlider(
+                    value: $viewModel.subtitleFontSize,
+                    range: 12...36,
+                    step: 2
+                )
+            }
+
+            HStack {
+                HStack(spacing: 8) {
+                    Text(L10n.tr("颜色"))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+
+                    ForEach(quickColors.indices, id: \.self) { index in
+                        let swatch = quickColors[index]
+                        let isMatched = swatch.rgbaHex == viewModel.subtitleTextColor.rgbaHex
+                        Button {
+                            viewModel.subtitleTextColor = swatch
+                        } label: {
+                            Circle()
+                                .fill(swatch)
+                                .frame(width: isMatched ? 18 : 16, height: isMatched ? 18 : 16)
+                                .overlay(
+                                    Circle().strokeBorder(
+                                        isMatched ? CatDesign.accentAmber : CatDesign.strokeGlass,
+                                        lineWidth: isMatched ? 2 : 0.75
+                                    )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ColorPicker("", selection: Binding(
+                        get: { viewModel.subtitleTextColor },
+                        set: { viewModel.subtitleTextColor = $0 }
+                    ), supportsOpacity: false)
+                    .labelsHidden()
+                    .scaleEffect(0.75)
+                    .frame(width: 22, height: 22)
+                }
+
+                Spacer(minLength: 6)
+
+                Button {
+                    viewModel.subtitleOutlineWeight = viewModel.subtitleOutlineWeight.next
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(L10n.tr("描边"))
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(CatDesign.textMuted)
+                        Text(viewModel.subtitleOutlineWeight.displayName)
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(CatDesign.accentAmber)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4.5)
+                    .background(CatDesign.surfacePill, in: Capsule())
+                    .overlay(Capsule().strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75))
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(L10n.tr("背景透明度"))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                    Spacer()
+                    Text("\(Int((viewModel.subtitleBackgroundOpacity * 100).rounded()))%")
+                        .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+
+                CatAmberSlider(
+                    value: Binding(
+                        get: { viewModel.subtitleBackgroundOpacity },
+                        set: { viewModel.subtitleBackgroundOpacity = $0 }
+                    ),
+                    range: 0...1,
+                    step: 0.05
+                )
+            }
+
+            HStack {
+                Text(L10n.tr("字幕位置"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    positionPill(title: L10n.tr("底部"), value: .bottom)
+                    positionPill(title: L10n.tr("顶部"), value: .top)
+                }
+                .padding(3)
+                .background(CatDesign.surfacePill, in: Capsule())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .catGlassCard(cornerRadius: 20)
+    }
+
+    private func positionPill(title: String, value: SubtitleStyle.SubtitlePosition) -> some View {
+        let isActive = viewModel.subtitlePositionRaw == value.rawValue
+        return Button {
+            viewModel.subtitlePositionRaw = value.rawValue
+        } label: {
+            Text(title)
+                .font(.system(size: 10.5, weight: isActive ? .semibold : .medium))
+                .foregroundStyle(isActive ? CatDesign.accentAmber : CatDesign.textMuted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(isActive ? CatDesign.amberTintFill : .clear, in: Capsule())
+                .overlay(Capsule().strokeBorder(isActive ? CatDesign.strokeAmber : .clear, lineWidth: 0.75))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - App Language Card (`695:1425`)
+
+    private var appLanguageCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(L10n.tr("应用语言"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+                Spacer()
+                Text(L10n.tr("下次启动生效"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(CatDesign.textDim)
+            }
+
+            HStack(spacing: 4) {
+                ForEach(AppLanguagePreference.allCases, id: \.self) { pref in
+                    let isSelected = viewModel.languagePreference == pref
+                    Button {
+                        guard viewModel.languagePreference != pref else { return }
+                        viewModel.languagePreference = pref
+                        showLanguageRestartAlert = true
+                    } label: {
+                        Text(pref.displayName)
+                            .font(.system(size: 11, weight: isSelected ? .semibold : .medium))
+                            .foregroundStyle(isSelected ? CatDesign.accentAmber : CatDesign.textMuted)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 28)
+                            .background(
+                                isSelected ? CatDesign.amberTintFill : .clear,
+                                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                    .strokeBorder(isSelected ? CatDesign.strokeAmber : .clear, lineWidth: 0.75)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(3)
+            .background(CatDesign.surfacePill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .catGlassCard(cornerRadius: 18)
     }
 }
 
-// MARK: - 主题色块（设置入口的右侧 trailing 缩略图）
+private struct CatAmberSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
 
-/// 设置主页面「外观」入口右侧的迷你色块，用三色拼贴展示当前主题。
-struct ThemeSwatch: View {
-    let theme: ColorTheme
+    private var fraction: Double {
+        let span = max(range.upperBound - range.lowerBound, 0.0001)
+        return min(max((value - range.lowerBound) / span, 0), 1)
+    }
 
     var body: some View {
-        HStack(spacing: 0) {
-            theme.background
-            theme.surface
-            theme.primary
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            let fillWidth = max(3, width * fraction)
+            let pawOffset = min(max(fillWidth - 6, 0), max(width - 12, 0))
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(CatDesign.progressTrack)
+                    .frame(height: 3)
+
+                Capsule()
+                    .fill(CatDesign.glowAmber)
+                    .frame(width: fillWidth, height: 3)
+
+                Image("CatPawDot")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 12, height: 12)
+                    .foregroundStyle(CatDesign.glowAmber)
+                    .shadow(color: CatDesign.glowAmber.opacity(0.8), radius: 2.5)
+                    .offset(x: pawOffset)
+            }
+            .frame(maxHeight: .infinity, alignment: .center)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 6)
+                    .onChanged { drag in
+                        let rawFraction = min(max(drag.location.x / width, 0), 1)
+                        let rawValue = range.lowerBound + rawFraction * (range.upperBound - range.lowerBound)
+                        let stepped = (rawValue / step).rounded() * step
+                        value = min(max(stepped, range.lowerBound), range.upperBound)
+                    }
+            )
         }
-        .frame(width: 36, height: 24)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay {
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.black.opacity(0.08), lineWidth: 0.5)
-        }
+        .frame(height: 20)
     }
+}
+
+#Preview("Settings Main") {
+    NavigationStack {
+        SettingsView()
+    }
+    .environmentObject(CloudSyncCoordinator.shared)
+    .environmentObject(ConnectionsViewModel())
+    .preferredColorScheme(.dark)
 }
 
 #Preview("Appearance") {
     NavigationStack {
         AppearanceSettingsView()
     }
+    .preferredColorScheme(.dark)
 }
