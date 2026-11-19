@@ -32,6 +32,7 @@ Redesign iOS `MediaDetailView` to replicate Figma frames `19 · Movie Detail —
 
 - The test Emby server returned single-entry `BackdropImageTags` for walked items (`backdrops=1`), leaving multi-image server-sourced carousel switching backed by unit tests and timer-transition inspection rather than a live multi-tag server item.
 - Plex watched-state toggling from the More menu remains local-only and can be overwritten on a later server metadata refresh.
+- The no-scale image load relies on Kingfisher 8.14 `KFImage` internals (`.fade` animates the image out of a zero-size frame; `loadTransition` inserts it at final geometry). Recheck MediaDetail image loading after any Kingfisher upgrade.
 
 ## Decisions
 
@@ -45,6 +46,7 @@ Redesign iOS `MediaDetailView` to replicate Figma frames `19 · Movie Detail —
 - 2026-11-19: Walked live Emby series (`新乌托邦`, `洛基`) and movie (`玩具总动员3`) detail screens on the iPhone 17 Pro iOS Simulator (`./run_device.sh --simulator` + `simctl` screenshots) across Night and Day modes, fixed scroll top-bar scrim height/visibility and Day Mode download-icon contrast, and verified `HEVC` / `10-bit` / `Dolby TrueHD 7.1` / `24.2 Mbps` chips on movie detail.
 - 2026-11-19: Post-task code review reported three blocking issues (tvShow download button disabled after partial episode completion, `mergeLocalProgress`/`mergeEpisodeBackdrops` dropping new `EpisodeInfo` technical fields, and tvShow `toggleWatched` not refreshing in-memory episode cards) plus minor issues (`.failed` task display, Plex URL helper, Plex episode dynamic-range alignment). All blocking and minor fixes were applied.
 - 2026-11-19: Final verification passed: `./init.sh` (364 `VanmoCore` tests with 1 Keychain test skipped in the unsigned process and 0 failures, architecture guards, Harness docs check, Exit 0), `./scripts/check-app-build.sh ios-simulator` (Exit 0), `./scripts/check-app-build.sh macos` (Exit 0), and final `./run_device.sh --simulator` visual check (`新乌托邦`).
+- 2026-11-19 follow-up: Removed the root `GeometryReader` (layout now fills the screen via per-layer `ignoresSafeArea`, `containerRelativeFrame` widths, and `onGeometryChange` for the top inset and scroll offset), replaced the 0.45 parallax offset with a pinned hero that stretches on pull-down and shrinks to a `260pt` floor (static `486pt` under Reduce Motion), and moved the hero, episode, cast, and collection `KFImage` loads from `.fade` + outer `.scaledToFill()` to `.loadTransition(.opacity)` + `contentConfigure { $0.scaledToFill() }` to remove load-time scale animations. Evidence: `./scripts/check-app-build.sh ios-simulator` (run `20261119-162606-67309`, pass), `check-harness-docs.sh` and `check-architecture-guards.sh` pass, simulator screenshot of full-screen fill, and operator physical-device acceptance of scroll feel, text legibility, no top-bar jump on entry, and scale-free first loads for the hero and all three thumbnail types.
 
 ## Next Step
 

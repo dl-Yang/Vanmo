@@ -23,44 +23,11 @@ struct MediaDetailView: View {
     @State private var downloadErrorMessage: String?
     @State private var isEnqueueingDownload = false
     @State private var scrollOffset: CGFloat = 0
+    @State private var topSafeAreaInset: CGFloat = 0
     @StateObject private var store = MediaDetailStore()
 
     var body: some View {
-        GeometryReader { geometry in
-            let topInset = geometry.safeAreaInsets.top
-            let heroTopAnchor = topInset > 0 ? topInset + 4 : 58
-            let heroContentTopPadding = max(286, heroTopAnchor + 228)
-
-            ZStack(alignment: .top) {
-                CatDesign.bgObsidian.ignoresSafeArea()
-
-                observedHeroBackdrop(width: geometry.size.width)
-
-                ScrollView(.vertical, showsIndicators: false) {
-                    detailContentStack
-                        .padding(.top, heroContentTopPadding)
-                        .padding(.bottom, 34)
-                        .frame(width: geometry.size.width, alignment: .leading)
-                        .background {
-                            GeometryReader { proxy in
-                                Color.clear
-                                    .preference(
-                                        key: DetailScrollOffsetKey.self,
-                                        value: proxy.frame(in: .named("mediaDetailScroll")).minY
-                                    )
-                            }
-                        }
-                }
-                .coordinateSpace(name: "mediaDetailScroll")
-                .onPreferenceChange(DetailScrollOffsetKey.self) { scrollOffset = $0 }
-                .ignoresSafeArea(edges: .top)
-
-                floatingTopBar(topPadding: heroTopAnchor)
-                    .zIndex(2)
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .ignoresSafeArea(edges: .top)
-        }
+        detailLayout
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -109,12 +76,51 @@ struct MediaDetailView: View {
 
     // MARK: - Subviews
 
-    private func observedHeroBackdrop(width: CGFloat) -> some View {
+    /// The root stays inside the safe area so `safeAreaInsets` stays readable;
+    /// only the backdrop, scroll view, and top bar extend under the status bar.
+    private var detailLayout: some View {
+        let heroTopAnchor = topSafeAreaInset > 0 ? topSafeAreaInset + 4 : 58
+        let heroContentTopPadding = max(286, heroTopAnchor + 228)
+
+        return ZStack(alignment: .top) {
+            // Overlay keeps the stretching hero out of the ZStack's size calculation.
+            CatDesign.bgObsidian
+                .ignoresSafeArea()
+                .overlay(alignment: .top) {
+                    observedHeroBackdrop
+                        .ignoresSafeArea(edges: .top)
+                }
+
+            ScrollView(.vertical, showsIndicators: false) {
+                detailContentStack
+                    .padding(.top, heroContentTopPadding)
+                    .padding(.bottom, 34)
+                    .containerRelativeFrame(.horizontal, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.frame(in: .named("mediaDetailScroll")).minY
+                    } action: { offset in
+                        scrollOffset = offset
+                    }
+            }
+            .coordinateSpace(name: "mediaDetailScroll")
+            .ignoresSafeArea(edges: .top)
+
+            floatingTopBar(topPadding: heroTopAnchor)
+                .ignoresSafeArea(edges: .top)
+                .zIndex(2)
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.safeAreaInsets.top
+        } action: { inset in
+            topSafeAreaInset = inset
+        }
+    }
+
+    private var observedHeroBackdrop: some View {
         MediaDetailObservedObject(state: store.summaryState) { summaryState in
             MediaDetailHeroBackdrop(
                 backdropURLs: resolvedHeroBackdrops(from: summaryState),
                 fallbackPosterURL: summaryState.content?.posterURL ?? item.posterURL,
-                width: width,
                 scrollOffset: scrollOffset
             )
             .allowsHitTesting(false)
@@ -194,9 +200,10 @@ struct MediaDetailView: View {
                 .frame(width: 16, height: 16)
                 .foregroundStyle(topBarIconColor)
                 .frame(width: 40, height: 40)
-                .detailLiquidGlass(in: Circle(), colorScheme: colorScheme)
                 .contentShape(Circle())
+                .detailLiquidGlass(in: Circle(), colorScheme: colorScheme)
         }
+        
         .buttonStyle(DetailNavigationButtonStyle())
         .accessibilityLabel(L10n.tr("返回"))
     }
@@ -897,15 +904,7 @@ struct MediaDetailView: View {
     }
 }
 
-// MARK: - Scroll Preference & Observed Helper
-
-private struct DetailScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
+// MARK: - Observed Helper
 
 private struct MediaDetailObservedObject<State: ObservableObject, Content: View>: View {
     @ObservedObject var state: State
@@ -939,7 +938,7 @@ private extension View {
             : Color.white.opacity(0.62)
         let fallbackFill: Color = colorScheme == .dark
             ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.55)
-            : Color.white.opacity(0.84)
+            : Color.white.opacity(0.24)
         let stroke: Color = amberStroke
             ? CatDesign.strokeAmber
             : (colorScheme == .dark
@@ -980,7 +979,6 @@ private extension View {
 private struct MediaDetailHeroBackdrop: View {
     let backdropURLs: [URL]
     let fallbackPosterURL: URL?
-    let width: CGFloat
     let scrollOffset: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -988,7 +986,8 @@ private struct MediaDetailHeroBackdrop: View {
     @State private var loadedURLs: Set<URL> = []
 
     private let baseHeroHeight: CGFloat = 486
-    private let baseScrimHeight: CGFloat = 500
+    private let minHeroHeight: CGFloat = 260
+    private let scrimOverhang: CGFloat = 14
     private let carouselIntervalNanoseconds: UInt64 = 5_000_000_000
 
     private var effectiveURLs: [URL] {
@@ -996,24 +995,26 @@ private struct MediaDetailHeroBackdrop: View {
         return raw.map { highResolutionArtworkURL(from: $0) }
     }
 
+    /// Pulling down stretches the pinned hero; scrolling up shrinks it until
+    /// `minHeroHeight`, after which only the content panel keeps scrolling.
+    private var heroHeight: CGFloat {
+        reduceMotion ? baseHeroHeight : max(minHeroHeight, baseHeroHeight + scrollOffset)
+    }
+
     var body: some View {
-        let pullDown = max(0, scrollOffset)
-        let scrollUp = min(0, scrollOffset)
-        let heroHeight = baseHeroHeight + pullDown
-        let parallaxOffset = pullDown > 0 ? 0 : scrollUp * 0.45
-        let scrollFade = 1.0 - min(max(-scrollUp / 280, 0), 0.72)
+        let reducedMotionOffset = reduceMotion ? min(0, scrollOffset) : 0
+        let scrollFade = 1.0 - min(max(-scrollOffset / 280, 0), 0.72)
 
         ZStack(alignment: .top) {
             CatDesign.mediaPlaceholder
-                .frame(width: width, height: heroHeight)
+                .frame(height: heroHeight)
 
             Group {
                 if effectiveURLs.isEmpty {
                     Image("DefaultHeroBackdrop")
                         .resizable()
                         .scaledToFill()
-                        .frame(width: width, height: heroHeight)
-                        .clipped()
+                        .heroArtworkFrame(height: heroHeight)
                 } else {
                     carouselImages(heroHeight: heroHeight)
                 }
@@ -1031,10 +1032,9 @@ private struct MediaDetailHeroBackdrop: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(width: width, height: baseScrimHeight + pullDown)
+            .frame(height: heroHeight + scrimOverhang)
         }
-        .offset(y: parallaxOffset)
-        .frame(width: width, height: baseScrimHeight, alignment: .top)
+        .offset(y: reducedMotionOffset)
         .task(id: effectiveURLs) {
             activeIndex = 0
             prefetchHeroImages(effectiveURLs)
@@ -1072,11 +1072,13 @@ private struct MediaDetailHeroBackdrop: View {
                                 CatDesign.mediaPlaceholder
                             }
                         }
-                        .fade(duration: 0.35)
+                        // Not `.fade`: Kingfisher's fade animates the image out of a zero-size frame.
+                        .loadTransition(.opacity, animation: .linear(duration: 0.35))
                         .resizable()
-                        .scaledToFill()
-                        .frame(width: width, height: heroHeight)
-                        .clipped()
+                        // Fill inside Kingfisher: the portrait placeholder is removed within the
+                        // load animation and must not drive the backdrop's aspect ratio.
+                        .contentConfigure { $0.scaledToFill() }
+                        .heroArtworkFrame(height: heroHeight)
                         .opacity(isCurrent ? 1 : 0)
                 }
             }
@@ -1110,6 +1112,15 @@ private struct MediaDetailHeroBackdrop: View {
         }
         components.queryItems = queryItems
         return components.url ?? url
+    }
+}
+
+private extension View {
+    /// Pins fill-scaled artwork to the container width so it cannot widen the hero.
+    func heroArtworkFrame(height: CGFloat) -> some View {
+        containerRelativeFrame(.horizontal)
+            .frame(height: height)
+            .clipped()
     }
 }
 
@@ -1531,9 +1542,9 @@ private struct MediaDetailEpisodesSection: View {
                     if let backdropURL = episode.backdropURL {
                         KFImage(backdropURL)
                             .placeholder { thumbnailPlaceholder }
-                            .fade(duration: 0.2)
+                            .loadTransition(.opacity, animation: .linear(duration: 0.2))
                             .resizable()
-                            .scaledToFill()
+                            .contentConfigure { $0.scaledToFill() }
                             .id(backdropURL)
                     } else {
                         thumbnailPlaceholder
@@ -1672,9 +1683,9 @@ private struct MediaDetailCastAvatar: View {
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
                                 .foregroundStyle(CatDesign.textMuted)
                         }
-                        .fade(duration: 0.2)
+                        .loadTransition(.opacity, animation: .linear(duration: 0.2))
                         .resizable()
-                        .scaledToFill()
+                        .contentConfigure { $0.scaledToFill() }
                         .frame(width: 60, height: 60)
                         .clipShape(Circle())
                 } else {
@@ -1753,9 +1764,9 @@ private struct MediaDetailCollectionCard: View {
 
                 if let posterURL = collection.posterURL {
                     KFImage(posterURL)
-                        .fade(duration: 0.2)
+                        .loadTransition(.opacity, animation: .linear(duration: 0.2))
                         .resizable()
-                        .scaledToFill()
+                        .contentConfigure { $0.scaledToFill() }
                 } else {
                     Image(systemName: "rectangle.stack.fill")
                         .font(.system(size: 26, weight: .semibold))
