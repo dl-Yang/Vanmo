@@ -12,11 +12,9 @@ Bitmap subtitles first fit proportionally within the available subtitle area and
 
 The default subtitle size is 18 points everywhere. Settings, the in-player sheet, persisted preferences, and rendered output must not expose different defaults.
 
-## Media Detail Actions
+## Media Detail Presentation
 
-The media-detail back and favorite actions remain 40-point circular controls with 24-point symbols and 16-point horizontal screen margins. iOS 26 and later use the system Liquid Glass effect. iOS 17–25 use an ultra-thin material fallback. Loading, selected favorite, disabled, and accessibility states remain available.
-
-The back and favorite actions remain outside the panel drag surface. When the detail panel is collapsed, upward dragging starts from the bottom title/detail affordance. When expanded, downward dragging starts from the panel grabber. A list poster remains visible as a blurred low-resolution placeholder until the high-resolution poster for the same item finishes loading.
+iOS Media Detail follows Figma `19 · Movie Detail — Above the Fold` (`745:1621`) and `20 · Movie Detail — Full Parallax Scroll` (`745:1783`) using a continuous parallax scroll layout with a `486pt` hero artwork header, multi-stop obsidian/cream melt scrim, and floating `40×40` Liquid Glass back and `More` (`...`) controls (`20pt` horizontal margins, iOS 26 `.glassEffect()` with material fallback on iOS 17–25; a subtle top scrim fades in while scrolling). The hero prioritizes server backdrop imagery with automatic 5-second cross-fade carousel (respecting Reduce Motion and prefetching adjacent frames) when multiple backdrops exist and falls back to poster artwork. Below the hero title, metadata, and capability badges (`4K`, `Dolby Vision`, `HDR10`, `Dolby Audio`, content rating), the primary action row pairs the amber `Play Now` capsule (with `CatPerchingPlayTopRight`) and `48×48` circular Liquid Glass favorite and download controls (preserving TV-show episode picker access even after partial episode downloads complete, and high-contrast download iconography in Day Mode), followed by the synopsis card, horizontal 16:9 episodes with watched (`CatSleepingPillBadge`) and in-progress (`CatPawProgressBar`) states synced from server and local SwiftData, cast & crew with roles, collections, and `MEDIA SPECIFICATIONS`. The `...` More menu provides watched/unwatched toggling (updating series episodes in view), metadata refresh, and system sharing.
 
 ## Player Orientation and Picture in Picture
 
@@ -34,7 +32,7 @@ iOS offers exactly three appearance choices:
 - Day (`#FAF7F2` warm cream surface with `#B86A08` deep amber accents)
 - Night (`#0B0C0E` obsidian surface with `#FFB547` amber glow accents)
 
-Removed light-only custom themes migrate to Day. The migration writes a valid stored value so Settings and the app root share one source of truth. Settings main (`13`) routes into dedicated obsidian/cream glass subpages for iCloud Sync, Playback, Audio, Subtitles (including OpenSubtitles), Library & Scan, Metadata Cache, Appearance & Subtitles (`14`), and Storage & Downloads. macOS appearance is unchanged (aside from the connected sidebar indicator `MacCatEyeStatus`).
+Removed light-only custom themes migrate to Day. The migration writes a valid stored value so Settings and the app root share one source of truth. The floating `CatGlassTabBar` renders Night and Day Liquid Glass appearances across all root tabs (`726:1455` / `726:1513`, using iOS 26 `.glassEffect(...)` with iOS 17–25 `.ultraThinMaterial` fallback and `114pt` bottom scrim), while the full-screen video player forces `.environment(\.colorScheme, .dark)` over cinema surfaces. Settings main (`13`) routes into dedicated obsidian/cream glass subpages for iCloud Sync, Playback, Audio, Subtitles (including OpenSubtitles), Library & Scan, Metadata Cache, Appearance & Subtitles (`14`), and Storage & Downloads. macOS appearance behavior is documented in [`../FRONTEND.md`](../FRONTEND.md).
 
 ## Acceptance
 
@@ -42,7 +40,7 @@ Removed light-only custom themes migrate to Day. The migration writes a valid st
 - The active player reflects in-player changes without reopening playback.
 - SRT/VTT and ASS/SSA text follow the selected style; bitmap subtitles change scale only.
 - MediaDetail uses Liquid Glass on iOS 26 and the material fallback on older supported systems.
-- MediaDetail actions remain tappable while panel gestures work only in their intended regions, and poster loading never exposes a white frame.
+- MediaDetail actions remain tappable during parallax scrolling, and hero artwork prioritizes backdrops with poster fallback.
 - iPhone playback enters landscape and returns to portrait; automatic PiP remains visible and playing across one Home/foreground round trip.
 - Settings displays only the three supported appearance options and applies each option correctly.
 

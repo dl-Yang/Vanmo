@@ -60,30 +60,64 @@ struct PlayerProgressBar: View {
     private func track(in size: CGSize) -> some View {
         let width = max(size.width, 1)
         let fillWidth = max(3, width * displayProgress)
-        let pawOffset = min(max(fillWidth - 6, 0), max(width - 12, 0))
+        let thumbOffset = min(max(fillWidth - 10, 0), max(width - 20, 0))
+        let cacheSpan = max(0, width * (cacheEnd - cacheStart))
 
         return ZStack(alignment: .leading) {
             Capsule()
-                .fill(CatDesign.Cinema.track)
-                .frame(height: 3)
+                .fill(Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.30))
+                .overlay(
+                    Capsule()
+                        .strokeBorder(
+                            Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.22),
+                            lineWidth: 0.75
+                        )
+                )
+                .frame(height: 5)
 
-            Capsule()
-                .fill(Color.white.opacity(0.32))
-                .frame(width: max(0, width * (cacheEnd - cacheStart)), height: 3)
-                .offset(x: width * cacheStart)
+            if cacheSpan > 0 {
+                Capsule()
+                    .fill(Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.26))
+                    .frame(width: cacheSpan, height: 3)
+                    .offset(x: width * cacheStart)
+            }
 
             Capsule()
                 .fill(CatDesign.glowAmber)
                 .frame(width: fillWidth, height: 3)
 
-            Image("CatPawDot")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 12, height: 12)
-                .foregroundStyle(CatDesign.glowAmber)
-                .shadow(color: CatDesign.glowAmber.opacity(0.9), radius: 3.5)
-                .offset(x: pawOffset)
+            ZStack {
+                Circle()
+                    .fill(Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.15))
+                    .overlay(
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        CatDesign.glowAmber.opacity(0.28),
+                                        Color.white.opacity(0.06)
+                                    ],
+                                    center: .center,
+                                    startRadius: 1,
+                                    endRadius: 10
+                                )
+                            )
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(CatDesign.glowAmber.opacity(0.60), lineWidth: 1)
+                    )
+                    .shadow(color: CatDesign.glowAmber.opacity(0.80), radius: 8)
+
+                Image("CatPawDot")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 12, height: 12)
+                    .foregroundStyle(CatDesign.glowAmber)
+            }
+            .frame(width: 20, height: 20)
+            .offset(x: thumbOffset)
         }
     }
 

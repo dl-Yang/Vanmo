@@ -2,8 +2,8 @@ import SwiftUI
 import VanmoCore
 
 enum PlayerPopoverTab: String, CaseIterable, Identifiable {
-    case audio
     case subtitles
+    case audio
     case quality
     case speed
 
@@ -11,15 +11,15 @@ enum PlayerPopoverTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .audio: return L10n.tr("音轨")
         case .subtitles: return L10n.tr("字幕")
+        case .audio: return L10n.tr("音轨")
         case .quality: return L10n.tr("画质")
         case .speed: return L10n.tr("倍速")
         }
     }
 }
 
-/// 对应 Figma `08 · Landscape Player — Track & Subtitle Popover` (`684:867`)。
+/// 对应 Figma `18 · Liquid Glass Player — Popover & HUD` (`732:1724`)。
 struct PlayerTracksPopover: View {
     @ObservedObject var viewModel: PlayerViewModel
     @Binding var selectedTab: PlayerPopoverTab
@@ -29,38 +29,39 @@ struct PlayerTracksPopover: View {
     let onOpenEpisodes: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 9) {
             segmentedTabs
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 4) {
+            ViewThatFits(in: .vertical) {
+                VStack(spacing: 5) {
                     tabContent
                 }
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 5) {
+                        tabContent
+                    }
+                }
+                .frame(height: 132)
             }
             .frame(maxHeight: 132)
 
             quickUtilityFooter
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .frame(width: 276)
-        .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(CatDesign.Cinema.surfaceGlassElevated)
-                )
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 1)
+        .padding(12)
+        .frame(width: 272)
+        .catLiquidGlass(
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous),
+            tint: Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.21),
+            fallbackFill: CatDesign.Cinema.surfaceGlassElevated,
+            stroke: Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.40),
+            strokeWidth: 1
         )
-        .shadow(color: .black.opacity(0.70), radius: 22, y: 12)
+        .shadow(color: .black.opacity(0.60), radius: 28, y: 12)
     }
 
     private var segmentedTabs: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 3) {
             ForEach(PlayerPopoverTab.allCases) { tab in
                 let isSelected = selectedTab == tab
                 Button {
@@ -70,16 +71,20 @@ struct PlayerTracksPopover: View {
                 } label: {
                     Text(tab.title)
                         .font(.system(size: 10.5, weight: isSelected ? .semibold : .medium))
-                        .foregroundStyle(isSelected ? CatDesign.glowAmber : CatDesign.Cinema.textMuted)
+                        .foregroundStyle(
+                            isSelected
+                                ? CatDesign.glowAmber
+                                : Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.65)
+                        )
                         .frame(maxWidth: .infinity)
                         .frame(height: 26)
                         .background(
-                            isSelected ? CatDesign.glowAmber.opacity(0.15) : .clear,
-                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            isSelected ? CatDesign.glowAmber.opacity(0.16) : .clear,
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                .strokeBorder(isSelected ? CatDesign.Cinema.strokeAmber : .clear, lineWidth: 0.75)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(isSelected ? CatDesign.glowAmber.opacity(0.60) : .clear, lineWidth: 0.8)
                         )
                 }
                 .buttonStyle(.plain)
@@ -87,7 +92,10 @@ struct PlayerTracksPopover: View {
         }
         .padding(3)
         .frame(height: 32)
-        .background(CatDesign.Cinema.surfacePill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+        )
     }
 
     @ViewBuilder
@@ -486,4 +494,21 @@ struct SubtitleSelectorView: View {
         }
         return parts.joined(separator: " · ")
     }
+}
+
+#Preview("Tracks Popover") {
+    ZStack {
+        Color.black.ignoresSafeArea()
+        PlayerTracksPopover(
+            viewModel: PlayerViewModel(
+                item: MediaItem(title: "Dune: Prophecy", fileURL: URL(fileURLWithPath: "/tmp/dune.mp4"))
+            ),
+            selectedTab: .constant(.subtitles),
+            onClosePopover: {},
+            onOpenSubtitleTools: {},
+            onOpenChapters: {},
+            onOpenEpisodes: {}
+        )
+    }
+    .preferredColorScheme(.dark)
 }

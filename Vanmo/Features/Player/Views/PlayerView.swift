@@ -32,6 +32,7 @@ struct PlayerView: View {
 
     var body: some View {
         playerSurface()
+            .environment(\.colorScheme, .dark)
     }
 
     private func playerSurface() -> some View {
@@ -76,6 +77,7 @@ struct PlayerView: View {
             }
 
             feedbackOverlays
+                .allowsHitTesting(false)
 
             if let notice = viewModel.notice {
                 PlayerNoticeOverlay(notice: notice) {
@@ -86,6 +88,7 @@ struct PlayerView: View {
 
             if viewModel.isRateBoosting {
                 rateBoostIndicator
+                    .allowsHitTesting(false)
             }
         }
         .overlay {
@@ -111,8 +114,8 @@ struct PlayerView: View {
                     onOpenChapters: { viewModel.showChapterList = true },
                     onOpenEpisodes: { viewModel.showEpisodeSelector = true }
                 )
-                .padding(.top, 60)
-                .padding(.trailing, 28)
+                .padding(.top, 62)
+                .padding(.trailing, 12)
                 .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
             }
         }
@@ -335,20 +338,20 @@ struct PlayerView: View {
         ZStack {
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [CatDesign.catSilhouette.opacity(0.65), .clear],
+                    colors: [Color(red: 9 / 255, green: 10 / 255, blue: 12 / 255).opacity(0.45), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 74)
+                .frame(height: 64)
 
                 Spacer()
 
                 LinearGradient(
-                    colors: [.clear, CatDesign.catSilhouette.opacity(0.80)],
+                    colors: [.clear, Color(red: 9 / 255, green: 10 / 255, blue: 12 / 255).opacity(0.60)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 116)
+                .frame(height: 98)
             }
             .ignoresSafeArea()
             .allowsHitTesting(false)
@@ -370,15 +373,31 @@ struct PlayerView: View {
 
                 bottomFloatingDeck
             }
-            .padding(.horizontal, 28)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 12)
+            .padding(.top, 14)
+            .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .transition(.opacity)
     }
 
-    // MARK: - Top Floating Bar (`684:714`)
+    // MARK: - Top Floating Liquid Glass Capsules (`732:1543`)
+
+    private var cinemaGlassTint: Color {
+        Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.21)
+    }
+
+    private var cinemaGlassStroke: Color {
+        Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.40)
+    }
+
+    private var amberGlassTint: Color {
+        CatDesign.glowAmber.opacity(0.149)
+    }
+
+    private var amberGlassStroke: Color {
+        CatDesign.glowAmber.opacity(0.60)
+    }
 
     private var topBar: some View {
         HStack(spacing: 12) {
@@ -388,17 +407,21 @@ struct PlayerView: View {
 
             topRightActionGroup
         }
-        .frame(height: 42)
+        .frame(height: 40)
     }
 
     private var topLeftTitlePill: some View {
         HStack(spacing: 10) {
             Button(action: closePlayer) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 13, weight: .semibold))
+                Image("CatLGBack")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
                     .foregroundStyle(CatDesign.Cinema.textIvory)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 30, height: 30)
                     .background(CatDesign.Cinema.surfacePill, in: Circle())
+                    .overlay(Circle().strokeBorder(cinemaGlassStroke, lineWidth: 0.75))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.tr("关闭"))
@@ -411,9 +434,10 @@ struct PlayerView: View {
 
                 if let epBadge = viewModel.playerEpisodeBadge {
                     Text(epBadge)
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(CatDesign.glowAmber)
                         .lineLimit(1)
+                        .layoutPriority(1)
                 }
             }
 
@@ -423,25 +447,36 @@ struct PlayerView: View {
                     .foregroundStyle(CatDesign.Cinema.textIvory)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(CatDesign.Cinema.surfacePill, in: Capsule())
-                    .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.75))
+                    .background(
+                        Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.08),
+                        in: Capsule()
+                    )
+                    .overlay(
+                        Capsule().strokeBorder(
+                            Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.18),
+                            lineWidth: 0.75
+                        )
+                    )
                     .lineLimit(1)
+                    .layoutPriority(1)
             }
         }
-        .padding(.leading, 6)
-        .padding(.trailing, 14)
+        .padding(.leading, 5)
+        .padding(.trailing, 12)
         .frame(height: 40)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay(Capsule().fill(CatDesign.Cinema.surfaceGlass))
-        }
-        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9))
+        .catLiquidGlass(
+            in: Capsule(),
+            tint: cinemaGlassTint,
+            fallbackFill: CatDesign.Cinema.surfaceGlass,
+            stroke: cinemaGlassStroke,
+            strokeWidth: 1
+        )
     }
 
     private var topRightActionGroup: some View {
         HStack(spacing: 8) {
             if pictureInPicture.isSupported && viewModel.canShowPictureInPictureButton {
+                let isPipActive = pictureInPicture.isActive || viewModel.isPictureInPictureActive
                 Button {
                     if viewModel.avPlayer != nil {
                         pictureInPicture.toggle()
@@ -449,30 +484,42 @@ struct PlayerView: View {
                         viewModel.toggleKSPictureInPicture()
                     }
                 } label: {
-                    Image(systemName: (pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? "pip.exit" : "pip.enter")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(CatDesign.Cinema.textIvory)
-                        .frame(width: 38, height: 38)
-                        .background {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay(Circle().fill(CatDesign.Cinema.surfaceGlass))
+                    Group {
+                        if isPipActive {
+                            Image(systemName: "pip.exit")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(CatDesign.glowAmber)
+                        } else {
+                            Image("CatLGPip")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 16, height: 16)
                         }
-                        .overlay(Circle().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9))
+                    }
+                    .frame(width: 40, height: 40)
+                    .catLiquidGlass(
+                        in: Circle(),
+                        tint: isPipActive ? amberGlassTint : cinemaGlassTint,
+                        fallbackFill: CatDesign.Cinema.surfaceGlass,
+                        stroke: isPipActive ? amberGlassStroke : cinemaGlassStroke,
+                        strokeWidth: 1,
+                        interactive: true
+                    )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel((pictureInPicture.isActive || viewModel.isPictureInPictureActive) ? L10n.tr("退出画中画") : L10n.tr("进入画中画"))
+                .accessibilityLabel(isPipActive ? L10n.tr("退出画中画") : L10n.tr("进入画中画"))
             }
 
             AirPlayRouteButton()
-                .frame(width: 22, height: 22)
-                .frame(width: 38, height: 38)
-                .background {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .overlay(Circle().fill(CatDesign.Cinema.surfaceGlass))
-                }
-                .overlay(Circle().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9))
+                .frame(width: 40, height: 40)
+                .catLiquidGlass(
+                    in: Circle(),
+                    tint: cinemaGlassTint,
+                    fallbackFill: CatDesign.Cinema.surfaceGlass,
+                    stroke: cinemaGlassStroke,
+                    strokeWidth: 1,
+                    interactive: true
+                )
                 .accessibilityLabel(L10n.tr("投屏"))
 
             let isTracksActive = activePopoverTab != nil
@@ -481,34 +528,22 @@ struct PlayerView: View {
                     activePopoverTab = isTracksActive ? nil : .subtitles
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Image("CatTrackSliders")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .foregroundStyle(isTracksActive ? CatDesign.glowAmber : CatDesign.Cinema.textIvory)
-
-                    Text(L10n.tr("轨道"))
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(isTracksActive ? CatDesign.glowAmber : CatDesign.Cinema.textIvory)
-                }
-                .padding(.leading, 12)
-                .padding(.trailing, 13)
-                .frame(height: 38)
-                .background {
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            Capsule().fill(isTracksActive ? CatDesign.Cinema.surfaceGlassElevated : CatDesign.Cinema.surfaceGlass)
-                        )
-                }
-                .overlay(
-                    Capsule().strokeBorder(
-                        isTracksActive ? CatDesign.Cinema.strokeAmber : CatDesign.Cinema.strokeGlass,
-                        lineWidth: 0.9
+                Image("CatLGCatSliders")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+                    .padding(.leading, 13)
+                    .padding(.trailing, 14)
+                    .frame(minWidth: 45)
+                    .frame(height: 40)
+                    .catLiquidGlass(
+                        in: Capsule(),
+                        tint: isTracksActive ? amberGlassTint : cinemaGlassTint,
+                        fallbackFill: isTracksActive ? CatDesign.Cinema.surfaceGlassElevated : CatDesign.Cinema.surfaceGlass,
+                        stroke: isTracksActive ? amberGlassStroke : cinemaGlassStroke,
+                        strokeWidth: 1,
+                        interactive: true
                     )
-                )
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.tr("轨道设置"))
@@ -554,7 +589,7 @@ struct PlayerView: View {
         }
     }
 
-    // MARK: - Bottom Floating Control Deck (`684:749`)
+    // MARK: - Bottom Split Liquid Glass Controls (`732:1571`)
 
     @ViewBuilder
     private var bottomFloatingDeck: some View {
@@ -577,37 +612,23 @@ struct PlayerView: View {
                         viewModel.seek(to: fraction * viewModel.duration)
                     }
                 )
+                .overlay(alignment: .topLeading) {
+                    if viewModel.seekPreviewActive {
+                        anchoredScrubPreview
+                    }
+                }
 
                 controlsRow
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .background {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .fill(CatDesign.Cinema.surfaceGlass)
-                    )
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9)
-            )
-            .overlay(alignment: .topLeading) {
-                if viewModel.seekPreviewActive {
-                    anchoredScrubPreview
-                }
             }
         }
     }
 
     private var anchoredScrubPreview: some View {
         GeometryReader { proxy in
-            let deckWidth = max(proxy.size.width, 138)
+            let trackWidth = max(proxy.size.width, 144)
             let fraction = viewModel.duration > 0 ? min(max(viewModel.seekTime / viewModel.duration, 0), 1) : 0
-            let rawX = fraction * deckWidth
-            let clampedX = min(max(rawX, 69), max(deckWidth - 69, 69))
+            let rawX = fraction * trackWidth
+            let clampedX = min(max(rawX, 72), max(trackWidth - 72, 72))
 
             scrubPreviewCard
                 .position(x: clampedX, y: -56)
@@ -617,15 +638,8 @@ struct PlayerView: View {
     }
 
     private var controlsRow: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 16) {
-                Text("\(viewModel.displayTime.formattedDuration) / \(viewModel.duration.formattedDuration)")
-                    .font(.system(size: 11.5, weight: .medium).monospacedDigit())
-                    .foregroundStyle(CatDesign.Cinema.textMuted)
-                    .lineLimit(1)
-
-                transportButtons
-            }
+        HStack(spacing: 8) {
+            leftTransportIsland
 
             Spacer(minLength: 8)
 
@@ -633,13 +647,39 @@ struct PlayerView: View {
         }
     }
 
-    private var transportButtons: some View {
+    private var leftTransportIsland: some View {
         HStack(spacing: 14) {
+            Text("\(viewModel.displayTime.formattedDuration) / \(viewModel.duration.formattedDuration)")
+                .font(.system(size: 11.5, weight: .medium).monospacedDigit())
+                .foregroundStyle(Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.80))
+                .lineLimit(1)
+
+            Rectangle()
+                .fill(Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.16))
+                .frame(width: 1, height: 16)
+
+            transportButtons
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .catLiquidGlass(
+            in: Capsule(),
+            tint: cinemaGlassTint,
+            fallbackFill: CatDesign.Cinema.surfaceGlass,
+            stroke: cinemaGlassStroke,
+            strokeWidth: 1
+        )
+    }
+
+    private var transportButtons: some View {
+        HStack(spacing: 6) {
             Button { viewModel.skipBackward() } label: {
-                Image("CatSkipBack15")
+                Image("CatLGSkipBack15")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
+                    .frame(width: 28, height: 40)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.tr("快退"))
@@ -657,11 +697,23 @@ struct PlayerView: View {
                             .frame(width: 20, height: 20)
                     } else {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(CatDesign.Cinema.textIvory)
                     }
                 }
-                .frame(width: 24, height: 24)
+                .frame(width: 30, height: 30)
+                .background(
+                    Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.14),
+                    in: Circle()
+                )
+                .overlay(
+                    Circle().strokeBorder(
+                        Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.25),
+                        lineWidth: 0.75
+                    )
+                )
+                .frame(width: 36, height: 40)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
@@ -671,10 +723,12 @@ struct PlayerView: View {
             )
 
             Button { viewModel.skipForward() } label: {
-                Image("CatSkipForward15")
+                Image("CatLGSkipForward15")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
+                    .frame(width: 28, height: 40)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.tr("快进"))
@@ -691,6 +745,8 @@ struct PlayerView: View {
                     .scaledToFit()
                     .frame(width: 18, height: 18)
                     .opacity(viewModel.canSelectEpisode ? 1 : 0.35)
+                    .frame(width: 28, height: 40)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!viewModel.canSelectEpisode)
@@ -711,30 +767,46 @@ struct PlayerView: View {
                             .frame(width: 18, height: 14)
 
                         Text(L10n.tr("跳过片头"))
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 11.5, weight: .semibold))
                             .foregroundStyle(CatDesign.glowAmber)
                     }
-                    .padding(.leading, 10)
-                    .padding(.trailing, 11)
-                    .frame(height: 28)
-                    .background(CatDesign.glowAmber.opacity(0.12), in: Capsule())
-                    .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeAmber, lineWidth: 0.85))
+                    .padding(.leading, 13)
+                    .padding(.trailing, 14)
+                    .frame(height: 44)
+                    .catLiquidGlass(
+                        in: Capsule(),
+                        tint: amberGlassTint,
+                        fallbackFill: CatDesign.glowAmber.opacity(0.15),
+                        stroke: amberGlassStroke,
+                        strokeWidth: 1,
+                        interactive: true
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(L10n.tr("跳过片头"))
             }
 
-            quickPill(String(format: "%.2gx", viewModel.config.playbackRate), isActive: activePopoverTab == .speed) {
+            let isSpeedActive = activePopoverTab == .speed
+            Button {
                 togglePopoverTab(.speed)
+            } label: {
+                Text(String(format: "%.2gx", viewModel.config.playbackRate))
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(isSpeedActive ? CatDesign.glowAmber : CatDesign.Cinema.textIvory)
+                    .padding(.horizontal, 13)
+                    .frame(minWidth: 44)
+                    .frame(height: 44)
+                    .catLiquidGlass(
+                        in: Capsule(),
+                        tint: isSpeedActive ? amberGlassTint : cinemaGlassTint,
+                        fallbackFill: isSpeedActive ? CatDesign.Cinema.surfaceGlassElevated : CatDesign.Cinema.surfaceGlass,
+                        stroke: isSpeedActive ? amberGlassStroke : cinemaGlassStroke,
+                        strokeWidth: 1,
+                        interactive: true
+                    )
             }
-
-            quickPill(L10n.tr("音轨"), isActive: activePopoverTab == .audio) {
-                togglePopoverTab(.audio)
-            }
-
-            quickPill(L10n.tr("字幕"), isActive: activePopoverTab == .subtitles) {
-                togglePopoverTab(.subtitles)
-            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.tr("倍速"))
         }
     }
 
@@ -742,27 +814,6 @@ struct PlayerView: View {
         withAnimation(.easeInOut(duration: 0.18)) {
             activePopoverTab = activePopoverTab == tab ? nil : tab
         }
-    }
-
-    private func quickPill(_ title: String, isActive: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11, weight: isActive ? .semibold : .medium))
-                .foregroundStyle(isActive ? CatDesign.glowAmber : CatDesign.Cinema.textIvory)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(
-                    isActive ? CatDesign.glowAmber.opacity(0.14) : CatDesign.Cinema.surfacePill,
-                    in: Capsule()
-                )
-                .overlay(
-                    Capsule().strokeBorder(
-                        isActive ? CatDesign.Cinema.strokeAmber : CatDesign.Cinema.strokeGlass,
-                        lineWidth: 0.75
-                    )
-                )
-        }
-        .buttonStyle(.plain)
     }
 
     private var liveBadge: some View {
@@ -784,19 +835,25 @@ struct PlayerView: View {
     private var feedbackOverlays: some View {
         ZStack {
             if let brightness = viewModel.brightnessOverlay {
-                GaugeOverlay(
-                    icon: "sun.max.fill",
+                VerticalGestureHUD(
+                    assetIcon: "CatLGBrightnessHud",
+                    systemIcon: nil,
                     value: Double(brightness),
-                    label: "\(Int(brightness * 100))%"
+                    label: "\(Int((brightness * 100).rounded()))%"
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .padding(.leading, 12)
             }
 
             if let volume = viewModel.volumeOverlay {
-                GaugeOverlay(
-                    icon: volume > 0 ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                VerticalGestureHUD(
+                    assetIcon: nil,
+                    systemIcon: volume > 0 ? "speaker.wave.2.fill" : "speaker.slash.fill",
                     value: Double(volume),
-                    label: "\(Int(volume * 100))%"
+                    label: "\(Int((volume * 100).rounded()))%"
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .padding(.trailing, 12)
             }
 
             if let seekDelta = viewModel.seekOverlay {
@@ -810,8 +867,13 @@ struct PlayerView: View {
                         .foregroundStyle(CatDesign.Cinema.textIvory)
                 }
                 .padding(16)
-                .background(CatDesign.Cinema.surfaceGlassElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.8))
+                .catLiquidGlass(
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous),
+                    tint: cinemaGlassTint,
+                    fallbackFill: CatDesign.Cinema.surfaceGlassElevated,
+                    stroke: cinemaGlassStroke,
+                    strokeWidth: 1
+                )
                 .transition(.scale.combined(with: .opacity))
             }
 
@@ -842,37 +904,46 @@ struct PlayerView: View {
                     }
                 }
             }
-            .frame(width: 138, height: 78)
+            .frame(width: 144, height: 82)
             .clipped()
 
             LinearGradient(
-                colors: [.clear, CatDesign.catSilhouette.opacity(0.90)],
+                colors: [.clear, Color(red: 10 / 255, green: 10 / 255, blue: 12 / 255).opacity(0.88)],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: 36)
+            .frame(height: 38)
 
             Text(viewModel.seekTime.formattedDuration)
                 .font(.system(size: 10.5, weight: .bold).monospacedDigit())
                 .foregroundStyle(CatDesign.glowAmber)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
+                .padding(.vertical, 2.5)
+                .background(
+                    Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.73),
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule().strokeBorder(
+                        Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.20),
+                        lineWidth: 0.75
+                    )
+                )
                 .padding(.bottom, 6)
         }
-        .frame(width: 138, height: 78)
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .frame(width: 144, height: 82)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .strokeBorder(CatDesign.Cinema.strokeAmber, lineWidth: 1.1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(CatDesign.glowAmber.opacity(0.60), lineWidth: 1.2)
         )
-        .shadow(color: .black.opacity(0.75), radius: 14, y: 8)
+        .shadow(color: .black.opacity(0.70), radius: 22, y: 10)
         .overlay(alignment: .top) {
             Image("CatLeaningPreview")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 46, height: 30)
-                .offset(x: 6, y: -25)
+                .offset(x: 3, y: -26)
                 .allowsHitTesting(false)
         }
     }
@@ -889,8 +960,13 @@ struct PlayerView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
-        .background(CatDesign.Cinema.surfaceGlassElevated, in: Capsule())
-        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeAmber, lineWidth: 0.9))
+        .catLiquidGlass(
+            in: Capsule(),
+            tint: cinemaGlassTint,
+            fallbackFill: CatDesign.Cinema.surfaceGlassElevated,
+            stroke: amberGlassStroke,
+            strokeWidth: 1
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.top, 44)
         .transition(.move(edge: .top).combined(with: .opacity))
@@ -928,28 +1004,55 @@ private struct PlayerNoticeOverlay: View {
 
 // MARK: - Supporting Views
 
-struct GaugeOverlay: View {
-    let icon: String
+struct VerticalGestureHUD: View {
+    let assetIcon: String?
+    let systemIcon: String?
     let value: Double
     let label: String
 
+    private var clampedValue: CGFloat {
+        CGFloat(min(max(value, 0), 1))
+    }
+
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(CatDesign.glowAmber)
-            ProgressView(value: value)
-                .frame(width: 100)
-                .tint(CatDesign.glowAmber)
+        VStack(spacing: 10) {
+            Group {
+                if let assetIcon {
+                    Image(assetIcon)
+                        .resizable()
+                        .scaledToFit()
+                } else if let systemIcon {
+                    Image(systemName: systemIcon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(CatDesign.glowAmber)
+                }
+            }
+            .frame(width: 16, height: 16)
+
+            ZStack(alignment: .bottom) {
+                Capsule()
+                    .fill(Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.18))
+                    .frame(width: 6, height: 92)
+
+                Capsule()
+                    .fill(CatDesign.glowAmber)
+                    .frame(width: 6, height: max(4, 92 * clampedValue))
+            }
+
             Text(label)
-                .font(.caption.weight(.medium))
+                .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
                 .foregroundStyle(CatDesign.Cinema.textIvory)
+                .lineLimit(1)
         }
-        .padding(16)
-        .background(CatDesign.Cinema.surfaceGlassElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.9)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .frame(width: 42)
+        .catLiquidGlass(
+            in: Capsule(),
+            tint: Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.21),
+            fallbackFill: CatDesign.Cinema.surfaceGlassElevated,
+            stroke: Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.40),
+            strokeWidth: 1
         )
     }
 }

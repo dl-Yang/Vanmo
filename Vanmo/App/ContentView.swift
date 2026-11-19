@@ -55,7 +55,7 @@ struct ContentView: View {
                     CatBottomBarScrim()
                         .transition(.opacity)
                     CatGlassTabBar(selectedTab: $appState.selectedTab)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 2)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 .ignoresSafeArea(.keyboard, edges: .bottom)

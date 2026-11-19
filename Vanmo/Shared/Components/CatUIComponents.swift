@@ -17,38 +17,81 @@ extension View {
     }
 }
 
+// MARK: - Liquid Glass Surface Helper
+
+extension View {
+    @ViewBuilder
+    func catLiquidGlass<S: InsettableShape>(
+        in shape: S,
+        tint: Color,
+        fallbackFill: Color? = nil,
+        stroke: Color,
+        strokeWidth: CGFloat = 1,
+        interactive: Bool = false
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .background {
+                    shape
+                        .fill(Color.clear)
+                        .glassEffect(
+                            interactive ? .regular.tint(tint).interactive() : .regular.tint(tint),
+                            in: shape
+                        )
+                }
+                .overlay {
+                    shape.strokeBorder(stroke, lineWidth: strokeWidth)
+                }
+        } else {
+            self
+                .background {
+                    shape
+                        .fill(.ultraThinMaterial)
+                        .overlay(shape.fill(fallbackFill ?? tint))
+                }
+                .overlay {
+                    shape.strokeBorder(stroke, lineWidth: strokeWidth)
+                }
+        }
+    }
+}
+
 // MARK: - Floating Cat Glass Tab Bar
 
 struct CatGlassTabBar: View {
     @Binding var selectedTab: AppTab
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var activePillNamespace
 
     var body: some View {
-        HStack(spacing: 0) {
+        tabItemsRow
+            .padding(6)
+            .frame(maxWidth: 366)
+            .frame(height: 68)
+            .catLiquidGlass(
+                in: Capsule(),
+                tint: barTint,
+                fallbackFill: barFallbackFill,
+                stroke: barStroke,
+                strokeWidth: 1
+            )
+            .shadow(
+                color: colorScheme == .dark
+                    ? Color.black.opacity(0.60)
+                    : Color(red: 24 / 255, green: 24 / 255, blue: 27 / 255).opacity(0.16),
+                radius: 13,
+                y: 12
+            )
+            .padding(.horizontal, 12)
+    }
+
+    private var tabItemsRow: some View {
+        HStack(spacing: 4) {
             ForEach(AppTab.allCases, id: \.self) { tab in
                 tabItemButton(for: tab)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: 420)
-        .frame(height: 66)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay(Capsule().fill(CatDesign.surfaceGlassElevated))
-        }
-        .overlay(
-            Capsule()
-                .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
-        )
-        .shadow(
-            color: colorScheme == .dark ? .black.opacity(0.65) : .black.opacity(0.14),
-            radius: 14,
-            y: 10
-        )
-        .padding(.horizontal, 24)
     }
 
     private func tabItemButton(for tab: AppTab) -> some View {
@@ -56,17 +99,21 @@ struct CatGlassTabBar: View {
         return Button {
             guard selectedTab != tab else { return }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82)) {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.30, dampingFraction: 0.80)) {
                 selectedTab = tab
             }
         } label: {
             VStack(spacing: isSelected ? 2 : 3) {
-                tabIcon(for: tab, isSelected: isSelected)
+                Image(tab.lgIconAssetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
                     .frame(width: 24, height: 24)
+                    .foregroundStyle(isSelected ? CatDesign.accentAmber : inactiveColor)
 
                 Text(tab.title)
                     .font(.system(size: 10, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected ? CatDesign.accentAmber : CatDesign.textMuted)
+                    .foregroundStyle(isSelected ? CatDesign.accentAmber : inactiveColor)
                     .lineLimit(1)
 
                 if isSelected {
@@ -74,13 +121,23 @@ struct CatGlassTabBar: View {
                         .renderingMode(.template)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 12, height: 12)
+                        .frame(width: 10, height: 9)
                         .foregroundStyle(CatDesign.accentAmber)
-                        .shadow(color: CatDesign.glowAmber.opacity(0.8), radius: 2.5)
+                        .shadow(
+                            color: colorScheme == .dark
+                                ? CatDesign.glowAmber.opacity(0.85)
+                                : CatDesign.accentAmber.opacity(0.40),
+                            radius: 2.5
+                        )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
+            .background {
+                if isSelected {
+                    activePillBackground
+                }
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
@@ -88,34 +145,71 @@ struct CatGlassTabBar: View {
         .accessibilityIdentifier(tab.accessibilityID)
     }
 
-    @ViewBuilder
-    private func tabIcon(for tab: AppTab, isSelected: Bool) -> some View {
-        let name = tab.catIconAssetName(isSelected: isSelected)
-        if isSelected {
-            Image(name)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(name)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(CatDesign.textMuted)
-        }
+    private var activePillBackground: some View {
+        Capsule()
+            .fill(activePillSecondaryTint)
+            .overlay(Capsule().fill(activePillTint))
+            .overlay(Capsule().strokeBorder(activePillStroke, lineWidth: 1))
+            .shadow(color: activePillShadow, radius: 12, y: 4)
+            .matchedGeometryEffect(id: "activeTabPill", in: activePillNamespace)
+    }
+
+    private var barTint: Color {
+        colorScheme == .dark
+            ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.21)
+            : Color.white.opacity(0.25)
+    }
+
+    private var barFallbackFill: Color {
+        colorScheme == .dark
+            ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.45)
+            : Color.white.opacity(0.55)
+    }
+
+    private var barStroke: Color {
+        colorScheme == .dark
+            ? Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.40)
+            : Color.white.opacity(0.90)
+    }
+
+    private var activePillTint: Color {
+        colorScheme == .dark
+            ? Color(red: 255 / 255, green: 181 / 255, blue: 71 / 255).opacity(0.141)
+            : Color.white.opacity(0.451)
+    }
+
+    private var activePillSecondaryTint: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(0.078)
+            : Color(red: 184 / 255, green: 106 / 255, blue: 8 / 255).opacity(0.11)
+    }
+
+    private var activePillStroke: Color {
+        colorScheme == .dark
+            ? Color(red: 255 / 255, green: 181 / 255, blue: 71 / 255).opacity(0.60)
+            : Color.white.opacity(0.95)
+    }
+
+    private var activePillShadow: Color {
+        colorScheme == .dark
+            ? Color(red: 255 / 255, green: 181 / 255, blue: 71 / 255).opacity(0.22)
+            : Color(red: 184 / 255, green: 106 / 255, blue: 8 / 255).opacity(0.14)
+    }
+
+    private var inactiveColor: Color {
+        colorScheme == .dark
+            ? Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.65)
+            : Color(red: 24 / 255, green: 24 / 255, blue: 27 / 255).opacity(0.60)
     }
 }
 
 private extension AppTab {
-    func catIconAssetName(isSelected: Bool) -> String {
+    var lgIconAssetName: String {
         switch self {
-        case .library:
-            return isSelected ? "CatTabLibraryActive" : "CatTabLibraryInactive"
-        case .connections:
-            return isSelected ? "CatTabFilesActive" : "CatTabFilesInactive"
-        case .search:
-            return isSelected ? "CatTabSearchActive" : "CatTabSearchInactive"
-        case .settings:
-            return isSelected ? "CatTabSettingsActive" : "CatTabSettingsInactive"
+        case .library: return "CatLGTabLibrary"
+        case .connections: return "CatLGTabFiles"
+        case .search: return "CatLGTabSearch"
+        case .settings: return "CatLGTabSettings"
         }
     }
 
@@ -130,19 +224,19 @@ private extension AppTab {
 }
 
 struct CatBottomBarScrim: View {
-    var height: CGFloat = 120
+    var height: CGFloat = 114
 
     var body: some View {
         LinearGradient(
             stops: [
                 .init(color: CatDesign.bgObsidian.opacity(0), location: 0),
-                .init(color: CatDesign.bgObsidian.opacity(0.85), location: 0.6),
-                .init(color: CatDesign.bgObsidian, location: 1)
+                .init(color: CatDesign.bgObsidian.opacity(0.55), location: 1)
             ],
             startPoint: .top,
             endPoint: .bottom
         )
         .frame(height: height)
+        .ignoresSafeArea(edges: .bottom)
         .allowsHitTesting(false)
     }
 }
