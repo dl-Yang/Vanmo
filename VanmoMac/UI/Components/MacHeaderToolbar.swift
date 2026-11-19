@@ -10,14 +10,18 @@ struct MacLibraryViewControls: View {
     var showsSortMenu: Bool = true
 
     var body: some View {
-        HStack(spacing: 16) {
-            HStack(spacing: 0) {
-                segmentButton(mode: .grid, systemImage: "square.grid.2x2")
-                segmentButton(mode: .list, systemImage: "list.bullet")
+        HStack(spacing: 10) {
+            HStack(spacing: 3) {
+                segmentButton(mode: .grid, assetName: "MacGridView")
+                segmentButton(mode: .list, assetName: "MacListView")
             }
-            .padding(3)
-            .background(theme.segmentedBackground)
-            .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.segmentedControl))
+            .padding(4)
+            .frame(height: 34)
+            .background(theme.segmentedBackground, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+            }
 
             if showsSortMenu {
                 Menu {
@@ -28,29 +32,55 @@ struct MacLibraryViewControls: View {
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .foregroundStyle(theme.secondaryText)
-                        .frame(width: 20, height: 20)
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 34, height: 34)
+                .background(theme.surfaceGlass, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                }
                 .help(L10n.tr("排序"))
             }
         }
     }
 
     @ViewBuilder
-    private func segmentButton(mode: MacLibraryViewMode, systemImage: String) -> some View {
+    private func segmentButton(mode: MacLibraryViewMode, assetName: String) -> some View {
         let isSelected = appState.viewMode == mode
         Button {
-            appState.viewMode = mode
+            withAnimation(.easeInOut(duration: 0.18)) {
+                appState.viewMode = mode
+            }
         } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(isSelected ? theme.primaryText : theme.secondaryText)
-                .frame(width: 24, height: 24)
-                .background(isSelected ? theme.segmentedSelectedBackground : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.segmentedSegment))
-                .shadow(color: isSelected ? Color.black.opacity(0.08) : .clear, radius: 1, y: 1)
+            ZStack(alignment: .topTrailing) {
+                Image(assetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+                    .foregroundStyle(isSelected ? theme.accentAmber : theme.secondaryText)
+                    .frame(width: 32, height: 26)
+                    .background(
+                        isSelected ? theme.segmentedSelectedBackground : Color.clear,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        if isSelected {
+                            Capsule()
+                                .strokeBorder(theme.strokeAmber, lineWidth: 0.75)
+                        }
+                    }
+
+                if isSelected {
+                    MacPawDotIndicator(size: 7)
+                        .offset(x: -3, y: 2)
+                }
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -58,53 +88,92 @@ struct MacLibraryViewControls: View {
 
 struct MacSidebarToggleButton: View {
     @EnvironmentObject private var appState: MacAppState
+    @EnvironmentObject private var downloadManager: DownloadManager
     @EnvironmentObject private var downloadHero: MacDownloadHeroController
     @Environment(\.macTheme) private var theme
     @Environment(\.openWindow) private var openWindow
 
+    private var hasActiveDownloads: Bool {
+        downloadManager.tasks.contains {
+            $0.status == .downloading || $0.status == .queued
+        }
+    }
+
     var body: some View {
-        HStack(spacing:0){
-            Button {
-                appState.isSidebarExpanded.toggle()
-            } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(theme.primaryText)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
+        HStack(spacing: 6) {
+            if appState.isSidebarExpanded {
+                Spacer(minLength: 0)
+            } else if appState.canGoBack && appState.selectedMediaItem == nil {
+                Button {
+                    appState.goBack()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.primaryText)
+                        .frame(width: 28, height: 28)
+                        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.85)
+                        }
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(L10n.tr("返回上一步"))
             }
-            .frame(width: 28, height: 28)
-            .buttonStyle(.plain)
-            .help(appState.isSidebarExpanded ? L10n.tr("收起侧边栏") : L10n.tr("展开侧边栏"))
-           
+
             Button {
-                appState.goBack()
+                openWindow(id: "downloads")
             } label: {
-                Image(systemName: "arrow.left")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(appState.canGoBack ? theme.primaryText : .gray.opacity(0.2))
+                Image("MacDownloadsTray")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(hasActiveDownloads ? theme.accentAmber : theme.primaryText)
                     .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .frame(width: 28, height: 28)
-            .buttonStyle(.plain)
-            .help(L10n.tr("返回上一步"))
-            
-            Spacer()
-            
-            Button {
-               openWindow(id: "downloads")
-            } label: {
-                Image(systemName: "arrow.down.circle")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
+                    .background(
+                        hasActiveDownloads ? theme.amberTintFill : theme.surfacePill,
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                    .overlay {
+                        if hasActiveDownloads {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(theme.strokeAmber, lineWidth: 0.85)
+                        }
+                    }
                     .scaleEffect(downloadHero.destinationScale)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help(L10n.tr("查看下载列表"))
             .macDownloadHeroFrame("destination")
             .accessibilityIdentifier("download.sidebar.icon")
+
+            Button {
+                appState.isSidebarExpanded.toggle()
+            } label: {
+                Image("MacSidebarCollapse")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        appState.isSidebarExpanded ? Color.clear : theme.surfaceGlass,
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                    .overlay {
+                        if !appState.isSidebarExpanded {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.85)
+                        }
+                    }
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(appState.isSidebarExpanded ? L10n.tr("收起侧边栏") : L10n.tr("展开侧边栏"))
         }
     }
 }
@@ -150,10 +219,16 @@ struct MacFilterPills: View {
                         Text(filter.title)
                             .font(MacDesignTokens.Typography.filterPill)
                             .foregroundStyle(isSelected ? theme.filterSelectedText : theme.filterUnselectedText)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, 14)
                             .frame(height: MacDesignTokens.Layout.filterPillHeight)
-                            .background(isSelected ? theme.filterSelectedBackground : theme.filterUnselectedBackground)
-                            .clipShape(Capsule())
+                            .background(
+                                isSelected ? theme.filterSelectedBackground : theme.filterUnselectedBackground,
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(isSelected ? theme.strokeAmber : theme.strokeGlass, lineWidth: 0.85)
+                            }
                     }
                     .buttonStyle(.plain)
                 }

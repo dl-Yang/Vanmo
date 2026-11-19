@@ -38,7 +38,6 @@ struct MacFavoritesListView: View {
     @State private var mediaPurgeHandlerId: UUID?
 
     private var displayItems: [MediaItem] {
-        // 先过滤已删对象，避免排序/展示时访问 displayTitle、mediaType 触发 SwiftData fault 崩溃。
         let alive = viewModel.items.filter { !$0.isDeleted }
         let base = MacLibrarySorting.sorted(alive, by: libraryViewModel.sortOption)
         guard isSearching, !searchText.isEmpty else { return base }
@@ -46,58 +45,21 @@ struct MacFavoritesListView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: MacDesignTokens.Layout.trafficLightsTopInset + 5)
-            header
+        ZStack(alignment: .topTrailing) {
+            MacCatAmbientHalo()
+                .offset(x: -70, y: -30)
 
-            if isSearching {
-                searchField
-            }
+            VStack(spacing: 0) {
+                header
 
-            Group {
-                if viewModel.isLoading && viewModel.items.isEmpty {
-                    ProgressView(L10n.tr("正在加载收藏…"))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if viewModel.items.isEmpty {
-                    Text(L10n.tr("还没有收藏"))
-                        .foregroundStyle(theme.secondaryText)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        MacLibraryMediaLayout(viewMode: appState.viewMode) {
-                            LazyVGrid(
-                                columns: [GridItem(.adaptive(minimum: MacDesignTokens.Layout.posterWidth), spacing: 16)],
-                                spacing: 16
-                            ) {
-                                ForEach(displayItems) { item in
-                                    MacPosterCard(
-                                        title: item.title,
-                                        subtitle: item.mediaType.displayName,
-                                        posterURL: item.posterURL
-                                    ) {
-                                        appState.openDetail(item)
-                                    }
-                                    .onAppear {
-                                        Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
-                                    }
-                                }
-                            }
-                        } listContent: {
-                            MacLibraryPosterList(items: displayItems, onSelect: { appState.openDetail($0) }) { item in
-                                Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
-                            }
-                        }
-                        .padding(MacDesignTokens.Layout.contentPadding)
-
-                        if viewModel.isLoadingMore {
-                            ProgressView().padding()
-                        }
-                    }
+                if isSearching {
+                    searchField
                 }
+
+                content
             }
         }
         .background(theme.appBackground)
-        // Root 将收藏通知写入 favoriteChangeNonce；未挂载期间变更也能在进入时触发 reload。
         .task(id: appState.favoriteChangeNonce) {
             viewModel.setModelContext(modelContext)
             await viewModel.reload()
@@ -123,51 +85,165 @@ struct MacFavoritesListView: View {
         }
     }
 
-    private var header: some View {
-        HStack {
+    @ViewBuilder
+    private var content: some View {
+        if viewModel.isLoading && viewModel.items.isEmpty {
+            ProgressView(L10n.tr("正在加载收藏…"))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if viewModel.items.isEmpty {
+            VStack(spacing: 12) {
+                Image("MacNavFavoritesPaw")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+                    .foregroundStyle(theme.accentAmber.opacity(0.7))
+                Text(L10n.tr("还没有收藏"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                Text(L10n.tr("你标记收藏的电影和电视剧会显示在这里。"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.secondaryText)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollView {
+                MacLibraryMediaLayout(viewMode: appState.viewMode) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: MacDesignTokens.Layout.posterWidth), spacing: MacDesignTokens.Layout.posterSpacing)],
+                        spacing: MacDesignTokens.Layout.posterSpacing
+                    ) {
+                        ForEach(displayItems) { item in
+                            MacPosterCard(
+                                title: item.displayTitle,
+                                subtitle: itemSubtitle(item),
+                                posterURL: item.posterURL
+                            ) {
+                                appState.openDetail(item)
+                            }
+                            .macMediaItemContextMenu(for: item)
+                            .onAppear {
+                                Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
+                            }
+                        }
+                    }
+                } listContent: {
+                    MacLibraryPosterList(items: displayItems, onSelect: { appState.openDetail($0) }) { item in
+                        Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
+                    }
+                }
+                .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+                .padding(.top, 14)
+                .padding(.bottom, 32)
 
+                if viewModel.isLoadingMore {
+                    ProgressView().padding()
+                }
+            }
+        }
+    }
+
+    private func itemSubtitle(_ item: MediaItem) -> String {
+        if let year = item.year {
+            return "\(item.mediaType.displayName) · \(year)"
+        }
+        return item.mediaType.displayName
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
             Text(L10n.tr("收藏"))
                 .font(MacDesignTokens.Typography.headerTitle)
+                .foregroundStyle(theme.primaryText)
+
+            HStack(spacing: 6) {
+                ForEach(MacFavoriteLibraryScope.allCases) { scope in
+                    let isSelected = viewModel.scope == scope
+                    Button {
+                        viewModel.scope = scope
+                    } label: {
+                        Text(scope.title)
+                            .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
+                            .foregroundStyle(isSelected ? theme.accentAmber : theme.secondaryText)
+                            .padding(.horizontal, 11)
+                            .frame(height: 26)
+                            .background(
+                                isSelected ? theme.amberTintFill : theme.surfacePill,
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(isSelected ? theme.strokeAmber : theme.strokeGlass, lineWidth: 0.8)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.leading, 8)
 
             Spacer()
 
-            Menu {
-                Picker(L10n.tr("收藏类型"), selection: $viewModel.scope) {
-                    ForEach(MacFavoriteLibraryScope.allCases) { scope in
-                        Text(scope.title).tag(scope)
-                    }
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isSearching.toggle()
+                    if !isSearching { searchText = "" }
                 }
             } label: {
-                Image(systemName: "slider.horizontal.3")
-            }
-            .menuStyle(.borderlessButton)
-
-            Button {
-                isSearching.toggle()
-                if !isSearching { searchText = "" }
-            } label: {
-                Image(systemName: isSearching ? "xmark" : "magnifyingglass")
+                Image("MacSearchCat")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+                    .foregroundStyle(isSearching ? theme.accentAmber : theme.secondaryText)
+                    .frame(width: 34, height: 34)
+                    .background(isSearching ? theme.amberTintFill : theme.surfaceGlass, in: Circle())
+                    .overlay {
+                        Circle()
+                            .strokeBorder(isSearching ? theme.strokeAmber : theme.strokeGlass, lineWidth: 0.9)
+                    }
             }
             .buttonStyle(.plain)
+            .help(isSearching ? L10n.tr("关闭搜索") : L10n.tr("搜索收藏"))
 
             MacLibraryViewControls()
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .frame(height: MacDesignTokens.Layout.headerHeight)
-        .background(theme.headerBackground)
+        .padding(.top, 18)
+        .padding(.bottom, 10)
     }
 
     private var searchField: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(theme.secondaryText)
+        HStack(spacing: 8) {
+            Image("MacSearchCat")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 15, height: 15)
+                .foregroundStyle(theme.accentAmber)
+
             TextField(L10n.tr("搜索收藏"), text: $searchText)
                 .textFieldStyle(.plain)
+                .font(.system(size: 12.5))
+                .foregroundStyle(theme.primaryText)
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.tertiaryText)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(theme.searchBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .frame(height: 34)
+        .background(theme.searchBackground, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(theme.strokeAmber, lineWidth: 0.9)
+        }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
         .padding(.bottom, 8)
     }
@@ -207,10 +283,8 @@ final class MacFavoritesListViewModel: ObservableObject {
         }
     }
 
-    /// 删除连接前同步剔除收藏列表中的 MediaItem。
     func removeItems(forConnectionId connectionId: UUID) {
         let remaining = items.filter { item in
-            // 已 detach 的对象只能安全读 isDeleted，不能再读 sourceConnectionId。
             guard !item.isDeleted else { return false }
             return item.sourceConnectionId != connectionId
         }

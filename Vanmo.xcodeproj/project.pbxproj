@@ -13,6 +13,7 @@
 		03B0F2B61C7AE2F1ADA9FCCF /* Int64+FileSize.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD83E98C75F323D9F3C45579 /* Int64+FileSize.swift */; };
 		0517193C8B8A78F97FD595D5 /* drive115.png in Resources */ = {isa = PBXBuildFile; fileRef = A9C894C4127F24180D62B76B /* drive115.png */; };
 		053F218D2F004F69BCB2A9D1 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66AC850C1907C97654689F25 /* SearchViewModel.swift */; };
+		05AB4FBDB4B9FC75CA557E33 /* MacCatUIComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ACBFFE1333F81FD0DAEB8E7 /* MacCatUIComponents.swift */; };
 		068CC4178E48140CFD936298 /* MacSubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A9C865D6F495BA681A5A92C /* MacSubtitleOverlayView.swift */; };
 		085A1EDD454ECBAE0ACB00F8 /* DownloadIslandCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0D65F2410B720D5DACC5437 /* DownloadIslandCapability.swift */; };
 		08D449B2FCD839563D28E73A /* URL+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B6219B4DB4376B9D457F04B /* URL+Extensions.swift */; };
@@ -290,6 +291,7 @@
 		68ADF359717CDE03BB014EA2 /* SecondFloorItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondFloorItemView.swift; sourceTree = "<group>"; };
 		68E11D6C42159C14B59AE87B /* CollectionFolderListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionFolderListView.swift; sourceTree = "<group>"; };
 		6AA788DB691AA953F10BC8B4 /* MacSearchResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacSearchResultsView.swift; sourceTree = "<group>"; };
+		6ACBFFE1333F81FD0DAEB8E7 /* MacCatUIComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCatUIComponents.swift; sourceTree = "<group>"; };
 		6D6524ADADB8CC750BE7000A /* iptv.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = iptv.png; sourceTree = "<group>"; };
 		6EA6AF4A0497F80D2A3D9CE1 /* CatDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatDesignTokens.swift; sourceTree = "<group>"; };
 		6EC988F514EC1CDBAADD33DB /* MacLibraryEmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLibraryEmptyStateView.swift; sourceTree = "<group>"; };
@@ -689,6 +691,7 @@
 		637D6EED0BBF627606E68376 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				6ACBFFE1333F81FD0DAEB8E7 /* MacCatUIComponents.swift */,
 				3A076FE8593DEDD875F5BAA8 /* MacHeaderToolbar.swift */,
 				3C3FD91E79D3D732075D25F4 /* MacLibrarySyncToast.swift */,
 				8C440DE29C5B79DC7AC5825B /* MacMediaCards.swift */,
@@ -1357,6 +1360,7 @@
 				49740FB0D4E2989DAAEDA7C3 /* MacAVPlayerView.swift in Sources */,
 				482D6C1831D360002E8F3554 /* MacAddConnectionView.swift in Sources */,
 				B68EC4B95F8D05BE5E67DD73 /* MacAppState.swift in Sources */,
+				05AB4FBDB4B9FC75CA557E33 /* MacCatUIComponents.swift in Sources */,
 				FA165DC13A7ED1A8CF709DD0 /* MacCollectionFolderListView.swift in Sources */,
 				0FF17D988CF0CB2C99AB934A /* MacConnectionTypeGroups.swift in Sources */,
 				60FA29961D5E179227A2CCF0 /* MacConnectionsBrowseView.swift in Sources */,

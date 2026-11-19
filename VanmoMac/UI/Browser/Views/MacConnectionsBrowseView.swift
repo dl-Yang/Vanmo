@@ -10,7 +10,8 @@ struct MacConnectionsBrowseView: View {
     @Environment(\.macTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("files.browserLayout") private var layoutRaw = MacFilesBrowserLayout.grid.rawValue
-    /// 正在打开的文件夹路径：保留旧内容并在该条目上显示打开态，加载完成后再做展开过渡。
+
+    @State private var filterText = ""
     @State private var openingFolderPath: String?
     @State private var isNavigatingDirectory = false
     @State private var folderTransition = MacFolderTransitionState()
@@ -19,16 +20,39 @@ struct MacConnectionsBrowseView: View {
 
     private static let contentSpace = "mac.files.browser.content"
     private static let gridColumns = Array(
-        repeating: GridItem(.flexible(), spacing: 16, alignment: .top),
-        count: 3
+        repeating: GridItem(.flexible(), spacing: 20, alignment: .top),
+        count: 4
     )
 
+    private var filteredFiles: [RemoteFile] {
+        let trimmed = filterText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return connectionsViewModel.files }
+        return connectionsViewModel.files.filter {
+            $0.name.localizedCaseInsensitiveContains(trimmed)
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            breadcrumbBar
-            Divider()
-            browserContent
+        ZStack(alignment: .topTrailing) {
+            MacCatAmbientHalo()
+                .offset(x: -70, y: -30)
+
+            VStack(spacing: 0) {
+                topToolbar
+
+                if connectionsViewModel.scanCoordinator.isActive {
+                    MacScanSyncBanner(
+                        coordinator: connectionsViewModel.scanCoordinator,
+                        onPause: { connectionsViewModel.pauseScan() },
+                        onResume: { connectionsViewModel.resumeScan() },
+                        onCancel: { connectionsViewModel.cancelScan() }
+                    )
+                    .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+                    .padding(.bottom, 12)
+                }
+
+                browserContent
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.appBackground)
@@ -36,14 +60,6 @@ struct MacConnectionsBrowseView: View {
             if connectionsViewModel.isLoading && !connectionsViewModel.scanCoordinator.isActive {
                 loadingOverlay
             }
-        }
-        .overlay(alignment: .bottom) {
-            MacScanSyncBanner(
-                coordinator: connectionsViewModel.scanCoordinator,
-                onPause: { connectionsViewModel.pauseScan() },
-                onResume: { connectionsViewModel.resumeScan() },
-                onCancel: { connectionsViewModel.cancelScan() }
-            )
         }
         .alert(L10n.tr("同步"), isPresented: Binding(
             get: { connectionsViewModel.scanToastMessage != nil },
@@ -69,83 +85,154 @@ struct MacConnectionsBrowseView: View {
         }
         .onChange(of: connectionsViewModel.selectedConnectionID) { _, _ in
             folderTransition = MacFolderTransitionState()
+            filterText = ""
+        }
+        .onChange(of: connectionsViewModel.currentPath) { _, _ in
+            filterText = ""
         }
         .contextMenu {
             connectionContextMenu
         }
     }
 
-    // MARK: - Header
+    // MARK: - Top Toolbar (Breadcrumb + Filter + Layout + Sync/Scan)
 
-    private var header: some View {
+    private var topToolbar: some View {
         HStack(spacing: 12) {
-            if let connection = connectionsViewModel.selectedConnection {
-                MacConnectionProviderIcon(type: connection.type, size: 20)
+            breadcrumbGroup
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(connection.name)
-                        .font(MacDesignTokens.Typography.headerTitle)
-                        .foregroundStyle(theme.primaryText)
-                        .lineLimit(1)
-
-                    Text(connectionStatusText(for: connection))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(theme.tertiaryText)
-                }
-            } else {
-                Text(L10n.tr("连接浏览"))
-                    .font(MacDesignTokens.Typography.headerTitle)
-                    .foregroundStyle(theme.primaryText)
-            }
-
-            Spacer(minLength: 0)
+            Spacer(minLength: 12)
 
             if connectionsViewModel.selectedConnection != nil {
-                Button {
-                    Task { await connectionsViewModel.refreshCurrentDirectory() }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .help(L10n.tr("刷新当前目录"))
-
-                Button {
-                    Task { await connectionsViewModel.scanCurrentDirectory() }
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .help(L10n.tr("同步当前目录到媒体库"))
+                folderFilterField
 
                 if connectionsViewModel.selectedConnection?.type != .iptv {
                     layoutToggle
                 }
 
+                Button {
+                    Task { await connectionsViewModel.scanCurrentDirectory() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image("MacSyncScan")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 14, height: 14)
+                        Text(L10n.tr("同步扫描"))
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.accentAmber)
+                    .padding(.leading, 12)
+                    .padding(.trailing, 13)
+                    .frame(height: 34)
+                    .background(theme.amberTintFill, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(theme.strokeAmber, lineWidth: 0.9)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(L10n.tr("同步当前目录到媒体库"))
+
                 Menu {
                     connectionContextMenu
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .frame(width: 28, height: 28)
+                    Image("MacMoreDots")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                        .foregroundStyle(theme.secondaryText)
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 34, height: 34)
+                .background(theme.surfaceGlass, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                }
+                .fixedSize()
                 .help(L10n.tr("更多操作"))
             }
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .frame(height: MacDesignTokens.Layout.headerHeight)
-        .background(theme.headerBackground)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(theme.headerBorder)
-                .frame(height: 1)
-        }
+        .padding(.top, 18)
+        .padding(.bottom, 14)
         .contextMenu {
             connectionContextMenu
+        }
+    }
+
+    private var breadcrumbGroup: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                if breadcrumbItems.isEmpty {
+                    Text(L10n.tr("连接浏览"))
+                        .font(MacDesignTokens.Typography.headerTitle)
+                        .foregroundStyle(theme.primaryText)
+                } else {
+                    ForEach(Array(breadcrumbItems.enumerated()), id: \.offset) { index, item in
+                        let isLast = index == breadcrumbItems.count - 1
+                        if index > 0 {
+                            Text("›")
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundStyle(theme.tertiaryText)
+                        }
+
+                        Button {
+                            navigateToBreadcrumb(item.path)
+                        } label: {
+                            Text(item.title)
+                                .font(.system(size: isLast ? 18 : 15, weight: isLast ? .bold : .medium))
+                                .foregroundStyle(isLast ? theme.primaryText : theme.secondaryText)
+                                .lineLimit(1)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isLast)
+                    }
+                }
+            }
+        }
+    }
+
+    private var currentDirectoryTitle: String {
+        breadcrumbItems.last?.title ?? L10n.tr("当前目录")
+    }
+
+    private var folderFilterField: some View {
+        HStack(spacing: 7) {
+            Image("MacSearchCat")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 14, height: 14)
+                .foregroundStyle(filterText.isEmpty ? theme.secondaryText : theme.accentAmber)
+
+            TextField(L10n.tr("过滤 %@...", currentDirectoryTitle), text: $filterText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundStyle(theme.primaryText)
+
+            if !filterText.isEmpty {
+                Button {
+                    filterText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.tertiaryText)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 10)
+        .frame(width: 210, height: 34)
+        .background(theme.surfaceGlass, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(filterText.isEmpty ? theme.strokeGlass : theme.strokeAmber, lineWidth: 0.9)
         }
     }
 
@@ -188,38 +275,6 @@ struct MacConnectionsBrowseView: View {
         }
     }
 
-    // MARK: - Breadcrumb
-
-    private var breadcrumbBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 4) {
-                ForEach(Array(breadcrumbItems.enumerated()), id: \.offset) { index, item in
-                    if index > 0 {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(theme.tertiaryText)
-                    }
-
-                    Button {
-                        navigateToBreadcrumb(item.path)
-                    } label: {
-                        Text(item.title)
-                            .font(.system(size: 13, weight: index == breadcrumbItems.count - 1 ? .semibold : .medium))
-                            .foregroundStyle(
-                                index == breadcrumbItems.count - 1 ? theme.primaryText : theme.secondaryText
-                            )
-                            .lineLimit(1)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(index == breadcrumbItems.count - 1)
-                }
-            }
-            .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-            .padding(.vertical, 10)
-        }
-        .background(theme.appBackground)
-    }
-
     // MARK: - Content
 
     @ViewBuilder
@@ -229,9 +284,31 @@ struct MacConnectionsBrowseView: View {
         } else if connectionsViewModel.isBrowsingFiles && !isNavigatingDirectory {
             loadingState
         } else if let message = connectionsViewModel.fileBrowserErrorMessage {
-            messageState(icon: "exclamationmark.triangle", title: L10n.tr("无法加载目录"), message: message)
+            emptyOrDisconnectedCard(
+                title: L10n.tr("无法加载目录"),
+                message: message,
+                actionTitle: L10n.tr("重新连接并扫描")
+            ) {
+                if let conn = connectionsViewModel.selectedConnection {
+                    Task { _ = await connectionsViewModel.connectAndScan(conn) }
+                }
+            }
         } else if connectionsViewModel.files.isEmpty {
-            messageState(icon: "folder", title: L10n.tr("文件夹为空"), message: L10n.tr("此目录下没有可显示的文件"))
+            emptyOrDisconnectedCard(
+                title: L10n.tr("空文件夹或连接已断开"),
+                message: L10n.tr("此目录下没有可显示的文件，或者连接暂时离线。"),
+                actionTitle: L10n.tr("重新连接并扫描")
+            ) {
+                Task { await connectionsViewModel.refreshCurrentDirectory() }
+            }
+        } else if filteredFiles.isEmpty {
+            emptyOrDisconnectedCard(
+                title: L10n.tr("没有匹配项"),
+                message: L10n.tr("当前目录下没有匹配「%@」的文件。", filterText),
+                actionTitle: L10n.tr("清除过滤")
+            ) {
+                filterText = ""
+            }
         } else {
             directoryContainer
         }
@@ -244,24 +321,57 @@ struct MacConnectionsBrowseView: View {
         return MacFilesBrowserLayout(rawValue: layoutRaw) ?? .grid
     }
 
-    /// 图标显示点击后切换到的布局（网格态显示列表图标）。
     private var layoutToggle: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                layoutRaw = (layout == .grid ? MacFilesBrowserLayout.list : .grid).rawValue
-            }
-        } label: {
-            Image(systemName: layout == .grid ? "list.bullet" : "square.grid.2x2")
-                .font(.system(size: 14, weight: .medium))
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
+        HStack(spacing: 3) {
+            layoutSegmentButton(mode: .grid, assetName: "MacGridView", help: L10n.tr("切换为网格"))
+            layoutSegmentButton(mode: .list, assetName: "MacListView", help: L10n.tr("切换为列表"))
         }
-        .buttonStyle(.plain)
-        .help(layout == .grid ? L10n.tr("切换为列表") : L10n.tr("切换为网格"))
-        .accessibilityLabel(layout == .grid ? L10n.tr("切换为列表") : L10n.tr("切换为网格"))
+        .padding(4)
+        .frame(height: 34)
+        .background(theme.surfaceGlass, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+        }
     }
 
-    /// 以连接 + 目录路径为身份做“文件夹打开”过渡：前进时从被点文件夹处展开，返回时收回到对应位置。
+    private func layoutSegmentButton(mode: MacFilesBrowserLayout, assetName: String, help: String) -> some View {
+        let isSelected = layout == mode
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                layoutRaw = mode.rawValue
+            }
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(assetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+                    .foregroundStyle(isSelected ? theme.accentAmber : theme.secondaryText)
+                    .frame(width: 32, height: 26)
+                    .background(
+                        isSelected ? theme.amberTintFill : Color.clear,
+                        in: Capsule()
+                    )
+                    .overlay {
+                        if isSelected {
+                            Capsule()
+                                .strokeBorder(theme.strokeAmber, lineWidth: 0.75)
+                        }
+                    }
+
+                if isSelected {
+                    MacPawDotIndicator(size: 7)
+                        .offset(x: -3, y: 2)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
     private var directoryContainer: some View {
         ZStack {
             directoryListing
@@ -286,23 +396,26 @@ struct MacConnectionsBrowseView: View {
             if layout == .grid {
                 gridListing
             } else {
-                LazyVStack(spacing: 4) {
-                    ForEach(connectionsViewModel.files) { file in
+                LazyVStack(spacing: 6) {
+                    ForEach(filteredFiles) { file in
                         fileRow(file)
                     }
                 }
                 .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-                .padding(.vertical, 12)
+                .padding(.bottom, 24)
             }
         }
     }
 
     private var gridListing: some View {
-        let folders = connectionsViewModel.files.filter(\.isDirectory)
-        let items = connectionsViewModel.files.filter { !$0.isDirectory }
-        return VStack(alignment: .leading, spacing: 12) {
+        let folders = filteredFiles.filter(\.isDirectory)
+        let items = filteredFiles.filter { !$0.isDirectory }
+        return VStack(alignment: .leading, spacing: 14) {
             if !folders.isEmpty {
-                gridSectionHeader(L10n.tr("文件夹"))
+                gridSectionHeader(
+                    L10n.tr("文件夹 · %d 项", folders.count),
+                    showsCat: items.isEmpty
+                )
                 LazyVGrid(columns: Self.gridColumns, spacing: 20) {
                     ForEach(folders) { folder in
                         folderGridTile(folder)
@@ -310,7 +423,10 @@ struct MacConnectionsBrowseView: View {
                 }
             }
             if !items.isEmpty {
-                gridSectionHeader(items.allSatisfy(\.isVideo) ? L10n.tr("视频") : L10n.tr("文件"))
+                let sectionTitle = items.allSatisfy(\.isVideo)
+                    ? L10n.tr("视频 · %d 项", items.count)
+                    : L10n.tr("文件 · %d 项", items.count)
+                gridSectionHeader(sectionTitle, showsCat: true)
                     .padding(.top, folders.isEmpty ? 0 : 8)
                 LazyVGrid(columns: Self.gridColumns, spacing: 20) {
                     ForEach(items) { file in
@@ -320,14 +436,27 @@ struct MacConnectionsBrowseView: View {
             }
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .padding(.top, 16)
-        .padding(.bottom, 24)
+        .padding(.bottom, 28)
     }
 
-    private func gridSectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(theme.sectionHeader)
+    private func gridSectionHeader(_ title: String, showsCat: Bool) -> some View {
+        HStack {
+            Text(title.uppercased())
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
+                .tracking(0.5)
+
+            Spacer()
+
+            if showsCat {
+                Image("MacStretchingCat")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 36, height: 14)
+                    .foregroundStyle(theme.secondaryText.opacity(0.75))
+            }
+        }
     }
 
     private func folderGridTile(_ folder: RemoteFile) -> some View {
@@ -376,7 +505,7 @@ struct MacConnectionsBrowseView: View {
                 extract: extractedFrameLoader(for: file)
             )
         }
-        .buttonStyle(MacConnectionFileRowButtonStyle(theme: theme))
+        .buttonStyle(.plain)
         .reportMacTileFrame(path: file.isDirectory ? file.path : nil, in: Self.contentSpace, store: tileFrames)
         .contextMenu {
             fileContextMenu(for: file)
@@ -475,54 +604,92 @@ struct MacConnectionsBrowseView: View {
     }
 
     private var emptySelectionState: some View {
-        messageState(
-            icon: "externaldrive",
+        emptyOrDisconnectedCard(
             title: L10n.tr("未选择连接"),
-            message: L10n.tr("请从侧边栏选择一个连接以浏览文件")
+            message: L10n.tr("请从侧边栏选择一个连接以浏览文件"),
+            actionTitle: nil,
+            action: {}
         )
     }
 
     private var loadingState: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             ProgressView()
             Text(L10n.tr("正在加载目录..."))
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(theme.tertiaryText)
+                .font(.system(size: 13.5, weight: .medium))
+                .foregroundStyle(theme.secondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func messageState(icon: String, title: String, message: String) -> some View {
-        VStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(theme.tertiaryText)
-            Text(title)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(theme.primaryText)
-            Text(message)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(theme.tertiaryText)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 360)
+    private func emptyOrDisconnectedCard(
+        title: String,
+        message: String,
+        actionTitle: String?,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack {
+            HStack(spacing: 18) {
+                Image("MacCatFolderCurious")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 84, height: 66)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 14.5, weight: .bold))
+                        .foregroundStyle(theme.primaryText)
+
+                    Text(message)
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.secondaryText)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 12)
+
+                if let actionTitle {
+                    Button(actionTitle, action: action)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(theme.accentAmber)
+                        .padding(.horizontal, 14)
+                        .frame(height: 34)
+                        .background(theme.amberTintFill, in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(theme.strokeAmber, lineWidth: 0.9)
+                        }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(theme.strokeGlass, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+            }
+            .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+            .padding(.top, 20)
+
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 32)
     }
 
     private var loadingOverlay: some View {
         ZStack {
-            Color.black.opacity(0.18)
+            Color.black.opacity(0.28)
             VStack(spacing: 12) {
                 ProgressView()
                     .controlSize(.regular)
                 Text(connectionsViewModel.loadingMessage)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.primaryText)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .macCatGlassCard(theme: theme, cornerRadius: 14)
         }
         .ignoresSafeArea()
     }
@@ -536,11 +703,8 @@ struct MacConnectionsBrowseView: View {
         let currentPath = connectionsViewModel.currentPath
         guard currentPath != "/" else { return items }
 
-        // 用导航时记录的目录展示名，避免 Box/OneDrive/Google Drive 的 `/item/{id}` 路径把 id 当标题。
         var ancestorPaths = connectionsViewModel.pathStack.filter { $0 != "/" }
         if ancestorPaths.isEmpty {
-            // 书签跳转会清空 pathStack；普通斜杠路径按当前路径补回祖先层，
-            // 不透明 `/item/{id}` 路径没有可推导的中间层，只保留根和目标。
             let components = currentPath.split(separator: "/").map(String.init)
             if components.first != "item", components.count > 1 {
                 var built = ""
@@ -559,19 +723,6 @@ struct MacConnectionsBrowseView: View {
             ?? (currentPath as NSString).lastPathComponent
         items.append((title, currentPath))
         return items
-    }
-
-    private func connectionStatusText(for connection: SavedConnection) -> String {
-        switch connectionsViewModel.connectionStatus(for: connection) {
-        case .idle:
-            return L10n.tr("未连接")
-        case .connecting:
-            return L10n.tr("连接中")
-        case .connected:
-            return L10n.tr("已连接")
-        case .failed:
-            return connectionsViewModel.connectionErrorMessage(for: connection) ?? L10n.tr("连接失败")
-        }
     }
 
     private func openPendingFolderBookmarkIfNeeded() async {
@@ -612,8 +763,6 @@ struct MacConnectionsBrowseView: View {
         }
     }
 
-    /// 面包屑只指向祖先目录：按 `pathStack` 中的位置算出后退层数（Emby 等 ID 路径没有可用的路径深度），
-    /// 内容收回到进入那一层时记录的锚点。
     private func navigateToBreadcrumb(_ path: String) {
         guard !isNavigatingDirectory else { return }
         let pathStack = connectionsViewModel.pathStack
@@ -694,7 +843,7 @@ struct MacConnectionsBrowseView: View {
     }
 }
 
-// MARK: - File Row
+// MARK: - File Row (List Mode)
 
 private struct MacConnectionFileRow: View {
     @Environment(\.macTheme) private var theme
@@ -704,22 +853,24 @@ private struct MacConnectionFileRow: View {
     var artwork: [URL] = []
     var extract: (() async -> URL?)?
 
+    @State private var isHovered = false
+
     var body: some View {
         HStack(spacing: 12) {
             fileIcon
-                .frame(width: 36, height: 36)
+                .frame(width: 40, height: 40)
                 .background(iconBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .clipped()
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(file.name)
-                    .font(.system(size: file.isDirectory ? 15 : 14, weight: file.isDirectory ? .semibold : .medium))
+                    .font(.system(size: file.isDirectory ? 14 : 13, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(1)
 
                 Text(subtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.tertiaryText)
+                    .font(.system(size: 11.5, weight: .regular))
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)
             }
 
@@ -727,17 +878,19 @@ private struct MacConnectionFileRow: View {
 
             if file.isDirectory {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(theme.tertiaryText)
             } else if file.isVideo {
                 Image(systemName: "play.circle.fill")
                     .font(.system(size: 18))
-                    .foregroundStyle(MacDesignTokens.accentBlue)
+                    .foregroundStyle(theme.accentAmber)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.vertical, 9)
+        .macCatGlassCard(theme: theme, cornerRadius: 14, isHighlighted: isHovered)
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
     }
 
     @ViewBuilder
@@ -748,7 +901,7 @@ private struct MacConnectionFileRow: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 20, height: 20)
-                .foregroundStyle(MacDesignTokens.accentBlue)
+                .foregroundStyle(theme.accentAmber)
         } else if file.isVideo {
             MacFilesCoverImage(candidates: artwork, extract: extract) {
                 systemGlyph("film")
@@ -760,36 +913,27 @@ private struct MacConnectionFileRow: View {
 
     private func systemGlyph(_ name: String) -> some View {
         Image(systemName: name)
-            .font(.system(size: 18, weight: .medium))
-            .foregroundStyle(file.isDirectory ? MacDesignTokens.accentBlue : theme.secondaryText)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(file.isDirectory ? theme.accentAmber : theme.secondaryText)
     }
 
     private var iconName: String {
-        if file.isDirectory {
-            return "folder.fill"
-        }
-        if file.isVideo {
-            return "film"
-        }
+        if file.isDirectory { return "folder.fill" }
+        if file.isVideo { return "film" }
         return "doc"
     }
 
     private var iconBackground: Color {
-        file.isDirectory ? MacDesignTokens.accentBlue.opacity(0.12) : theme.secondaryButtonBackground
+        file.isDirectory ? theme.amberTintFill : theme.surfacePill
     }
 
     private var subtitle: String {
-        if file.isDirectory {
-            return L10n.tr("文件夹")
-        }
-        if file.size > 0 {
-            return MacBrowseFormatters.fileSize(file.size)
-        }
+        if file.isDirectory { return L10n.tr("文件夹") }
+        if file.size > 0 { return MacBrowseFormatters.fileSize(file.size) }
         return file.type.macBrowseDisplayName
     }
 }
 
-/// 按优先级依次尝试封面地址（海报 → 背景图），全部缺失或加载失败后再抽帧，最后显示占位图标。
 private struct MacFilesCoverImage<Placeholder: View>: View {
     let candidates: [URL]
     let extract: (() async -> URL?)?
@@ -839,7 +983,7 @@ private struct MacCoverStepKey: Hashable {
     let step: Int
 }
 
-// MARK: - Grid (Files-Grid)
+// MARK: - Grid Tiles (4-Column Black Cat Cards)
 
 private struct MacFolderGridTile: View {
     @Environment(\.macTheme) private var theme
@@ -851,32 +995,43 @@ private struct MacFolderGridTile: View {
     let reduceMotion: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(MacDesignTokens.accentBlue.opacity(isHovered ? 0.16 : 0.12))
-                .frame(height: 112)
-                .overlay {
-                    Image(isOpening ? "MacFilesFolderOpen" : "MacFilesFolder")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 44, height: 44)
-                        .foregroundStyle(MacDesignTokens.accentBlue)
-                }
-                .overlay(alignment: .topTrailing) {
-                    if isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(10)
+        VStack(alignment: .leading, spacing: 7) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isHovered ? theme.amberTintFill : theme.surfaceGlass)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(isHovered ? theme.strokeAmber : theme.strokeGlass, lineWidth: isHovered ? 1.15 : 0.9)
                     }
-                }
-                .scaleEffect(isOpening && !reduceMotion ? 1.06 : 1)
+                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
 
-            Text(name)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(theme.primaryText)
-                .lineLimit(2, reservesSpace: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(isOpening ? "MacFilesFolderOpen" : "MacFilesFolder")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(theme.accentAmber)
+
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                        .padding(10)
+                }
+            }
+            .scaleEffect(isOpening && !reduceMotion ? 1.04 : 1)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+
+                Text(L10n.tr("文件夹"))
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(theme.secondaryText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
@@ -894,15 +1049,27 @@ private struct MacVideoGridCard: View {
     let progress: FileWatchProgress?
     let extract: (() async -> URL?)?
 
+    private var isHighlighted: Bool {
+        isHovered || (progress != nil && progress?.isWatched == false && (progress?.fraction ?? 0) > 0)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             cover
-            Text(file.name)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(theme.primaryText)
-                .lineLimit(2, reservesSpace: true)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(file.name)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Text(metaLine)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle((progress?.isWatched == true || (progress?.fraction ?? 0) > 0) ? theme.accentAmber : theme.secondaryText)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
@@ -921,55 +1088,77 @@ private struct MacVideoGridCard: View {
                     placeholderGlyph
                 }
             }
+            .overlay(alignment: .bottom) {
+                LinearGradient(
+                    colors: [Color.clear, MacDesignTokens.catSilhouette.opacity(0.91)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 68)
+            }
             .overlay(alignment: .bottom) { progressBar }
             .overlay(alignment: .topTrailing) { watchedBadge }
             .overlay {
                 if isHovered && file.isVideo {
                     ZStack {
-                        Color.black.opacity(0.25)
+                        Color.black.opacity(0.28)
                         Image(systemName: "play.circle.fill")
-                            .font(.system(size: 36))
-                            .foregroundStyle(.white.opacity(0.9))
+                            .font(.system(size: 34))
+                            .foregroundStyle(MacDesignTokens.glowAmber)
                     }
                 }
             }
-            .background(theme.secondaryButtonBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(theme.surfaceGlass)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(
+                        isHighlighted ? theme.strokeAmber : theme.strokeGlass,
+                        lineWidth: isHighlighted ? 1.15 : 0.9
+                    )
+            }
     }
 
     private var placeholderGlyph: some View {
         Image(systemName: file.isVideo ? "film" : file.type.macBrowseSystemImage)
-            .font(.system(size: 28, weight: .light))
+            .font(.system(size: 26, weight: .light))
             .foregroundStyle(theme.tertiaryText)
     }
 
     @ViewBuilder
     private var progressBar: some View {
         if let progress, !progress.isWatched, progress.fraction > 0 {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.35))
-                    Capsule()
-                        .fill(MacDesignTokens.accentBlue)
-                        .frame(width: max(4, proxy.size.width * progress.fraction))
-                }
-            }
-            .frame(height: 4)
-            .padding(.horizontal, 10)
-            .padding(.bottom, 8)
+            MacCatProgressTrack(progress: progress.fraction)
+                .padding(.horizontal, 11)
+                .padding(.bottom, 10)
         }
     }
 
     @ViewBuilder
     private var watchedBadge: some View {
         if progress?.isWatched == true {
-            Image(systemName: "checkmark")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 20, height: 20)
-                .background(Color.black.opacity(0.55), in: Circle())
-                .padding(8)
+            MacSleepingCatWatchedPill()
+                .padding(9)
         }
+    }
+
+    private var metaLine: String {
+        var parts: [String] = []
+        if let progress {
+            if progress.isWatched {
+                parts.append(L10n.tr("已看"))
+            } else if progress.fraction > 0 {
+                parts.append("\(Int((progress.fraction * 100).rounded()))%")
+            }
+        }
+        let ext = (file.name as NSString).pathExtension.uppercased()
+        if !ext.isEmpty {
+            parts.append(ext)
+        }
+        if file.size > 0 {
+            parts.append(MacBrowseFormatters.fileSize(file.size))
+        }
+        return parts.isEmpty ? file.type.macBrowseDisplayName : parts.joined(separator: " · ")
     }
 
     private var progressDescription: String {
@@ -989,11 +1178,9 @@ private enum MacFilesBrowserLayout: String {
 private struct MacFolderTransitionState {
     var anchor: UnitPoint = .center
     var isForward = false
-    /// 每进入一级记录被点文件夹的锚点，返回时内容收回到对应位置。
     var anchorStack: [UnitPoint] = []
 }
 
-/// 文件夹条目在内容区的位置。引用类型：滚动时更新不触发视图刷新。
 private final class MacFilesTileFrameStore {
     var frames: [String: CGRect] = [:]
 }
@@ -1009,7 +1196,6 @@ private extension View {
     }
 }
 
-/// 前进：新目录从被点文件夹处放大展开，旧目录轻微放大淡出；返回：反向收回。Reduce Motion 只淡入淡出。
 private struct MacFolderOpenTransition: Transition {
     let anchor: UnitPoint
     let isForward: Bool
@@ -1028,18 +1214,6 @@ private struct MacFolderOpenTransition: Transition {
         case .willAppear: return isForward ? 0.2 : 1.03
         case .didDisappear: return isForward ? 1.03 : 0.2
         }
-    }
-}
-
-private struct MacConnectionFileRowButtonStyle: ButtonStyle {
-    let theme: MacThemeColors
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(configuration.isPressed ? theme.secondaryButtonBackground : Color.clear)
-            )
     }
 }
 
@@ -1080,27 +1254,13 @@ private extension RemoteFileType {
     }
 }
 
-#Preview("Grid States") {
-    let video = RemoteFile(name: "Dune Prophecy S01E01.mkv", path: "/v1", size: 1, isDirectory: false, modifiedDate: nil, type: .video)
-    let subtitle = RemoteFile(name: "Dune Prophecy S01E01.srt", path: "/s1", size: 1, isDirectory: false, modifiedDate: nil, type: .subtitle)
-    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16, alignment: .top), count: 3), spacing: 20) {
-        MacFolderGridTile(name: "Specials", isOpening: false, isLoading: false, reduceMotion: false)
-        MacFolderGridTile(name: "Extras", isOpening: true, isLoading: true, reduceMotion: false)
-        MacFolderGridTile(name: "A very long folder name that wraps onto two lines", isOpening: false, isLoading: false, reduceMotion: false)
-        MacVideoGridCard(file: video, artwork: [], progress: FileWatchProgress(fraction: 0.42, isWatched: false), extract: nil)
-        MacVideoGridCard(file: video, artwork: [], progress: FileWatchProgress(fraction: 1, isWatched: true), extract: nil)
-        MacVideoGridCard(file: subtitle, artwork: [], progress: nil, extract: nil)
-    }
-    .padding(24)
-    .frame(width: 944)
-    .macTheme(.light)
-}
-
-#Preview("Browse Light") {
+#Preview("Browse Dark") {
     MacConnectionsBrowseView()
         .environmentObject(MacAppState())
         .environmentObject(MacLibraryViewModel())
         .environmentObject(MacConnectionsViewModel())
-        .macTheme(.light)
-        .frame(width: 960, height: 640)
+        .environmentObject(MacSearchViewModel())
+        .environmentObject(DownloadManager.shared)
+        .macTheme(.dark)
+        .frame(width: 1199, height: 760)
 }

@@ -43,24 +43,28 @@ private struct MacDownloadHeroCapsule: View {
                         .resizable()
                         .scaledToFill()
                 } else {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                    Image("MacDownloadsTray")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(3)
+                        .foregroundStyle(MacDesignTokens.glowAmber)
                 }
             }
             .frame(width: 22, height: 22)
             .clipShape(Circle())
 
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(MacDesignTokens.Cinema.textIvory)
                 .lineLimit(1)
         }
         .padding(.leading, 6)
         .padding(.trailing, 12)
         .padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
-        .shadow(color: .black.opacity(0.18), radius: 10, y: 3)
+        .background(MacDesignTokens.Cinema.panelGlass, in: Capsule())
+        .overlay(Capsule().strokeBorder(MacDesignTokens.Cinema.strokeAmber, lineWidth: 1))
+        .shadow(color: .black.opacity(0.45), radius: 12, y: 4)
         .frame(maxWidth: 240)
     }
 }

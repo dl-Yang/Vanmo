@@ -25,7 +25,7 @@ struct MacScannedLibraryListView: View {
         VStack(spacing: 0) {
             MacLibrarySublistHeader(
                 title: collectionType.displayName,
-                subtitle: "\(connection.name) · \(loadedCount) 项"
+                subtitle: "\(connection.name) · \(L10n.tr("%d 项", loadedCount))"
             )
 
             Group {
@@ -37,7 +37,7 @@ struct MacScannedLibraryListView: View {
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if isEmpty {
-                    Text("此连接下没有可显示的\(collectionType.displayName)")
+                    Text(L10n.tr("此连接下没有可显示的 %@", collectionType.displayName))
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -130,7 +130,7 @@ struct MacScannedLibraryListView: View {
                 ForEach(shows, id: \.id) { show in
                     MacPosterCard(
                         title: show.title,
-                        subtitle: "\(show.episodeCount) 集",
+                        subtitle: L10n.tr("%d 集", show.episodeCount),
                         posterURL: show.posterURL
                     ) {
                         appState.openScannedShowDetail(
@@ -161,20 +161,28 @@ struct MacScannedLibraryListView: View {
                             parentDirectory: show.parentDirectory
                         )
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 14) {
                             MacRemoteImage(url: show.posterURL)
-                                .frame(width: 60, height: 90)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .frame(width: 54, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .strokeBorder(theme.strokeGlass, lineWidth: 0.75)
+                                }
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(show.title)
-                                    .font(.system(size: 15, weight: .semibold))
-                                Text("\(show.episodeCount) 集")
-                                    .font(.caption)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(theme.primaryText)
+                                Text(L10n.tr("%d 集", show.episodeCount))
+                                    .font(.system(size: 12))
                                     .foregroundStyle(theme.secondaryText)
                             }
                             Spacer()
                         }
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .macCatGlassCard(theme: theme, cornerRadius: 14)
+                        .padding(.vertical, 4)
                     }
                     .buttonStyle(.plain)
                 }

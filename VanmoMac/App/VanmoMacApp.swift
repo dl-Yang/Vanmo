@@ -102,12 +102,14 @@ struct VanmoMacApp: App {
                 .environmentObject(cloudSyncCoordinator)
                 .environmentObject(appState)
                 .environmentObject(downloadManager)
-                .frame(minWidth: 760, minHeight: 520)
+                .frame(
+                    width: MacDesignTokens.Layout.settingsWindowWidth,
+                    height: MacDesignTokens.Layout.settingsWindowHeight
+                )
         }
         .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unifiedCompact)
         .modelContainer(sharedModelContainer)
-        .windowResizability(.contentMinSize)
+        .windowResizability(.contentSize)
         .defaultSize(
             width: MacDesignTokens.Layout.settingsWindowWidth,
             height: MacDesignTokens.Layout.settingsWindowHeight

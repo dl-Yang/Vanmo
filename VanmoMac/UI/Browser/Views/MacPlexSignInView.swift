@@ -80,12 +80,14 @@ struct MacPlexSignInView: View {
                 .padding(.bottom, 20)
                 .frame(minHeight: PlexSheetMetrics.contentMinHeight, alignment: .topLeading)
 
-            Divider()
+            Rectangle()
+                .fill(theme.strokeSubtle)
+                .frame(height: 1)
 
             footer
         }
-        .frame(width: MacDesignTokens.Layout.addConnectionContentWidth)
-        .background(panelBackground)
+        .frame(width: 500)
+        .background(theme.surfacePanel)
         .task {
             model.start()
         }
@@ -255,7 +257,7 @@ struct MacPlexSignInView: View {
                     Text(L10n.tr("重新获取代码"))
                         .font(.system(size: 12, weight: .medium))
                 }
-                .foregroundStyle(MacDesignTokens.accentBlue)
+                .foregroundStyle(theme.accentAmber)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -409,20 +411,12 @@ struct MacPlexSignInView: View {
 
     // MARK: - Theme Colors
 
-    private var panelBackground: Color {
-        colorScheme == .dark
-            ? Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255)
-            : Color(red: 245 / 255, green: 245 / 255, blue: 247 / 255)
-    }
-
     private var inputBackground: Color {
-        colorScheme == .dark ? Color.black.opacity(0.2) : .white
+        theme.surfaceGlass
     }
 
     private var inputBorder: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.1)
-            : Color(red: 209 / 255, green: 213 / 255, blue: 220 / 255)
+        theme.strokeGlass
     }
 }
 
@@ -485,10 +479,10 @@ private struct MacPlexServerRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(rowBackground)
             .overlay {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(isHovered ? MacDesignTokens.accentBlue.opacity(0.5) : inputBorder, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(isHovered ? theme.strokeAmber : theme.strokeGlass, lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -503,16 +497,7 @@ private struct MacPlexServerRow: View {
     }
 
     private var rowBackground: Color {
-        if isHovered {
-            return MacDesignTokens.accentBlue.opacity(colorScheme == .dark ? 0.18 : 0.08)
-        }
-        return colorScheme == .dark ? Color.black.opacity(0.2) : .white
-    }
-
-    private var inputBorder: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.1)
-            : Color(red: 209 / 255, green: 213 / 255, blue: 220 / 255)
+        isHovered ? theme.amberTintFill : theme.surfaceGlass
     }
 
     /// 一台服务器可能同时暴露局域网、远程与中继端点；按连接能力给出徽标。

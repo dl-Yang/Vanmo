@@ -3,7 +3,6 @@ import SwiftData
 import SwiftUI
 import VanmoCore
 
-/// macOS「打开 URL 链接」主内容区。对齐 Figma `Files` 页 `DirectLink-Light` / `-Dark` / `-States`。
 struct MacDirectLinkView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.macTheme) private var theme
@@ -13,14 +12,19 @@ struct MacDirectLinkView: View {
     @FocusState private var isFieldFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    inputSection
-                    recentSection
+        ZStack(alignment: .topTrailing) {
+            MacCatAmbientHalo()
+                .offset(x: -70, y: -30)
+
+            VStack(spacing: 0) {
+                header
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        inputSection
+                        recentSection
+                    }
+                    .padding(.bottom, 28)
                 }
-                .padding(.bottom, 24)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -40,23 +44,18 @@ struct MacDirectLinkView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(L10n.tr("打开 URL 链接"))
                 .font(MacDesignTokens.Typography.headerTitle)
                 .foregroundStyle(theme.primaryText)
             Text(L10n.tr("串流或下载 http(s) 直链视频"))
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(theme.tertiaryText)
+                .foregroundStyle(theme.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .frame(height: MacDesignTokens.Layout.headerHeight)
-        .background(theme.headerBackground)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(theme.primaryText.opacity(0.1))
-                .frame(height: 1)
-        }
+        .padding(.top, 18)
+        .padding(.bottom, 10)
     }
 
     // MARK: - 输入
@@ -67,47 +66,39 @@ struct MacDirectLinkView: View {
 
     private var inputSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 urlField
                 Button(action: playInput) {
                     Label(L10n.tr("播放"), systemImage: "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .frame(height: 36)
-                        .background(MacDesignTokens.accentBlue, in: RoundedRectangle(cornerRadius: 8))
                 }
+                .buttonStyle(MacCatAmberButtonStyle(height: 38, horizontalPadding: 18))
+
                 Button(action: downloadInput) {
                     Label(L10n.tr("下载"), systemImage: "arrow.down.to.line")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(theme.secondaryText)
-                        .padding(.horizontal, 16)
-                        .frame(height: 36)
-                        .background(theme.secondaryButtonBackground, in: RoundedRectangle(cornerRadius: 8))
                 }
+                .buttonStyle(MacCatGlassButtonStyle(height: 38, horizontalPadding: 16))
             }
-            .buttonStyle(.plain)
 
             if let error = model.inputError {
                 Label(error, systemImage: "exclamationmark.circle")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color(nsColor: .systemRed))
+                    .foregroundStyle(theme.dangerRed)
             }
 
             Text(L10n.tr("支持 MP4、MKV、MOV、HLS 等格式。链接只保存在本机；需要账号密码的地址请改用 WebDAV 连接。"))
                 .font(.system(size: 12))
-                .foregroundStyle(theme.tertiaryText)
+                .foregroundStyle(theme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .padding(.top, 20)
+        .padding(.top, 12)
     }
 
     private var urlField: some View {
         HStack(spacing: 8) {
             Image(systemName: "link")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(theme.tertiaryText)
+                .foregroundStyle(isFieldFocused ? theme.accentAmber : theme.secondaryText)
             TextField(L10n.tr("粘贴或输入 https:// 链接"), text: $model.input)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
@@ -119,21 +110,22 @@ struct MacDirectLinkView: View {
                 Task { @MainActor in model.input = text.trimmingCharacters(in: .whitespacesAndNewlines) }
             }
             .labelStyle(.titleOnly)
-            .buttonBorderShape(.roundedRectangle(radius: 6))
+            .buttonBorderShape(.capsule)
             .controlSize(.small)
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 4)
-        .frame(height: 36)
-        .background(theme.searchBackground, in: RoundedRectangle(cornerRadius: 8))
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
+        .frame(height: 38)
+        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(fieldStroke, lineWidth: isFieldFocused || model.inputError != nil ? 2 : 0)
+            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                .strokeBorder(fieldStroke, lineWidth: isFieldFocused || model.inputError != nil ? 1.2 : 0.9)
         }
     }
 
     private var fieldStroke: Color {
-        model.inputError == nil ? MacDesignTokens.accentBlue : Color(nsColor: .systemRed)
+        if model.inputError != nil { return theme.dangerRed }
+        return isFieldFocused ? theme.strokeAmber : theme.strokeGlass
     }
 
     // MARK: - 最近链接
@@ -143,16 +135,12 @@ struct MacDirectLinkView: View {
         if model.entries.isEmpty {
             emptyState
         } else {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(L10n.tr("最近链接"))
-                    Spacer()
-                    Text("\(model.entries.count)")
-                }
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(theme.sectionHeader)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 6)
+            VStack(alignment: .leading, spacing: 8) {
+                MacCatSectionHeaderRow(
+                    title: L10n.tr("最近链接"),
+                    badgeText: "\(model.entries.count)",
+                    showsStretchingCat: true
+                )
 
                 ForEach(model.entries) { item in
                     let task = DirectLinkLibrary.downloadTask(for: item.fileURL, in: downloadManager.tasks)
@@ -167,23 +155,19 @@ struct MacDirectLinkView: View {
                     .contextMenu { rowMenu(for: item, task: task) }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
             .padding(.top, 24)
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "link")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(theme.tertiaryText)
-                .frame(width: 44, height: 44)
-                .background(theme.emptyIconBackground, in: RoundedRectangle(cornerRadius: 10))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10).stroke(theme.emptyIconBorder, lineWidth: 1)
-                }
+        VStack(spacing: 10) {
+            Image("MacCatFolderCurious")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 72, height: 56)
             Text(L10n.tr("还没有链接"))
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 14.5, weight: .bold))
                 .foregroundStyle(theme.primaryText)
             Text(L10n.tr("播放或下载过的链接会出现在这里，并保留续播进度。"))
                 .font(.system(size: 12))
@@ -191,7 +175,14 @@ struct MacDirectLinkView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 64)
+        .padding(.vertical, 36)
+        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(theme.strokeGlass, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+        }
+        .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+        .padding(.top, 32)
     }
 
     @ViewBuilder
@@ -257,8 +248,6 @@ struct MacDirectLinkView: View {
     }
 }
 
-// MARK: - 列表行
-
 private struct MacDirectLinkRow: View {
     @Environment(\.macTheme) private var theme
 
@@ -276,21 +265,26 @@ private struct MacDirectLinkRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(DirectLinkLibrary.formatLabel(for: item.fileURL))
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 10.5, weight: .bold))
                 .tracking(0.4)
-                .foregroundStyle(MacDesignTokens.accentBlue)
+                .foregroundStyle(theme.accentAmber)
                 .frame(width: 40, height: 40)
-                .background(MacDesignTokens.accentBlue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                .background(theme.amberTintFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(theme.strokeAmber, lineWidth: 0.8)
+                }
             textColumn
             Spacer(minLength: 8)
             trailing
         }
         .padding(.horizontal, 12)
-        .frame(height: 60)
-        .background(isHovered ? theme.primaryText.opacity(0.04) : .clear, in: RoundedRectangle(cornerRadius: 10))
+        .frame(height: 62)
+        .macCatGlassCard(theme: theme, cornerRadius: 14, isHighlighted: isHovered)
         .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .onTapGesture(count: 2, perform: onPlay)
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: L10n.tr("播放"), onPlay)
@@ -299,30 +293,29 @@ private struct MacDirectLinkRow: View {
     private var textColumn: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(item.title)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13.5, weight: .semibold))
                 .foregroundStyle(theme.primaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
             HStack(spacing: 6) {
                 Text(item.fileURL.host ?? "")
-                    .foregroundStyle(theme.tertiaryText)
+                    .foregroundStyle(theme.secondaryText)
                 if let meta {
-                    Circle().fill(theme.sectionHeader).frame(width: 3, height: 3)
+                    Circle().fill(theme.tertiaryText).frame(width: 3, height: 3)
                     Text(meta.text).foregroundStyle(meta.color)
                 }
             }
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: 11.5, weight: .medium))
             .lineLimit(1)
             if showsResumeBar {
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(theme.progressTrack)
-                        Capsule()
-                            .fill(MacDesignTokens.accentBlue)
-                            .frame(width: proxy.size.width * min(max(item.playbackProgress, 0), 1))
-                    }
-                }
-                .frame(width: 240, height: 3)
+                MacCatProgressTrack(
+                    progress: item.playbackProgress,
+                    trackColor: theme.progressTrack,
+                    height: 3,
+                    showsPawThumb: true,
+                    pawSize: 8
+                )
+                .frame(width: 240)
             }
         }
     }
@@ -331,23 +324,23 @@ private struct MacDirectLinkRow: View {
     private var trailing: some View {
         HStack(spacing: 6) {
             if isHovered {
-                iconButton("play.fill", help: L10n.tr("播放"), action: onPlay)
+                iconButton("play.fill", tint: theme.accentAmber, help: L10n.tr("播放"), action: onPlay)
             }
             if isStreamOnly {
                 Text(L10n.tr("仅串流"))
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(theme.chipText)
                     .padding(.horizontal, 8)
-                    .frame(height: 22)
-                    .background(theme.chipBackground, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.chip))
+                    .frame(height: 24)
+                    .background(theme.chipBackground, in: Capsule())
                     .overlay {
-                        RoundedRectangle(cornerRadius: MacDesignTokens.Radius.chip).stroke(theme.chipBorder, lineWidth: 1)
+                        Capsule().strokeBorder(theme.chipBorder, lineWidth: 0.8)
                     }
             } else {
                 downloadControl
             }
             if isHovered {
-                iconButton("trash", help: L10n.tr("移除"), action: onRemove)
+                iconButton("trash", tint: theme.dangerRed, help: L10n.tr("移除"), action: onRemove)
             }
         }
     }
@@ -358,14 +351,14 @@ private struct MacDirectLinkRow: View {
         case .queued, .downloading, .paused:
             Button(action: onDownloadAction) {
                 ZStack {
-                    Circle().stroke(MacDesignTokens.accentBlue.opacity(0.18), lineWidth: 2.5)
+                    Circle().stroke(theme.amberTintFill, lineWidth: 2.5)
                     Circle()
                         .trim(from: 0, to: max(task?.progress ?? 0, 0.02))
-                        .stroke(MacDesignTokens.accentBlue, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        .stroke(theme.accentAmber, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Image(systemName: task?.status == .paused ? "arrow.down" : "stop.fill")
                         .font(.system(size: task?.status == .paused ? 10 : 7, weight: .bold))
-                        .foregroundStyle(MacDesignTokens.accentBlue)
+                        .foregroundStyle(theme.accentAmber)
                 }
                 .frame(width: 22, height: 22)
                 .frame(width: 28, height: 28)
@@ -375,31 +368,37 @@ private struct MacDirectLinkRow: View {
             .help(task?.status == .paused ? L10n.tr("继续") : L10n.tr("暂停"))
         case .completed:
             iconButton("arrow.up.forward.square", help: L10n.tr("在 Finder 中显示"), action: onReveal)
-            Image(systemName: "checkmark")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color(nsColor: .systemGreen))
-                .frame(width: 28, height: 28)
-                .background(Color(nsColor: .systemGreen).opacity(0.14), in: Circle())
-                .accessibilityLabel(L10n.tr("已下载"))
+            MacSleepingCatWatchedPill()
         case .failed:
-            iconButton("arrow.clockwise", help: L10n.tr("重试"), tint: Color(nsColor: .systemRed), action: onDownloadAction)
+            iconButton("arrow.clockwise", tint: theme.dangerRed, help: L10n.tr("重试"), action: onDownloadAction)
         case nil:
-            iconButton("arrow.down.to.line", help: L10n.tr("下载"), action: onDownloadAction)
+            Button(action: onDownloadAction) {
+                Image("MacDownloadsTray")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 14, height: 14)
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(width: 28, height: 28)
+                    .background(theme.surfacePill, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help(L10n.tr("下载"))
         }
     }
 
     private func iconButton(
         _ systemName: String,
-        help: String,
         tint: Color? = nil,
+        help: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(tint ?? theme.secondaryText)
                 .frame(width: 28, height: 28)
-                .background((tint ?? theme.primaryText).opacity(tint == nil ? 0.05 : 0.1), in: RoundedRectangle(cornerRadius: 6))
+                .background(theme.surfacePill, in: Circle())
         }
         .buttonStyle(.plain)
         .help(help)
@@ -414,17 +413,17 @@ private struct MacDirectLinkRow: View {
         if let task {
             let percent = Int((task.progress * 100).rounded())
             switch task.status {
-            case .queued: return (L10n.tr("等待下载"), theme.tertiaryText)
-            case .downloading: return (L10n.tr("下载中 %d%%", percent), MacDesignTokens.accentBlue)
-            case .paused: return (L10n.tr("已暂停 %d%%", percent), theme.tertiaryText)
-            case .completed: return (L10n.tr("已下载"), Color(nsColor: .systemGreen))
-            case .failed: return (L10n.tr("下载失败"), Color(nsColor: .systemRed))
+            case .queued: return (L10n.tr("等待下载"), theme.secondaryText)
+            case .downloading: return (L10n.tr("下载中 %d%%", percent), theme.accentAmber)
+            case .paused: return (L10n.tr("已暂停 %d%%", percent), theme.secondaryText)
+            case .completed: return (L10n.tr("已下载"), theme.successGreen)
+            case .failed: return (L10n.tr("下载失败"), theme.dangerRed)
             }
         }
         if showsResumeBar {
             return (
                 LocalizedFormat.remainingDuration(position: item.lastPlaybackPosition, total: item.duration),
-                theme.tertiaryText
+                theme.accentAmber
             )
         }
         return nil

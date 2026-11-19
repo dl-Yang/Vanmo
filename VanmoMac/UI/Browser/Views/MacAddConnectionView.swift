@@ -5,20 +5,21 @@ import VanmoCore
 
 struct MacAddConnectionView: View {
     @ObservedObject var viewModel: MacConnectionsViewModel
+    @EnvironmentObject private var appState: MacAppState
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macTheme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
 
     let editingConnection: SavedConnection?
 
     @State private var name = ""
-    @State private var selectedType: ConnectionType = .webdav
+    @State private var selectedType: ConnectionType = .emby
     @State private var host = ""
     @State private var port = ""
     @State private var useHTTPS = true
     @State private var username = ""
     @State private var password = ""
     @State private var path = ""
+    @State private var showsAllProtocols = false
 
     @State private var folderURL: URL?
     @State private var folderBookmark: Data?
@@ -27,7 +28,6 @@ struct MacAddConnectionView: View {
     @State private var isAuthenticatingOAuth = false
     @State private var oauthErrorMessage: String?
 
-    /// Plex 走 PIN 登录：新建连接由登录 sheet 创建，本页「保存」只给既有连接改名。
     @State private var isPlexSignInPresented = false
     @State private var plexSignInCompleted = false
     @State private var isRenamingPlex = false
@@ -36,7 +36,7 @@ struct MacAddConnectionView: View {
         self.viewModel = viewModel
         self.editingConnection = editingConnection
 
-        let type = editingConnection?.type ?? .webdav
+        let type = editingConnection?.type ?? .emby
         let localFolderURL = editingConnection.flatMap { connection -> URL? in
             guard connection.type.isLocal else { return nil }
             let folderPath = connection.path ?? connection.host
@@ -55,32 +55,45 @@ struct MacAddConnectionView: View {
         _path = State(initialValue: editingConnection?.path ?? "")
         _folderURL = State(initialValue: localFolderURL)
         _folderBookmark = State(initialValue: editingConnection?.bookmarkData)
+        _showsAllProtocols = State(initialValue: editingConnection != nil && !Self.featuredTypes.contains(type))
+    }
+
+    private static let featuredTypes: [ConnectionType] = [
+        .emby, .jellyfin, .plex, .smb,
+        .ftp, .googleDrive, .baiduNetdisk,
+    ]
+
+    private static let remainingTypes: [ConnectionType] = [
+        .sftp, .webdav, .alist, .fnos,
+        .localFolder, .oneDrive, .box, .pCloudDrive,
+        .yandexDisk, .iptv, .nfs, .dlna,
+        .drive115, .quarkDrive, .mega,
+    ]
+
+    private var displayedProtocolTiles: [ProtocolTileItem] {
+        if isEditing {
+            return [.connection(selectedType)]
+        }
+        var items = Self.featuredTypes.map { ProtocolTileItem.connection($0) }
+        items.append(.directURL)
+        if showsAllProtocols {
+            items.append(contentsOf: Self.remainingTypes.map { ProtocolTileItem.connection($0) })
+        }
+        return items
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            rightPanel
+        ZStack {
+            modalBody
+                .padding(.top, 38)
         }
-        .frame(width: MacDesignTokens.Layout.addConnectionWidth, height: MacDesignTokens.Layout.addConnectionHeight)
-        .background(modalBackground)
-        .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.addConnectionRadius, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: MacDesignTokens.Layout.addConnectionRadius, style: .continuous)
-                .stroke(borderColor, lineWidth: 1)
-        }
-        .overlay {
-            if viewModel.isLoading {
-                loadingOverlay
-            }
-        }
-        .shadow(color: shadowColor, radius: colorScheme == .dark ? 30 : 20, y: colorScheme == .dark ? 15 : 10)
         .onAppear {
             guard !isEditing else { return }
             useHTTPS = inferredHTTPSFromHost(defaultValue: defaultHTTPS(for: selectedType))
             port = "\(defaultPort(for: selectedType, useHTTPS: useHTTPS))"
             applyDefaults(for: selectedType)
         }
+        .preferredColorScheme(theme.isDark ? .dark : .light)
         .alert(L10n.tr("错误"), isPresented: $viewModel.showError) {
             Button(L10n.tr("确定")) {}
         } message: {
@@ -98,118 +111,170 @@ struct MacAddConnectionView: View {
         }
     }
 
-    // MARK: - Sidebar
+    private var modalBody: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        modalHeader
+                        protocolGridSection
+                        formFieldsSection
+                    }
+                    .padding(.horizontal, 26)
+                    .padding(.top, 22)
+                    .padding(.bottom, 16)
+                }
 
-    private var sidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(MacConnectionTypeGroup.allCases) { group in
-                    groupSection(group)
+                modalFooter
+                    .padding(.horizontal, 26)
+                    .padding(.bottom, 22)
+                    .padding(.top, 8)
+            }
+            .frame(width: MacDesignTokens.Layout.addConnectionWidth, height: MacDesignTokens.Layout.addConnectionHeight)
+            .background(theme.surfacePanel, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.modalDialog, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: MacDesignTokens.Radius.modalDialog, style: .continuous)
+                    .strokeBorder(theme.strokeGlass, lineWidth: 1)
+            }
+            .overlay {
+                if viewModel.isLoading {
+                    loadingOverlay
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 16)
-        }
-        .frame(width: MacDesignTokens.Layout.addConnectionSidebarWidth)
-        .background(sidebarBackground)
-        .overlay(alignment: .trailing) {
-            Rectangle()
-                .fill(dividerColor)
-                .frame(width: 1)
-        }
-    }
+            .shadow(color: Color.black.opacity(theme.isDark ? 0.72 : 0.22), radius: 24, y: 12)
 
-    private func groupSection(_ group: MacConnectionTypeGroup) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if group != MacConnectionTypeGroup.allCases.first {
-                Spacer().frame(height: 20)
-            }
-
-            Text(group.title)
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.61)
-                .foregroundStyle(theme.sectionHeader)
-                .padding(.horizontal, 8)
-                .padding(.bottom, 6)
-
-            ForEach(group.types, id: \.self) { type in
-                protocolRow(type)
-            }
+            Image("MacModalPeekingCat")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 86, height: 46)
+                .offset(x: -56, y: -39)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
-    private func protocolRow(_ type: ConnectionType) -> some View {
-        let isSelected = selectedType == type
+    // MARK: - Header
+
+    private var modalHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isEditing ? L10n.tr("编辑 %@", selectedType.displayName) : L10n.tr("添加连接"))
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(theme.primaryText)
+
+                Text(selectedType.macAddConnectionDescription ?? L10n.tr("连接媒体服务器、NAS 共享、网盘或直链 URL"))
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.secondaryText)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 12)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(theme.secondaryText)
+                    .frame(width: 28, height: 28)
+                    .background(theme.surfacePill, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help(L10n.tr("关闭"))
+        }
+    }
+
+    // MARK: - Protocol Tiles
+
+    private var protocolGridSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(L10n.tr("协议与来源").uppercased())
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(theme.tertiaryText)
+                    .tracking(0.5)
+
+                Spacer()
+
+                if !isEditing {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showsAllProtocols.toggle()
+                        }
+                    } label: {
+                        Text(showsAllProtocols ? L10n.tr("收起部分协议 ▴") : L10n.tr("全部协议 (22) ▾"))
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(theme.accentAmber)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
+            LazyVGrid(columns: columns, spacing: 6) {
+                ForEach(displayedProtocolTiles) { tile in
+                    protocolTile(tile)
+                }
+            }
+        }
+    }
+
+    private func protocolTile(_ tile: ProtocolTileItem) -> some View {
+        let isSelected: Bool = {
+            if case .connection(let type) = tile {
+                return selectedType == type
+            }
+            return false
+        }()
 
         return Button {
-            selectType(type)
-        } label: {
-            HStack(spacing: 10) {
-                MacConnectionProviderIcon(type: type, size: 18)
-                Text(type.macSidebarLabel)
-                    .font(.system(size: 13, weight: .medium))
-                    .tracking(-0.08)
-                Spacer(minLength: 0)
+            switch tile {
+            case .connection(let type):
+                selectType(type)
+            case .directURL:
+                dismiss()
+                appState.openDirectLinks()
             }
-            .foregroundStyle(isSelected ? .white : sidebarItemText)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text(tile.badge)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundStyle(isSelected ? theme.accentAmber : theme.tertiaryText)
+                    Spacer()
+                    if isSelected {
+                        MacPawDotIndicator(size: 10)
+                    }
+                }
+
+                Spacer(minLength: 4)
+
+                Text(tile.label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+            }
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, 9)
+            .frame(height: 62)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? MacDesignTokens.accentBlue : Color.clear)
-            .contentShape(Rectangle())
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .shadow(
-                color: isSelected ? Color.black.opacity(0.1) : .clear,
-                radius: 1.5,
-                y: 1
+            .background(
+                isSelected ? theme.amberTintFill : theme.surfaceGlass,
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isSelected ? theme.strokeAmber : theme.strokeGlass, lineWidth: isSelected ? 1.15 : 0.85)
+            }
         }
         .buttonStyle(.plain)
-        .padding(.top, 2)
-        .disabled(isEditing)
+        .disabled(isEditing && !isSelected)
     }
 
-    // MARK: - Right Panel
-
-    private var rightPanel: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                    formContent
-                }
-                .padding(40)
-            }
-
-            footer
-        }
-        .frame(width: MacDesignTokens.Layout.addConnectionContentWidth)
-        .background(contentBackground)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 16) {
-                MacConnectionProviderIcon(type: selectedType, size: 40)
-                Text(isEditing ? "编辑 \(selectedType.displayName)" : selectedType.macAddConnectionTitle)
-                    .font(.system(size: 24, weight: .bold))
-                    .tracking(-0.53)
-                    .foregroundStyle(theme.primaryText)
-            }
-
-            if let description = selectedType.macAddConnectionDescription, selectedType != .plex {
-                Text(description)
-                    .font(.system(size: 13))
-                    .tracking(-0.08)
-                    .foregroundStyle(theme.tertiaryText)
-                    .padding(.top, 16)
-            }
-        }
-        .padding(.bottom, 32)
-    }
+    // MARK: - Form Fields
 
     @ViewBuilder
-    private var formContent: some View {
+    private var formFieldsSection: some View {
         if selectedType.isLocal {
             localFolderForm
         } else if selectedType.supportsOAuthLogin {
@@ -220,201 +285,227 @@ struct MacAddConnectionView: View {
             officialCloudDriveForm
         } else {
             remoteServerForm
-            if selectedType.requiresAuth {
-                authForm
-            }
         }
     }
 
     private var localFolderForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            formRow(label: L10n.tr("名称")) {
-                macTextField(L10n.tr("我的文件夹"), text: $name)
+        VStack(alignment: .leading, spacing: 12) {
+            fieldBox(label: L10n.tr("显示名称")) {
+                catTextField(L10n.tr("我的文件夹"), text: $name)
             }
 
             Button(action: pickLocalFolder) {
                 HStack {
                     Image(systemName: "folder.badge.plus")
+                        .foregroundStyle(theme.accentAmber)
                     Text(folderURL == nil ? L10n.tr("选择文件夹...") : L10n.tr("更换文件夹"))
+                        .foregroundStyle(theme.primaryText)
                     Spacer()
                 }
-                .font(.system(size: 13))
-                .foregroundStyle(theme.secondaryText)
-                .padding(.horizontal, 11)
-                .frame(height: 33.5)
-                .background(inputBackground)
+                .font(.system(size: 12.5, weight: .medium))
+                .padding(.horizontal, 12)
+                .frame(height: 38)
+                .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke(inputBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                        .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
                 }
             }
             .buttonStyle(.plain)
 
             if let folderURL {
                 Text(folderURL.path)
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.tertiaryText)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(2)
                     .truncationMode(.middle)
             }
 
             if let folderPickerError {
                 Text(folderPickerError)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.dangerRed)
             }
         }
-        .frame(maxWidth: 400, alignment: .leading)
     }
 
     private var remoteServerForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            formRow(label: L10n.tr("名称")) {
-                macTextField(L10n.tr("我的服务器"), text: $name)
-            }
-
-            formRow(label: L10n.tr("主机")) {
-                macTextField(hostPlaceholder, text: $host)
-                    .onChange(of: host) { _, _ in
-                        applyHostSchemeDefaults()
-                    }
-            }
-
-            if supportsHTTPS(for: selectedType) {
-                formRow(label: L10n.tr("连接")) {
-                    HStack(spacing: 12) {
-                        Text("HTTPS")
-                            .font(.system(size: 13))
-                            .foregroundStyle(theme.secondaryText)
-
-                        Toggle("", isOn: $useHTTPS)
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                            .onChange(of: useHTTPS) { _, newValue in
-                                applyHTTPSPortDefault(newValue)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                fieldBox(label: L10n.tr("主机 / 服务器地址").uppercased()) {
+                    HStack(spacing: 8) {
+                        catTextField(hostPlaceholder, text: $host)
+                            .onChange(of: host) { _, _ in
+                                applyHostSchemeDefaults()
                             }
 
-                        Text(L10n.tr("端口"))
-                            .font(.system(size: 13))
-                            .foregroundStyle(theme.secondaryText)
-                            .padding(.leading, 8)
-
-                        macTextField("443", text: $port)
-                            .frame(width: 64)
+                        if supportsHTTPS(for: selectedType) {
+                            Button {
+                                useHTTPS.toggle()
+                                applyHTTPSPortDefault(useHTTPS)
+                            } label: {
+                                Text("HTTPS")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                    .foregroundStyle(useHTTPS ? theme.accentAmber : theme.tertiaryText)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(useHTTPS ? theme.amberTintFill : theme.surfacePill, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                }
-            } else {
-                formRow(label: L10n.tr("端口")) {
-                    macTextField("\(selectedType.defaultPort)", text: $port)
-                        .frame(width: 120)
-                }
-            }
-
-            formRow(label: L10n.tr("路径")) {
-                macTextField(pathPlaceholder, text: $path)
-            }
-
-            if let formValidationMessage {
-                Text(formValidationMessage)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
-            }
-        }
-        .frame(maxWidth: 400, alignment: .leading)
-    }
-
-    private var authForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Divider()
-                .padding(.leading, 72)
-                .padding(.top, 8)
-
-            formRow(label: L10n.tr("用户名")) {
-                macTextField("", text: $username)
-            }
-
-            formRow(label: L10n.tr("密码")) {
-                SecureField("", text: $password)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .padding(.horizontal, 11)
-                    .frame(height: 33.5)
-                    .background(inputBackground)
+                    .padding(.horizontal, 12)
+                    .frame(height: 38)
+                    .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 5)
-                            .stroke(inputBorder, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                            .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
                     }
+                }
+
+                fieldBox(label: L10n.tr("端口").uppercased()) {
+                    catTextField("\(selectedType.defaultPort)", text: $port)
+                        .padding(.horizontal, 12)
+                        .frame(height: 38)
+                        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                        }
+                }
+                .frame(width: 104)
+            }
+
+            if selectedType.requiresAuth {
+                HStack(alignment: .top, spacing: 12) {
+                    fieldBox(label: L10n.tr("用户名").uppercased()) {
+                        catTextField("", text: $username)
+                            .padding(.horizontal, 12)
+                            .frame(height: 38)
+                            .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                                    .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                            }
+                    }
+
+                    fieldBox(label: L10n.tr("密码 / 令牌").uppercased()) {
+                        SecureField("", text: $password)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(theme.primaryText)
+                            .padding(.horizontal, 12)
+                            .frame(height: 38)
+                            .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                                    .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                            }
+                    }
+                }
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                fieldBox(label: L10n.tr("显示名称").uppercased()) {
+                    catTextField(selectedType.displayName, text: $name)
+                        .padding(.horizontal, 12)
+                        .frame(height: 38)
+                        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                        }
+                }
+
+                fieldBox(label: L10n.tr("可选路径").uppercased()) {
+                    catTextField(pathPlaceholder, text: $path)
+                        .padding(.horizontal, 12)
+                        .frame(height: 38)
+                        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                        }
+                }
             }
 
             if isEditing {
                 Text(editingPasswordHint)
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.tertiaryText)
-                    .padding(.leading, 72)
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.secondaryText)
+            }
+
+            if let formValidationMessage {
+                Text(formValidationMessage)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.dangerRed)
             }
         }
-        .frame(maxWidth: 400, alignment: .leading)
-        .padding(.top, 8)
     }
 
     private var oauthForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             if isEditing {
-                formRow(label: L10n.tr("名称")) {
-                    macTextField(selectedType.displayName, text: $name)
+                fieldBox(label: L10n.tr("显示名称").uppercased()) {
+                    catTextField(selectedType.displayName, text: $name)
+                        .padding(.horizontal, 12)
+                        .frame(height: 38)
+                        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                        }
                 }
             }
 
             if !OAuthProviderConfiguration.isConfigured(for: selectedType) {
                 Text(OAuthProviderConfiguration.missingCredentialHint(for: selectedType))
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.dangerRed)
             }
 
             Button {
                 Task { await beginOAuthLogin() }
             } label: {
                 HStack {
-                    Text(isEditing ? "重新登录 \(selectedType.displayName)" : "使用 \(selectedType.displayName) 账号登录")
+                    Text(isEditing ? L10n.tr("重新登录 %@", selectedType.displayName) : L10n.tr("使用 %@ 账号登录", selectedType.displayName))
                     Spacer()
                     if isAuthenticatingOAuth || viewModel.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
+                        ProgressView().controlSize(.small)
                     }
                 }
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(MacDesignTokens.accentBlue)
-                .clipShape(RoundedRectangle(cornerRadius: 5))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(MacCatAmberGlassButtonStyle(height: 40, horizontalPadding: 16))
             .disabled(!OAuthProviderConfiguration.isConfigured(for: selectedType) || isAuthenticatingOAuth || viewModel.isLoading)
 
             if let oauthErrorMessage {
                 Text(oauthErrorMessage)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.red)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.dangerRed)
             }
         }
-        .frame(maxWidth: 400, alignment: .leading)
     }
 
     private var plexForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             if let editingConnection {
-                formRow(label: L10n.tr("名称")) {
-                    macTextField(L10n.tr("Plex 服务器"), text: $name)
+                fieldBox(label: L10n.tr("显示名称").uppercased()) {
+                    catTextField(L10n.tr("Plex 服务器"), text: $name)
+                        .padding(.horizontal, 12)
+                        .frame(height: 38)
+                        .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                        }
                 }
 
                 plexConnectionSummary(editingConnection)
 
                 if viewModel.plexConnectionNeedsReauthentication(editingConnection) {
                     Text(L10n.tr("Plex 登录状态已失效，请重新登录。"))
-                        .font(.system(size: 12))
+                        .font(.system(size: 11.5))
                         .foregroundStyle(.orange)
-                        .padding(.leading, 72)
                 }
 
                 plexSignInButton(title: L10n.tr("重新登录 Plex"))
@@ -422,17 +513,16 @@ struct MacAddConnectionView: View {
                 plexSignInButton(title: L10n.tr("使用 Plex 账号登录"))
             }
         }
-        .frame(maxWidth: 400, alignment: .leading)
     }
 
     private func plexConnectionSummary(_ connection: SavedConnection) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(L10n.tr("Plex 服务器"))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(theme.tertiaryText)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(theme.secondaryText)
 
             Text(displayedPlexServer)
-                .font(.system(size: 13))
+                .font(.system(size: 12.5))
                 .foregroundStyle(theme.primaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -440,20 +530,15 @@ struct MacAddConnectionView: View {
             if let account = connection.username,
                !account.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(L10n.tr("已登录 Plex 账号：%@", account))
-                    .font(.system(size: 12))
-                    .foregroundStyle(theme.tertiaryText)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(inputBackground)
-        .overlay {
-            RoundedRectangle(cornerRadius: 5)
-                .stroke(inputBorder, lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .macCatGlassCard(theme: theme, cornerRadius: 11)
         .accessibilityElement(children: .combine)
     }
 
@@ -465,168 +550,104 @@ struct MacAddConnectionView: View {
                 Text(title)
                 Spacer()
                 if viewModel.isLoading {
-                    ProgressView()
-                        .controlSize(.small)
+                    ProgressView().controlSize(.small)
                 }
             }
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(MacDesignTokens.accentBlue)
-            .clipShape(RoundedRectangle(cornerRadius: 5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(MacCatAmberGlassButtonStyle(height: 40, horizontalPadding: 16))
         .disabled(viewModel.isLoading)
         .accessibilityIdentifier(editingConnection == nil ? "mac.plex.signIn" : "mac.plex.relogin")
     }
 
     private var officialCloudDriveForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            formRow(label: L10n.tr("名称")) {
-                macTextField(selectedType.displayName, text: $name)
+        VStack(alignment: .leading, spacing: 12) {
+            fieldBox(label: L10n.tr("显示名称").uppercased()) {
+                catTextField(selectedType.displayName, text: $name)
+                    .padding(.horizontal, 12)
+                    .frame(height: 38)
+                    .background(theme.surfaceGlass, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: MacDesignTokens.Radius.inputField, style: .continuous)
+                            .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                    }
             }
 
             Text(selectedType.macAddConnectionDescription ?? "")
                 .font(.system(size: 12))
-                .foregroundStyle(theme.tertiaryText)
+                .foregroundStyle(theme.secondaryText)
         }
-        .frame(maxWidth: 400, alignment: .leading)
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            if selectedType == .plex && !isEditing {
-                Text(L10n.tr("通过 Plex 账号登录后自动创建连接"))
+    // MARK: - Footer
+
+    private var modalFooter: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image("MacCatEyeStatus")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 13, height: 7)
+                    .shadow(color: MacDesignTokens.glowAmber.opacity(0.75), radius: 2)
+
+                Text(selectedType == .plex && !isEditing
+                     ? L10n.tr("通过 Plex 账号登录后自动创建连接")
+                     : L10n.tr("安全保存在 macOS 钥匙串中"))
                     .font(.system(size: 11))
-                    .foregroundStyle(theme.tertiaryText)
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)
-                    .truncationMode(.tail)
-                    .accessibilityIdentifier("mac.plex.footerHint")
             }
 
             Spacer()
 
             Button(L10n.tr("取消")) { dismiss() }
-                .buttonStyle(MacSecondaryActionButtonStyle(theme: theme))
+                .buttonStyle(MacCatGlassButtonStyle(height: 38, horizontalPadding: 18))
 
-            Button(L10n.tr("保存")) { save() }
-                .buttonStyle(MacPrimaryActionButtonStyle())
+            Button(isEditing ? L10n.tr("保存") : L10n.tr("测试并连接")) { save() }
+                .buttonStyle(MacCatAmberButtonStyle(height: 38, horizontalPadding: 20))
                 .disabled(!isValid || viewModel.isLoading || isRenamingPlex)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 17)
-        .padding(.bottom, 16)
-        .background(contentBackground)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(dividerColor)
-                .frame(height: 1)
+                .opacity((!isValid || viewModel.isLoading || isRenamingPlex) ? 0.45 : 1)
         }
     }
 
-    // MARK: - Form Components
+    // MARK: - Helpers
 
-    private func formRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack(alignment: .center, spacing: 16) {
+    private func fieldBox<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .tracking(-0.08)
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(theme.secondaryText)
-                .frame(width: 56, alignment: .trailing)
+                .tracking(0.4)
 
             content()
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func macTextField(_ placeholder: String, text: Binding<String>) -> some View {
+    private func catTextField(_ placeholder: String, text: Binding<String>) -> some View {
         TextField(placeholder, text: text)
             .textFieldStyle(.plain)
-            .font(.system(size: 13))
+            .font(.system(size: 12.5, weight: .medium))
             .foregroundStyle(theme.primaryText)
-            .padding(.horizontal, 11)
-            .frame(height: 33.5)
-            .background(inputBackground)
-            .overlay {
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(inputBorder, lineWidth: 1)
-            }
-    }
-
-    // MARK: - Loading Overlay
-
-    private var loadingMessageText: String {
-        let trimmed = viewModel.loadingMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? L10n.tr("处理中...") : trimmed
     }
 
     private var loadingOverlay: some View {
-        ZStack {
-            Color.black.opacity(colorScheme == .dark ? 0.45 : 0.35)
+        let trimmed = viewModel.loadingMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = trimmed.isEmpty ? L10n.tr("处理中...") : trimmed
 
-            VStack(spacing: 16) {
-                ProgressView()
-                    .controlSize(.regular)
-
-                Text(loadingMessageText)
-                    .font(.system(size: 13))
-                    .tracking(-0.08)
-                    .foregroundStyle(theme.secondaryText)
+        return ZStack {
+            Color.black.opacity(0.45)
+            VStack(spacing: 14) {
+                ProgressView().controlSize(.regular)
+                Text(message)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(theme.primaryText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 240)
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 20)
-            .background(contentBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(dividerColor, lineWidth: 1)
-            }
-            .shadow(color: shadowColor, radius: 8, y: 4)
+            .macCatGlassCard(theme: theme, cornerRadius: 14)
         }
-        .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.addConnectionRadius, style: .continuous))
-    }
-
-    // MARK: - Theme Colors
-
-    private var modalBackground: Color {
-        colorScheme == .dark ? Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255) : Color(red: 245 / 255, green: 245 / 255, blue: 247 / 255)
-    }
-
-    private var sidebarBackground: Color {
-        colorScheme == .dark
-            ? Color(red: 40 / 255, green: 40 / 255, blue: 43 / 255).opacity(0.8)
-            : Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255).opacity(0.8)
-    }
-
-    private var contentBackground: Color {
-        colorScheme == .dark ? Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255) : Color(red: 245 / 255, green: 245 / 255, blue: 247 / 255)
-    }
-
-    private var sidebarItemText: Color {
-        colorScheme == .dark ? Color(red: 209 / 255, green: 213 / 255, blue: 220 / 255) : Color(red: 54 / 255, green: 65 / 255, blue: 83 / 255)
-    }
-
-    private var dividerColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1)
-    }
-
-    private var borderColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.5) : Color.black.opacity(0.1)
-    }
-
-    private var shadowColor: Color {
-        colorScheme == .dark ? Color.black.opacity(0.6) : Color.black.opacity(0.2)
-    }
-
-    private var inputBackground: Color {
-        colorScheme == .dark ? Color.black.opacity(0.2) : .white
-    }
-
-    private var inputBorder: Color {
-        colorScheme == .dark ? Color.white.opacity(0.1) : Color(red: 209 / 255, green: 213 / 255, blue: 220 / 255)
+        .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.modalDialog, style: .continuous))
     }
 
     // MARK: - Actions
@@ -638,8 +659,6 @@ struct MacAddConnectionView: View {
             : false
         port = "\(defaultPort(for: type, useHTTPS: useHTTPS))"
         applyDefaults(for: type)
-        // 若 host 已是带 scheme 无端口的完整 URL，重置默认端口后需重新套用标准端口，
-        // 避免「先粘贴 https://host、后选择 Emby」时端口又被改回 8096。
         applyHostSchemeDefaults()
         if !type.isLocal {
             folderURL = nil
@@ -686,13 +705,14 @@ struct MacAddConnectionView: View {
         }
 
         Task {
+            let resolvedName = trimmedName.isEmpty ? selectedType.displayName : trimmedName
             let didConnect: Bool
             if selectedType.isLocal {
                 guard let folderURL, let folderBookmark else { return }
                 if let editingConnection {
                     didConnect = await viewModel.updateConnection(
                         editingConnection,
-                        name: name,
+                        name: resolvedName,
                         host: folderURL.path,
                         port: 0,
                         username: nil,
@@ -702,7 +722,7 @@ struct MacAddConnectionView: View {
                     )
                 } else {
                     didConnect = await viewModel.saveConnection(
-                        name: name,
+                        name: resolvedName,
                         type: selectedType,
                         host: folderURL.path,
                         port: 0,
@@ -718,7 +738,7 @@ struct MacAddConnectionView: View {
                 if let editingConnection {
                     didConnect = await viewModel.updateConnection(
                         editingConnection,
-                        name: name,
+                        name: resolvedName,
                         host: input.host,
                         port: input.port,
                         username: username.isEmpty ? nil : username,
@@ -728,7 +748,7 @@ struct MacAddConnectionView: View {
                     )
                 } else {
                     didConnect = await viewModel.saveConnection(
-                        name: name,
+                        name: resolvedName,
                         type: selectedType,
                         host: input.host,
                         port: input.port,
@@ -745,7 +765,6 @@ struct MacAddConnectionView: View {
         }
     }
 
-    /// 既有 Plex 连接只改名：不重新授权、不重新连接扫描。
     private func savePlexRename() {
         guard let editingConnection, !trimmedName.isEmpty else { return }
         isRenamingPlex = true
@@ -787,7 +806,6 @@ struct MacAddConnectionView: View {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Plex 连接保存的是完整 endpoint URI；摘要里只显示 host:port。
     private var displayedPlexServer: String {
         guard let editingConnection else { return "" }
         guard let url = URL(string: editingConnection.host), let host = url.host else {
@@ -800,7 +818,6 @@ struct MacAddConnectionView: View {
     private func handlePlexSignInDismiss() {
         guard plexSignInCompleted else { return }
         plexSignInCompleted = false
-        // 重新登录成功的 Plex 行保留原名称；若用户在名称栏改过名，补一次改名，避免输入被丢弃。
         if let editingConnection,
            !trimmedName.isEmpty,
            trimmedName != editingConnection.name {
@@ -819,7 +836,7 @@ struct MacAddConnectionView: View {
 
     private var hostPlaceholder: String {
         if selectedType.isMediaServer {
-            return "https://example.com"
+            return "https://emby.studio.local"
         }
         if selectedType == .iptv {
             return L10n.tr("播放列表 URL 或主机地址")
@@ -838,13 +855,11 @@ struct MacAddConnectionView: View {
     }
 
     private var isValid: Bool {
-        // Plex 新连接由 PIN 登录流程创建；本页「保存」只负责给既有 Plex 连接改名。
         if selectedType == .plex {
             return isEditing && !trimmedName.isEmpty
         }
-        guard !name.isEmpty else { return false }
         if selectedType.isLocal {
-            return folderBookmark != nil
+            return folderBookmark != nil && !name.isEmpty
         }
         if selectedType.supportsOAuthLogin {
             return isEditing
@@ -961,9 +976,6 @@ struct MacAddConnectionView: View {
         if let componentPort = components.port {
             port = "\(componentPort)"
         } else if hasExplicitScheme {
-            // 用户粘贴了带 scheme 但不带端口的完整 URL（如 https://emby.example.com）：
-            // 应使用该 scheme 的标准端口（https→443 / http→80），而不是媒体服务器的
-            // 默认端口（如 Emby 8096），否则会拼出 https://host:8096 这类错误地址。
             port = components.scheme?.lowercased() == "http" ? "80" : "443"
         }
     }
@@ -1023,59 +1035,74 @@ struct MacAddConnectionView: View {
     }
 }
 
-// MARK: - Button Styles
+private enum ProtocolTileItem: Identifiable {
+    case connection(ConnectionType)
+    case directURL
 
-/// 供 Plex 登录 sheet（`MacPlexSignInView`）复用，保持与 Add Connection 一致的按钮外观。
+    var id: String {
+        switch self {
+        case .connection(let type): return "conn-\(type.rawValue)"
+        case .directURL: return "direct-url"
+        }
+    }
+
+    var badge: String {
+        switch self {
+        case .connection(let type): return type.macShortBadge
+        case .directURL: return "URL"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .connection(let type): return type.macSidebarLabel
+        case .directURL: return L10n.tr("直链 URL")
+        }
+    }
+}
+
+// MARK: - Legacy Compatibility Button Styles (used by MacPlexSignInView)
+
 struct MacPrimaryActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .medium))
-            .tracking(-0.08)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 25)
-            .padding(.vertical, 7)
-            .background(MacDesignTokens.accentBlue.opacity(configuration.isPressed ? 0.85 : 1))
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .shadow(color: Color.black.opacity(0.1), radius: 1.5, y: 1)
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(MacDesignTokens.catSilhouette)
+            .padding(.horizontal, 20)
+            .frame(height: 36)
+            .background(MacDesignTokens.glowAmber.opacity(configuration.isPressed ? 0.85 : 1), in: Capsule())
     }
 }
 
 struct MacSecondaryActionButtonStyle: ButtonStyle {
     let theme: MacThemeColors
 
-    @Environment(\.colorScheme) private var colorScheme
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .medium))
-            .tracking(-0.08)
-            .foregroundStyle(colorScheme == .dark ? .white : theme.secondaryText)
-            .padding(.horizontal, 25)
-            .padding(.vertical, 7)
-            .background(
-                colorScheme == .dark
-                    ? Color(red: 58 / 255, green: 58 / 255, blue: 60 / 255).opacity(configuration.isPressed ? 0.85 : 1)
-                    : Color.white.opacity(configuration.isPressed ? 0.85 : 1)
-            )
+            .foregroundStyle(theme.primaryText)
+            .padding(.horizontal, 18)
+            .frame(height: 36)
+            .background(theme.surfaceGlass.opacity(configuration.isPressed ? 0.8 : 1), in: Capsule())
             .overlay {
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(colorScheme == .dark ? Color.clear : Color(red: 209 / 255, green: 213 / 255, blue: 220 / 255), lineWidth: 1)
+                Capsule()
+                    .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .shadow(color: Color.black.opacity(0.1), radius: 1.5, y: 1)
     }
-}
-
-#Preview("Add Connection Light") {
-    MacAddConnectionView(viewModel: MacConnectionsViewModel())
-        .macTheme(.light)
-        .padding()
-        .background(Color.gray.opacity(0.3))
 }
 
 #Preview("Add Connection Dark") {
     MacAddConnectionView(viewModel: MacConnectionsViewModel())
+        .environmentObject(MacAppState())
         .macTheme(.dark)
-        .padding()
-        .background(Color.black)
+        .padding(40)
+        .background(Color.black.opacity(0.6))
+}
+
+#Preview("Add Connection Light") {
+    MacAddConnectionView(viewModel: MacConnectionsViewModel())
+        .environmentObject(MacAppState())
+        .macTheme(.light)
+        .padding(40)
+        .background(Color.gray.opacity(0.3))
 }

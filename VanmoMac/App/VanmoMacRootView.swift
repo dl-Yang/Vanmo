@@ -31,16 +31,18 @@ struct VanmoMacRootView: View {
                 if appState.isSidebarExpanded {
                     MacSidebarView()
                         .transition(.move(edge: .leading))
+                    Rectangle()
+                        .fill(activeTheme.strokeGlass)
+                        .frame(width: 1)
                 }
                 mainContent
                     .background(activeTheme.appBackground)
-//                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 4)
             }
             .ignoresSafeArea(edges: .top)
             .overlay {
                 if isDropTargeted {
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(MacDesignTokens.accentBlue, style: StrokeStyle(lineWidth: 2, dash: [8]))
+                        .stroke(MacDesignTokens.glowAmber, style: StrokeStyle(lineWidth: 2, dash: [8]))
                         .padding(12)
                         .background(Color.black.opacity(0.08))
                         .allowsHitTesting(false)
@@ -49,11 +51,24 @@ struct VanmoMacRootView: View {
 
             // 顶部悬浮控制条：展开/折叠 + 下载，侧边栏收起时保持原位可用。
             MacSidebarToggleButton()
-                .frame(width: appState.sidebarWidth - MacDesignTokens.Layout.trafficLightsLeadingInset)
+                .frame(
+                    width: appState.isSidebarExpanded
+                        ? max(120, appState.sidebarWidth - MacDesignTokens.Layout.trafficLightsLeadingInset - 14)
+                        : 120
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.leading, MacDesignTokens.Layout.trafficLightsLeadingInset + 5)
-                .padding(.top, 2)
+                .padding(.leading, MacDesignTokens.Layout.trafficLightsLeadingInset)
+                .padding(.top, 10)
                 .ignoresSafeArea(edges: .top)
+
+            // ⌘F 全局聚焦侧边栏搜索框
+            Button("") {
+                appState.focusSearch()
+            }
+            .keyboardShortcut("f", modifiers: .command)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
 
             MacDownloadHeroOverlay()
                 .allowsHitTesting(false)
@@ -81,6 +96,7 @@ struct VanmoMacRootView: View {
             }
         }
         .macTheme(activeTheme)
+        .preferredColorScheme(appState.appearanceMode.preferredColorScheme)
         .background {
             MacMainWindowAccessor { window in
                 appState.registerMainWindow(window)
@@ -351,10 +367,7 @@ struct VanmoMacRootView: View {
     }
 
     private var activeTheme: MacThemeColors {
-        if appState.selectedMediaItem == nil, libraryViewModel.isLibraryEmpty {
-            return isDarkAppearance ? .emptyDark : .light
-        }
-        return isDarkAppearance ? .dark : .light
+        isDarkAppearance ? .dark : .light
     }
 
     @ViewBuilder

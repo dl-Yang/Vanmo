@@ -29,4 +29,15 @@ enum MacFormatters {
         let value = playerTimestamp(abs(interval))
         return interval < 0 ? "-\(value)" : value
     }
+
+    static func playbackRate(_ rate: Double) -> String {
+        if (rate * 10).rounded() == rate * 10 {
+            return String(format: "%.1fx", rate)
+        }
+        return String(format: "%.2fx", rate)
+    }
+
+    static func playbackRate(_ rate: Float) -> String {
+        playbackRate(Double(rate))
+    }
 }

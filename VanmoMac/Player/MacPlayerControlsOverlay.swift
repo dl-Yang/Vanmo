@@ -4,245 +4,342 @@ import VanmoCore
 
 struct MacPlayerControlsOverlay: View {
     @ObservedObject var viewModel: MacPlayerViewModel
+    let item: MediaItem?
     let title: String
     let showsLoadingChrome: Bool
-    let onClose: () -> Void
+    @Binding var activeDrawerTab: MacPlayerDrawerTab?
+
+    @State private var isHoveringTimeline = false
+    @State private var isDraggingTimeline = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 16) {
-                HStack(spacing: 16) {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 48, height: 48)
-                            .macPlayerGlassCircle()
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(L10n.tr("关闭"))
-
-                    HStack(spacing: 24) {
-                        rateMenu
-                        scaleMenu
-                        Button(action: viewModel.toggleFullScreen) {
-                            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 22, height: 22)
+        ZStack {
+            if activeDrawerTab != nil {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            activeDrawerTab = nil
                         }
-                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 16)
-                    .frame(height: 48)
-                    .macPlayerGlassCapsule()
+            }
+
+            VStack(spacing: 0) {
+                topFloatingHeader
+                    .padding(.horizontal, 24)
+                    .padding(.top, 18)
+
+                Spacer()
+
+                bottomCinemaDeckContainer
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 22)
+            }
+
+            if activeDrawerTab != nil {
+                VStack(alignment: .trailing, spacing: 0) {
+                    MacPlayerTrackDrawer(viewModel: viewModel, activeTab: $activeDrawerTab)
+                        .contentShape(Rectangle())
+                        .onTapGesture {}
+                        .padding(.top, 68)
+                        .padding(.trailing, 24)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
+            }
+        }
+    }
+
+    // MARK: - Top Floating Glass Header
+
+    private var topFloatingHeader: some View {
+        HStack(spacing: 12) {
+            // 左侧为交通灯留白
+            Color.clear
+                .frame(width: 60, height: 12)
+
+            titleAndSpecPill
+
+            Spacer(minLength: 12)
+
+            HStack(spacing: 8) {
+                if viewModel.canSelectEpisode {
+                    headerDrawerPill(
+                        title: L10n.tr("选集"),
+                        isActive: activeDrawerTab == .episodes
+                    ) {
+                        toggleDrawer(.episodes)
+                    }
                 }
 
-                Spacer(minLength: 12)
-
-                Text(title)
-                    .font(MacDesignTokens.Typography.playerTitle)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .shadow(color: .black.opacity(0.2), radius: 3, y: 2)
-
-                Spacer(minLength: 12)
-
-                volumePill
+                headerDrawerPill(
+                    title: L10n.tr("音频 / 字幕"),
+                    isActive: activeDrawerTab == .audio || activeDrawerTab == .subtitles
+                ) {
+                    toggleDrawer(.subtitles)
+                }
             }
-            .padding(.horizontal, 32)
-            .padding(.top, 28)
+        }
+    }
 
-            Spacer()
+    private var titleAndSpecPill: some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(MacDesignTokens.Typography.playerTitle)
+                .foregroundStyle(MacDesignTokens.Cinema.textIvory)
+                .lineLimit(1)
 
-            transportControls
+            if let episodeTag = currentEpisodeSubtitle {
+                Text(episodeTag)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(MacDesignTokens.Cinema.amber)
+                    .lineLimit(1)
+            }
 
-            Spacer()
+            if let spec = qualitySpecLabel {
+                Text(spec)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(MacDesignTokens.Cinema.textIvory)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2.5)
+                    .background(MacDesignTokens.Cinema.surfacePill, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(MacDesignTokens.Cinema.strokeGlass, lineWidth: 0.75)
+                    }
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 38)
+        .background(MacDesignTokens.Cinema.panelGlass, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(MacDesignTokens.Cinema.strokeGlass, lineWidth: 0.9)
+        }
+    }
+
+    private func headerDrawerPill(
+        title: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if isActive {
+                    MacPawDotIndicator(size: 10, useCinemaGlow: true)
+                }
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isActive ? MacDesignTokens.Cinema.amber : MacDesignTokens.Cinema.textIvory)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 36)
+            .background(
+                isActive ? MacDesignTokens.Cinema.amberTint : MacDesignTokens.Cinema.panelGlass,
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .strokeBorder(isActive ? MacDesignTokens.Cinema.strokeAmber : MacDesignTokens.Cinema.strokeGlass, lineWidth: 0.9)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func toggleDrawer(_ tab: MacPlayerDrawerTab) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            if activeDrawerTab == tab || (tab == .subtitles && (activeDrawerTab == .audio || activeDrawerTab == .subtitles)) {
+                activeDrawerTab = nil
+            } else {
+                activeDrawerTab = tab
+            }
+        }
+    }
+
+    // MARK: - Bottom Liquid Glass Control Deck
+
+    private var bottomCinemaDeckContainer: some View {
+        VStack(spacing: 12) {
+            scrubberTimeline
 
             HStack {
-                if viewModel.canSelectEpisode {
-                    Button(L10n.tr("选集")) {
-                        viewModel.showEpisodeSelector = true
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .frame(height: 36)
-                    .macPlayerGlassCapsule()
-                }
-                Spacer()
-                HStack(spacing: 24) {
-                    controlButton("text.bubble") { viewModel.showSubtitleSelector = true }
-                    controlButton("waveform") { viewModel.showAudioSelector = true }
-                    controlButton("arrow.triangle.2.circlepath") { viewModel.cycleScaleMode() }
-                }
-                .padding(.horizontal, 20)
-                .frame(height: 48)
-                .macPlayerGlassCapsule()
+                leftTimeCluster
+                Spacer(minLength: 12)
+                centerTransportCluster
+                Spacer(minLength: 12)
+                rightUtilityCluster
             }
-            .padding(.horizontal, 32)
-
-            progressSlider
-                .padding(.horizontal, 32)
-                .padding(.top, 16)
-                .padding(.bottom, 24)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .frame(maxWidth: MacDesignTokens.Layout.playerControlPanelWidth)
+        .frame(height: MacDesignTokens.Layout.playerControlPanelHeight)
+        .background(
+            MacDesignTokens.Cinema.panelGlass,
+            in: RoundedRectangle(cornerRadius: MacDesignTokens.Layout.playerControlPanelRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: MacDesignTokens.Layout.playerControlPanelRadius, style: .continuous)
+                .strokeBorder(MacDesignTokens.Cinema.strokeGlass, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.7), radius: 22, y: 10)
     }
 
-    private var rateMenu: some View {
-        Menu {
-            ForEach(PlayerConfig.availableRates, id: \.self) { rate in
-                Button {
-                    viewModel.setRate(rate)
-                } label: {
-                    HStack {
-                        Text("\(rate, specifier: "%.2g")x")
-                        if viewModel.config.playbackRate == rate {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            Text("\(viewModel.config.playbackRate, specifier: "%.2g")x")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(minWidth: 22, minHeight: 22)
-        }
-        .menuStyle(.borderlessButton)
-    }
-
-    private var scaleMenu: some View {
-        Menu {
-            ForEach(VideoScaleMode.allCases, id: \.self) { mode in
-                Button {
-                    viewModel.setScaleMode(mode)
-                } label: {
-                    HStack {
-                        Label(mode.displayName, systemImage: mode.icon)
-                        if viewModel.config.scaleMode == mode {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: viewModel.config.scaleMode.icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-        }
-        .menuStyle(.borderlessButton)
-    }
-
-    private var progressSlider: some View {
+    private var scrubberTimeline: some View {
         GeometryReader { proxy in
             let width = max(proxy.size.width, 1)
-            let played = viewModel.scrubPreviewTime.map { duration in
-                viewModel.duration > 0 ? duration / viewModel.duration : 0
-            } ?? viewModel.progress
+            let playedFraction: Double = {
+                if let previewTime = viewModel.scrubPreviewTime, viewModel.duration > 0 {
+                    return min(max(previewTime / viewModel.duration, 0), 1)
+                }
+                return min(max(viewModel.progress, 0), 1)
+            }()
+            let thumbX = width * playedFraction
+
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.3))
+                    .fill(MacDesignTokens.Cinema.track)
+                    .frame(height: 3.5)
+
                 Capsule()
-                    .fill(Color.white.opacity(0.55))
-                    .frame(width: max(0, width * (viewModel.cacheEnd - viewModel.cacheStart)))
+                    .fill(Color.white.opacity(0.32))
+                    .frame(width: max(0, width * max(0, viewModel.cacheEnd - viewModel.cacheStart)), height: 3.5)
                     .offset(x: width * viewModel.cacheStart)
+
                 Capsule()
-                    .fill(.white)
-                    .frame(width: width * played)
+                    .fill(MacDesignTokens.Cinema.amber)
+                    .frame(width: max(0, thumbX), height: 3.5)
+
+                MacPawDotIndicator(size: 10, useCinemaGlow: true)
+                    .offset(x: min(max(thumbX - 5, 0), max(0, width - 10)))
             }
-            .frame(height: 6)
-            .frame(maxHeight: .infinity, alignment: .center)
+            .frame(height: 14)
             .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                guard viewModel.duration > 0 else { return }
+                switch phase {
+                case .active(let location):
+                    isHoveringTimeline = true
+                    if !isDraggingTimeline {
+                        viewModel.updateScrub(to: location.x / width)
+                    }
+                case .ended:
+                    isHoveringTimeline = false
+                    if !isDraggingTimeline {
+                        viewModel.clearScrubPreview()
+                    }
+                }
+            }
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
+                        isDraggingTimeline = true
                         viewModel.updateScrub(to: value.location.x / width)
                     }
                     .onEnded { value in
+                        isDraggingTimeline = false
                         viewModel.commitScrub(to: value.location.x / width)
                     }
             )
             .macBlocksWindowDrag()
-            .overlay(alignment: .top) {
-                if let previewTime = viewModel.scrubPreviewTime {
+            .overlay(alignment: .topLeading) {
+                if let previewTime = viewModel.scrubPreviewTime, (isHoveringTimeline || isDraggingTimeline) {
+                    let cardWidth: CGFloat = 164
+                    let clampedX = min(max(thumbX - cardWidth / 2, 0), max(0, width - cardWidth))
                     scrubPreviewCard(time: previewTime)
-                        .offset(y: -132)
+                        .offset(x: clampedX, y: -124)
                 }
             }
         }
-        .frame(height: 20)
+        .frame(height: 14)
     }
 
     private func scrubPreviewCard(time: TimeInterval) -> some View {
-        VStack(spacing: 6) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.white.opacity(0.08))
+        ZStack(alignment: .top) {
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(MacDesignTokens.Cinema.panelGlass)
+
                 if let image = viewModel.scrubPreviewImage {
                     Image(nsImage: image)
                         .resizable()
                         .scaledToFill()
                 }
+
+                LinearGradient(
+                    colors: [Color.clear, MacDesignTokens.catSilhouette.opacity(0.9)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 42)
+
+                Text(MacFormatters.playerTimestamp(time))
+                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                    .foregroundStyle(MacDesignTokens.Cinema.amber)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 2.5)
+                    .background(MacDesignTokens.Cinema.panelGlass, in: Capsule())
+                    .padding(.bottom, 8)
             }
-            .frame(width: 156, height: 88)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            Text(MacFormatters.playerTimestamp(time))
-                .font(MacDesignTokens.Typography.playerTime)
-                .foregroundStyle(.white)
+            .frame(width: 164, height: 92)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(MacDesignTokens.Cinema.strokeAmber, lineWidth: 1.15)
+            }
+            .shadow(color: .black.opacity(0.75), radius: 18, y: 8)
+            .padding(.top, 22)
+
+            Image("MacScrubPreviewCat")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 48, height: 30)
+                .offset(y: -4)
         }
-        .padding(6)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .allowsHitTesting(false)
     }
 
-    private var volumePill: some View {
-        HStack(spacing: 16) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.2))
-                    Capsule()
-                        .fill(.white)
-                        .frame(width: max(0, proxy.size.width * viewModel.volume))
-                }
-                .frame(height: 8)
-                .frame(maxHeight: .infinity, alignment: .center)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            viewModel.setVolume(value.location.x / max(proxy.size.width, 1))
-                        }
-                )
-                .macBlocksWindowDrag()
-            }
-            .frame(width: 114, height: 48)
-            Image(systemName: viewModel.volume > 0.01 ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 20, height: 20)
-        }
-        .padding(.horizontal, 20)
-        .frame(width: 192, height: 48)
-        .macPlayerGlassCapsule()
+    private var leftTimeCluster: some View {
+        Text("\(MacFormatters.playerTimestamp(viewModel.currentTime))  /  \(MacFormatters.playerTimestamp(viewModel.duration))")
+            .font(.system(size: 12, weight: .medium).monospacedDigit())
+            .foregroundStyle(MacDesignTokens.Cinema.textMuted)
     }
 
-    private var transportControls: some View {
-        HStack(spacing: 64) {
-            skipButton(seconds: -10)
+    private var centerTransportCluster: some View {
+        HStack(spacing: 20) {
+            Button {
+                viewModel.skip(by: -15)
+            } label: {
+                Image("MacPlayerSkipBack15")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .help(L10n.tr("后退 15 秒"))
+
             Button(action: viewModel.togglePlayPause) {
                 Group {
                     if showsLoadingChrome {
                         MacPlayerLoadingArc()
+                    } else if viewModel.playbackState == .playing {
+                        Image("MacPlayerPause")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 18, height: 18)
                     } else {
-                        Image(systemName: viewModel.playbackState == .playing ? "pause.fill" : "play.fill")
-                            .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(.white)
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(MacDesignTokens.Cinema.textIvory)
                     }
                 }
-                .frame(width: 96, height: 96)
-                .macPlayerGlassCircle()
+                .frame(width: 38, height: 38)
+                .background(MacDesignTokens.Cinema.surfacePill, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(MacDesignTokens.Cinema.strokeGlass, lineWidth: 0.9)
+                }
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
@@ -250,65 +347,165 @@ struct MacPlayerControlsOverlay: View {
                     ? L10n.tr("正在加载")
                     : (viewModel.playbackState == .playing ? L10n.tr("暂停") : L10n.tr("播放"))
             )
-            skipButton(seconds: 10)
+
+            Button {
+                viewModel.skip(by: 15)
+            } label: {
+                Image("MacPlayerSkipFwd15")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .help(L10n.tr("前进 15 秒"))
         }
     }
 
-    private func skipButton(seconds: TimeInterval) -> some View {
-        Button {
-            viewModel.skip(by: seconds)
+    private var rightUtilityCluster: some View {
+        HStack(spacing: 14) {
+            rateAndScaleMenu
+
+            volumeSliderGroup
+
+            Button(action: viewModel.toggleFullScreen) {
+                Image("MacPlayerFullscreen")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L10n.tr("切换全屏"))
+        }
+    }
+
+    private var rateAndScaleMenu: some View {
+        Menu {
+            Section(L10n.tr("倍速")) {
+                ForEach(PlayerConfig.availableRates, id: \.self) { rate in
+                    Button {
+                        viewModel.setRate(rate)
+                    } label: {
+                        HStack {
+                            Text(MacFormatters.playbackRate(rate))
+                            if viewModel.config.playbackRate == rate {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+            Section(L10n.tr("画面比例")) {
+                ForEach(VideoScaleMode.allCases, id: \.self) { mode in
+                    Button {
+                        viewModel.setScaleMode(mode)
+                    } label: {
+                        HStack {
+                            Label(mode.displayName, systemImage: mode.icon)
+                            if viewModel.config.scaleMode == mode {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
         } label: {
-            Image(systemName: seconds < 0 ? "gobackward.10" : "goforward.10")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 64, height: 64)
-                .macPlayerGlassCircle()
+            Text(MacFormatters.playbackRate(viewModel.config.playbackRate))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(MacDesignTokens.Cinema.textIvory)
         }
-        .buttonStyle(.plain)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .padding(.horizontal, 9)
+        .frame(height: 26)
+        .background(MacDesignTokens.Cinema.surfacePill, in: Capsule())
+        .fixedSize()
     }
 
-    private func controlButton(_ systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white.opacity(0.8))
-                .frame(width: 20, height: 20)
-        }
-        .buttonStyle(.plain)
-    }
-}
+    private var volumeSliderGroup: some View {
+        HStack(spacing: 7) {
+            Button {
+                viewModel.setVolume(viewModel.volume > 0.01 ? 0 : 0.7)
+            } label: {
+                Group {
+                    if viewModel.volume > 0.01 {
+                        Image("MacPlayerVolume")
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        Image(systemName: "speaker.slash.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(MacDesignTokens.Cinema.textMuted)
+                    }
+                }
+                .frame(width: 16, height: 16)
+            }
+            .buttonStyle(.plain)
 
-private extension View {
-    @ViewBuilder
-    func macPlayerGlassCircle() -> some View {
-        if #available(macOS 26.0, *) {
-            self.contentShape(Circle())
-                .glassEffect(.clear, in: .circle)
-        } else {
-            self.contentShape(Circle())
-                .background {
-                    Circle().fill(.ultraThinMaterial).opacity(0.22)
+            GeometryReader { proxy in
+                let width = max(proxy.size.width, 1)
+                let fillWidth = max(0, width * min(max(viewModel.volume, 0), 1))
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(MacDesignTokens.Cinema.track)
+                        .frame(height: 3)
+
+                    Capsule()
+                        .fill(MacDesignTokens.Cinema.amber)
+                        .frame(width: fillWidth, height: 3)
+
+                    Circle()
+                        .fill(MacDesignTokens.Cinema.textIvory)
+                        .frame(width: 8, height: 8)
+                        .offset(x: min(max(fillWidth - 4, 0), max(0, width - 8)))
                 }
-                .overlay {
-                    Circle().strokeBorder(.white.opacity(0.28), lineWidth: 1)
-                }
+                .frame(maxHeight: .infinity, alignment: .center)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            viewModel.setVolume(value.location.x / width)
+                        }
+                )
+                .macBlocksWindowDrag()
+            }
+            .frame(width: 72, height: 18)
         }
     }
 
-    @ViewBuilder
-    func macPlayerGlassCapsule() -> some View {
-        if #available(macOS 26.0, *) {
-            self.contentShape(Capsule())
-                .glassEffect(.clear, in: .capsule)
-        } else {
-            self.contentShape(Capsule())
-                .background {
-                    Capsule().fill(.ultraThinMaterial).opacity(0.22)
+    // MARK: - Metadata Helpers
+
+    private var currentEpisodeSubtitle: String? {
+        if let episodeId = viewModel.currentEpisodeID {
+            for group in viewModel.episodeGroups {
+                if let ep = group.episodes.first(where: { $0.id == episodeId }) {
+                    return "\(ep.episodeCode) · \(ep.displayTitle)"
                 }
-                .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.28), lineWidth: 1)
-                }
+            }
         }
+        if let season = item?.seasonNumber, let ep = item?.episodeNumber {
+            let code = String(format: "S%02d E%02d", season, ep)
+            if let epTitle = item?.episodeTitle, !epTitle.isEmpty {
+                return "\(code) · \(epTitle)"
+            }
+            return code
+        }
+        return nil
+    }
+
+    private var qualitySpecLabel: String? {
+        if let dr = item?.dynamicRange?.uppercased(), !dr.isEmpty {
+            if let h = item?.videoHeight, h >= 2000 {
+                return "4K \(dr)"
+            }
+            return dr
+        }
+        if let h = item?.videoHeight {
+            if h >= 2000 { return "4K" }
+            if h >= 1000 { return "1080p" }
+        }
+        return nil
     }
 }
 
@@ -318,8 +515,6 @@ private extension View {
     }
 }
 
-/// 播放器窗口开启了 `isMovableByWindowBackground`。窗口是否跟着拖动在按下鼠标时决定，
-/// 所以指针停在拖动控件上时先关掉它，否则拖进度条会同时拖动窗口。
 private struct MacWindowDragBlocker: ViewModifier {
     @State private var isHovering = false
 
@@ -330,7 +525,6 @@ private struct MacWindowDragBlocker: ViewModifier {
     }
 }
 
-/// 只通过 NSView 自己的弱引用 `window` 改窗口，避免 SwiftUI 状态反过来持有窗口。
 private struct MacWindowDragBlockerView: NSViewRepresentable {
     let blocksDrag: Bool
 
@@ -348,8 +542,6 @@ private struct MacWindowDragBlockerView: NSViewRepresentable {
         view.blocksDrag = false
     }
 
-    /// 进度条和音量条各有一个实例，界面刷新会反复写入 `blocksDrag`。只在值变化时改窗口，
-    /// 否则没被悬停的那个会把刚关掉的窗口拖动重新打开。
     final class BlockerView: NSView {
         var blocksDrag = false {
             didSet {
@@ -384,8 +576,8 @@ private struct MacPlayerLoadingArc: View {
             let turns = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1)
             Circle()
                 .trim(from: 0.08, to: 0.38)
-                .stroke(.white, style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
-                .frame(width: 36, height: 36)
+                .stroke(MacDesignTokens.Cinema.amber, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .frame(width: 22, height: 22)
                 .rotationEffect(.degrees(reduceMotion ? -90 : turns * 360 - 90))
         }
         .accessibilityLabel(L10n.tr("正在加载"))

@@ -137,27 +137,29 @@ private struct MacEmbyChildListRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: serverItem.mediaType.icon)
-                .font(.title3)
-                .foregroundStyle(MacDesignTokens.accentBlue)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(theme.accentAmber)
                 .frame(width: 36, height: 36)
-                .background(MacDesignTokens.accentBlue.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .background(theme.amberTintFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(theme.strokeAmber, lineWidth: 0.75)
+                }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(serverItem.title)
-                    .font(.body)
-                    .fontWeight(.medium)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
                     Text(serverItem.mediaType.displayName)
-                        .font(.caption)
+                        .font(.system(size: 11.5))
                         .foregroundStyle(theme.secondaryText)
 
                     if let year = serverItem.year {
                         Text(String(year))
-                            .font(.caption)
+                            .font(.system(size: 11.5))
                             .foregroundStyle(theme.tertiaryText)
                     }
                 }
@@ -171,6 +173,9 @@ private struct MacEmbyChildListRow: View {
                     .foregroundStyle(theme.tertiaryText)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .macCatGlassCard(theme: theme, cornerRadius: 14)
+        .padding(.vertical, 4)
     }
 }

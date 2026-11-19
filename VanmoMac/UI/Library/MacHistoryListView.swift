@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 import VanmoCore
 
-/// 全部观看记录页面：侧边栏 History 入口，按最近播放时间倒序展示全部历史。
+/// 全部继续观看 / 观看记录页面：侧边栏 Continue Watching 入口，按最近播放时间倒序展示全部历史。
 struct MacHistoryListView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appState: MacAppState
@@ -16,18 +16,20 @@ struct MacHistoryListView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: MacDesignTokens.Layout.trafficLightsTopInset + 5)
-            header
-            content
+        ZStack(alignment: .topTrailing) {
+            MacCatAmbientHalo()
+                .offset(x: -70, y: -30)
+
+            VStack(spacing: 0) {
+                header
+                content
+            }
         }
         .background(theme.appBackground)
-        // 首次挂载与每次播放结束（进度落库）后刷新。
         .task(id: appState.watchHistoryChangeNonce) {
             viewModel.setModelContext(modelContext)
             await viewModel.reload()
         }
-        // 兜底：详情页「标记已看」等未广播 nonce 的变更，切回本页时补一次刷新。
         .onChange(of: appState.contentRoute) { _, newRoute in
             guard newRoute == .libraryHistory else { return }
             Task { await viewModel.reload() }
@@ -56,21 +58,31 @@ struct MacHistoryListView: View {
             ProgressView(L10n.tr("正在加载历史记录…"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if viewModel.items.isEmpty {
-            Text(L10n.tr("还没有观看记录"))
-                .foregroundStyle(theme.secondaryText)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 12) {
+                Image("MacNavHistoryTail")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+                    .foregroundStyle(theme.accentAmber.opacity(0.7))
+                Text(L10n.tr("还没有观看记录"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(theme.primaryText)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView {
                 MacLibraryMediaLayout(viewMode: appState.viewMode) {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: MacDesignTokens.Layout.posterWidth), spacing: 16)],
-                        spacing: 16
+                        columns: [GridItem(.adaptive(minimum: MacDesignTokens.Layout.continueWatchingWidth), spacing: 20)],
+                        spacing: 20
                     ) {
                         ForEach(displayItems) { item in
-                            MacPosterCard(
+                            MacContinueWatchingCard(
                                 title: item.displayTitle,
                                 subtitle: subtitle(for: item),
-                                posterURL: item.posterURL
+                                posterURL: item.backdropURL ?? item.posterURL,
+                                progress: item.playbackProgress
                             ) {
                                 play(item)
                             }
@@ -85,7 +97,9 @@ struct MacHistoryListView: View {
                         Task { await viewModel.loadNextPageIfNeeded(currentItem: item) }
                     }
                 }
-                .padding(MacDesignTokens.Layout.contentPadding)
+                .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
+                .padding(.top, 14)
+                .padding(.bottom, 32)
 
                 if viewModel.isLoadingMore {
                     ProgressView().padding()
@@ -96,27 +110,26 @@ struct MacHistoryListView: View {
 
     private var header: some View {
         HStack {
-            Text(L10n.tr("历史记录"))
+            Text(L10n.tr("继续观看"))
                 .font(MacDesignTokens.Typography.headerTitle)
+                .foregroundStyle(theme.primaryText)
 
             Spacer()
 
-            // 历史记录固定按最近播放倒序，不提供排序菜单。
             MacLibraryViewControls(showsSortMenu: false)
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .frame(height: MacDesignTokens.Layout.headerHeight)
-        .background(theme.headerBackground)
+        .padding(.top, 18)
+        .padding(.bottom, 10)
     }
 
-    /// 历史记录条目语义为「继续观看」：点击直接从上次位置继续播放。
     private func play(_ item: MediaItem) {
         appState.play(item, from: item.lastPlaybackPosition)
     }
 
     private func subtitle(for item: MediaItem) -> String {
         if item.lastPlaybackPosition > 0, item.duration > 0 {
-            return MacFormatters.remainingDuration(position: item.lastPlaybackPosition, total: item.duration)
+            return "\(MacFormatters.formatDuration(item.lastPlaybackPosition)) · \(MacFormatters.formatDuration(item.duration))"
         }
         if let year = item.year {
             return String(year)
@@ -154,14 +167,12 @@ final class MacHistoryListViewModel: ObservableObject {
             }
             replaceItems(newItems, dbScanned: result.dbScanned, reachedEnd: result.reachedEnd)
         } catch is CancellationError {
-            // task(id:) 因 nonce 变化取消上一次加载时保留旧数据，避免列表闪烁/被清空。
             return
         } catch {
             items = []
         }
     }
 
-    /// 删除连接前同步剔除历史记录中的 MediaItem。
     func removeItems(forConnectionId connectionId: UUID) {
         let remaining = items.filter { item in
             guard !item.isDeleted else { return false }
@@ -268,5 +279,5 @@ private struct MacHistoryBatchResult: Sendable {
     MacHistoryListView()
         .environmentObject(MacAppState())
         .environmentObject(MacLibraryViewModel())
-        .macTheme(.light)
+        .macTheme(.dark)
 }

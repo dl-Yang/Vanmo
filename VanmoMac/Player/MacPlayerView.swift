@@ -12,6 +12,7 @@ struct MacPlayerView: View {
     @State private var debugHoldLoading = false
     @State private var playbackStalled = false
     @State private var lastPlaybackAdvance = Date()
+    @State private var activeDrawerTab: MacPlayerDrawerTab?
 
     private var showsLoadingChrome: Bool {
         if debugHoldLoading { return true }
@@ -141,15 +142,6 @@ struct MacPlayerView: View {
                 appState.unregisterActivePlayer()
                 reloadLibrary()
             }
-            .sheet(isPresented: $viewModel.showAudioSelector) {
-                MacAudioTrackSelectorView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $viewModel.showSubtitleSelector) {
-                MacSubtitleSelectorView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $viewModel.showEpisodeSelector) {
-                MacEpisodeSelectorView(viewModel: viewModel)
-            }
             .alert(L10n.tr("提示"), isPresented: alertBinding) {
                 Button(L10n.tr("确定"), role: .cancel) {
                     viewModel.alertMessage = nil
@@ -168,9 +160,11 @@ struct MacPlayerView: View {
                     videoView: viewModel.ksVideoView,
                     scaleMode: viewModel.config.scaleMode
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .ignoresSafeArea()
             } else {
                 MacAVPlayerView(player: viewModel.player, videoGravity: viewModel.videoGravity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .ignoresSafeArea()
             }
 
@@ -182,9 +176,10 @@ struct MacPlayerView: View {
 
             LinearGradient(
                 stops: [
-                    .init(color: .black.opacity(0.3), location: 0),
-                    .init(color: .black.opacity(0), location: 0.45),
-                    .init(color: .black.opacity(0.6), location: 1)
+                    .init(color: MacDesignTokens.catSilhouette.opacity(0.60), location: 0),
+                    .init(color: MacDesignTokens.catSilhouette.opacity(0), location: 0.25),
+                    .init(color: MacDesignTokens.catSilhouette.opacity(0), location: 0.72),
+                    .init(color: MacDesignTokens.catSilhouette.opacity(0.80), location: 1)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -194,9 +189,10 @@ struct MacPlayerView: View {
 
             MacPlayerControlsOverlay(
                 viewModel: viewModel,
+                item: appState.playerItem,
                 title: appState.playerItem?.displayTitle ?? appState.playerItem?.title ?? L10n.tr("播放器"),
                 showsLoadingChrome: showsLoadingChrome,
-                onClose: closePlayer
+                activeDrawerTab: $activeDrawerTab
             )
         }
         .overlay {
@@ -306,9 +302,9 @@ private struct EdgeCometStroke: View {
                 comet.addPath(path.trimmedPath(from: 0, to: phase + cometLength - 1))
             }
             for glow in Self.glowLayers {
-                strokeComet(context: &context, comet: comet, lineWidth: glow.lineWidth, color: Color.white.opacity(glow.opacity), blur: glow.blur)
+                strokeComet(context: &context, comet: comet, lineWidth: glow.lineWidth, color: MacDesignTokens.glowAmber.opacity(glow.opacity), blur: glow.blur)
             }
-            strokeComet(context: &context, comet: comet, lineWidth: coreWidth, color: .white, blur: 0)
+            strokeComet(context: &context, comet: comet, lineWidth: coreWidth, color: MacDesignTokens.Cinema.textIvory, blur: 0)
         }
         .allowsHitTesting(false)
     }

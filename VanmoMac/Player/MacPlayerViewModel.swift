@@ -25,9 +25,6 @@ final class MacPlayerViewModel: ObservableObject {
     @Published var subtitleStyle = MacSubtitleStylePreferences.load() {
         didSet { MacSubtitleStylePreferences.save(subtitleStyle) }
     }
-    @Published var showAudioSelector = false
-    @Published var showSubtitleSelector = false
-    @Published var showEpisodeSelector = false
     @Published private(set) var onlineSubtitleResults: [OnlineSubtitleResult] = []
     @Published private(set) var isSearchingOnlineSubtitles = false
     @Published private(set) var isDownloadingOnlineSubtitle = false
@@ -296,6 +293,12 @@ final class MacPlayerViewModel: ObservableObject {
         notePrefetchPlayheadIfNeeded(time: duration * min(max(progress, 0), 1), force: true)
     }
 
+    func clearScrubPreview() {
+        scrubPreviewTask?.cancel()
+        scrubPreviewTime = nil
+        scrubPreviewImage = nil
+    }
+
     func skip(by seconds: TimeInterval) {
         seek(toSeconds: currentTime + seconds)
     }
@@ -415,7 +418,6 @@ final class MacPlayerViewModel: ObservableObject {
     func playEpisode(_ episode: MacPlayerEpisode) async {
         guard !didCleanup else { return }
         guard episode.id != currentEpisodeID else {
-            showEpisodeSelector = false
             return
         }
 
@@ -437,7 +439,6 @@ final class MacPlayerViewModel: ObservableObject {
         }
         currentEpisodeID = episode.id
         didReportWatchedToServer = false
-        showEpisodeSelector = false
 
         do {
             try await loadAndPlayCurrentItem()

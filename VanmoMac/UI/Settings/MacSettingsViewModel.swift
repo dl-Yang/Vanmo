@@ -62,6 +62,24 @@ final class MacSettingsViewModel: ObservableObject {
         set { subtitleBackgroundColorHex = newValue.rgbaHex }
     }
 
+    var subtitleBackgroundOpacity: Double {
+        get {
+            let comps = NSColor(subtitleBackgroundColor).usingColorSpace(.sRGB)?.cgColor.components
+            return Double(comps?.count == 4 ? comps?[3] ?? 0.6 : 0.6)
+        }
+        set {
+            let clamped = min(max(newValue, 0), 1)
+            let base = NSColor(subtitleBackgroundColor).usingColorSpace(.sRGB) ?? NSColor.black
+            let updated = NSColor(
+                srgbRed: base.redComponent,
+                green: base.greenComponent,
+                blue: base.blueComponent,
+                alpha: clamped
+            )
+            subtitleBackgroundColor = Color(nsColor: updated)
+        }
+    }
+
     var subtitlePosition: MacSubtitlePosition {
         get { MacSubtitlePosition(rawValue: subtitlePositionRaw) ?? .bottom }
         set { subtitlePositionRaw = newValue.rawValue }

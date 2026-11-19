@@ -13,8 +13,14 @@ struct MacLibrarySublistHeader: View {
                 appState.backFromLibrarySubRoute()
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.primaryText)
+                    .frame(width: 34, height: 34)
+                    .background(theme.surfaceGlass, in: Circle())
+                    .overlay {
+                        Circle()
+                            .strokeBorder(theme.strokeGlass, lineWidth: 0.9)
+                    }
             }
             .buttonStyle(.plain)
 
@@ -23,7 +29,7 @@ struct MacLibrarySublistHeader: View {
                     .font(MacDesignTokens.Typography.headerTitle)
                     .foregroundStyle(theme.primaryText)
                 Text(subtitle)
-                    .font(.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(theme.secondaryText)
             }
 
@@ -32,10 +38,7 @@ struct MacLibrarySublistHeader: View {
             MacLibraryViewControls()
         }
         .padding(.horizontal, MacDesignTokens.Layout.contentPadding)
-        .frame(height: MacDesignTokens.Layout.headerHeight)
-        .background(theme.headerBackground)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(theme.headerBorder).frame(height: 1)
-        }
+        .padding(.top, 18)
+        .padding(.bottom, 10)
     }
 }

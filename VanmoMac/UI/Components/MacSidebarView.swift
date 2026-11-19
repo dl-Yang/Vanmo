@@ -1,25 +1,30 @@
+import AppKit
 import SwiftData
 import SwiftUI
-import AppKit
 import VanmoCore
 
 struct MacSearchField: View {
+    @EnvironmentObject private var appState: MacAppState
     @Environment(\.macTheme) private var theme
+    @FocusState private var isFocused: Bool
 
     @Binding var text: String
     var onFocus: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(theme.searchPlaceholder)
-                .padding(.leading, 10)
+            Image("MacSearchCat")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(isFocused ? theme.accentAmber : theme.secondaryText)
 
             TextField(L10n.tr("搜索"), text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14))
+                .font(.system(size: 12.5))
                 .foregroundStyle(theme.primaryText)
+                .focused($isFocused)
                 .onSubmit(onFocus)
                 .onChange(of: text) { _, newValue in
                     if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -33,19 +38,28 @@ struct MacSearchField: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(theme.searchPlaceholder)
+                        .foregroundStyle(theme.tertiaryText)
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, 8)
+            } else {
+                Text("⌘F")
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundStyle(theme.tertiaryText)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(theme.surfacePill, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
         }
-        .frame(height: 28)
-        .background(theme.searchBackground)
+        .padding(.horizontal, 10)
+        .frame(height: 34)
+        .background(theme.searchBackground, in: RoundedRectangle(cornerRadius: MacDesignTokens.Radius.searchField, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.searchField)
-                .stroke(theme.searchBorder, lineWidth: theme.searchBorder == .clear ? 0 : 1)
+            RoundedRectangle(cornerRadius: MacDesignTokens.Radius.searchField, style: .continuous)
+                .strokeBorder(isFocused ? theme.strokeAmber : theme.searchBorder, lineWidth: 0.9)
         }
-        .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Radius.searchField))
+        .onChange(of: appState.searchFocusNonce) { _, _ in
+            isFocused = true
+        }
     }
 }
 
@@ -53,28 +67,56 @@ struct MacSidebarRow: View {
     @Environment(\.macTheme) private var theme
 
     let title: String
-    let systemImage: String
+    let iconAssetName: String
     let isSelected: Bool
     let action: () -> Void
 
+    @State private var isHovered = false
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 16, height: 16)
+            HStack(spacing: 10) {
+                Image(iconAssetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(isSelected ? theme.accentAmber : theme.secondaryText)
+
                 Text(title)
-                    .font(MacDesignTokens.Typography.sidebarItem)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? theme.primaryText : theme.sidebarItemText)
+                    .lineLimit(1)
+
                 Spacer(minLength: 0)
+
+                if isSelected {
+                    MacPawDotIndicator(size: 10)
+                }
             }
-            .foregroundStyle(isSelected ? theme.sidebarSelectedText : theme.sidebarItemText)
             .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
             .frame(height: MacDesignTokens.Layout.sidebarRowHeight)
-            .background(isSelected ? theme.sidebarSelectedBackground : Color.clear)
+            .background(
+                rowBackground,
+                in: RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius, style: .continuous)
+            )
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius, style: .continuous)
+                        .strokeBorder(theme.strokeAmber, lineWidth: 0.85)
+                }
+            }
             .contentShape(Rectangle())
-            .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius))
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return theme.amberTintFill }
+        if isHovered { return theme.surfaceRowSubtle }
+        return .clear
     }
 }
 
@@ -86,46 +128,78 @@ struct MacConnectionSidebarRow: View {
     let isSelected: Bool
     let action: () -> Void
 
+    @State private var isHovered = false
+
     private var status: MacConnectionStatus {
         connectionsViewModel.connectionStatus(for: connection)
     }
 
+    private var isConnectedOrSelected: Bool {
+        status == .connected || isSelected
+    }
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                if let imageName = connection.type.macSidebarImageName {
-                    Image(imageName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                } else {
-                    Image(systemName: connection.type.macSidebarIcon)
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(width: 16, height: 16)
-                }
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 9) {
+                protocolBadge
+
+                VStack(alignment: .leading, spacing: 1) {
                     Text(connection.name)
-                        .font(MacDesignTokens.Typography.sidebarItem)
+                        .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                        .foregroundStyle(isConnectedOrSelected ? theme.primaryText : theme.secondaryText)
                         .lineLimit(1)
+
                     if status == .failed {
                         Text(L10n.tr("连接失败"))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.orange)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(theme.dangerRed)
                             .lineLimit(1)
                     }
                 }
+
                 Spacer(minLength: 0)
+
                 statusIndicator
             }
-            .foregroundStyle(isSelected ? theme.sidebarSelectedText : theme.sidebarItemText)
             .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
             .frame(minHeight: MacDesignTokens.Layout.sidebarRowHeight)
-            .background(isSelected ? theme.sidebarSelectedBackground : Color.clear)
+            .background(
+                rowBackground,
+                in: RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius, style: .continuous)
+            )
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius, style: .continuous)
+                        .strokeBorder(theme.strokeAmber, lineWidth: 0.85)
+                }
+            }
             .contentShape(Rectangle())
-            .clipShape(RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius))
         }
         .buttonStyle(.plain)
-        .opacity(status == .failed ? 0.72 : 1)
+        .opacity(status == .failed ? 0.82 : 1)
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return theme.amberTintFill }
+        if isHovered { return theme.surfaceRowSubtle }
+        return .clear
+    }
+
+    private var protocolBadge: some View {
+        Text(connection.type.macShortBadge)
+            .font(.system(size: 7.5, weight: .bold))
+            .foregroundStyle(isConnectedOrSelected ? theme.accentAmber : theme.secondaryText)
+            .frame(width: 22, height: 22)
+            .background(
+                isConnectedOrSelected ? theme.amberTintFill : theme.surfacePill,
+                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(isConnectedOrSelected ? theme.strokeAmber : theme.strokeGlass, lineWidth: 0.75)
+            }
     }
 
     @ViewBuilder
@@ -133,21 +207,25 @@ struct MacConnectionSidebarRow: View {
         switch status {
         case .connecting:
             ProgressView()
-                .controlSize(.small)
+                .controlSize(.mini)
         case .connected:
             Image("MacCatEyeStatus")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 13, height: 7)
+                .shadow(color: MacDesignTokens.glowAmber.opacity(0.75), radius: 2)
                 .accessibilityLabel(L10n.tr("已连接"))
                 .help(L10n.tr("已连接"))
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.orange)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(theme.dangerRed)
                 .help(failureHelpText)
         case .idle:
-            EmptyView()
+            Circle()
+                .fill(theme.tertiaryText.opacity(0.65))
+                .frame(width: 5, height: 5)
+                .help(L10n.tr("未连接"))
         }
     }
 
@@ -172,6 +250,7 @@ struct MacSidebarView: View {
     @State private var dragStartWidth: CGFloat?
     @State private var liveSidebarWidth: CGFloat?
     @State private var isResizeHandleHovered = false
+    @State private var isSettingsHovered = false
 
     private var displayedSidebarWidth: CGFloat {
         liveSidebarWidth ?? appState.sidebarWidth
@@ -192,7 +271,7 @@ struct MacSidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 展开/折叠控制行已移出为顶部悬浮层，这里保留等高占位避免内容位置变化。
+            // 顶部留空给交通灯与悬浮 Downloads / Collapse 按钮
             Color.clear
                 .frame(height: MacDesignTokens.Layout.sidebarControlRowHeight)
 
@@ -200,15 +279,22 @@ struct MacSidebarView: View {
                 appState.selectSearch()
                 searchViewModel.search()
             }
+            .padding(.horizontal, MacDesignTokens.Layout.sidebarHorizontalPadding)
+            .padding(.top, 10)
 
-            Spacer(minLength: 12)
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.tr("媒体库").uppercased())
+                        .font(MacDesignTokens.Typography.sidebarSection)
+                        .foregroundStyle(theme.sectionHeader)
+                        .tracking(0.6)
+                        .padding(.top, 16)
+                        .padding(.bottom, 4)
+
                     ForEach(MacSidebarSection.allCases) { section in
                         MacSidebarRow(
                             title: section.title,
-                            systemImage: section.systemImage,
+                            iconAssetName: section.catIconName,
                             isSelected: isLibrarySectionSelected(section)
                         ) {
                             appState.selectLibrarySection(section)
@@ -235,19 +321,33 @@ struct MacSidebarView: View {
                                 Label(L10n.tr("打开 URL 链接…"), systemImage: "link")
                             }
                         } label: {
-                            Image(systemName: "plus")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(theme.sectionHeader)
-                                .frame(width: 20, height: 20)
+                            HStack(spacing: 3) {
+                                Image("MacPlusCat")
+                                    .renderingMode(.template)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 14, height: 14)
+                                    .foregroundStyle(theme.accentAmber)
+                                Text("▾")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(theme.secondaryText)
+                            }
                         }
                         .menuStyle(.borderlessButton)
                         .menuIndicator(.hidden)
+                        .padding(.leading, 6)
+                        .padding(.trailing, 7)
+                        .frame(height: 22)
+                        .background(theme.surfacePill, in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(theme.strokeGlass, lineWidth: 0.75)
+                        }
                         .fixedSize()
                         .help(L10n.tr("添加"))
                     }
-                    .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding + 4)
-                    .padding(.top, 24)
-                    .padding(.bottom, 8)
+                    .padding(.top, 16)
+                    .padding(.bottom, 6)
 
                     ForEach(visibleConnections) { connection in
                         MacConnectionSidebarRow(
@@ -297,13 +397,7 @@ struct MacSidebarView: View {
                     }
 
                     if showsDirectLinksRow {
-                        MacSidebarRow(
-                            title: L10n.tr("URL 链接"),
-                            systemImage: "link",
-                            isSelected: appState.contentRoute == .directLinks && appState.selectedMediaItem == nil
-                        ) {
-                            appState.openDirectLinks()
-                        }
+                        directLinksSidebarRow
                     }
                 }
                 .padding(.horizontal, MacDesignTokens.Layout.sidebarHorizontalPadding)
@@ -319,18 +413,60 @@ struct MacSidebarView: View {
         }
     }
 
+    private var directLinksSidebarRow: some View {
+        let isSelected = appState.contentRoute == .directLinks && appState.selectedMediaItem == nil
+        return Button {
+            appState.openDirectLinks()
+        } label: {
+            HStack(spacing: 9) {
+                Text("URL")
+                    .font(.system(size: 7.5, weight: .bold))
+                    .foregroundStyle(theme.accentAmber)
+                    .frame(width: 22, height: 22)
+                    .background(theme.amberTintFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(theme.strokeAmber, lineWidth: 0.75)
+                    }
+
+                Text(L10n.tr("URL 链接"))
+                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(theme.primaryText)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                Image("MacCatEyeStatus")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 13, height: 7)
+                    .shadow(color: MacDesignTokens.glowAmber.opacity(0.75), radius: 2)
+            }
+            .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
+            .frame(height: MacDesignTokens.Layout.sidebarRowHeight)
+            .background(
+                isSelected ? theme.amberTintFill : Color.clear,
+                in: RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius, style: .continuous)
+            )
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius, style: .continuous)
+                        .strokeBorder(theme.strokeAmber, lineWidth: 0.85)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var sidebarResizeHandle: some View {
-        // Hit target is local; width changes must not feed back into DragGesture
-        // translation, or the sidebar will oscillate while dragging.
         Color.clear
             .frame(width: 8)
             .contentShape(Rectangle())
             .overlay(alignment: .trailing) {
                 Rectangle()
-                    .fill(isResizeHandleHovered || liveSidebarWidth != nil
-                          ? theme.primaryText.opacity(0.28)
-                          : theme.primaryText.opacity(0.08))
-                    .frame(width: 1)
+                    .fill(isResizeHandleHovered || liveSidebarWidth != nil ? theme.strokeAmber : Color.clear)
+                    .frame(width: 1.5)
             }
             .onHover { hovering in
                 isResizeHandleHovered = hovering
@@ -347,7 +483,6 @@ struct MacSidebarView: View {
                             dragStartWidth = appState.sidebarWidth
                         }
                         guard let dragStartWidth else { return }
-                        // Global delta stays stable even as the handle moves with width.
                         let delta = value.location.x - value.startLocation.x
                         let nextWidth = MacAppState.clampedSidebarWidth(dragStartWidth + delta)
                         guard liveSidebarWidth != nextWidth else {
@@ -379,20 +514,45 @@ struct MacSidebarView: View {
     }
 
     private var settingsFooter: some View {
-        MacSidebarRow(
-            title: L10n.tr("设置"),
-            systemImage: "gearshape",
-            isSelected: false
-        ) {
-            openSettings()
+        VStack(spacing: 10) {
+            Rectangle()
+                .fill(theme.strokeSubtle)
+                .frame(height: 0.75)
+
+            Button {
+                openSettings()
+            } label: {
+                HStack(spacing: 10) {
+                    Image("MacSettingsYarn")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+                        .foregroundStyle(isSettingsHovered ? theme.accentAmber : theme.secondaryText)
+
+                    Text(L10n.tr("设置"))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(isSettingsHovered ? theme.primaryText : theme.sidebarItemText)
+
+                    Spacer(minLength: 0)
+
+                    Text("⌘,")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(theme.tertiaryText)
+                }
+                .padding(.horizontal, MacDesignTokens.Layout.sidebarItemPadding)
+                .frame(height: 36)
+                .background(
+                    isSettingsHovered ? theme.surfaceRowSubtle : Color.clear,
+                    in: RoundedRectangle(cornerRadius: MacDesignTokens.Layout.sidebarRowRadius, style: .continuous)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { isSettingsHovered = $0 }
         }
         .padding(.horizontal, MacDesignTokens.Layout.sidebarHorizontalPadding)
-        .padding(.vertical, 12)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(theme.sidebarBorder)
-                .frame(height: 1)
-        }
+        .padding(.bottom, 14)
     }
 
     private func sidebarSyncLabel(for connection: SavedConnection) -> String {
@@ -446,6 +606,7 @@ struct MacSidebarView: View {
             searchViewModel: searchViewModel
         )
     }
+
     private func isLibrarySectionSelected(_ section: MacSidebarSection) -> Bool {
         guard appState.selectedMediaItem == nil else { return false }
         switch appState.contentRoute {
@@ -461,43 +622,32 @@ struct MacSidebarView: View {
     }
 }
 
-private extension ConnectionType {
-    var macSidebarImageName: String? {
+extension ConnectionType {
+    var macShortBadge: String {
         switch self {
-        case .localFolder: return "MacConnLocalFolder"
-        case .smb: return "MacConnSMB"
-        case .ftp: return "MacConnFTP"
-        case .sftp: return "MacConnSFTP"
-        case .webdav: return "MacConnWebDAV"
-        case .alist: return "MacConnAList"
-        case .removedOfficialCloudDrive: return "MacConnAliyunDrive"
-        case .baiduNetdisk: return "MacConnBaiduNetdisk"
-        case .drive115: return "MacConnDrive115"
-        case .quarkDrive: return "MacConnQuarkDrive"
-        case .googleDrive: return "MacConnGoogleDrive"
-        case .oneDrive: return "MacConnOneDrive"
-        case .box: return "MacConnBox"
-        case .pCloudDrive: return "MacConnPCloud"
-        case .yandexDisk: return "MacConnYandexDisk"
-        case .mega: return "MacConnMEGA"
-        case .iptv: return "MacConnIPTV"
-        case .fnos: return "MacConnFnOS"
-        case .nfs: return "MacConnNFS"
-        case .dlna: return "MacConnDLNA"
-        case .plex: return "MacConnPlex"
-        case .emby: return "MacConnEmby"
-        case .jellyfin: return "MacConnJellyfin"
-        }
-    }
-
-    var macSidebarIcon: String {
-        switch self {
-        case .localFolder:
-            return "folder"
-        case .googleDrive, .oneDrive, .box, .pCloudDrive, .yandexDisk, .mega, .baiduNetdisk, .drive115, .quarkDrive:
-            return "icloud"
-        default:
-            return "externaldrive"
+        case .emby: return "EMB"
+        case .jellyfin: return "JLY"
+        case .plex: return "PLX"
+        case .smb: return "SMB"
+        case .ftp: return "FTP"
+        case .sftp: return "SFT"
+        case .webdav: return "DAV"
+        case .alist: return "ALS"
+        case .fnos: return "FNO"
+        case .nfs: return "NFS"
+        case .dlna: return "DLN"
+        case .iptv: return "IPT"
+        case .googleDrive: return "GDR"
+        case .oneDrive: return "OND"
+        case .box: return "BOX"
+        case .baiduNetdisk: return "BDN"
+        case .pCloudDrive: return "PCL"
+        case .yandexDisk: return "YND"
+        case .drive115: return "115"
+        case .quarkDrive: return "QRK"
+        case .mega: return "MGA"
+        case .localFolder: return "LCL"
+        case .removedOfficialCloudDrive: return "ALI"
         }
     }
 }

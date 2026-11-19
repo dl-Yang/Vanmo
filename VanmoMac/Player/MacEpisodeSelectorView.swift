@@ -1,112 +1,115 @@
 import SwiftUI
 import VanmoCore
 
-struct MacEpisodeSelectorView: View {
+struct MacEpisodeSelectorDrawerContent: View {
     @ObservedObject var viewModel: MacPlayerViewModel
-    @Environment(\.dismiss) private var dismiss
+    let onDidSelectEpisode: () -> Void
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                if viewModel.episodeGroups.count > 1 {
-                    seasonPicker
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            if viewModel.episodeGroups.count > 1 {
+                seasonPicker
+            }
 
-                List {
-                    ForEach(viewModel.selectedSeasonEpisodes) { episode in
-                        Button {
-                            Task {
-                                await viewModel.playEpisode(episode)
-                                dismiss()
-                            }
-                        } label: {
+            if viewModel.selectedSeasonEpisodes.isEmpty {
+                Text(L10n.tr("暂无剧集"))
+                    .font(.system(size: 12))
+                    .foregroundStyle(MacDesignTokens.Cinema.textDim)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 6) {
+                        ForEach(viewModel.selectedSeasonEpisodes) { episode in
                             episodeRow(episode)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
-                .listStyle(.inset)
-            }
-            .padding(.top, 12)
-            .navigationTitle(L10n.tr("选集"))
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.tr("完成")) { dismiss() }
-                }
+                .frame(maxHeight: 280)
             }
         }
-        .frame(minWidth: 480, minHeight: 420)
     }
 
     private var seasonPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(viewModel.episodeGroups) { group in
+                    let selected = isSelectedSeason(group.seasonNumber)
                     Button {
                         viewModel.selectedEpisodeSeason = group.seasonNumber
                     } label: {
                         Text(LocalizedFormat.seasonLabel(group.seasonNumber))
-                            .font(.subheadline)
-                            .fontWeight(isSelectedSeason(group.seasonNumber) ? .semibold : .regular)
-                            .foregroundStyle(isSelectedSeason(group.seasonNumber) ? MacDesignTokens.accentBlue : .secondary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
+                            .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                            .foregroundStyle(selected ? MacDesignTokens.Cinema.amber : MacDesignTokens.Cinema.textMuted)
+                            .padding(.horizontal, 10)
+                            .frame(height: 24)
                             .background(
-                                isSelectedSeason(group.seasonNumber)
-                                    ? MacDesignTokens.accentBlue.opacity(0.16)
-                                    : Color.primary.opacity(0.06),
+                                selected ? MacDesignTokens.Cinema.amberTint : MacDesignTokens.Cinema.surfacePill,
                                 in: Capsule()
                             )
+                            .overlay {
+                                if selected {
+                                    Capsule()
+                                        .strokeBorder(MacDesignTokens.Cinema.strokeAmber, lineWidth: 0.75)
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal)
         }
     }
 
     private func episodeRow(_ episode: MacPlayerEpisode) -> some View {
-        HStack(spacing: 12) {
-            VStack(spacing: 2) {
-                Text(LocalizedFormat.compactEpisodeCode(episode.episodeNumber))
-                    .font(.caption)
-                    .fontWeight(.bold)
-                Text(LocalizedFormat.compactSeasonCode(episode.seasonNumber))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        let isCurrent = isCurrentEpisode(episode)
+        return Button {
+            Task {
+                await viewModel.playEpisode(episode)
+                onDidSelectEpisode()
             }
-            .foregroundStyle(isCurrentEpisode(episode) ? MacDesignTokens.accentBlue : .primary)
-            .frame(width: 48, height: 48)
-            .background(
-                (isCurrentEpisode(episode) ? MacDesignTokens.accentBlue.opacity(0.14) : Color.primary.opacity(0.06)),
-                in: RoundedRectangle(cornerRadius: 12)
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(episode.displayTitle)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    Text(episode.episodeCode)
-                    if episode.duration > 0 {
-                        Text(MacFormatters.formatDuration(episode.duration))
-                    }
+        } label: {
+            HStack(spacing: 10) {
+                if isCurrent {
+                    MacPawDotIndicator(size: 10, useCinemaGlow: true)
+                } else {
+                    Color.clear.frame(width: 10, height: 10)
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
 
-            Spacer()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(episode.displayTitle)
+                        .font(.system(size: 12.5, weight: isCurrent ? .semibold : .medium))
+                        .foregroundStyle(isCurrent ? MacDesignTokens.Cinema.textIvory : MacDesignTokens.Cinema.textMuted)
+                        .lineLimit(1)
 
-            if isCurrentEpisode(episode) {
-                Image(systemName: "play.fill")
-                    .font(.caption)
-                    .foregroundStyle(MacDesignTokens.accentBlue)
+                    HStack(spacing: 6) {
+                        Text(episode.episodeCode)
+                        if episode.duration > 0 {
+                            Text("·")
+                            Text(MacFormatters.formatDuration(episode.duration))
+                        }
+                    }
+                    .font(.system(size: 10))
+                    .foregroundStyle(isCurrent ? MacDesignTokens.Cinema.amber : MacDesignTokens.Cinema.textDim)
+                }
+
+                Spacer(minLength: 0)
             }
+            .padding(.leading, 10)
+            .padding(.trailing, 12)
+            .padding(.vertical, 9)
+            .background(
+                isCurrent ? MacDesignTokens.Cinema.amberTint : MacDesignTokens.Cinema.surfaceRow,
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay {
+                if isCurrent {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(MacDesignTokens.Cinema.strokeAmber, lineWidth: 0.85)
+                }
+            }
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
     }
 
     private func isSelectedSeason(_ season: Int) -> Bool {
@@ -115,5 +118,19 @@ struct MacEpisodeSelectorView: View {
 
     private func isCurrentEpisode(_ episode: MacPlayerEpisode) -> Bool {
         viewModel.currentEpisodeID == episode.id
+    }
+}
+
+struct MacEpisodeSelectorView: View {
+    @ObservedObject var viewModel: MacPlayerViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        MacEpisodeSelectorDrawerContent(viewModel: viewModel) {
+            dismiss()
+        }
+        .padding(16)
+        .background(MacDesignTokens.Cinema.drawerGlass)
+        .frame(width: 300)
     }
 }

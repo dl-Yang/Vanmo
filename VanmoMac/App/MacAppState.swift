@@ -5,24 +5,32 @@ import VanmoCore
 
 enum MacSidebarSection: String, CaseIterable, Identifiable {
     case home
-    case favorites
     case history
+    case favorites
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .home: L10n.tr("首页")
+        case .history: L10n.tr("继续观看")
         case .favorites: L10n.tr("收藏")
-        case .history: L10n.tr("历史记录")
+        }
+    }
+
+    var catIconName: String {
+        switch self {
+        case .home: "MacNavHomeActive"
+        case .history: "MacNavHistoryTail"
+        case .favorites: "MacNavFavoritesPaw"
         }
     }
 
     var systemImage: String {
         switch self {
         case .home: "house"
-        case .favorites: "heart"
         case .history: "clock"
+        case .favorites: "heart"
         }
     }
 }
@@ -74,6 +82,14 @@ enum MacAppearanceMode: String, CaseIterable, Identifiable {
         case .system: systemColorScheme == .dark
         case .light: false
         case .dark: true
+        }
+    }
+
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 }
@@ -144,6 +160,7 @@ final class MacAppState: ObservableObject {
     @Published var isAddConnectionPresented = false
     @Published var editingConnection: SavedConnection?
     @Published var isSidebarExpanded: Bool = true
+    @Published var searchFocusNonce = UUID()
 
     var sidebarWidth: CGFloat {
         get { Self.clampedSidebarWidth(CGFloat(storedSidebarWidth)) }
@@ -361,6 +378,14 @@ final class MacAppState: ObservableObject {
     func selectSearch() {
         contentRoute = .search
         closeDetail()
+    }
+
+    func focusSearch() {
+        if !isSidebarExpanded {
+            isSidebarExpanded = true
+        }
+        selectSearch()
+        searchFocusNonce = UUID()
     }
 
     func enterConnectionBrowser(_ connection: SavedConnection) {

@@ -3,6 +3,8 @@ import SwiftUI
 import VanmoCore
 
 struct MacRemoteImage: View {
+    @Environment(\.macTheme) private var theme
+
     let url: URL?
     var contentMode: SwiftUI.ContentMode = .fill
 
@@ -25,7 +27,7 @@ struct MacRemoteImage: View {
                         LoadingIndicatorView(size: 24)
                     }
                 }
-                .fade(duration: 0.25)
+                .fade(duration: url.isFileURL ? 0 : 0.2)
                 .resizable()
                 .aspectRatio(contentMode: contentMode)
         } else {
@@ -34,11 +36,12 @@ struct MacRemoteImage: View {
     }
 
     private var placeholder: some View {
-        ZStack{
+        ZStack {
             Rectangle()
-                .fill(Color.white)
+                .fill(theme.isDark ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255) : Color(red: 0xEB / 255, green: 0xE5 / 255, blue: 0xDA / 255))
             Image(systemName: "film")
-                .font(.largeTitle)
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(theme.tertiaryText)
                 .contentShape(Rectangle())
         }
     }

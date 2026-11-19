@@ -1,6 +1,6 @@
 # Vanmo Architecture
 
-> This document describes the repository as of September 16, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
+> This document describes the repository as of November 19, 2026. It is based on the current working tree, `project.yml`, `Packages/VanmoCore/Package.swift`, application entry points, runtime data flows, and the existing test suite.
 > If this document conflicts with the code, treat `project.yml`, `Packages/VanmoCore/Package.swift`, and the current implementation as the sources of truth.
 
 ## 1. System Overview
@@ -10,6 +10,7 @@ Vanmo is a cross-platform video player with three products:
 - `Vanmo`: the iOS 17+ application.
 - `Vanmo-macOS`: the native macOS 14+ application.
 - `VanmoCore`: a local Swift Package shared by both applications. It owns domain models, persistence, remote connections, scanning, downloads, subtitles, metadata, and playback infrastructure.
+- Shared UI reused directly across targets is strictly listed in `project.yml` (`Vanmo/Shared/Components/MediaTitleLogoView.swift` with optional `titleColor`, and `LoadingIndicatorView.swift`).
 
 The project primarily uses Swift 5.9, SwiftUI, SwiftData, Swift Concurrency, Combine, AVFoundation, and KSPlayer. It is not a strict Clean Architecture implementation. A more accurate description is:
 
@@ -265,7 +266,7 @@ This window lifecycle is one of the largest platform differences between iOS and
 Key models:
 
 - `MediaItem`: media identity, metadata, playback state, source, remote version, probe results, audio tracks, subtitle preferences, optional server `contentRating`, and probed or server-supplied video dimensions.
-- `RemoteFile` and `ServerMediaItem`: Sendable transport models for file services and media servers. `ServerMediaItem` can carry optional `contentRating`, `videoWidth`, `videoHeight`, and `dynamicRange` from Emby, Jellyfin, or Plex. Emby/Jellyfin listings also fill `RemoteFile.posterURL` / `backdropURL` (item image, else series poster / parent backdrop) and server `playbackPosition` / `runtime` / `isPlayed`; these URLs carry `api_key`, stay in memory, and are never logged.
+- `RemoteFile` and `ServerMediaItem`: Sendable transport models for file services and media servers. `ServerMediaItem` can carry optional `contentRating`, `videoWidth`, `videoHeight`, `videoCodec`, `videoBitDepth`, `bitRate`, `dynamicRange`, `audioTracks`, and `backdropURLs` (multiple backdrops) from Emby, Jellyfin, or Plex; `EpisodeInfo` similarly carries per-episode `lastPlaybackPosition`, `isWatched`, and stream technical metadata. Emby/Jellyfin listings also fill `RemoteFile.posterURL` / `backdropURL` (item image, else series poster / parent backdrop) and server `playbackPosition` / `runtime` / `isPlayed`; these URLs carry `api_key`, stay in memory, and are never logged.
 - `SavedConnection`: non-sensitive remote connection configuration. Passwords and OAuth tokens are stored separately.
 - `PlaybackRecord`: local playback-history snapshot.
 - `FolderBookmark`: a remote directory selected for synchronization.
@@ -383,7 +384,7 @@ Metadata has two complementary paths:
 - Catalog identification uses `FileNameParser`, `DirectorySemanticsParser`, `NFOMetadataParser`, `MediaIdentificationPipeline`, `EpisodeClusterPlanner`, and `MediaItemFactory`.
 - Detail refresh uses `MetadataRefreshCoordinator` to load metadata, episodes, and cast from Emby, Jellyfin, or Plex before persisting a `MetadataCacheRecord`.
 
-`MetadataCache` is an actor that serializes index operations. Text fields and remote artwork URLs are persisted before a bounded, deduplicated background artwork task downloads logo, backdrop, cast, and episode images. `MediaDetailProgressiveLoader` starts cache, server detail, seasons, and collections together and emits typed events in completion order. iOS and macOS stores merge those events into separate summary, cast, collection, episode, technical, and action states instead of publishing one aggregate detail snapshot. The UI renders basic `MediaItem` fields immediately; artwork completion is not on the text or list critical path.
+`MetadataCache` is an actor that serializes index operations (`MetadataCacheIndex.currentSchemaVersion = 2`, keeping backward-compatible decoding for legacy `MetadataCacheRecord` and `CachedEpisodeInfo` JSON fields). Text fields, remote artwork URLs (`backdropRemoteURLs`, `logoRemoteURL`, `posterRemoteURL`), cast roles, and video/audio technical specifications (`videoCodec`, `videoBitDepth`, `bitRate`, `audioTracks`) are persisted before a bounded, deduplicated background artwork task downloads logo, backdrop, cast, and episode images. `MediaDetailProgressiveLoader` starts cache, server detail, seasons, and collections together and emits typed events in completion order. iOS and macOS stores merge those events into separate summary, cast, collection, episode, technical, and action states instead of publishing one aggregate detail snapshot. The UI renders basic `MediaItem` fields immediately; artwork completion is not on the text or list critical path. Emby/Jellyfin detail requests parse all `BackdropImageTags` indices, `Person.Role`, and episode `UserData`; Plex detail requests parse `meta.image`, `/library/metadata/{ratingKey}/arts`, `Role.role`, `Media`/`Stream` specs, and episode `viewOffset`/`viewCount`.
 
 ### 6.7 Subtitles
 
@@ -534,11 +535,11 @@ sequenceDiagram
 
 ### 8.3 Metadata Detail
 
-1. The detail screen immediately renders base fields from `MediaItem`.
+1. The detail screen immediately renders base fields from `MediaItem`. On iOS, `MediaDetailView` presents a continuous parallax `486pt` hero header (backdrop-first with automatic 5-second cross-fade carousel for multi-backdrop items and poster fallback) above the action row, synopsis, episodes, cast, collections, and `MEDIA SPECIFICATIONS`.
 2. `MediaDetailProgressiveLoader` concurrently reads `MetadataCache` and starts supported detail, season, and collection requests.
 3. Each completed request emits a typed update; the selected season starts its first episode page without waiting for unrelated requests.
 4. Detail text and remote artwork URLs are persisted first. Bounded background image caching cannot delay summary, cast names, seasons, episodes, or collections.
-5. Platform stores apply updates to component-scoped observable state, so a cast, collection, episode, or artwork update does not invalidate the root detail view.
+5. Platform stores apply updates to component-scoped observable state, so a cast, collection, episode, or artwork update does not invalidate the root detail view. On iOS, episode progress and watched badges merge server state with local SwiftData episode rows when loading and upon dismissing the player or toggling watched state.
 6. Generation and cancellation checks prevent stale requests from overwriting the current detail.
 
 ### 8.4 iOS Visual Verification
