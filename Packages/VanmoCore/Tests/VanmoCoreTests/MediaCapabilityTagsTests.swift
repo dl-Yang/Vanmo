@@ -136,4 +136,61 @@ final class MediaCapabilityTagsTests: XCTestCase {
             ["TV-MA", "1080P"]
         )
     }
+
+    func testDetailCapabilityBadgesPrioritizeResolutionAndDynamicRange() {
+        XCTAssertEqual(
+            MediaCapabilityTags.detailCapabilityBadges(
+                contentRating: "TV-MA",
+                width: 3840,
+                height: 2160,
+                dynamicRange: DynamicRange.dolbyVision.rawValue,
+                audioTracks: [AudioTrackInfo(id: 0, codec: "truehd", channels: 8)],
+                fileName: "Dune.2160p.DV.HDR10.mkv"
+            ),
+            ["4K", "Dolby Vision", "HDR10", "TV-MA"]
+        )
+        XCTAssertEqual(
+            MediaCapabilityTags.detailCapabilityBadges(
+                contentRating: nil,
+                width: 1920,
+                height: 1080,
+                dynamicRange: DynamicRange.hdr10.rawValue,
+                audioTracks: [],
+                fileName: nil
+            ),
+            ["1080P", "HDR10"]
+        )
+    }
+
+    func testMediaSpecificationChipsFormatCodecBitDepthAudioAndBitrate() {
+        XCTAssertEqual(
+            MediaCapabilityTags.mediaSpecificationChips(
+                videoCodec: "hevc",
+                bitDepth: 10,
+                audioTracks: [AudioTrackInfo(id: 0, codec: "truehd", channels: 8)],
+                bitRate: 64_200_000
+            ),
+            ["HEVC", "10-bit", "Dolby TrueHD 7.1", "64.2 Mbps"]
+        )
+        XCTAssertEqual(
+            MediaCapabilityTags.mediaSpecificationChips(
+                videoCodec: "h264",
+                bitDepth: nil,
+                audioTracks: [AudioTrackInfo(id: 0, codec: "aac", channels: 2)],
+                bitRate: nil,
+                fileSize: 1_500_000_000,
+                duration: 1200
+            ),
+            ["H.264", "AAC Stereo", "10.0 Mbps"]
+        )
+        XCTAssertEqual(
+            MediaCapabilityTags.mediaSpecificationChips(
+                videoCodec: nil,
+                bitDepth: nil,
+                audioTracks: [],
+                bitRate: nil
+            ),
+            []
+        )
+    }
 }

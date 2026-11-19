@@ -957,11 +957,14 @@ fileprivate enum EmbyItemMapper {
             nil
         }
 
-        let backdropURL: URL? = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
-            URL(string: "\(base)/\(prefix)Items/\(item.id)/Images/Backdrop?maxWidth=1920&quality=80&api_key=\(token)")
+        let backdropURLs: [URL] = if let backdrops = item.backdropImageTags, !backdrops.isEmpty {
+            backdrops.enumerated().compactMap { index, tag in
+                URL(string: "\(base)/\(prefix)Items/\(item.id)/Images/Backdrop/\(index)?tag=\(tag)&maxWidth=1920&quality=80&api_key=\(token)")
+            }
         } else {
-            nil
+            []
         }
+        let backdropURL: URL? = backdropURLs.first
 
         let logoURL: URL? = if item.imageTags?.logo != nil {
             URL(string: "\(base)/\(prefix)Items/\(item.id)/Images/Logo?maxHeight=300&quality=90&api_key=\(token)")
@@ -993,10 +996,11 @@ fileprivate enum EmbyItemMapper {
                 prefix: prefix,
                 token: token
             )
+            let roleName = person.role?.trimmingCharacters(in: .whitespacesAndNewlines)
             return CastMemberInfo(
                 id: person.id ?? person.name,
                 name: person.name,
-                role: nil,
+                role: (roleName?.isEmpty == false) ? roleName : nil,
                 profileRemoteURL: profileURL
             )
         }
@@ -1019,7 +1023,12 @@ fileprivate enum EmbyItemMapper {
         let container = primarySource?.container.flatMap { $0.isEmpty ? nil : $0 }
         let fileSize = primarySource?.size ?? 0
         let videoSize = videoDimensions(from: primarySource)
-        let dynamicRange = dolbyDynamicRange(from: primarySource)
+        let videoStream = primaryVideoStream(from: primarySource)
+        let videoCodec = MediaCapabilityTags.normalizedVideoCodec(videoStream?.codec)
+        let videoBitDepth = resolvedBitDepth(from: videoStream)
+        let bitRate = primarySource?.bitrate ?? videoStream?.bitRate
+        let dynamicRange = resolvedDynamicRange(from: primarySource)
+        let audioTracks = mappedAudioTracks(from: primarySource)
 
         let showTitle = item.seriesName
         let seasonNumber = item.parentIndexNumber
@@ -1056,6 +1065,7 @@ fileprivate enum EmbyItemMapper {
             mediaType: mediaType,
             posterURL: posterURL,
             backdropURL: backdropURL,
+            backdropURLs: backdropURLs,
             logoURL: logoURL,
             genres: item.genres ?? [],
             director: director,
@@ -1070,7 +1080,11 @@ fileprivate enum EmbyItemMapper {
             container: container,
             videoWidth: videoSize.width,
             videoHeight: videoSize.height,
+            videoCodec: videoCodec,
+            videoBitDepth: videoBitDepth,
+            bitRate: bitRate,
             dynamicRange: dynamicRange,
+            audioTracks: audioTracks,
             showTitle: showTitle,
             seasonNumber: seasonNumber,
             episodeNumber: episodeNumber,
@@ -1091,6 +1105,56 @@ fileprivate enum EmbyItemMapper {
             return (video.width, video.height)
         }
         return (source?.width, source?.height)
+    }
+
+    fileprivate static func primaryVideoStream(from source: EmbyMediaSource?) -> EmbyMediaStream? {
+        source?.mediaStreams?.first(where: { $0.type?.caseInsensitiveCompare("Video") == .orderedSame })
+    }
+
+    fileprivate static func resolvedBitDepth(from stream: EmbyMediaStream?) -> Int? {
+        if let bitDepth = stream?.bitDepth, bitDepth > 0 {
+            return bitDepth
+        }
+        if let profile = stream?.profile?.lowercased(), profile.contains("10") {
+            return 10
+        }
+        return nil
+    }
+
+    fileprivate static func resolvedDynamicRange(from source: EmbyMediaSource?) -> String? {
+        let streams = source?.mediaStreams ?? []
+        if let videoStream = streams.first(where: { $0.type?.caseInsensitiveCompare("Video") == .orderedSame }) {
+            if let detected = MediaCapabilityTags.detectDynamicRangeValue(
+                videoRange: videoStream.videoRange,
+                videoRangeType: videoStream.videoRangeType,
+                colorTransfer: videoStream.colorTransfer
+            ), detected != .sdr {
+                return detected.rawValue
+            }
+        }
+        if streams.contains(where: { stream in
+            MediaCapabilityTags.isDolbyVisionRange(stream.videoRange)
+                || MediaCapabilityTags.isDolbyVisionRange(stream.videoRangeType)
+        }) {
+            return DynamicRange.dolbyVision.rawValue
+        }
+        return nil
+    }
+
+    fileprivate static func mappedAudioTracks(from source: EmbyMediaSource?) -> [AudioTrackInfo] {
+        let streams = source?.mediaStreams ?? []
+        return streams
+            .filter { $0.type?.caseInsensitiveCompare("Audio") == .orderedSame }
+            .enumerated()
+            .map { index, stream in
+                AudioTrackInfo(
+                    id: index,
+                    language: stream.language,
+                    title: stream.displayTitle ?? stream.title,
+                    codec: stream.codec,
+                    channels: stream.channels
+                )
+            }
     }
 
     fileprivate static func dolbyDynamicRange(from source: EmbyMediaSource?) -> String? {
@@ -1392,11 +1456,13 @@ private struct EmbyMediaDetail: Decodable, Sendable {
 private struct EmbyUserData: Decodable, Sendable {
     let playbackPositionTicks: Int64?
     let isFavorite: Bool?
+    let played: Bool?
     let lastPlayedDate: Date?
 
     enum CodingKeys: String, CodingKey {
         case playbackPositionTicks = "PlaybackPositionTicks"
         case isFavorite = "IsFavorite"
+        case played = "Played"
         case lastPlayedDate = "LastPlayedDate"
     }
 }
@@ -1421,6 +1487,7 @@ private struct EmbyMediaSource: Decodable, Sendable {
     let size: Int64?
     let width: Int?
     let height: Int?
+    let bitrate: Int?
     let mediaStreams: [EmbyMediaStream]?
 
     enum CodingKeys: String, CodingKey {
@@ -1429,6 +1496,7 @@ private struct EmbyMediaSource: Decodable, Sendable {
         case size = "Size"
         case width = "Width"
         case height = "Height"
+        case bitrate = "Bitrate"
         case mediaStreams = "MediaStreams"
     }
 }
@@ -1438,7 +1506,14 @@ private struct EmbyMediaStream: Decodable, Sendable {
     let width: Int?
     let height: Int?
     let videoRange: String?
+    let videoRangeType: String?
+    let colorTransfer: String?
     let codec: String?
+    let profile: String?
+    let bitDepth: Int?
+    let bitRate: Int?
+    let channels: Int?
+    let language: String?
     let displayTitle: String?
     let title: String?
 
@@ -1447,7 +1522,14 @@ private struct EmbyMediaStream: Decodable, Sendable {
         case width = "Width"
         case height = "Height"
         case videoRange = "VideoRange"
+        case videoRangeType = "VideoRangeType"
+        case colorTransfer = "ColorTransfer"
         case codec = "Codec"
+        case profile = "Profile"
+        case bitDepth = "BitDepth"
+        case bitRate = "BitRate"
+        case channels = "Channels"
+        case language = "Language"
         case displayTitle = "DisplayTitle"
         case title = "Title"
     }
@@ -1457,12 +1539,14 @@ private struct EmbyPerson: Decodable, Sendable {
     let id: String?
     let name: String
     let type: String
+    let role: String?
     let primaryImageTag: String?
 
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
         case type = "Type"
+        case role = "Role"
         case primaryImageTag = "PrimaryImageTag"
     }
 }
@@ -2009,7 +2093,13 @@ public struct EpisodeInfo: Identifiable, Sendable {
     public let remotePath: String?
     public let videoWidth: Int?
     public let videoHeight: Int?
+    public let videoCodec: String?
+    public let videoBitDepth: Int?
+    public let bitRate: Int?
     public let dynamicRange: String?
+    public let audioTracks: [AudioTrackInfo]
+    public let lastPlaybackPosition: TimeInterval
+    public let isWatched: Bool
 
     public init(
         id: String,
@@ -2026,7 +2116,13 @@ public struct EpisodeInfo: Identifiable, Sendable {
         remotePath: String? = nil,
         videoWidth: Int? = nil,
         videoHeight: Int? = nil,
-        dynamicRange: String? = nil
+        videoCodec: String? = nil,
+        videoBitDepth: Int? = nil,
+        bitRate: Int? = nil,
+        dynamicRange: String? = nil,
+        audioTracks: [AudioTrackInfo] = [],
+        lastPlaybackPosition: TimeInterval = 0,
+        isWatched: Bool = false
     ) {
         self.id = id; self.title = title; self.seasonNumber = seasonNumber; self.episodeNumber = episodeNumber
         self.duration = duration; self.overview = overview; self.streamURL = streamURL; self.backdropURL = backdropURL
@@ -2034,7 +2130,13 @@ public struct EpisodeInfo: Identifiable, Sendable {
         self.remotePath = remotePath
         self.videoWidth = videoWidth
         self.videoHeight = videoHeight
+        self.videoCodec = videoCodec
+        self.videoBitDepth = videoBitDepth
+        self.bitRate = bitRate
         self.dynamicRange = dynamicRange
+        self.audioTracks = audioTracks
+        self.lastPlaybackPosition = lastPlaybackPosition
+        self.isWatched = isWatched
     }
 }
 
@@ -2199,7 +2301,8 @@ public enum EmbyEpisodeFetcher {
             resolvingAgainstBaseURL: false
         )!
         var queryItems = [
-            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags,ImageTags,MediaSources,MediaStreams,OfficialRating"),
+            URLQueryItem(name: "Fields", value: "Overview,RunTimeTicks,BackdropImageTags,ImageTags,MediaSources,MediaStreams,OfficialRating,UserData"),
+            URLQueryItem(name: "EnableUserData", value: "true"),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
             URLQueryItem(name: "Limit", value: String(pageSize)),
             URLQueryItem(name: "api_key", value: context.token),
@@ -2264,6 +2367,12 @@ public enum EmbyEpisodeFetcher {
 
         let source = item.mediaSources?.first
         let videoSize = EmbyItemMapper.videoDimensions(from: source)
+        let videoStream = EmbyItemMapper.primaryVideoStream(from: source)
+        let playbackPosition: TimeInterval = if let ticks = item.userData?.playbackPositionTicks {
+            Double(ticks) / 10_000_000.0
+        } else {
+            0
+        }
         return EpisodeInfo(
             id: item.id,
             title: item.name,
@@ -2279,7 +2388,13 @@ public enum EmbyEpisodeFetcher {
             remotePath: item.id,
             videoWidth: videoSize.width,
             videoHeight: videoSize.height,
-            dynamicRange: EmbyItemMapper.dolbyDynamicRange(from: source)
+            videoCodec: MediaCapabilityTags.normalizedVideoCodec(videoStream?.codec),
+            videoBitDepth: EmbyItemMapper.resolvedBitDepth(from: videoStream),
+            bitRate: source?.bitrate ?? videoStream?.bitRate,
+            dynamicRange: EmbyItemMapper.resolvedDynamicRange(from: source),
+            audioTracks: EmbyItemMapper.mappedAudioTracks(from: source),
+            lastPlaybackPosition: playbackPosition,
+            isWatched: item.userData?.played ?? false
         )
     }
 }

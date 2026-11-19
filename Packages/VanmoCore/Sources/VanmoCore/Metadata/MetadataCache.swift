@@ -63,7 +63,9 @@ public actor MetadataCache {
                 fileSize: episode.fileSize,
                 originalFileName: episode.originalFileName,
                 container: episode.container,
-                remotePath: episode.remotePath
+                remotePath: episode.remotePath,
+                lastPlaybackPosition: episode.lastPlaybackPosition,
+                isWatched: episode.isWatched
             ))
         }
 
@@ -212,7 +214,9 @@ public actor MetadataCache {
                                     fileSize: episode.fileSize,
                                     originalFileName: episode.originalFileName,
                                     container: episode.container,
-                                    remotePath: episode.remotePath
+                                    remotePath: episode.remotePath,
+                                    lastPlaybackPosition: episode.lastPlaybackPosition,
+                                    isWatched: episode.isWatched
                                 )
                             } catch {
                                 VanmoLogger.metadata.error(
@@ -403,7 +407,9 @@ public actor MetadataCache {
                 fileSize: episode.fileSize,
                 originalFileName: episode.originalFileName,
                 container: episode.container,
-                remotePath: episode.remotePath
+                remotePath: episode.remotePath,
+                lastPlaybackPosition: episode.lastPlaybackPosition,
+                isWatched: episode.isWatched
             )
         }
         return current
@@ -465,7 +471,9 @@ public actor MetadataCache {
                 fileSize: episode.fileSize,
                 originalFileName: episode.originalFileName,
                 container: episode.container,
-                remotePath: episode.remotePath
+                remotePath: episode.remotePath,
+                lastPlaybackPosition: episode.lastPlaybackPosition,
+                isWatched: episode.isWatched
             )
         }
         return byID.values.sorted {

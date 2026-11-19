@@ -107,6 +107,56 @@ final class MediaDetailProgressiveLoaderTests: XCTestCase {
         await artworkGate.open()
     }
 
+    func testMetadataCacheRecordDecodesLegacyJSONAndResolvesMultipleBackdrops() throws {
+        let legacyJSON = """
+        {
+          "key": { "cacheKey": "server:100", "serverId": "100" },
+          "title": "Dune",
+          "genres": ["Sci-Fi"],
+          "cast": [],
+          "castMembers": [],
+          "originCountry": [],
+          "backdropRemoteURL": "https://example.com/backdrop0.jpg",
+          "episodes": [
+            {
+              "id": "ep1",
+              "title": "Ep 1",
+              "seasonNumber": 1,
+              "episodeNumber": 1,
+              "duration": 3600,
+              "streamURL": "https://example.com/ep1.mkv"
+            }
+          ],
+          "source": "emby"
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(MetadataCacheRecord.self, from: legacyJSON)
+        XCTAssertEqual(decoded.backdropRemoteURLs, [URL(string: "https://example.com/backdrop0.jpg")!])
+        XCTAssertEqual(decoded.episodes.first?.lastPlaybackPosition, 0)
+        XCTAssertEqual(decoded.episodes.first?.isWatched, false)
+
+        let multi = MetadataCacheRecord(
+            key: decoded.key,
+            title: "Dune",
+            backdropLocalPath: "images/emby_100/backdrop.jpg",
+            backdropRemoteURL: URL(string: "https://example.com/backdrop0.jpg")!,
+            backdropRemoteURLs: [
+                URL(string: "https://example.com/backdrop0.jpg")!,
+                URL(string: "https://example.com/backdrop1.jpg")!
+            ],
+            source: .emby
+        )
+        let root = URL(fileURLWithPath: "/tmp/cache")
+        XCTAssertEqual(
+            multi.resolvedBackdropURLs(rootDirectory: root),
+            [
+                URL(fileURLWithPath: "/tmp/cache/images/emby_100/backdrop.jpg"),
+                URL(string: "https://example.com/backdrop1.jpg")!
+            ]
+        )
+    }
+
     private func makeItem(mediaType: MediaType) -> MediaItem {
         let item = MediaItem(
             title: "Show",

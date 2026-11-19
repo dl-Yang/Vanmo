@@ -20,6 +20,14 @@ public struct CachedEpisodeInfo: Codable, Sendable, Identifiable {
     public let originalFileName: String?
     public let container: String?
     public let remotePath: String?
+    public let lastPlaybackPosition: TimeInterval
+    public let isWatched: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, seasonNumber, episodeNumber, duration, overview, streamURL
+        case backdropLocalPath, backdropRemoteURL, fileSize, originalFileName, container, remotePath
+        case lastPlaybackPosition, isWatched
+    }
 
     public init(
         id: String,
@@ -34,7 +42,9 @@ public struct CachedEpisodeInfo: Codable, Sendable, Identifiable {
         fileSize: Int64? = nil,
         originalFileName: String? = nil,
         container: String? = nil,
-        remotePath: String? = nil
+        remotePath: String? = nil,
+        lastPlaybackPosition: TimeInterval = 0,
+        isWatched: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -49,6 +59,27 @@ public struct CachedEpisodeInfo: Codable, Sendable, Identifiable {
         self.originalFileName = originalFileName
         self.container = container
         self.remotePath = remotePath
+        self.lastPlaybackPosition = lastPlaybackPosition
+        self.isWatched = isWatched
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        seasonNumber = try container.decode(Int.self, forKey: .seasonNumber)
+        episodeNumber = try container.decode(Int.self, forKey: .episodeNumber)
+        duration = try container.decode(TimeInterval.self, forKey: .duration)
+        overview = try container.decodeIfPresent(String.self, forKey: .overview)
+        streamURL = try container.decode(URL.self, forKey: .streamURL)
+        backdropLocalPath = try container.decodeIfPresent(String.self, forKey: .backdropLocalPath)
+        backdropRemoteURL = try container.decodeIfPresent(URL.self, forKey: .backdropRemoteURL)
+        fileSize = try container.decodeIfPresent(Int64.self, forKey: .fileSize)
+        originalFileName = try container.decodeIfPresent(String.self, forKey: .originalFileName)
+        self.container = try container.decodeIfPresent(String.self, forKey: .container)
+        remotePath = try container.decodeIfPresent(String.self, forKey: .remotePath)
+        lastPlaybackPosition = try container.decodeIfPresent(TimeInterval.self, forKey: .lastPlaybackPosition) ?? 0
+        isWatched = try container.decodeIfPresent(Bool.self, forKey: .isWatched) ?? false
     }
 
     public func makeEpisodeInfo(rootDirectory: URL) -> EpisodeInfo {
@@ -71,7 +102,9 @@ public struct CachedEpisodeInfo: Codable, Sendable, Identifiable {
             fileSize: fileSize ?? 0,
             originalFileName: originalFileName,
             container: container,
-            remotePath: remotePath
+            remotePath: remotePath,
+            lastPlaybackPosition: lastPlaybackPosition,
+            isWatched: isWatched
         )
     }
 }
@@ -94,10 +127,15 @@ public struct MetadataCacheRecord: Codable, Sendable {
     public var backdropLocalPath: String?
     public var logoRemoteURL: URL?
     public var backdropRemoteURL: URL?
+    public var backdropRemoteURLs: [URL]
     public var posterRemoteURL: URL?
     public var videoWidth: Int?
     public var videoHeight: Int?
+    public var videoCodec: String?
+    public var videoBitDepth: Int?
+    public var bitRate: Int?
     public var dynamicRange: String?
+    public var audioTracks: [AudioTrackInfo]
     public var episodes: [CachedEpisodeInfo]
     public var fetchedAt: Date
     public var source: MetadataSource
@@ -113,7 +151,20 @@ public struct MetadataCacheRecord: Codable, Sendable {
         if let path = backdropLocalPath {
             return rootDirectory.appendingPathComponent(path)
         }
-        return backdropRemoteURL
+        return backdropRemoteURL ?? backdropRemoteURLs.first
+    }
+
+    public func resolvedBackdropURLs(rootDirectory: URL) -> [URL] {
+        var urls: [URL] = []
+        if let first = resolvedBackdropURL(rootDirectory: rootDirectory) {
+            urls.append(first)
+        }
+        for remote in backdropRemoteURLs {
+            if urls.isEmpty || (remote != backdropRemoteURL && !urls.contains(remote)) {
+                urls.append(remote)
+            }
+        }
+        return urls
     }
 
     public func makeCastDisplays(rootDirectory: URL) -> [CastMemberDisplay] {
@@ -134,8 +185,9 @@ public struct MetadataCacheRecord: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case key, title, originalTitle, year, overview, rating, contentRating, genres, director, cast, castMembers
-        case originCountry, tmdbID, logoLocalPath, backdropLocalPath, logoRemoteURL, backdropRemoteURL
-        case posterRemoteURL, videoWidth, videoHeight, dynamicRange, episodes, fetchedAt, source
+        case originCountry, tmdbID, logoLocalPath, backdropLocalPath, logoRemoteURL, backdropRemoteURL, backdropRemoteURLs
+        case posterRemoteURL, videoWidth, videoHeight, videoCodec, videoBitDepth, bitRate, dynamicRange, audioTracks
+        case episodes, fetchedAt, source
     }
 
     public init(
@@ -156,14 +208,28 @@ public struct MetadataCacheRecord: Codable, Sendable {
         backdropLocalPath: String? = nil,
         logoRemoteURL: URL? = nil,
         backdropRemoteURL: URL? = nil,
+        backdropRemoteURLs: [URL] = [],
         posterRemoteURL: URL? = nil,
         videoWidth: Int? = nil,
         videoHeight: Int? = nil,
+        videoCodec: String? = nil,
+        videoBitDepth: Int? = nil,
+        bitRate: Int? = nil,
         dynamicRange: String? = nil,
+        audioTracks: [AudioTrackInfo] = [],
         episodes: [CachedEpisodeInfo] = [],
         fetchedAt: Date = Date(),
         source: MetadataSource
     ) {
+        let resolvedBackdrops: [URL]
+        if !backdropRemoteURLs.isEmpty {
+            resolvedBackdrops = backdropRemoteURLs
+        } else if let backdropRemoteURL {
+            resolvedBackdrops = [backdropRemoteURL]
+        } else {
+            resolvedBackdrops = []
+        }
+
         self.key = key
         self.title = title
         self.originalTitle = originalTitle
@@ -180,11 +246,16 @@ public struct MetadataCacheRecord: Codable, Sendable {
         self.logoLocalPath = logoLocalPath
         self.backdropLocalPath = backdropLocalPath
         self.logoRemoteURL = logoRemoteURL
-        self.backdropRemoteURL = backdropRemoteURL
+        self.backdropRemoteURL = backdropRemoteURL ?? resolvedBackdrops.first
+        self.backdropRemoteURLs = resolvedBackdrops
         self.posterRemoteURL = posterRemoteURL
         self.videoWidth = videoWidth
         self.videoHeight = videoHeight
+        self.videoCodec = videoCodec
+        self.videoBitDepth = videoBitDepth
+        self.bitRate = bitRate
         self.dynamicRange = dynamicRange
+        self.audioTracks = audioTracks
         self.episodes = episodes
         self.fetchedAt = fetchedAt
         self.source = source
@@ -209,10 +280,22 @@ public struct MetadataCacheRecord: Codable, Sendable {
         backdropLocalPath = try container.decodeIfPresent(String.self, forKey: .backdropLocalPath)
         logoRemoteURL = try container.decodeIfPresent(URL.self, forKey: .logoRemoteURL)
         backdropRemoteURL = try container.decodeIfPresent(URL.self, forKey: .backdropRemoteURL)
+        let decodedBackdrops = try container.decodeIfPresent([URL].self, forKey: .backdropRemoteURLs) ?? []
+        if !decodedBackdrops.isEmpty {
+            backdropRemoteURLs = decodedBackdrops
+        } else if let backdropRemoteURL {
+            backdropRemoteURLs = [backdropRemoteURL]
+        } else {
+            backdropRemoteURLs = []
+        }
         posterRemoteURL = try container.decodeIfPresent(URL.self, forKey: .posterRemoteURL)
         videoWidth = try container.decodeIfPresent(Int.self, forKey: .videoWidth)
         videoHeight = try container.decodeIfPresent(Int.self, forKey: .videoHeight)
+        videoCodec = try container.decodeIfPresent(String.self, forKey: .videoCodec)
+        videoBitDepth = try container.decodeIfPresent(Int.self, forKey: .videoBitDepth)
+        bitRate = try container.decodeIfPresent(Int.self, forKey: .bitRate)
         dynamicRange = try container.decodeIfPresent(String.self, forKey: .dynamicRange)
+        audioTracks = try container.decodeIfPresent([AudioTrackInfo].self, forKey: .audioTracks) ?? []
         episodes = try container.decodeIfPresent([CachedEpisodeInfo].self, forKey: .episodes) ?? []
         fetchedAt = try container.decodeIfPresent(Date.self, forKey: .fetchedAt) ?? Date()
         source = try container.decode(MetadataSource.self, forKey: .source)
@@ -220,7 +303,7 @@ public struct MetadataCacheRecord: Codable, Sendable {
 }
 
 public struct MetadataCacheIndex: Codable, Sendable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public let schemaVersion: Int
     public var records: [String: MetadataCacheRecord]

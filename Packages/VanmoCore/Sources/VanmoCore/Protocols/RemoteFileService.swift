@@ -77,6 +77,7 @@ public struct ServerMediaItem: Sendable {
     public let mediaType: MediaType
     public let posterURL: URL?
     public let backdropURL: URL?
+    public let backdropURLs: [URL]
     public let logoURL: URL?
     public let genres: [String]
     public let director: String?
@@ -91,7 +92,11 @@ public struct ServerMediaItem: Sendable {
     public let container: String?
     public let videoWidth: Int?
     public let videoHeight: Int?
+    public let videoCodec: String?
+    public let videoBitDepth: Int?
+    public let bitRate: Int?
     public let dynamicRange: String?
+    public let audioTracks: [AudioTrackInfo]
 
     public let showTitle: String?
     public let seasonNumber: Int?
@@ -116,6 +121,7 @@ public struct ServerMediaItem: Sendable {
         mediaType: MediaType,
         posterURL: URL? = nil,
         backdropURL: URL? = nil,
+        backdropURLs: [URL] = [],
         logoURL: URL? = nil,
         genres: [String] = [],
         director: String? = nil,
@@ -130,7 +136,11 @@ public struct ServerMediaItem: Sendable {
         container: String? = nil,
         videoWidth: Int? = nil,
         videoHeight: Int? = nil,
+        videoCodec: String? = nil,
+        videoBitDepth: Int? = nil,
+        bitRate: Int? = nil,
         dynamicRange: String? = nil,
+        audioTracks: [AudioTrackInfo] = [],
         showTitle: String? = nil,
         seasonNumber: Int? = nil,
         episodeNumber: Int? = nil,
@@ -141,6 +151,15 @@ public struct ServerMediaItem: Sendable {
         lastPlaybackPosition: TimeInterval = 0,
         isFavoriteOnServer: Bool = false
     ) {
+        let resolvedBackdrops: [URL]
+        if !backdropURLs.isEmpty {
+            resolvedBackdrops = backdropURLs
+        } else if let backdropURL {
+            resolvedBackdrops = [backdropURL]
+        } else {
+            resolvedBackdrops = []
+        }
+
         self.serverId = serverId
         self.title = title
         self.originalTitle = originalTitle
@@ -150,7 +169,8 @@ public struct ServerMediaItem: Sendable {
         self.contentRating = contentRating
         self.mediaType = mediaType
         self.posterURL = posterURL
-        self.backdropURL = backdropURL
+        self.backdropURL = backdropURL ?? resolvedBackdrops.first
+        self.backdropURLs = resolvedBackdrops
         self.logoURL = logoURL
         self.genres = genres
         self.director = director
@@ -165,7 +185,11 @@ public struct ServerMediaItem: Sendable {
         self.container = container
         self.videoWidth = videoWidth
         self.videoHeight = videoHeight
+        self.videoCodec = videoCodec
+        self.videoBitDepth = videoBitDepth
+        self.bitRate = bitRate
         self.dynamicRange = dynamicRange
+        self.audioTracks = audioTracks
         self.showTitle = showTitle
         self.seasonNumber = seasonNumber
         self.episodeNumber = episodeNumber

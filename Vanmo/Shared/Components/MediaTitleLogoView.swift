@@ -6,6 +6,7 @@ struct MediaTitleLogoView: View {
     let title: String
     let logoURL: URL?
     var titleFont: Font = .system(size: 28, weight: .bold)
+    var titleColor: Color = .primary
     var collapsedStyle: Bool = false
     var maxLogoHeight: CGFloat = 72
     var contentAlignment: HorizontalAlignment = .center
@@ -34,7 +35,7 @@ struct MediaTitleLogoView: View {
                 .font(collapsedStyle ? .system(size: 36, weight: .black, design: .rounded) : titleFont)
                 .kerning(collapsedStyle ? -0.5 : 0)
                 .multilineTextAlignment(textAlignment)
-                .foregroundStyle(collapsedStyle ? .white : .primary)
+                .foregroundStyle(collapsedStyle ? .white : titleColor)
                 .shadow(color: collapsedStyle ? .black.opacity(0.35) : .clear, radius: collapsedStyle ? 18 : 0, y: collapsedStyle ? 8 : 0)
                 .frame(maxWidth: .infinity, alignment: stackAlignment)
                 .opacity(isLogoLoaded ? 0 : 1)
@@ -43,9 +44,7 @@ struct MediaTitleLogoView: View {
                 KFImage(currentLogoURL)
                     .onSuccess { _ in
                         displayedLogoURL = currentLogoURL
-                        withAnimation(.easeOut(duration: 0.35)) {
-                            isLogoLoaded = true
-                        }
+                        isLogoLoaded = true
                     }
                     .onFailure { _ in
                         if displayedLogoURL == nil {

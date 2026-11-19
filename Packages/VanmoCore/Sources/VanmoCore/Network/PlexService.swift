@@ -588,12 +588,20 @@ private struct PlexMediaContainer: Decodable {
     let offset: Int?
     let directory: [PlexDirectory]?
     let metadata: [PlexMetadata]?
+    let photo: [PlexPhoto]?
 
     enum CodingKeys: String, CodingKey {
         case size, totalSize, offset
         case directory = "Directory"
         case metadata = "Metadata"
+        case photo = "Photo"
     }
+}
+
+private struct PlexPhoto: Decodable {
+    let key: String?
+    let ratingKey: String?
+    let selected: Bool?
 }
 
 private struct PlexDirectory: Decodable {
@@ -612,6 +620,8 @@ private struct PlexMetadata: Decodable {
     let rating: Double?
     /// 单位毫秒。
     let duration: Int?
+    let viewOffset: Int?
+    let viewCount: Int?
     let thumb: String?
     let art: String?
     let type: String
@@ -624,33 +634,47 @@ private struct PlexMetadata: Decodable {
     let contentRating: String?
     let media: [PlexMedia]?
     let director: [PlexTag]?
-    let role: [PlexTag]?
+    let role: [PlexRoleTag]?
     let genre: [PlexTag]?
     let country: [PlexTag]?
+    let image: [PlexImage]?
 
     enum CodingKeys: String, CodingKey {
         case ratingKey, key, title, originalTitle, summary, year, rating, duration
+        case viewOffset, viewCount
         case thumb, art, type, parentIndex, index, parentTitle, guid, contentRating
         case media = "Media"
         case director = "Director"
         case role = "Role"
         case genre = "Genre"
         case country = "Country"
+        case image = "Image"
     }
+}
+
+private struct PlexImage: Decodable {
+    let type: String?
+    let url: String?
 }
 
 private struct PlexMedia: Decodable {
     let id: Int?
     let duration: Int?
+    let bitrate: Int?
     let width: Int?
     let height: Int?
+    let videoCodec: String?
+    let audioCodec: String?
+    let audioChannels: Int?
     let videoResolution: String?
     let videoProfile: String?
     let container: String?
     let part: [PlexPart]?
 
     enum CodingKeys: String, CodingKey {
-        case id, duration, width, height, videoResolution, videoProfile, container
+        case id, duration, bitrate, width, height
+        case videoCodec, audioCodec, audioChannels
+        case videoResolution, videoProfile, container
         case part = "Part"
     }
 }
@@ -661,10 +685,40 @@ private struct PlexPart: Decodable {
     let size: Int64?
     let container: String?
     let file: String?
+    let stream: [PlexStream]?
+
+    enum CodingKeys: String, CodingKey {
+        case id, key, size, container, file
+        case stream = "Stream"
+    }
+}
+
+private struct PlexStream: Decodable {
+    let streamType: Int?
+    let codec: String?
+    let bitDepth: Int?
+    let bitrate: Int?
+    let channels: Int?
+    let language: String?
+    let displayTitle: String?
+    let colorTrc: String?
+    let doviPresent: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case streamType, codec, bitDepth, bitrate, channels, language, displayTitle, colorTrc
+        case doviPresent = "DOVIPresent"
+    }
 }
 
 private struct PlexTag: Decodable {
     let tag: String?
+}
+
+private struct PlexRoleTag: Decodable {
+    let id: Int?
+    let tag: String?
+    let role: String?
+    let thumb: String?
 }
 
 private struct PlexSection {
@@ -797,13 +851,77 @@ public enum PlexItemDetailFetcher {
         try validatePlexResponse(response, body: data, context: "fetch item detail")
 
         let result = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
-        guard let meta = result.mediaContainer.metadata?.first,
-              let mapped = mapPlexMetadataToServerItem(meta, baseURL: context.baseURL, token: context.token) else {
+        guard let meta = result.mediaContainer.metadata?.first else {
+            throw NetworkError.transferFailed("无法解析媒体详情")
+        }
+
+        let extraBackdropURLs = (try? await fetchArtworkURLs(ratingKey: ratingKey, context: context)) ?? []
+        guard let mapped = mapPlexMetadataToServerItem(
+            meta,
+            baseURL: context.baseURL,
+            token: context.token,
+            extraBackdropURLs: extraBackdropURLs
+        ) else {
             throw NetworkError.transferFailed("无法解析媒体详情")
         }
 
         return mapped
     }
+
+    private static func fetchArtworkURLs(
+        ratingKey: String,
+        context: PlexSessionContext
+    ) async throws -> [URL] {
+        var components = URLComponents(
+            url: context.baseURL.appendingPathComponent("library/metadata/\(ratingKey)/arts"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "X-Plex-Token", value: context.token)]
+        guard let url = components.url else { return [] }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(PlexCredentialStore.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            return []
+        }
+        let container = try JSONDecoder().decode(PlexMediaContainerResponse.self, from: data)
+        let photos = container.mediaContainer.photo ?? []
+        let sorted = photos.sorted { ($0.selected == true ? 0 : 1) < ($1.selected == true ? 0 : 1) }
+        return sorted.compactMap { photo in
+            guard let key = photo.key else { return nil }
+            return makePlexResourceURL(key, baseURL: context.baseURL, token: context.token)
+        }
+    }
+}
+
+fileprivate func makePlexResourceURL(_ pathOrURL: String, baseURL: URL, token: String) -> URL? {
+    let trimmed = pathOrURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+        return URL(string: trimmed)
+    }
+    let normalized = trimmed.hasPrefix("/") ? trimmed : "/\(trimmed)"
+    guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+        return nil
+    }
+    if let queryIndex = normalized.firstIndex(of: "?") {
+        let pathPart = String(normalized[..<queryIndex])
+        let queryPart = String(normalized[normalized.index(after: queryIndex)...])
+        components.path = pathPart
+        components.percentEncodedQuery = queryPart
+    } else {
+        components.path = normalized
+    }
+    var items = components.queryItems ?? []
+    if !items.contains(where: { $0.name == "X-Plex-Token" }) {
+        items.append(URLQueryItem(name: "X-Plex-Token", value: token))
+    }
+    components.queryItems = items
+    return components.url
 }
 
 public enum PlexIntroMarkerFetcher {
@@ -844,7 +962,8 @@ public enum PlexIntroMarkerFetcher {
 fileprivate func mapPlexMetadataToServerItem(
     _ meta: PlexMetadata,
     baseURL: URL,
-    token: String
+    token: String,
+    extraBackdropURLs: [URL] = []
 ) -> ServerMediaItem? {
     let mediaType: MediaType
     switch meta.type {
@@ -856,11 +975,32 @@ fileprivate func mapPlexMetadataToServerItem(
     guard let ratingKey = meta.ratingKey else { return nil }
 
     let posterURL: URL? = meta.thumb.flatMap { thumb in
-        URL(string: "\(baseURL.absoluteString)\(thumb)?X-Plex-Token=\(token)")
+        makePlexResourceURL(thumb, baseURL: baseURL, token: token)
     }
-    let backdropURL: URL? = meta.art.flatMap { art in
-        URL(string: "\(baseURL.absoluteString)\(art)?X-Plex-Token=\(token)")
+    var backdropCandidates: [URL] = []
+    if let primaryArt = meta.art.flatMap({ makePlexResourceURL($0, baseURL: baseURL, token: token) }) {
+        backdropCandidates.append(primaryArt)
     }
+    if let images = meta.image {
+        for image in images where image.type?.lowercased() == "background" {
+            if let path = image.url,
+               let url = makePlexResourceURL(path, baseURL: baseURL, token: token),
+               !backdropCandidates.contains(url) {
+                backdropCandidates.append(url)
+            }
+        }
+    }
+    for url in extraBackdropURLs where !backdropCandidates.contains(url) {
+        backdropCandidates.append(url)
+    }
+    let backdropURL: URL? = backdropCandidates.first
+
+    let logoURL: URL? = meta.image?
+        .first(where: { $0.type?.lowercased() == "clearlogo" })?
+        .url
+        .flatMap { path in
+            makePlexResourceURL(path, baseURL: baseURL, token: token)
+        }
 
     let streamURL: URL
     if mediaType == .tvShow {
@@ -888,14 +1028,76 @@ fileprivate func mapPlexMetadataToServerItem(
     let fallbackSize = VideoResolutionLabel.dimensions(fromResolutionToken: primaryMedia?.videoResolution)
     let videoWidth = primaryMedia?.width ?? fallbackSize?.width
     let videoHeight = primaryMedia?.height ?? fallbackSize?.height
-    let dynamicRange: String? = MediaCapabilityTags.isDolbyVisionRange(primaryMedia?.videoProfile)
-        ? DynamicRange.dolbyVision.rawValue
-        : nil
+
+    let videoStream = primaryPart?.stream?.first(where: { $0.streamType == 1 })
+    let videoCodec = MediaCapabilityTags.normalizedVideoCodec(videoStream?.codec ?? primaryMedia?.videoCodec)
+    let videoBitDepth = videoStream?.bitDepth
+    let bitRate: Int? = {
+        if let mediaBitrate = primaryMedia?.bitrate, mediaBitrate > 0 {
+            return mediaBitrate * 1000
+        }
+        if let streamBitrate = videoStream?.bitrate, streamBitrate > 0 {
+            return streamBitrate * 1000
+        }
+        return nil
+    }()
+
+    let dynamicRange: String? = {
+        if videoStream?.doviPresent == true || MediaCapabilityTags.isDolbyVisionRange(primaryMedia?.videoProfile) {
+            return DynamicRange.dolbyVision.rawValue
+        }
+        if let detected = MediaCapabilityTags.detectDynamicRangeValue(
+            videoRange: primaryMedia?.videoProfile,
+            colorTransfer: videoStream?.colorTrc
+        ), detected != .sdr {
+            return detected.rawValue
+        }
+        return nil
+    }()
+
+    let audioTracks: [AudioTrackInfo] = {
+        let streams = (primaryPart?.stream ?? []).filter { $0.streamType == 2 }
+        if !streams.isEmpty {
+            return streams.enumerated().map { index, stream in
+                AudioTrackInfo(
+                    id: index,
+                    language: stream.language,
+                    title: stream.displayTitle,
+                    codec: stream.codec,
+                    channels: stream.channels
+                )
+            }
+        }
+        if let audioCodec = primaryMedia?.audioCodec {
+            return [AudioTrackInfo(id: 0, codec: audioCodec, channels: primaryMedia?.audioChannels)]
+        }
+        return []
+    }()
 
     let directors = meta.director?.compactMap(\.tag).joined(separator: ", ")
     let normalizedDirector = (directors?.isEmpty ?? true) ? nil : directors
 
-    let cast: [String] = meta.role?.compactMap(\.tag).prefix(10).map { $0 } ?? []
+    let roleEntries = Array((meta.role ?? []).prefix(10))
+    let castMembers: [CastMemberInfo] = roleEntries.compactMap { entry in
+        guard let name = entry.tag?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            return nil
+        }
+        let roleName = entry.role?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let profileURL: URL? = entry.thumb.flatMap { thumb in
+            if thumb.hasPrefix("http://") || thumb.hasPrefix("https://") {
+                return URL(string: thumb)
+            }
+            let normalized = thumb.hasPrefix("/") ? thumb : "/\(thumb)"
+            return URL(string: "\(baseURL.absoluteString)\(normalized)?X-Plex-Token=\(token)")
+        }
+        return CastMemberInfo(
+            id: entry.id.map(String.init) ?? name,
+            name: name,
+            role: (roleName?.isEmpty == false) ? roleName : nil,
+            profileRemoteURL: profileURL
+        )
+    }
+    let cast: [String] = castMembers.map(\.name)
     let genres: [String] = meta.genre?.compactMap(\.tag) ?? []
     let countries: [String] = meta.country?.compactMap(\.tag) ?? []
 
@@ -912,9 +1114,12 @@ fileprivate func mapPlexMetadataToServerItem(
         mediaType: mediaType,
         posterURL: posterURL,
         backdropURL: backdropURL,
+        backdropURLs: backdropCandidates,
+        logoURL: logoURL,
         genres: genres,
         director: normalizedDirector,
         cast: cast,
+        castMembers: castMembers,
         originCountry: countries,
         tmdbID: tmdbID,
         streamURL: streamURL,
@@ -924,7 +1129,11 @@ fileprivate func mapPlexMetadataToServerItem(
         container: container,
         videoWidth: videoWidth,
         videoHeight: videoHeight,
+        videoCodec: videoCodec,
+        videoBitDepth: videoBitDepth,
+        bitRate: bitRate,
         dynamicRange: dynamicRange,
+        audioTracks: audioTracks,
         showTitle: nil,
         seasonNumber: nil,
         episodeNumber: nil,
@@ -1156,6 +1365,44 @@ public enum PlexEpisodeFetcher {
 
         let primaryMedia = meta.media?.first
         let fallbackSize = VideoResolutionLabel.dimensions(fromResolutionToken: primaryMedia?.videoResolution)
+        let videoStream = part.stream?.first(where: { $0.streamType == 1 })
+        let audioTracks: [AudioTrackInfo] = {
+            let streams = (part.stream ?? []).filter { $0.streamType == 2 }
+            if !streams.isEmpty {
+                return streams.enumerated().map { index, stream in
+                    AudioTrackInfo(
+                        id: index,
+                        language: stream.language,
+                        title: stream.displayTitle,
+                        codec: stream.codec,
+                        channels: stream.channels
+                    )
+                }
+            }
+            if let audioCodec = primaryMedia?.audioCodec {
+                return [AudioTrackInfo(id: 0, codec: audioCodec, channels: primaryMedia?.audioChannels)]
+            }
+            return []
+        }()
+        let bitRate: Int? = {
+            if let mediaBitrate = primaryMedia?.bitrate, mediaBitrate > 0 { return mediaBitrate * 1000 }
+            if let streamBitrate = videoStream?.bitrate, streamBitrate > 0 { return streamBitrate * 1000 }
+            return nil
+        }()
+        let playbackPosition = meta.viewOffset.map { Double($0) / 1000.0 } ?? 0
+        let isWatched = (meta.viewCount ?? 0) > 0
+        let dynamicRange: String? = {
+            if videoStream?.doviPresent == true || MediaCapabilityTags.isDolbyVisionRange(primaryMedia?.videoProfile) {
+                return DynamicRange.dolbyVision.rawValue
+            }
+            if let detected = MediaCapabilityTags.detectDynamicRangeValue(
+                videoRange: primaryMedia?.videoProfile,
+                colorTransfer: videoStream?.colorTrc
+            ), detected != .sdr {
+                return detected.rawValue
+            }
+            return nil
+        }()
         return EpisodeInfo(
             id: key,
             title: meta.title,
@@ -1171,9 +1418,13 @@ public enum PlexEpisodeFetcher {
             remotePath: partKey,
             videoWidth: primaryMedia?.width ?? fallbackSize?.width,
             videoHeight: primaryMedia?.height ?? fallbackSize?.height,
-            dynamicRange: MediaCapabilityTags.isDolbyVisionRange(primaryMedia?.videoProfile)
-                ? DynamicRange.dolbyVision.rawValue
-                : nil
+            videoCodec: MediaCapabilityTags.normalizedVideoCodec(videoStream?.codec ?? primaryMedia?.videoCodec),
+            videoBitDepth: videoStream?.bitDepth,
+            bitRate: bitRate,
+            dynamicRange: dynamicRange,
+            audioTracks: audioTracks,
+            lastPlaybackPosition: playbackPosition,
+            isWatched: isWatched
         )
     }
 }

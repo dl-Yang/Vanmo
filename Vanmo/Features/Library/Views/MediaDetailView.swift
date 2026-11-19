@@ -8,102 +8,66 @@ struct MediaDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("metadata.autoDownload") private var metadataAutoDownload = true
+
     let item: MediaItem
 
     @State private var isUpdatingFavorite = false
+    @State private var isUpdatingWatched = false
     @State private var favoriteErrorMessage: String?
-    @State private var activeSheet: MediaDetailSheet?
+    @State private var watchedErrorMessage: String?
+    @State private var isSynopsisExpanded = false
     @State private var isDownloadPickerPresented = false
     @State private var selectedDownloadEpisodes: [String: EpisodeInfo] = [:]
     @State private var downloadErrorMessage: String?
     @State private var isEnqueueingDownload = false
+    @State private var scrollOffset: CGFloat = 0
     @StateObject private var store = MediaDetailStore()
-
-    /// 面板的三种形态：收起（不可见）/ 展开（固定 3/4 屏高）
-    private enum PanelState { case collapsed, expanded }
-    @State private var panelState: PanelState = .collapsed
-    /// 拖拽过程中实时的手势位移
-    @State private var dragOffset: CGFloat = 0
-    /// 用户是否已主动操作过面板（拖拽/展开）。一旦交互过，加载完成后不再自动展开。
-    @State private var userDidInteractWithPanel = false
-
-    /// 媒体信息布局占屏高比例（不超过 3/4）
-    private let panelHeightRatio: CGFloat = 0.75
-
-    private let accentBlue = Color.vanmoAccent
-    private let starYellow = Color(red: 245/255, green: 194/255, blue: 75/255)
 
     var body: some View {
         GeometryReader { geometry in
-            let totalHeight = geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom
-            let panelHeight = totalHeight * panelHeightRatio
-            let expandedTop = totalHeight - panelHeight          // 展开时面板顶部 Y
-            let collapsedTop = totalHeight                        // 收起时面板完全移出屏幕
-            let baseTop = panelState == .expanded ? expandedTop : collapsedTop
-            let currentTop = min(max(baseTop + dragOffset, expandedTop), collapsedTop)
-            // 0 = 收起，1 = 展开
-            let reveal = max(0, min(1, (collapsedTop - currentTop) / panelHeight))
-            // 收起态向下回拉（用于海报景深联动）
-            let pullDown = panelState == .collapsed ? max(0, dragOffset) : 0
+            let topInset = geometry.safeAreaInsets.top
+            let heroTopAnchor = topInset > 0 ? topInset + 4 : 58
+            let heroContentTopPadding = max(286, heroTopAnchor + 228)
 
             ZStack(alignment: .top) {
-                MediaDetailHeroBackdrop(
-                    itemPosterURL: item.posterURL,
-                    summaryState: store.summaryState,
-                    width: geometry.size.width,
-                    height: totalHeight,
-                    reveal: reveal,
-                    pullDown: pullDown
-                )
-                    .allowsHitTesting(false)
+                CatDesign.bgObsidian.ignoresSafeArea()
 
-                // 收起态前景：底部标题 + 上滑指示器
-                observedCollapsedForeground
-                    .frame(width: geometry.size.width, height: totalHeight, alignment: .bottom)
-                    .opacity(1 - reveal)
-                    .allowsHitTesting(panelState == .collapsed)
+                observedHeroBackdrop(width: geometry.size.width)
 
-                // 媒体信息面板
-                mediaInfoPanel(panelHeight: panelHeight,
-                               isScrollEnabled: panelState == .expanded && dragOffset == 0)
-                    .frame(width: geometry.size.width, height: panelHeight)
-                    .offset(y: currentTop)
+                ScrollView(.vertical, showsIndicators: false) {
+                    detailContentStack
+                        .padding(.top, heroContentTopPadding)
+                        .padding(.bottom, 34)
+                        .frame(width: geometry.size.width, alignment: .leading)
+                        .background {
+                            GeometryReader { proxy in
+                                Color.clear
+                                    .preference(
+                                        key: DetailScrollOffsetKey.self,
+                                        value: proxy.frame(in: .named("mediaDetailScroll")).minY
+                                    )
+                            }
+                        }
+                }
+                .coordinateSpace(name: "mediaDetailScroll")
+                .onPreferenceChange(DetailScrollOffsetKey.self) { scrollOffset = $0 }
+                .ignoresSafeArea(edges: .top)
 
-                topNavBar(topPadding: geometry.safeAreaInsets.top)
+                floatingTopBar(topPadding: heroTopAnchor)
                     .zIndex(2)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
+            .ignoresSafeArea(edges: .top)
         }
-        .ignoresSafeArea()
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .catTabBarHidden(true)
         .task(id: metadataTaskID) {
-            let loadTask = Task {
-                await store.load(
-                    item: item,
-                    modelContext: modelContext,
-                    autoDownloadMetadata: metadataAutoDownload
-                )
-            }
-            await Task.yield()
-#if DEBUG
-            store.installDebugHeroWalkEpisodesIfNeeded(for: item)
-#endif
-            if !userDidInteractWithPanel, panelState == .collapsed {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                    panelState = .expanded
-                }
-            }
-            await loadTask.value
-#if DEBUG
-            if DownloadHeroWalkFixtures.shouldAutoEnqueue, item.mediaType == .tvShow {
-                await enqueueDebugHeroWalkIfNeeded()
-            }
-#endif
+            await loadDetailContent()
         }
 #if DEBUG
         .task(id: "\(item.id)-hero-auto-movie") {
@@ -111,340 +75,220 @@ struct MediaDetailView: View {
             await enqueueDebugHeroWalkIfNeeded()
         }
 #endif
+        .onChange(of: appState.isPlayerPresented) { _, isPresented in
+            if !isPresented {
+                store.syncLocalPlaybackStates(for: item, in: modelContext)
+            }
+        }
         .alert(L10n.tr("收藏失败"), isPresented: favoriteErrorBinding) {
             Button(L10n.tr("确定")) {}
         } message: {
             Text(favoriteErrorMessage ?? "")
         }
+        .alert(L10n.tr("标记失败"), isPresented: watchedErrorBinding) {
+            Button(L10n.tr("确定")) {}
+        } message: {
+            Text(watchedErrorMessage ?? "")
+        }
         .modifier(MediaDetailRefreshErrorPresenter(state: store.actionState))
         .sheet(isPresented: $isDownloadPickerPresented) {
-            MediaDetailObservedObject(state: store.episodeState) { episodeState in
-                EpisodeDownloadPicker(
-                    episodes: episodeState.episodes,
-                    seasonNumbers: episodeState.seasons.map(\.seasonNumber),
-                    selectedSeason: episodeState.selectedSeason,
-                    selectedEpisodes: $selectedDownloadEpisodes,
-                    isLoading: episodeState.isLoading || episodeState.isLoadingMore,
-                    onSelectSeason: { season in
-                        Task {
-                            await store.selectSeason(season, item: item, modelContext: modelContext)
-                            await loadAllEpisodesForDownload()
-                        }
-                    },
-                    onConfirm: enqueueSelectedEpisodes
-                )
-            }
+            episodeDownloadSheet
         }
-        .alert(L10n.tr("下载失败"), isPresented: Binding(
-            get: { downloadErrorMessage != nil },
-            set: { if !$0 { downloadErrorMessage = nil } }
-        )) {
+        .alert(L10n.tr("下载失败"), isPresented: downloadErrorBinding) {
             Button(L10n.tr("确定")) {}
         } message: {
             Text(downloadErrorMessage ?? "")
         }
         .overlay {
-            if let sheet = activeSheet {
-                modalOverlay(for: sheet)
+            if isSynopsisExpanded {
+                synopsisModalOverlay
             }
         }
-        .animation(.spring(response: 0.34, dampingFraction: 0.86), value: activeSheet)
+        .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86), value: isSynopsisExpanded)
     }
 
-    // MARK: - 手势
+    // MARK: - Subviews
 
-    private func panelDrag() -> some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                userDidInteractWithPanel = true
-                dragOffset = value.translation.height
-            }
-            .onEnded { value in
-                let predicted = value.predictedEndTranslation.height
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                    switch panelState {
-                    case .collapsed:
-                        if predicted < -120 { panelState = .expanded }
-                    case .expanded:
-                        if predicted > 120 { panelState = .collapsed }
-                    }
-                    dragOffset = 0
-                }
-            }
-    }
-
-    // MARK: - 顶部导航
-
-    private func topNavBar(topPadding: CGFloat) -> some View {
-        HStack {
-            CatBackButton(size: 40, cinemaStyle: true) {
-                dismiss()
-            }
-
-            Spacer()
-
-            if store.supportsMetadataRefresh(for: item, in: modelContext) {
-                observedRefreshButton
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, topPadding > 0 ? topPadding + 4 : 48)
-    }
-
-    private var observedRefreshButton: some View {
-        MediaDetailObservedObject(state: store.actionState) { actionState in
-            Button {
-                Task {
-                    await store.refreshMetadata(for: item, modelContext: modelContext, force: true)
-                }
-            } label: {
-                ZStack {
-                    if actionState.isRefreshingMetadata {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(CatDesign.glowAmber)
-                            .scaleEffect(0.75)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(CatDesign.Cinema.textIvory)
-                    }
-                }
-                .frame(width: 40, height: 40)
-                .background {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .overlay(Circle().fill(CatDesign.Cinema.surfaceGlass))
-                }
-                .overlay(Circle().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 1))
-                .contentShape(Circle())
-            }
-            .buttonStyle(DetailNavigationButtonStyle())
-            .disabled(actionState.isRefreshingMetadata)
-            .accessibilityLabel(L10n.tr("刷新"))
-        }
-    }
-
-    // MARK: - 收起态前景
-
-    private var observedCollapsedForeground: some View {
+    private func observedHeroBackdrop(width: CGFloat) -> some View {
         MediaDetailObservedObject(state: store.summaryState) { summaryState in
-            MediaDetailObservedObject(state: store.episodeState) { episodeState in
-                collapsedForeground(summaryState: summaryState, episodeState: episodeState)
-            }
+            MediaDetailHeroBackdrop(
+                backdropURLs: resolvedHeroBackdrops(from: summaryState),
+                fallbackPosterURL: summaryState.content?.posterURL ?? item.posterURL,
+                width: width,
+                scrollOffset: scrollOffset
+            )
+            .allowsHitTesting(false)
         }
     }
 
-    private func collapsedForeground(
-        summaryState: MediaDetailSummaryState,
-        episodeState: MediaDetailEpisodeState
-    ) -> some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            VStack(spacing: 0) {
-                VStack(spacing: 12) {
-                    MediaDetailTitleLogoView(
-                        title: collapsedTitle,
-                        logoURL: summaryState.content?.logoURL ?? item.logoURL,
-                        collapsedStyle: true,
-                        maxLogoHeight: 88
-                    )
-
-                    MediaDetailMetaRow(
-                        values: panelMetaValues(summaryState: summaryState, episodeState: episodeState),
-                        style: .collapsed
-                    )
-                }
-                .padding(.bottom, 90)
-
-                collapsedHint(isLoading: summaryState.isLoading)
-                    .padding(.bottom, 50)
-                    .padding(.horizontal, 24)
-            }
-            .contentShape(Rectangle())
-            .gesture(panelDrag())
-        }
-    }
-
-    @ViewBuilder
-    private func collapsedHint(isLoading: Bool) -> some View {
-        if isLoading {
-            VStack(spacing: 8) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(.white)
-
-                Text(L10n.tr("加载中"))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-        } else {
-            VStack(spacing: 8) {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
-                    .background(Color.black.opacity(0.25), in: Circle())
-                    .overlay { Circle().strokeBorder(.white.opacity(0.4), lineWidth: 1) }
-
-                Text(L10n.tr("上滑查看详情"))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-            }
-        }
-    }
-
-    // MARK: - 媒体信息面板
-
-    private func mediaInfoPanel(panelHeight: CGFloat, isScrollEnabled: Bool) -> some View {
-        ZStack(alignment: .topLeading) {
-            CatAmberHalo(width: 180, height: 80, opacity: 0.16)
-                .padding(.top, 90)
-                .padding(.leading, 24)
-
-            VStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    Capsule()
-                        .fill(CatDesign.grabberFill)
-                        .frame(width: 44, height: 4)
-                        .padding(.top, 12)
-                        .padding(.bottom, 16)
-                }
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-                .gesture(panelDrag())
-
-                ScrollView {
-                    Group {
-                        if item.mediaType == .tvShow {
-                            tvShowPanelContent
-                        } else {
-                            moviePanelContent
-                        }
-                    }
-                    .padding(.horizontal, CatDesign.horizontalMargin)
-                    .padding(.bottom, 44)
-                }
-                .scrollDisabled(!isScrollEnabled)
-                .scrollIndicators(.hidden)
-            }
-        }
-        .frame(height: panelHeight, alignment: .top)
-        .background(panelGlassBackground)
-    }
-
-    private var panelGlassBackground: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: CatDesign.radiusSheetTop, topTrailingRadius: CatDesign.radiusSheetTop, style: .continuous)
-
-        return shape
-            .fill(.ultraThinMaterial)
-            .overlay(shape.fill(CatDesign.surfacePanel))
-            .overlay(shape.strokeBorder(CatDesign.strokeGlass, lineWidth: 1))
-            .shadow(color: CatDesign.cardShadow, radius: 28, y: -10)
-            .ignoresSafeArea(edges: .bottom)
-    }
-
-    private var moviePanelContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            observedPanelHeader(title: item.displayTitle)
-            observedPanelActions(play: { appState.play(item) })
+    private var detailContentStack: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            heroTitleAndActionsBlock
             observedSynopsis
+            if item.mediaType == .tvShow {
+                observedEpisodes
+            }
             observedCast
             observedCollections
-            observedDetails(directorLabel: L10n.tr("导演"))
+            observedTechnicalSpecs
         }
     }
 
-    private var tvShowPanelContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            observedPanelHeader(title: item.showTitle ?? item.title)
-            observedPanelActions(play: {
-                if let ep = store.nextEpisodeToPlay { playEpisode(ep) }
-            })
-            observedSynopsis
-            observedEpisodes
-            observedCast
-            observedCollections
-            observedDetails(directorLabel: L10n.tr("主创"))
+    private var heroTitleAndActionsBlock: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            observedTitleAndMeta
+            observedPanelActions(play: handlePrimaryPlayTap)
         }
+        .padding(.horizontal, CatDesign.horizontalMargin)
     }
 
-    // MARK: - 面板子区块
-
-    private func observedPanelHeader(title: String) -> some View {
+    private var observedTitleAndMeta: some View {
         MediaDetailObservedObject(state: store.summaryState) { summaryState in
             MediaDetailObservedObject(state: store.episodeState) { episodeState in
                 MediaDetailObservedObject(state: store.technicalState) { technicalState in
-                    MediaDetailPanelHeader(
-                        title: title,
-                        rating: summaryState.content?.rating ?? item.rating,
+                    MediaDetailTitleAndMetaBlock(
+                        title: displayTitle,
                         logoURL: summaryState.content?.logoURL ?? item.logoURL,
-                        metaValues: panelMetaValues(
-                            summaryState: summaryState,
-                            episodeState: episodeState
-                        ),
-                        tags: capabilityTags(
-                            summaryState: summaryState,
-                            technicalState: technicalState
-                        )
+                        metaText: heroMetaText(summaryState: summaryState, episodeState: episodeState),
+                        badges: capabilityTags(summaryState: summaryState, technicalState: technicalState)
                     )
                 }
             }
         }
     }
 
-    /// 元信息行的展示值（年份 / 类型 / 季数或时长），供收起态与 header 共用。
-    private func panelMetaValues(
-        summaryState: MediaDetailSummaryState,
-        episodeState: MediaDetailEpisodeState
-    ) -> [String] {
-        var values: [String] = []
-        if let year = item.year { values.append("\(year)") }
-        if let genre = displayGenres(from: summaryState).first { values.append(genre) }
-        if item.mediaType == .tvShow {
-            if !episodeState.seasons.isEmpty {
-                values.append("\(episodeState.seasons.count) 季")
-            }
-        } else if item.duration > 0 {
-            values.append(item.duration.shortDuration)
+    private func floatingTopBar(topPadding: CGFloat) -> some View {
+        let scrollProgress = min(max((-scrollOffset - 24) / 70, 0), 1)
+        return HStack {
+            topBackButton
+            Spacer()
+            observedMoreMenuButton
         }
-        return values
+        .padding(.horizontal, 20)
+        .padding(.top, topPadding)
+        .padding(.bottom, 14)
+        .background(alignment: .top) {
+            LinearGradient(
+                stops: [
+                    .init(color: CatDesign.bgObsidian.opacity(0.96), location: 0.0),
+                    .init(color: CatDesign.bgObsidian.opacity(0.92), location: 0.72),
+                    .init(color: CatDesign.bgObsidian.opacity(0), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: topPadding + 78)
+            .opacity(scrollProgress)
+            .allowsHitTesting(false)
+        }
     }
 
-    private func displayGenres(from summaryState: MediaDetailSummaryState) -> [String] {
-        let genres = summaryState.content?.genres ?? []
-        return genres.isEmpty ? item.genres : genres
+    private var topBackButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image("CatLGBack")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(topBarIconColor)
+                .frame(width: 40, height: 40)
+                .detailLiquidGlass(in: Circle(), colorScheme: colorScheme)
+                .contentShape(Circle())
+        }
+        .buttonStyle(DetailNavigationButtonStyle())
+        .accessibilityLabel(L10n.tr("返回"))
     }
 
-    private func capabilityTags(
-        summaryState: MediaDetailSummaryState,
-        technicalState: MediaDetailTechnicalState
-    ) -> [String] {
-        MediaCapabilityTags.displayTags(
-            contentRating: summaryState.content?.contentRating ?? item.contentRating,
-            width: technicalState.videoWidth ?? item.videoWidth,
-            height: technicalState.videoHeight ?? item.videoHeight,
-            dynamicRange: technicalState.dynamicRange ?? item.dynamicRange,
-            audioTracks: item.audioTracks,
-            fileName: [
-                item.originalFileName,
-                item.title,
-                item.fileURL.lastPathComponent,
-                technicalState.episodeFileNameHint
-            ]
-                .compactMap { $0 }
-                .joined(separator: " ")
-        )
+    private var observedMoreMenuButton: some View {
+        MediaDetailObservedObject(state: store.actionState) { actionState in
+            MediaDetailObservedObject(state: store.summaryState) { summaryState in
+                Menu {
+                    Button {
+                        Task { await toggleWatched() }
+                    } label: {
+                        Label(
+                            item.isWatched ? L10n.tr("标记未看") : L10n.tr("标记已看"),
+                            systemImage: item.isWatched ? "checkmark.circle.fill" : "checkmark.circle"
+                        )
+                    }
+                    .disabled(isUpdatingWatched)
+
+                    if store.supportsMetadataRefresh(for: item, in: modelContext) {
+                        Button {
+                            Task {
+                                await store.refreshMetadata(for: item, modelContext: modelContext, force: true)
+                            }
+                        } label: {
+                            Label(L10n.tr("刷新元数据"), systemImage: "arrow.clockwise")
+                        }
+                        .disabled(actionState.isRefreshingMetadata)
+                    }
+
+                    ShareLink(item: shareSummaryText(from: summaryState)) {
+                        Label(L10n.tr("分享"), systemImage: "square.and.arrow.up")
+                    }
+                } label: {
+                    ZStack {
+                        if actionState.isRefreshingMetadata || isUpdatingWatched {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(CatDesign.accentAmber)
+                                .scaleEffect(0.72)
+                        } else {
+                            Image("CatLGMoreDots")
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 18, height: 18)
+                                .foregroundStyle(topBarIconColor)
+                        }
+                    }
+                    .frame(width: 40, height: 40)
+                    .detailLiquidGlass(in: Circle(), colorScheme: colorScheme)
+                    .contentShape(Circle())
+                }
+                .accessibilityLabel(L10n.tr("更多"))
+            }
+        }
     }
 
     private var observedSynopsis: some View {
         MediaDetailObservedObject(state: store.summaryState) { summaryState in
-            MediaDetailSynopsisSection(
+            MediaDetailSynopsisCard(
                 overview: displayOverview(from: summaryState)
             ) {
-                activeSheet = .synopsis
+                isSynopsisExpanded = true
             }
+            .padding(.horizontal, CatDesign.horizontalMargin)
+        }
+    }
+
+    private var observedEpisodes: some View {
+        MediaDetailObservedObject(state: store.episodeState) { episodeState in
+            MediaDetailEpisodesSection(
+                episodes: episodeState.episodes,
+                seasonNumbers: episodeState.seasons.map(\.seasonNumber),
+                selectedSeason: Binding(
+                    get: { episodeState.selectedSeason },
+                    set: { season in
+                        guard let season else { return }
+                        Task {
+                            await store.selectSeason(season, item: item, modelContext: modelContext)
+                        }
+                    }
+                ),
+                isLoadingEpisodes: episodeState.isLoading,
+                isLoadingMore: episodeState.isLoadingMore,
+                hasMoreEpisodes: episodeState.hasMore,
+                onPlay: playEpisode,
+                onLoadMore: {
+                    Task {
+                        await store.loadMoreEpisodes(item: item, modelContext: modelContext)
+                    }
+                }
+            )
         }
     }
 
@@ -463,92 +307,121 @@ struct MediaDetailView: View {
         }
     }
 
-    private func observedDetails(directorLabel: String) -> some View {
-        MediaDetailObservedObject(state: store.summaryState) { summaryState in
-            MediaDetailDetailsSection(
-                director: summaryState.content?.director,
-                genres: displayGenres(from: summaryState),
-                directorLabel: directorLabel
+    private var observedTechnicalSpecs: some View {
+        MediaDetailObservedObject(state: store.technicalState) { technicalState in
+            let chips = MediaCapabilityTags.mediaSpecificationChips(
+                videoCodec: technicalState.videoCodec ?? item.videoCodec,
+                bitDepth: technicalState.videoBitDepth,
+                audioTracks: technicalState.audioTracks.isEmpty ? item.audioTracks : technicalState.audioTracks,
+                bitRate: technicalState.bitRate,
+                fileSize: item.fileSize,
+                duration: item.duration
             )
-        }
-    }
-
-    private var observedEpisodes: some View {
-        MediaDetailObservedObject(state: store.episodeState) { episodeState in
-            MediaDetailEpisodesSection(
-                episodes: episodeState.episodes,
-                seasonNumbers: episodeState.seasons.map(\.seasonNumber),
-                selectedSeason: Binding(
-                    get: { episodeState.selectedSeason },
-                    set: { season in
-                        guard let season else { return }
-                        Task {
-                            await store.selectSeason(season, item: item, modelContext: modelContext)
-                        }
-                    }
-                ),
-                accentColor: Color.vanmoAccent,
-                isLoadingEpisodes: episodeState.isLoading,
-                isLoadingMore: episodeState.isLoadingMore,
-                hasMoreEpisodes: episodeState.hasMore,
-                onPlay: playEpisode,
-                onLoadMore: {
-                    Task {
-                        await store.loadMoreEpisodes(item: item, modelContext: modelContext)
-                    }
-                }
-            )
+            MediaDetailSpecsFooter(chips: chips)
         }
     }
 
     private func observedPanelActions(play: @escaping () -> Void) -> some View {
-        MediaDetailObservedObject(state: store.summaryState) { summaryState in
-            MediaDetailPanelActions(
-                isTVShow: item.mediaType == .tvShow,
-                isFavorite: item.isFavorite,
-                isUpdatingFavorite: isUpdatingFavorite,
-                resumeLabel: resumeCueText,
-                shareText: shareSummaryText(from: summaryState),
-                isRelatedDownload: isRelatedDownloadRequest,
-                isEnqueueingDownload: isEnqueueingDownload,
-                play: play,
-                toggleFavorite: { Task { await setFavorite(!item.isFavorite) } },
-                download: handleDownloadButtonTap
+        MediaDetailPrimaryActionRow(
+            isTVShow: item.mediaType == .tvShow,
+            playButtonTitle: playButtonTitle,
+            isFavorite: item.isFavorite,
+            isUpdatingFavorite: isUpdatingFavorite,
+            isRelatedDownload: isRelatedDownloadRequest,
+            isEnqueueingDownload: isEnqueueingDownload,
+            play: play,
+            toggleFavorite: { Task { await setFavorite(!item.isFavorite) } },
+            download: handleDownloadButtonTap
+        )
+    }
+
+    private var episodeDownloadSheet: some View {
+        MediaDetailObservedObject(state: store.episodeState) { episodeState in
+            EpisodeDownloadPicker(
+                episodes: episodeState.episodes,
+                seasonNumbers: episodeState.seasons.map(\.seasonNumber),
+                selectedSeason: episodeState.selectedSeason,
+                selectedEpisodes: $selectedDownloadEpisodes,
+                isLoading: episodeState.isLoading || episodeState.isLoadingMore,
+                onSelectSeason: { season in
+                    Task {
+                        await store.selectSeason(season, item: item, modelContext: modelContext)
+                        await loadAllEpisodesForDownload()
+                    }
+                },
+                onConfirm: enqueueSelectedEpisodes
             )
         }
     }
 
-    private var resumeCueText: String? {
-        if item.mediaType == .tvShow {
-            if let ep = store.nextEpisodeToPlay {
-                return String(format: "S%02d E%02d", ep.seasonNumber, ep.episodeNumber)
+    private var synopsisModalOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.65)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { isSynopsisExpanded = false }
+                .transition(.opacity)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text(L10n.tr("简介"))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(CatDesign.textIvory)
+
+                    Spacer()
+
+                    Button { isSynopsisExpanded = false } label: {
+                        Image("CatClearCircle")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 20)
+
+                ScrollView {
+                    MediaDetailObservedObject(state: store.summaryState) { summaryState in
+                        Text(displayOverview(from: summaryState) ?? L10n.tr("暂无简介"))
+                            .font(.system(size: 14))
+                            .lineSpacing(7)
+                            .foregroundStyle(CatDesign.textMuted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 16)
+                    }
+                }
+                .frame(maxHeight: 360)
             }
-            return nil
+            .padding(.horizontal, 22)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .catGlassCard(cornerRadius: 24, elevated: true)
+            .padding(.horizontal, 24)
         }
-        guard item.lastPlaybackPosition > 0, !item.isWatched, item.duration > item.lastPlaybackPosition else {
-            return nil
-        }
-        return LocalizedFormat.remainingDuration(position: item.lastPlaybackPosition, total: item.duration)
     }
 
-    private func shareSummaryText(from summaryState: MediaDetailSummaryState) -> String {
-        let title = collapsedTitle
-        let year = item.year.map { " (\($0))" } ?? ""
-        let overview = displayOverview(from: summaryState)
-        if let overview, !overview.isEmpty {
-            return "\(title)\(year)\n\(overview)"
-        }
-        return "\(title)\(year)"
-    }
+    // MARK: - Formatting & Computed State
 
-    // MARK: - 状态逻辑
+    private var topBarIconColor: Color {
+        colorScheme == .dark ? CatDesign.Cinema.textIvory : CatDesign.textIvory
+    }
 
     private var metadataTaskID: String {
         MetadataCacheKey.from(item).cacheKey
     }
 
-    private var collapsedTitle: String {
+    private var displayTitle: String {
         item.mediaType == .tvShow ? (item.showTitle ?? item.title) : item.displayTitle
+    }
+
+    private var playButtonTitle: String {
+        if item.mediaType != .tvShow,
+           item.lastPlaybackPosition > 0,
+           !item.isWatched,
+           item.duration > item.lastPlaybackPosition {
+            return L10n.tr("继续播放")
+        }
+        return L10n.tr("立即播放")
     }
 
     private var favoriteErrorBinding: Binding<Bool> {
@@ -559,10 +432,132 @@ struct MediaDetailView: View {
         }
     }
 
+    private var watchedErrorBinding: Binding<Bool> {
+        Binding {
+            watchedErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented { watchedErrorMessage = nil }
+        }
+    }
+
+    private var downloadErrorBinding: Binding<Bool> {
+        Binding {
+            downloadErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented { downloadErrorMessage = nil }
+        }
+    }
+
+    private func resolvedHeroBackdrops(from summaryState: MediaDetailSummaryState) -> [URL] {
+        if let backdrops = summaryState.content?.backdropURLs, !backdrops.isEmpty {
+            return backdrops
+        }
+        if let localBackdrop = item.backdropURL {
+            return [localBackdrop]
+        }
+        return []
+    }
+
+    private func heroMetaText(
+        summaryState: MediaDetailSummaryState,
+        episodeState: MediaDetailEpisodeState
+    ) -> String? {
+        var parts: [String] = []
+        if let year = summaryState.content?.year ?? item.year {
+            parts.append("\(year)")
+        }
+        if let genre = displayGenres(from: summaryState).first {
+            parts.append(genre)
+        }
+        if item.mediaType == .tvShow {
+            if !episodeState.seasons.isEmpty {
+                parts.append(L10n.tr("%d 季", episodeState.seasons.count))
+            } else if item.duration > 0 {
+                parts.append(item.duration.localizedShortDuration)
+            }
+        } else if item.duration > 0 {
+            parts.append(item.duration.localizedShortDuration)
+        }
+        if let rating = summaryState.content?.rating ?? item.rating, rating > 0 {
+            parts.append(String(format: "★ %.1f", rating))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: "  ·  ")
+    }
+
+    private func displayGenres(from summaryState: MediaDetailSummaryState) -> [String] {
+        let genres = summaryState.content?.genres ?? []
+        return genres.isEmpty ? item.genres : genres
+    }
+
     private func displayOverview(from summaryState: MediaDetailSummaryState) -> String? {
-        if let overview = summaryState.content?.overview { return overview }
+        if let overview = summaryState.content?.overview, !overview.isEmpty { return overview }
         guard let overview = item.overview, !overview.isEmpty else { return nil }
         return overview
+    }
+
+    private func capabilityTags(
+        summaryState: MediaDetailSummaryState,
+        technicalState: MediaDetailTechnicalState
+    ) -> [String] {
+        MediaCapabilityTags.detailCapabilityBadges(
+            contentRating: summaryState.content?.contentRating ?? item.contentRating,
+            width: technicalState.videoWidth ?? item.videoWidth,
+            height: technicalState.videoHeight ?? item.videoHeight,
+            dynamicRange: technicalState.dynamicRange ?? item.dynamicRange,
+            audioTracks: technicalState.audioTracks.isEmpty ? item.audioTracks : technicalState.audioTracks,
+            fileName: [
+                item.originalFileName,
+                item.title,
+                item.fileURL.lastPathComponent,
+                technicalState.episodeFileNameHint
+            ]
+                .compactMap { $0 }
+                .joined(separator: " ")
+        )
+    }
+
+    private func shareSummaryText(from summaryState: MediaDetailSummaryState) -> String {
+        let title = displayTitle
+        let year = item.year.map { " (\($0))" } ?? ""
+        let overview = displayOverview(from: summaryState)
+        if let overview, !overview.isEmpty {
+            return "\(title)\(year)\n\(overview)"
+        }
+        return "\(title)\(year)"
+    }
+
+    // MARK: - Actions & Loading
+
+    private func loadDetailContent() async {
+        store.syncLocalPlaybackStates(for: item, in: modelContext)
+        let loadTask = Task {
+            await store.load(
+                item: item,
+                modelContext: modelContext,
+                autoDownloadMetadata: metadataAutoDownload
+            )
+        }
+#if DEBUG
+        await Task.yield()
+        store.installDebugHeroWalkEpisodesIfNeeded(for: item)
+#endif
+        await loadTask.value
+        store.syncLocalPlaybackStates(for: item, in: modelContext)
+#if DEBUG
+        if DownloadHeroWalkFixtures.shouldAutoEnqueue, item.mediaType == .tvShow {
+            await enqueueDebugHeroWalkIfNeeded()
+        }
+#endif
+    }
+
+    private func handlePrimaryPlayTap() {
+        if item.mediaType == .tvShow {
+            if let ep = store.nextEpisodeToPlay {
+                playEpisode(ep)
+            }
+        } else {
+            appState.play(item)
+        }
     }
 
     private func setFavorite(_ isFavorite: Bool) async {
@@ -593,6 +588,59 @@ struct MediaDetailView: View {
             NotificationCenter.default.post(name: .mediaFavoriteDidChange, object: persisted)
         } catch {
             favoriteErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func toggleWatched() async {
+        guard !isUpdatingWatched else { return }
+        isUpdatingWatched = true
+        defer { isUpdatingWatched = false }
+
+        let targetWatched = !item.isWatched
+        let previousPosition = item.lastPlaybackPosition
+        let previousPlayedAt = item.lastPlayedAt
+
+        item.isWatched = targetWatched
+        if targetWatched {
+            if item.duration > 0 {
+                item.lastPlaybackPosition = item.duration
+            }
+            item.lastPlayedAt = Date()
+        } else {
+            item.lastPlaybackPosition = 0
+        }
+
+        do {
+            let snapshot = try? mediaServerConnectionSnapshot()
+            if item.serverId != nil,
+               let snapshot,
+               snapshot.type == .emby || snapshot.type == .jellyfin {
+                try await EmbyPlayedUpdater.setPlayed(
+                    item,
+                    isPlayed: targetWatched,
+                    connection: snapshot
+                )
+            }
+            let persisted = try persistWatchedState(
+                isWatched: targetWatched,
+                position: item.lastPlaybackPosition,
+                lastPlayedAt: item.lastPlayedAt
+            )
+            if persisted.isProgressCloudSynced {
+                CloudSyncCoordinator.shared.markMediaProgressChanged(persisted, in: modelContext)
+            }
+            try modelContext.save()
+            if persisted.isProgressCloudSynced {
+                CloudSyncCoordinator.shared.requestSync(reason: "watched", context: modelContext)
+            }
+            if item.mediaType == .tvShow {
+                store.applySeriesWatchedState(targetWatched, for: item, in: modelContext)
+            }
+        } catch {
+            item.isWatched = !targetWatched
+            item.lastPlaybackPosition = previousPosition
+            item.lastPlayedAt = previousPlayedAt
+            watchedErrorMessage = error.localizedDescription
         }
     }
 
@@ -630,6 +678,38 @@ struct MediaDetailView: View {
         return item
     }
 
+    @discardableResult
+    private func persistWatchedState(
+        isWatched: Bool,
+        position: TimeInterval,
+        lastPlayedAt: Date?
+    ) throws -> MediaItem {
+        guard let serverId = item.serverId else {
+            if item.modelContext == nil {
+                modelContext.insert(item)
+            }
+            return item
+        }
+
+        let sourceConnectionId = item.sourceConnectionId
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { mediaItem in
+                mediaItem.serverId == serverId &&
+                    mediaItem.sourceConnectionId == sourceConnectionId
+            }
+        )
+        if let storedItem = try modelContext.fetch(descriptor).first {
+            storedItem.isWatched = isWatched
+            storedItem.lastPlaybackPosition = position
+            storedItem.lastPlayedAt = lastPlayedAt
+            return storedItem
+        }
+        if item.modelContext == nil {
+            modelContext.insert(item)
+        }
+        return item
+    }
+
     private func playEpisode(_ episode: EpisodeInfo) {
         let episodeItem = MediaItem(
             title: item.title,
@@ -646,6 +726,8 @@ struct MediaDetailView: View {
         episodeItem.serverId = episode.id
         episodeItem.seriesId = item.serverId ?? item.seriesId
         episodeItem.sourceConnectionId = item.sourceConnectionId
+        episodeItem.lastPlaybackPosition = episode.lastPlaybackPosition
+        episodeItem.isWatched = episode.isWatched
         appState.play(episodeItem)
     }
 
@@ -813,79 +895,15 @@ struct MediaDetailView: View {
     private func mediaServerConnectionSnapshot() throws -> MediaServerConnectionSnapshot? {
         try MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
     }
+}
 
-    private func initial(for name: String) -> String {
-        String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased()
-    }
+// MARK: - Scroll Preference & Observed Helper
 
-    private func highResolutionPosterURL(from url: URL?) -> URL? {
-        guard let url,
-              url.path.contains("/Items/"),
-              url.path.contains("/Images/Primary"),
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return url
-        }
+private struct DetailScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
 
-        var queryItems = components.queryItems ?? []
-        queryItems.removeAll { item in
-            item.name.caseInsensitiveCompare("maxHeight") == .orderedSame ||
-                item.name.caseInsensitiveCompare("maxWidth") == .orderedSame ||
-                item.name.caseInsensitiveCompare("quality") == .orderedSame
-        }
-        queryItems.append(URLQueryItem(name: "maxHeight", value: "1800"))
-        queryItems.append(URLQueryItem(name: "quality", value: "100"))
-        components.queryItems = queryItems
-        return components.url ?? url
-    }
-
-    // MARK: - 弹层
-
-    private func modalOverlay(for sheet: MediaDetailSheet) -> some View {
-        ZStack {
-            Color.black.opacity(0.65)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture { activeSheet = nil }
-                .transition(.opacity)
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Text(sheet == .synopsis ? L10n.tr("简介") : L10n.tr("详情"))
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(CatDesign.textIvory)
-
-                    Spacer()
-
-                    Button { activeSheet = nil } label: {
-                        Image("CatClearCircle")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 22, height: 22)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 20)
-
-                if sheet == .synopsis {
-                    ScrollView {
-                        MediaDetailObservedObject(state: store.summaryState) { summaryState in
-                            Text(displayOverview(from: summaryState) ?? L10n.tr("暂无简介"))
-                                .font(.system(size: 14))
-                                .lineSpacing(7)
-                                .foregroundStyle(CatDesign.textMuted)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 16)
-                        }
-                    }
-                    .frame(maxHeight: 360)
-                }
-            }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .catGlassCard(cornerRadius: 24, elevated: true)
-            .padding(.horizontal, 24)
-        }
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
@@ -906,94 +924,173 @@ private struct MediaDetailObservedObject<State: ObservableObject, Content: View>
     }
 }
 
-private struct MediaDetailHeroBackdrop: View {
-    let itemPosterURL: URL?
-    @ObservedObject var summaryState: MediaDetailSummaryState
-    let width: CGFloat
-    let height: CGFloat
-    let reveal: CGFloat
-    let pullDown: CGFloat
+// MARK: - Detail Liquid Glass Helpers
 
-    @State private var dominantColor: Color = .black
-    @State private var loadedHeroPosterURL: URL?
+private extension View {
+    @ViewBuilder
+    func detailLiquidGlass<S: InsettableShape>(
+        in shape: S,
+        colorScheme: ColorScheme,
+        amberStroke: Bool = false,
+        strokeWidth: CGFloat = 1
+    ) -> some View {
+        let tint: Color = colorScheme == .dark
+            ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.22)
+            : Color.white.opacity(0.62)
+        let fallbackFill: Color = colorScheme == .dark
+            ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.55)
+            : Color.white.opacity(0.84)
+        let stroke: Color = amberStroke
+            ? CatDesign.strokeAmber
+            : (colorScheme == .dark
+                ? Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.40)
+                : CatDesign.strokeGlass)
+
+        self.catLiquidGlass(
+            in: shape,
+            tint: tint,
+            fallbackFill: fallbackFill,
+            stroke: stroke,
+            strokeWidth: strokeWidth,
+            interactive: true
+        )
+    }
+
+    func detailChipSurface(colorScheme: ColorScheme, height: CGFloat, horizontalPadding: CGFloat, cornerRadius: CGFloat) -> some View {
+        let fill: Color = colorScheme == .dark
+            ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.22)
+            : CatDesign.surfacePill
+        let stroke: Color = colorScheme == .dark
+            ? Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.40)
+            : CatDesign.strokeGlass
+
+        return self
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: height)
+            .background(fill, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(stroke, lineWidth: 0.8)
+            )
+    }
+}
+
+// MARK: - Seamless Parallax Hero Backdrop & Carousel
+
+private struct MediaDetailHeroBackdrop: View {
+    let backdropURLs: [URL]
+    let fallbackPosterURL: URL?
+    let width: CGFloat
+    let scrollOffset: CGFloat
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var activeIndex = 0
+    @State private var loadedURLs: Set<URL> = []
+
+    private let baseHeroHeight: CGFloat = 486
+    private let baseScrimHeight: CGFloat = 500
+    private let carouselIntervalNanoseconds: UInt64 = 5_000_000_000
+
+    private var effectiveURLs: [URL] {
+        let raw = backdropURLs.isEmpty ? [fallbackPosterURL].compactMap { $0 } : backdropURLs
+        return raw.map { highResolutionArtworkURL(from: $0) }
+    }
 
     var body: some View {
-        let blurRadius = 4.0 * reveal
-        let scale = 1.0 - (0.04 * reveal) + (pullDown / 2600)
+        let pullDown = max(0, scrollOffset)
+        let scrollUp = min(0, scrollOffset)
+        let heroHeight = baseHeroHeight + pullDown
+        let parallaxOffset = pullDown > 0 ? 0 : scrollUp * 0.45
+        let scrollFade = 1.0 - min(max(-scrollUp / 280, 0), 0.72)
 
-        ZStack {
-            dominantColor
+        ZStack(alignment: .top) {
+            CatDesign.mediaPlaceholder
+                .frame(width: width, height: heroHeight)
 
-            heroImage
-                .blur(radius: blurRadius)
-                .scaleEffect(scale)
+            Group {
+                if effectiveURLs.isEmpty {
+                    Image("DefaultHeroBackdrop")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: width, height: heroHeight)
+                        .clipped()
+                } else {
+                    carouselImages(heroHeight: heroHeight)
+                }
+            }
+            .opacity(scrollFade)
 
             LinearGradient(
                 stops: [
-                    .init(color: CatDesign.bgObsidian.opacity(0.45), location: 0.0),
-                    .init(color: CatDesign.bgObsidian.opacity(0.10), location: 0.32),
-                    .init(color: CatDesign.bgObsidian.opacity(0.80), location: 0.65),
-                    .init(color: CatDesign.bgObsidian, location: 1.0),
+                    .init(color: CatDesign.bgObsidian.opacity(0.40), location: 0.00),
+                    .init(color: CatDesign.bgObsidian.opacity(0.08), location: 0.25),
+                    .init(color: CatDesign.bgObsidian.opacity(0.60), location: 0.58),
+                    .init(color: CatDesign.bgObsidian.opacity(0.90), location: 0.82),
+                    .init(color: CatDesign.bgObsidian, location: 1.00)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .opacity(0.85 + (0.15 * reveal))
+            .frame(width: width, height: baseScrimHeight + pullDown)
         }
-        .ignoresSafeArea()
-        .task(id: displayPosterURL) {
-            let posterURL = displayPosterURL
-            loadedHeroPosterURL = nil
-            let color = await DominantColorExtractor.cachedColor(for: posterURL)
-            guard !Task.isCancelled, posterURL == displayPosterURL else { return }
-            dominantColor = color
-        }
-    }
-
-    private var heroImage: some View {
-        let highResolutionURL = displayPosterURL
-        let isHighResolutionLoaded = highResolutionURL != nil
-            && loadedHeroPosterURL == highResolutionURL
-
-        return ZStack {
-            if !isHighResolutionLoaded {
-                KFImage(itemPosterURL)
-                    .placeholder { Color.black }
-                    .fade(duration: 0.2)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: width, height: height)
-                    .scaleEffect(1.15)
-                    .blur(radius: 24)
-                    .clipped()
-                    .transition(.opacity)
-            }
-
-            KFImage(highResolutionURL)
-                .onSuccess { _ in
-                    guard highResolutionURL == displayPosterURL else { return }
-                    withAnimation(.easeOut(duration: 0.35)) {
-                        loadedHeroPosterURL = highResolutionURL
-                    }
+        .offset(y: parallaxOffset)
+        .frame(width: width, height: baseScrimHeight, alignment: .top)
+        .task(id: effectiveURLs) {
+            activeIndex = 0
+            prefetchHeroImages(effectiveURLs)
+            guard effectiveURLs.count > 1 else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: carouselIntervalNanoseconds)
+                guard !Task.isCancelled, effectiveURLs.count > 1 else { break }
+                let nextIndex = (activeIndex + 1) % effectiveURLs.count
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.9)) {
+                    activeIndex = nextIndex
                 }
-                .fade(duration: 0.35)
-                .resizable()
-                .scaledToFill()
-                .frame(width: width, height: height)
-                .scaleEffect(1.08)
-                .clipped()
-                .opacity(isHighResolutionLoaded ? 1 : 0)
+            }
         }
     }
 
-    private var displayPosterURL: URL? {
-        highResolutionPosterURL(from: summaryState.content?.posterURL ?? itemPosterURL)
+    @ViewBuilder
+    private func carouselImages(heroHeight: CGFloat) -> some View {
+        let safeIndex = min(activeIndex, max(effectiveURLs.count - 1, 0))
+        ZStack {
+            ForEach(Array(effectiveURLs.enumerated()), id: \.offset) { index, url in
+                let isCurrent = index == safeIndex
+                let isAdjacent = effectiveURLs.count > 1 && index == (safeIndex + 1) % effectiveURLs.count
+                if isCurrent || isAdjacent || loadedURLs.contains(url) {
+                    KFImage(url)
+                        .onSuccess { _ in
+                            loadedURLs.insert(url)
+                        }
+                        .placeholder {
+                            if index == 0, let fallbackPosterURL {
+                                KFImage(fallbackPosterURL)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .blur(radius: 18)
+                            } else {
+                                CatDesign.mediaPlaceholder
+                            }
+                        }
+                        .fade(duration: 0.35)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: width, height: heroHeight)
+                        .clipped()
+                        .opacity(isCurrent ? 1 : 0)
+                }
+            }
+        }
     }
 
-    private func highResolutionPosterURL(from url: URL?) -> URL? {
-        guard let url,
-              url.path.contains("/Items/"),
-              url.path.contains("/Images/Primary"),
+    private func prefetchHeroImages(_ urls: [URL]) {
+        guard urls.count > 1 else { return }
+        ImagePrefetcher(urls: urls).start()
+    }
+
+    private func highResolutionArtworkURL(from url: URL) -> URL {
+        guard url.path.contains("/Items/"),
+              (url.path.contains("/Images/Primary") || url.path.contains("/Images/Backdrop")),
               var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return url
         }
@@ -1004,788 +1101,76 @@ private struct MediaDetailHeroBackdrop: View {
                 item.name.caseInsensitiveCompare("maxWidth") == .orderedSame ||
                 item.name.caseInsensitiveCompare("quality") == .orderedSame
         }
-        queryItems.append(URLQueryItem(name: "maxHeight", value: "1800"))
-        queryItems.append(URLQueryItem(name: "quality", value: "100"))
+        if url.path.contains("/Images/Backdrop") {
+            queryItems.append(URLQueryItem(name: "maxWidth", value: "1920"))
+            queryItems.append(URLQueryItem(name: "quality", value: "90"))
+        } else {
+            queryItems.append(URLQueryItem(name: "maxHeight", value: "1800"))
+            queryItems.append(URLQueryItem(name: "quality", value: "100"))
+        }
         components.queryItems = queryItems
         return components.url ?? url
     }
 }
 
-private struct DetailNavigationButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .opacity(configuration.isPressed ? 0.78 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
+// MARK: - Title, Meta, Capability Badges & Primary Actions
 
-private enum MediaDetailSheet: Identifiable, Equatable {
-    case synopsis
-    case cast
-    case episodes
-
-    var id: String {
-        switch self {
-        case .synopsis: return "synopsis"
-        case .cast: return "cast"
-        case .episodes: return "episodes"
-        }
-    }
-}
-
-/// 详情页信息面板的聚合快照：所有异步数据一次性组装，供 UI 单次刷新。
-struct MediaDetailContent {
-    var posterURL: URL?
-    var rating: Double?
-    var contentRating: String?
-    var logoURL: URL?
-    var overview: String?
-    var genres: [String]
-    var director: String?
-    var castMembers: [CastMemberDisplay]
-    var seasons: [SeasonInfo]
-    var collections: [ServerMediaItem]
-}
-
-@MainActor
-final class MediaDetailSummaryState: ObservableObject {
-    @Published var content: MediaDetailContent?
-    @Published var isLoading = false
-}
-
-@MainActor
-final class MediaDetailCastState: ObservableObject {
-    @Published var members: [CastMemberDisplay] = []
-}
-
-@MainActor
-final class MediaDetailCollectionState: ObservableObject {
-    @Published var items: [ServerMediaItem] = []
-}
-
-@MainActor
-final class MediaDetailEpisodeState: ObservableObject {
-    @Published var seasons: [SeasonInfo] = []
-    @Published var selectedSeason: Int?
-    @Published var episodes: [EpisodeInfo] = []
-    @Published var isLoading = false
-    @Published var isLoadingMore = false
-    @Published var hasMore = false
-}
-
-@MainActor
-final class MediaDetailTechnicalState: ObservableObject {
-    @Published var videoWidth: Int?
-    @Published var episodeFileNameHint: String?
-    @Published var videoHeight: Int?
-    @Published var dynamicRange: String?
-}
-
-@MainActor
-final class MediaDetailActionState: ObservableObject {
-    @Published var isRefreshingMetadata = false
-    @Published var refreshErrorMessage: String?
-}
-
-@MainActor
-final class MediaDetailStore: ObservableObject {
-    let summaryState = MediaDetailSummaryState()
-    let castState = MediaDetailCastState()
-    let collectionState = MediaDetailCollectionState()
-    let episodeState = MediaDetailEpisodeState()
-    let technicalState = MediaDetailTechnicalState()
-    let actionState = MediaDetailActionState()
-
-    var content: MediaDetailContent? {
-        get {
-            guard var value = summaryState.content else { return nil }
-            value.castMembers = castState.members
-            value.seasons = episodeState.seasons
-            value.collections = collectionState.items
-            return value
-        }
-        set {
-            summaryState.content = newValue.map {
-                MediaDetailContent(
-                    posterURL: $0.posterURL,
-                    rating: $0.rating,
-                    contentRating: $0.contentRating,
-                    logoURL: $0.logoURL,
-                    overview: $0.overview,
-                    genres: $0.genres,
-                    director: $0.director,
-                    castMembers: [],
-                    seasons: [],
-                    collections: []
-                )
-            }
-            castState.members = newValue?.castMembers ?? []
-            episodeState.seasons = newValue?.seasons ?? []
-            collectionState.items = newValue?.collections ?? []
-        }
-    }
-
-    var isLoading: Bool {
-        get { summaryState.isLoading }
-        set { summaryState.isLoading = newValue }
-    }
-
-    var selectedSeason: Int? {
-        get { episodeState.selectedSeason }
-        set { episodeState.selectedSeason = newValue }
-    }
-
-    var seasonEpisodes: [EpisodeInfo] {
-        get { episodeState.episodes }
-        set { episodeState.episodes = newValue }
-    }
-
-    var isLoadingEpisodes: Bool {
-        get { episodeState.isLoading }
-        set { episodeState.isLoading = newValue }
-    }
-
-    var isLoadingMoreEpisodes: Bool {
-        get { episodeState.isLoadingMore }
-        set { episodeState.isLoadingMore = newValue }
-    }
-
-    var hasMoreEpisodes: Bool {
-        get { episodeState.hasMore }
-        set { episodeState.hasMore = newValue }
-    }
-
-    var isRefreshingMetadata: Bool {
-        get { actionState.isRefreshingMetadata }
-        set { actionState.isRefreshingMetadata = newValue }
-    }
-
-    var videoWidth: Int? {
-        get { technicalState.videoWidth }
-        set { technicalState.videoWidth = newValue }
-    }
-
-    var episodeFileNameHint: String? {
-        get { technicalState.episodeFileNameHint }
-        set { technicalState.episodeFileNameHint = newValue }
-    }
-
-    var videoHeight: Int? {
-        get { technicalState.videoHeight }
-        set { technicalState.videoHeight = newValue }
-    }
-
-    var dynamicRange: String? {
-        get { technicalState.dynamicRange }
-        set { technicalState.dynamicRange = newValue }
-    }
-
-    var refreshErrorMessage: String? {
-        get { actionState.refreshErrorMessage }
-        set { actionState.refreshErrorMessage = newValue }
-    }
-
-    private var loadedKey: String?
-    private var loadGeneration = 0
-    private var episodeStartIndex = 0
-    private var episodeLoadGeneration = 0
-    private var metadataCacheRecord: MetadataCacheRecord?
-    private var metadataRootDirectory: URL?
-    private var initialEpisodeTask: Task<Void, Never>?
-    private let metadataLoader = MediaDetailProgressiveLoader()
-
-    private let episodePageSize = 20
-
-    // MARK: - 派生
-
-    var seasonNumbers: [Int] {
-        (content?.seasons ?? []).map(\.seasonNumber)
-    }
-
-    var currentSeasonEpisodes: [EpisodeInfo] {
-        seasonEpisodes
-    }
-
-    var nextEpisodeToPlay: EpisodeInfo? {
-        seasonEpisodes
-            .sorted { ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber) }
-            .first
-    }
-
-    func supportsMetadataRefresh(for item: MediaItem, in modelContext: ModelContext) -> Bool {
-        if (try? connectionSnapshot(for: item, in: modelContext)) != nil {
-            return true
-        }
-        return MetadataRefreshCoordinator.supportsRefresh(for: item)
-    }
-
-    // MARK: - Loading
-
-    func load(item: MediaItem, modelContext: ModelContext, autoDownloadMetadata: Bool) async {
-        let key = detailKey(for: item)
-        guard loadedKey != key else { return }
-        loadedKey = key
-        loadGeneration += 1
-        let generation = loadGeneration
-        defer {
-            if generation == loadGeneration {
-                isLoading = false
-                if Task.isCancelled {
-                    loadedKey = nil
-                }
-            }
-        }
-
-        isLoading = true
-        resetEpisodePagingState()
-        content = baseContent(for: item)
-        #if DEBUG
-        VanmoLogger.library.info("[Debug][Detail] load type=\(item.mediaType.rawValue, privacy: .public) title=\(item.title, privacy: .private)")
-        #endif
-        videoWidth = item.videoWidth
-        videoHeight = item.videoHeight
-        dynamicRange = item.dynamicRange
-        episodeFileNameHint = nil
-
-        await performAggregate(
-            item: item,
-            modelContext: modelContext,
-            autoDownloadMetadata: autoDownloadMetadata,
-            force: false,
-            generation: generation
-        )
-    }
-
-    func refreshMetadata(for item: MediaItem, modelContext: ModelContext, force: Bool) async {
-        guard !isRefreshingMetadata else { return }
-        isRefreshingMetadata = true
-        defer { isRefreshingMetadata = false }
-        loadGeneration += 1
-        let generation = loadGeneration
-        initialEpisodeTask?.cancel()
-        episodeLoadGeneration += 1
-
-        await performAggregate(
-            item: item,
-            modelContext: modelContext,
-            autoDownloadMetadata: true,
-            force: force,
-            generation: generation
-        )
-    }
-
-    func selectSeason(_ season: Int, item: MediaItem, modelContext: ModelContext) async {
-        guard selectedSeason != season else { return }
-        selectedSeason = season
-        await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
-    }
-
-#if DEBUG
-    func installDebugHeroWalkEpisodesIfNeeded(for item: MediaItem) {
-        guard DownloadHeroWalkFixtures.requestedKind == .series, item.mediaType == .tvShow else { return }
-        guard let episodes = try? DownloadHeroWalkFixtures.seriesEpisodes() else { return }
-        if content == nil {
-            content = MediaDetailContent(
-                posterURL: item.posterURL,
-                rating: nil,
-                contentRating: nil,
-                logoURL: nil,
-                overview: item.overview,
-                genres: [],
-                director: nil,
-                castMembers: [],
-                seasons: [SeasonInfo(seasonNumber: 1)],
-                collections: []
-            )
-        } else {
-            content?.seasons = [SeasonInfo(seasonNumber: 1)]
-        }
-        selectedSeason = 1
-        seasonEpisodes = episodes
-        hasMoreEpisodes = false
-        isLoadingEpisodes = false
-        isLoadingMoreEpisodes = false
-    }
-#endif
-
-    func loadMoreEpisodes(item: MediaItem, modelContext: ModelContext) async {
-        guard hasMoreEpisodes, !isLoadingMoreEpisodes, !isLoadingEpisodes else { return }
-        await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: false)
-    }
-
-    /// 缓存、详情、季和合集按完成顺序发布，避免最慢请求阻塞其它组件。
-    private func performAggregate(
-        item: MediaItem,
-        modelContext: ModelContext,
-        autoDownloadMetadata: Bool,
-        force: Bool,
-        generation: Int
-    ) async {
-        let root = (try? await MetadataCache.shared.rootDirectoryURL())
-            ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        metadataRootDirectory = root
-        let connection = try? connectionSnapshot(for: item, in: modelContext)
-        let canRefresh = supportsMetadataRefresh(for: item, in: modelContext)
-        let updates = metadataLoader.updates(
-            for: item,
-            connection: connection,
-            autoDownloadMetadata: autoDownloadMetadata && canRefresh,
-            force: force
-        )
-
-        for await event in updates {
-            guard generation == loadGeneration, !Task.isCancelled, !item.isDeleted else { return }
-            switch event {
-            case .cached(let record), .metadata(let record):
-                applyMetadataRecord(record, root: root, item: item)
-                if episodeState.seasons.isEmpty, item.mediaType == .tvShow {
-                    applySeasons(seasonInfos(from: record), item: item, modelContext: modelContext)
-                }
-            case .seasons(let seasons):
-                applySeasons(seasons, item: item, modelContext: modelContext)
-            case .collections(let collections):
-                collectionState.items = collections
-            case .failed(let component, let message):
-                if component == .metadata {
-                    refreshErrorMessage = message
-                }
-            case .finished:
-                isLoading = false
-            }
-        }
-
-        guard generation == loadGeneration, !Task.isCancelled else { return }
-        isLoading = false
-    }
-
-    private func baseContent(for item: MediaItem) -> MediaDetailContent {
-        let members = item.cast.enumerated().map { index, name in
-            CastMemberDisplay(id: "\(index)-\(name)", name: name, role: nil, profileURL: nil)
-        }
-        return MediaDetailContent(
-            posterURL: item.posterURL,
-            rating: item.rating,
-            contentRating: item.contentRating,
-            logoURL: item.logoURL,
-            overview: item.overview,
-            genres: item.genres,
-            director: item.director,
-            castMembers: members,
-            seasons: [],
-            collections: []
-        )
-    }
-
-    private func applyMetadataRecord(
-        _ record: MetadataCacheRecord,
-        root: URL,
-        item: MediaItem
-    ) {
-        metadataCacheRecord = record
-        var snapshot = summaryState.content ?? baseContent(for: item)
-        snapshot.posterURL = record.posterRemoteURL ?? snapshot.posterURL
-        snapshot.rating = record.rating ?? snapshot.rating
-        snapshot.contentRating = MediaCapabilityTags.normalizedContentRating(record.contentRating)
-            ?? snapshot.contentRating
-        snapshot.logoURL = record.resolvedLogoURL(rootDirectory: root) ?? snapshot.logoURL
-        snapshot.overview = record.overview?.isEmpty == false ? record.overview : snapshot.overview
-        snapshot.genres = record.genres.isEmpty ? snapshot.genres : record.genres
-        snapshot.director = record.director?.isEmpty == false ? record.director : snapshot.director
-        summaryState.content = snapshot
-
-        let members = record.makeCastDisplays(rootDirectory: root)
-        if !members.isEmpty {
-            castState.members = members
-        }
-
-        videoWidth = record.videoWidth ?? videoWidth
-        videoHeight = record.videoHeight ?? videoHeight
-        dynamicRange = record.dynamicRange ?? dynamicRange
-    }
-
-    private func applySeasons(
-        _ seasons: [SeasonInfo],
-        item: MediaItem,
-        modelContext: ModelContext
-    ) {
-        guard !seasons.isEmpty else { return }
-        episodeState.seasons = seasons
-        let previousSeason = selectedSeason
-        if let previousSeason, seasons.contains(where: { $0.seasonNumber == previousSeason }) {
-            selectedSeason = previousSeason
-        } else {
-            selectedSeason = seasons.first?.seasonNumber
-        }
-
-        initialEpisodeTask?.cancel()
-        initialEpisodeTask = Task { [weak self] in
-            guard let self else { return }
-            await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
-        }
-    }
-
-    private func applyTechnicalFields(
-        from episodes: [EpisodeInfo]
-    ) {
-        let names = episodes.compactMap(\.originalFileName).joined(separator: " ")
-        episodeFileNameHint = names.isEmpty ? nil : names
-
-        let match = episodes.first {
-            ($0.videoWidth ?? 0) > 0 || ($0.videoHeight ?? 0) > 0
-        }
-        #if DEBUG
-        VanmoLogger.library.info("[Debug][Detail] tvTags episodes=\(episodes.count, privacy: .public) width=\(match?.videoWidth ?? 0, privacy: .public) height=\(match?.videoHeight ?? 0, privacy: .public) files=\(names.isEmpty ? "none" : "yes", privacy: .public)")
-        #endif
-        guard let match else { return }
-
-        videoWidth = videoWidth ?? match.videoWidth
-        videoHeight = videoHeight ?? match.videoHeight
-        dynamicRange = dynamicRange ?? match.dynamicRange
-    }
-
-    private func resetEpisodePagingState() {
-        initialEpisodeTask?.cancel()
-        episodeLoadGeneration += 1
-        selectedSeason = nil
-        seasonEpisodes = []
-        isLoadingEpisodes = false
-        isLoadingMoreEpisodes = false
-        hasMoreEpisodes = false
-        episodeStartIndex = 0
-        metadataCacheRecord = nil
-        metadataRootDirectory = nil
-    }
-
-    private func loadSeasonEpisodes(item: MediaItem, modelContext: ModelContext, reset: Bool) async {
-        guard !Task.isCancelled,
-              loadedKey == detailKey(for: item),
-              item.mediaType == .tvShow else {
-            return
-        }
-        guard let season = selectedSeason else { return }
-
-        if reset {
-            episodeLoadGeneration += 1
-            seasonEpisodes = []
-            episodeStartIndex = 0
-            hasMoreEpisodes = false
-            isLoadingEpisodes = true
-            isLoadingMoreEpisodes = false
-        } else {
-            guard hasMoreEpisodes, !isLoadingMoreEpisodes, !isLoadingEpisodes else { return }
-            isLoadingMoreEpisodes = true
-        }
-
-        let generation = episodeLoadGeneration
-        let startIndex = reset ? 0 : episodeStartIndex
-
-        defer {
-            if generation == episodeLoadGeneration {
-                isLoadingEpisodes = false
-                isLoadingMoreEpisodes = false
-            }
-        }
-
-        do {
-            let page = try await fetchEpisodesPage(
-                item: item,
-                modelContext: modelContext,
-                season: season,
-                startIndex: startIndex,
-                pageSize: episodePageSize
-            )
-
-            guard generation == episodeLoadGeneration, !item.isDeleted else { return }
-
-            let merged = mergeEpisodeBackdrops(page.items, for: item)
-            if reset {
-                seasonEpisodes = merged
-            } else {
-                let existingIDs = Set(seasonEpisodes.map(\.id))
-                seasonEpisodes.append(contentsOf: merged.filter { !existingIDs.contains($0.id) })
-            }
-
-            episodeStartIndex = startIndex + page.items.count
-            hasMoreEpisodes = page.items.count >= episodePageSize
-                && episodeStartIndex < page.totalRecordCount
-            let cacheKey = MetadataCacheKey.from(item)
-            Task(priority: .utility) {
-                try? await MetadataCache.shared.cacheEpisodes(page.items, for: cacheKey)
-            }
-        } catch {
-            VanmoLogger.library.error("[MediaServer] Failed to load season episodes: \(error.localizedDescription)")
-            guard generation == episodeLoadGeneration else { return }
-
-            if reset, let fallback = cachedEpisodes(for: season, item: item), !fallback.isEmpty {
-                seasonEpisodes = fallback
-                episodeStartIndex = fallback.count
-                hasMoreEpisodes = false
-            } else if reset {
-                seasonEpisodes = []
-                hasMoreEpisodes = false
-            }
-        }
-
-        applyTechnicalFields(from: seasonEpisodes)
-    }
-
-    private func fetchEpisodesPage(
-        item: MediaItem,
-        modelContext: ModelContext,
-        season: Int,
-        startIndex: Int,
-        pageSize: Int
-    ) async throws -> EpisodePage {
-        guard let seriesServerId = item.serverId else {
-            throw NetworkError.notConnected
-        }
-
-        let snapshot = try? connectionSnapshot(for: item, in: modelContext)
-
-        switch item.fileURL.host {
-        case "plex-series":
-            if let seasonKey = content?.seasons.first(where: { $0.seasonNumber == season })?.serverId {
-                if let snapshot {
-                    return try await PlexEpisodeFetcher.fetchEpisodesPage(
-                        seasonRatingKey: seasonKey,
-                        seasonNumber: season,
-                        startIndex: startIndex,
-                        pageSize: pageSize,
-                        connection: snapshot
-                    )
-                }
-                return try await PlexEpisodeFetcher.fetchEpisodesPage(
-                    seasonRatingKey: seasonKey,
-                    seasonNumber: season,
-                    startIndex: startIndex,
-                    pageSize: pageSize
-                )
-            }
-
-            let all: [EpisodeInfo]
-            if let snapshot {
-                all = try await PlexEpisodeFetcher.fetchEpisodes(
-                    seriesRatingKey: seriesServerId,
-                    connection: snapshot
-                )
-            } else {
-                all = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
-            }
-            let filtered = all
-                .filter { $0.seasonNumber == season }
-                .sorted { $0.episodeNumber < $1.episodeNumber }
-            let slice = Array(filtered.dropFirst(startIndex).prefix(pageSize))
-            return EpisodePage(items: slice, totalRecordCount: filtered.count)
-        default:
-            if let snapshot {
-                return try await EmbyEpisodeFetcher.fetchEpisodesPage(
-                    seriesId: seriesServerId,
-                    season: season,
-                    startIndex: startIndex,
-                    pageSize: pageSize,
-                    connection: snapshot
-                )
-            }
-            return try await EmbyEpisodeFetcher.fetchEpisodesPage(
-                seriesId: seriesServerId,
-                season: season,
-                startIndex: startIndex,
-                pageSize: pageSize
-            )
-        }
-    }
-
-    private func seasonInfos(from record: MetadataCacheRecord) -> [SeasonInfo] {
-        Array(Set(record.episodes.map(\.seasonNumber)))
-            .sorted()
-            .map { SeasonInfo(seasonNumber: $0) }
-    }
-
-    private func cachedEpisodes(for season: Int, item: MediaItem) -> [EpisodeInfo]? {
-        guard let record = metadataCacheRecord,
-              let root = metadataRootDirectory,
-              item.mediaType == .tvShow,
-              !record.episodes.isEmpty else {
-            return nil
-        }
-        return record.episodes
-            .filter { $0.seasonNumber == season }
-            .map { $0.makeEpisodeInfo(rootDirectory: root) }
-            .sorted { $0.episodeNumber < $1.episodeNumber }
-    }
-
-    private func mergeEpisodeBackdrops(_ loaded: [EpisodeInfo], for item: MediaItem) -> [EpisodeInfo] {
-        guard let record = metadataCacheRecord,
-              let root = metadataRootDirectory,
-              item.mediaType == .tvShow,
-              !record.episodes.isEmpty else {
-            return loaded
-        }
-
-        let cachedByID = Dictionary(record.episodes.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
-        return loaded.map { episode in
-            guard episode.backdropURL == nil, let cached = cachedByID[episode.id] else { return episode }
-            let cachedEpisode = cached.makeEpisodeInfo(rootDirectory: root)
-            guard let backdropURL = cachedEpisode.backdropURL else { return episode }
-            return EpisodeInfo(
-                id: episode.id,
-                title: episode.title,
-                seasonNumber: episode.seasonNumber,
-                episodeNumber: episode.episodeNumber,
-                duration: episode.duration,
-                overview: episode.overview,
-                streamURL: episode.streamURL,
-                backdropURL: backdropURL,
-                fileSize: episode.fileSize,
-                originalFileName: episode.originalFileName,
-                container: episode.container,
-                remotePath: episode.remotePath,
-                videoWidth: episode.videoWidth,
-                videoHeight: episode.videoHeight,
-                dynamicRange: episode.dynamicRange
-            )
-        }
-    }
-
-    // MARK: - 支持
-
-    private func detailKey(for item: MediaItem) -> String {
-        MetadataCacheKey.from(item).cacheKey
-    }
-
-    private func connectionSnapshot(for item: MediaItem, in modelContext: ModelContext) throws -> MediaServerConnectionSnapshot? {
-        try MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
-    }
-}
-
-private struct MediaDetailRefreshErrorPresenter: ViewModifier {
-    @ObservedObject var state: MediaDetailActionState
-
-    private var refreshErrorBinding: Binding<Bool> {
-        Binding {
-            state.refreshErrorMessage != nil
-        } set: { isPresented in
-            if !isPresented { state.refreshErrorMessage = nil }
-        }
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .alert(L10n.tr("刷新失败"), isPresented: refreshErrorBinding) {
-                Button(L10n.tr("确定")) {}
-            } message: {
-                Text(state.refreshErrorMessage ?? "")
-            }
-    }
-}
-
-private struct MediaDetailTitleLogoView: View {
+private struct MediaDetailTitleAndMetaBlock: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let logoURL: URL?
-    var collapsedStyle = false
-    var maxLogoHeight: CGFloat = 72
+    let metaText: String?
+    let badges: [String]
 
     var body: some View {
-        MediaTitleLogoView(
-            title: title,
-            logoURL: logoURL,
-            collapsedStyle: collapsedStyle,
-            maxLogoHeight: maxLogoHeight
-        )
-    }
-}
-
-private struct MediaDetailPanelHeader: View {
-    let title: String
-    let rating: Double?
-    let logoURL: URL?
-    let metaValues: [String]
-    let tags: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             MediaTitleLogoView(
                 title: title,
                 logoURL: logoURL,
-                titleFont: .system(size: 26, weight: .bold),
-                maxLogoHeight: 60,
+                titleFont: .system(size: 30, weight: .bold),
+                titleColor: CatDesign.textIvory,
+                maxLogoHeight: 64,
                 contentAlignment: .leading
             )
 
-            HStack(spacing: 8) {
-                if let rating {
-                    Text(String(format: "★ %.1f", rating))
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(CatDesign.accentAmber)
-                }
-
-                if !metaValues.isEmpty {
-                    Text(metaValues.joined(separator: " · "))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(CatDesign.textMuted)
-                        .lineLimit(1)
-                }
+            if let metaText {
+                Text(metaText)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(CatDesign.accentAmber)
+                    .lineLimit(1)
             }
 
-            if !tags.isEmpty {
+            if !badges.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(Array(tags.enumerated()), id: \.offset) { _, tag in
-                            tagView(tag)
+                    HStack(spacing: 7) {
+                        ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
+                            Text(badge)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(CatDesign.textIvory)
+                                .detailChipSurface(
+                                    colorScheme: colorScheme,
+                                    height: 24,
+                                    horizontalPadding: 9,
+                                    cornerRadius: 12
+                                )
                         }
                     }
                 }
+                .padding(.top, 2)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-
-    private func tagView(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(CatDesign.textIvory)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3.5)
-            .background(CatDesign.surfacePill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75)
-            )
-    }
 }
 
-private func mediaDetailDisplayedTask(
-    in tasks: [DownloadTaskSnapshot],
-    matching isRelated: (DownloadRequest) -> Bool
-) -> DownloadTaskSnapshot? {
-    let related = tasks.filter { isRelated($0.request) }
-    if let downloading = related.first(where: { $0.status == .downloading }) {
-        return downloading
-    }
-    if let queued = related
-        .filter({ $0.status == .queued })
-        .min(by: { $0.createdAt < $1.createdAt }) {
-        return queued
-    }
-    if let paused = related
-        .filter({ $0.status == .paused })
-        .min(by: { $0.createdAt < $1.createdAt }) {
-        return paused
-    }
-    guard !related.isEmpty, related.allSatisfy({ $0.status == .completed }) else {
-        return nil
-    }
-    return related.max(by: { $0.updatedAt < $1.updatedAt })
-}
-
-private struct MediaDetailPanelActions: View {
+private struct MediaDetailPrimaryActionRow: View {
     @EnvironmentObject private var downloadManager: DownloadManager
+    @Environment(\.colorScheme) private var colorScheme
+
     let isTVShow: Bool
+    let playButtonTitle: String
     let isFavorite: Bool
     let isUpdatingFavorite: Bool
-    let resumeLabel: String?
-    let shareText: String
     let isRelatedDownload: (DownloadRequest) -> Bool
     let isEnqueueingDownload: Bool
     let play: () -> Void
@@ -1803,89 +1188,57 @@ private struct MediaDetailPanelActions: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            playButtonWithCat
-            actionRow
+        HStack(spacing: 10) {
+            playNowButton
+            favoriteButton
+            downloadButton
         }
+        .padding(.top, 14)
+        .padding(.bottom, 6)
     }
 
-    private var playButtonWithCat: some View {
-        Button(action: play) {
-            HStack(spacing: 9) {
+    private var playNowButton: some View {
+        let fill: Color = colorScheme == .dark
+            ? Color(red: 1.0, green: 181 / 255, blue: 71 / 255).opacity(0.70)
+            : CatDesign.accentAmber.opacity(0.90)
+        let stroke: Color = colorScheme == .dark
+            ? Color.white.opacity(0.75)
+            : Color.white.opacity(0.85)
+
+        return Button(action: play) {
+            HStack(spacing: 8) {
                 Image("CatPlaySmall")
+                    .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 15, height: 15)
+                    .frame(width: 14, height: 15)
+                    .foregroundStyle(Color.white.opacity(0.95))
 
-                Text(isTVShow ? L10n.tr("播放剧集") : L10n.tr("播放影片"))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(CatDesign.textIvory)
-
-                Spacer(minLength: 8)
-
-                if let resumeLabel {
-                    Text(resumeLabel)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(CatDesign.accentAmber)
-                        .lineLimit(1)
-                }
+                Text(playButtonTitle)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.95))
+                    .lineLimit(1)
             }
-            .padding(.leading, 54)
-            .padding(.trailing, 20)
-            .frame(height: 54)
+            .padding(.horizontal, 18)
             .frame(maxWidth: .infinity)
-            .catGlassCard(cornerRadius: 27, elevated: true, amberStroke: true, strokeWidth: 1.15)
-            .shadow(color: CatDesign.amberGlowShadow, radius: 14, y: 6)
+            .frame(height: 48)
+            .background(fill, in: Capsule())
+            .overlay(Capsule().strokeBorder(stroke, lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.12), radius: 12, y: 4)
         }
         .buttonStyle(.plain)
-        .padding(.top, 18)
-        .overlay(alignment: .topLeading) {
-            Image("CatPerchingPlay")
+        .overlay(alignment: .topTrailing) {
+            Image("CatPerchingPlayTopRight")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 88, height: 76)
-                .offset(x: -14, y: -14)
+                .frame(width: 74, height: 68)
+                .offset(x: 15, y: -22)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
-    private var actionRow: some View {
-        HStack(spacing: 10) {
-            favoriteStampButton
-
-            ShareLink(item: shareText) {
-                HStack(spacing: 8) {
-                    Image("CatShareFeline")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 18, height: 18)
-                        .foregroundStyle(CatDesign.textIvory)
-
-                    Text(L10n.tr("分享"))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(CatDesign.textIvory)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .catGlassCard(cornerRadius: CatDesign.radiusPill)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: download) {
-                MediaDetailDownloadPillContent(
-                    taskID: displayedDownloadTask?.id,
-                    isEnqueueing: isEnqueueingDownload
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(isDownloadDisabled)
-            .downloadHeroFrame("source")
-            .accessibilityIdentifier("download.detail.button")
-        }
-    }
-
-    private var favoriteStampButton: some View {
+    private var favoriteButton: some View {
         Button(action: toggleFavorite) {
             ZStack {
                 if isUpdatingFavorite {
@@ -1906,17 +1259,33 @@ private struct MediaDetailPanelActions: View {
                         .foregroundStyle(CatDesign.textMuted)
                 }
             }
-            .frame(width: 46, height: 46)
-            .catGlassCard(cornerRadius: CatDesign.radiusPill, amberStroke: isFavorite)
+            .frame(width: 48, height: 48)
+            .detailLiquidGlass(in: Circle(), colorScheme: colorScheme, amberStroke: isFavorite)
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .disabled(isUpdatingFavorite)
         .accessibilityLabel(isFavorite ? L10n.tr("取消收藏") : L10n.tr("收藏"))
     }
+
+    private var downloadButton: some View {
+        Button(action: download) {
+            MediaDetailDownloadCircleContent(
+                taskID: displayedDownloadTask?.id,
+                isEnqueueing: isEnqueueingDownload
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isDownloadDisabled)
+        .downloadHeroFrame("source")
+        .accessibilityIdentifier("download.detail.button")
+    }
 }
 
-private struct MediaDetailDownloadPillContent: View {
+private struct MediaDetailDownloadCircleContent: View {
     @EnvironmentObject private var downloadManager: DownloadManager
+    @Environment(\.colorScheme) private var colorScheme
+
     let taskID: UUID?
     let isEnqueueing: Bool
 
@@ -1925,20 +1294,17 @@ private struct MediaDetailDownloadPillContent: View {
         return downloadManager.tasks.first { $0.id == taskID }
     }
 
+    private var isAmberHighlighted: Bool {
+        task?.status == .downloading || task?.status == .queued || task?.status == .completed
+    }
+
     var body: some View {
-        HStack(spacing: 8) {
+        ZStack {
             iconContent
-            Text(labelText)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(task?.status == .completed ? CatDesign.accentAmber : CatDesign.textIvory)
-                .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 46)
-        .catGlassCard(
-            cornerRadius: CatDesign.radiusPill,
-            amberStroke: task?.status == .downloading || task?.status == .completed
-        )
+        .frame(width: 48, height: 48)
+        .detailLiquidGlass(in: Circle(), colorScheme: colorScheme, amberStroke: isAmberHighlighted)
+        .contentShape(Circle())
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)
     }
@@ -1951,45 +1317,44 @@ private struct MediaDetailDownloadPillContent: View {
                 MediaDetailDownloadProgressRing(progress: nil, tint: CatDesign.accentAmber)
                     .frame(width: 20, height: 20)
             case .downloading:
-                MediaDetailDownloadProgressRing(progress: task.totalBytes > 0 ? task.progress : nil, tint: CatDesign.accentAmber)
-                    .frame(width: 20, height: 20)
+                MediaDetailDownloadProgressRing(
+                    progress: task.totalBytes > 0 ? task.progress : nil,
+                    tint: CatDesign.accentAmber
+                )
+                .frame(width: 20, height: 20)
             case .paused:
                 Image("CatPlaySmall")
+                    .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 14, height: 14)
+                    .foregroundStyle(CatDesign.accentAmber)
             case .completed:
                 Image("CatEarCheck")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 18, height: 18)
             case .failed:
-                Image("CatDownloadFeline")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 18, height: 18)
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(CatDesign.dangerRed)
             }
         } else if isEnqueueing {
             ProgressView()
                 .controlSize(.small)
                 .tint(CatDesign.accentAmber)
+        } else if colorScheme == .light {
+            Image("CatDownloadFeline")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 18, height: 18)
+                .foregroundStyle(CatDesign.textIvory)
         } else {
             Image("CatDownloadFeline")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 18, height: 18)
-        }
-    }
-
-    private var labelText: String {
-        guard let task else { return L10n.tr("下载") }
-        switch task.status {
-        case .queued: return L10n.tr("等待中")
-        case .downloading:
-            return task.totalBytes > 0 ? "\(Int(task.progress * 100))%" : L10n.tr("下载中")
-        case .paused: return L10n.tr("继续")
-        case .completed: return L10n.tr("已下载")
-        case .failed: return L10n.tr("重试")
         }
     }
 
@@ -2000,7 +1365,7 @@ private struct MediaDetailDownloadPillContent: View {
         case .queued: return "暂停等待中的下载"
         case .downloading: return "暂停下载"
         case .paused: return "继续下载"
-        case .completed: return "已下载"
+        case .completed: return L10n.tr("已下载")
         case .failed: return L10n.tr("重新下载")
         }
     }
@@ -2009,6 +1374,474 @@ private struct MediaDetailDownloadPillContent: View {
         guard let task, task.totalBytes > 0 else { return "" }
         return "\(Int(task.progress * 100))%"
     }
+}
+
+// MARK: - Synopsis Card
+
+private struct MediaDetailSynopsisCard: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let overview: String?
+    let onTap: () -> Void
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let fill: Color = colorScheme == .dark
+            ? Color(red: 18 / 255, green: 19 / 255, blue: 22 / 255).opacity(0.45)
+            : CatDesign.surfaceGlass
+        let stroke: Color = colorScheme == .dark
+            ? Color(red: 244 / 255, green: 239 / 255, blue: 230 / 255).opacity(0.40)
+            : CatDesign.strokeGlass
+
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(L10n.tr("简介"))
+                        .font(.system(size: 13.5, weight: .bold))
+                        .foregroundStyle(CatDesign.textIvory)
+
+                    Spacer()
+
+                    Text(L10n.tr("更多 ›"))
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+
+                Text(overview ?? L10n.tr("暂无简介"))
+                    .font(.system(size: 12))
+                    .lineSpacing(3.5)
+                    .foregroundStyle(CatDesign.textMuted)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+            .background(fill, in: shape)
+            .overlay(shape.strokeBorder(stroke, lineWidth: 0.9))
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Episodes Section
+
+private struct MediaDetailEpisodesSection: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let episodes: [EpisodeInfo]
+    let seasonNumbers: [Int]
+    @Binding var selectedSeason: Int?
+    var isLoadingEpisodes: Bool = false
+    var isLoadingMore: Bool = false
+    var hasMoreEpisodes: Bool = false
+    let onPlay: (EpisodeInfo) -> Void
+    var onLoadMore: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            headerRow
+
+            if isLoadingEpisodes && episodes.isEmpty {
+                ProgressView()
+                    .tint(CatDesign.accentAmber)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            } else if episodes.isEmpty {
+                Text(L10n.tr("暂无剧集"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(CatDesign.textMuted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(episodes) { episode in
+                            episodeHorizontalCard(episode)
+                                .id(episode.id)
+                        }
+
+                        if hasMoreEpisodes || isLoadingMore {
+                            Group {
+                                if isLoadingMore {
+                                    ProgressView()
+                                        .tint(CatDesign.accentAmber)
+                                        .frame(width: 48, height: 98)
+                                } else {
+                                    Color.clear
+                                        .frame(width: 1, height: 98)
+                                }
+                            }
+                            .onAppear { onLoadMore?() }
+                        }
+                    }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                }
+                .scrollClipDisabled()
+            }
+        }
+    }
+
+    private var headerRow: some View {
+        HStack(spacing: 8) {
+            Text(L10n.tr("剧集"))
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(CatDesign.textIvory)
+
+            CatStretchingDivider()
+
+            Spacer(minLength: 8)
+
+            if !seasonNumbers.isEmpty {
+                Menu {
+                    ForEach(seasonNumbers, id: \.self) { season in
+                        Button(LocalizedFormat.seasonLabel(season)) { selectedSeason = season }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(LocalizedFormat.seasonLabel(selectedSeason ?? seasonNumbers.first ?? 1))
+                            .font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundStyle(CatDesign.accentAmber)
+                    .detailChipSurface(
+                        colorScheme: colorScheme,
+                        height: 28,
+                        horizontalPadding: 11,
+                        cornerRadius: 14
+                    )
+                }
+                .disabled(seasonNumbers.count <= 1)
+            }
+        }
+        .padding(.horizontal, CatDesign.horizontalMargin)
+    }
+
+    private func episodeHorizontalCard(_ episode: EpisodeInfo) -> some View {
+        let isCompleted = episode.isWatched
+        let isInProgress = !isCompleted && episode.lastPlaybackPosition > 0 && episode.duration > 0
+        let progress = isInProgress ? min(max(episode.lastPlaybackPosition / episode.duration, 0.02), 1) : 0
+
+        return Button {
+            onPlay(episode)
+        } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                ZStack(alignment: .topLeading) {
+                    if let backdropURL = episode.backdropURL {
+                        KFImage(backdropURL)
+                            .placeholder { thumbnailPlaceholder }
+                            .fade(duration: 0.2)
+                            .resizable()
+                            .scaledToFill()
+                            .id(backdropURL)
+                    } else {
+                        thumbnailPlaceholder
+                    }
+
+                    LinearGradient(
+                        colors: [.clear, CatDesign.catSilhouette.opacity(0.92)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 58)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+
+                    Text(String(format: "E%02d", episode.episodeNumber))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CatDesign.Cinema.textIvory)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
+                        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.75))
+                        .padding(7)
+
+                    if isCompleted {
+                        CatSleepingPillBadge()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                            .padding(7)
+                    }
+
+                    if isInProgress {
+                        CatPawProgressBar(progress: progress, trackHeight: 3, showPawDot: true)
+                            .padding(.horizontal, 9)
+                            .padding(.bottom, 5)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    }
+                }
+                .frame(width: 174, height: 98)
+                .clipShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
+                        .strokeBorder(isInProgress ? CatDesign.strokeAmber : CatDesign.strokeGlass, lineWidth: 1)
+                )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(episode.title.isEmpty ? LocalizedFormat.episodeLabel(episode.episodeNumber) : episode.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(CatDesign.textIvory)
+                        .lineLimit(1)
+
+                    episodeSubtitle(episode, isCompleted: isCompleted, isInProgress: isInProgress)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                }
+                .frame(width: 174, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func episodeSubtitle(_ episode: EpisodeInfo, isCompleted: Bool, isInProgress: Bool) -> some View {
+        if isCompleted {
+            let durationLabel = episode.duration > 0 ? episode.duration.localizedShortDuration : LocalizedFormat.unknownDuration()
+            Text("\(durationLabel) · \(L10n.tr("已看"))")
+                .foregroundStyle(CatDesign.accentAmber)
+        } else if isInProgress {
+            let posText = formatPlaybackTimestamp(episode.lastPlaybackPosition)
+            let totalText = episode.duration > 0 ? episode.duration.localizedShortDuration : LocalizedFormat.unknownDuration()
+            Text("\(posText) · \(totalText)")
+                .foregroundStyle(CatDesign.textMuted)
+        } else {
+            Text(episode.duration > 0 ? episode.duration.localizedShortDuration : LocalizedFormat.unknownDuration())
+                .foregroundStyle(CatDesign.textMuted)
+        }
+    }
+
+    private func formatPlaybackTimestamp(_ seconds: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(seconds))
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let secs = totalSeconds % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        }
+        return String(format: "%02d:%02d", minutes, secs)
+    }
+
+    private var thumbnailPlaceholder: some View {
+        ZStack {
+            CatDesign.mediaPlaceholder
+            Image(systemName: "play.rectangle")
+                .font(.title3)
+                .foregroundStyle(CatDesign.textMuted.opacity(0.45))
+        }
+    }
+}
+
+// MARK: - Cast & Crew Section
+
+private struct MediaDetailCastSection: View {
+    let members: [CastMemberDisplay]
+
+    var body: some View {
+        if !members.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L10n.tr("演职员"))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(members) { member in
+                            MediaDetailCastAvatar(member: member)
+                        }
+                    }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                }
+            }
+        }
+    }
+}
+
+private struct MediaDetailCastAvatar: View {
+    let member: CastMemberDisplay
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .fill(CatDesign.surfacePill)
+
+                if let profileURL = member.profileURL {
+                    KFImage(profileURL)
+                        .placeholder {
+                            Text(initial(for: member.name))
+                                .font(.system(size: 20, weight: .bold, design: .rounded))
+                                .foregroundStyle(CatDesign.textMuted)
+                        }
+                        .fade(duration: 0.2)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60)
+                        .clipShape(Circle())
+                } else {
+                    Text(initial(for: member.name))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(CatDesign.textMuted)
+                }
+            }
+            .frame(width: 60, height: 60)
+            .overlay(Circle().strokeBorder(CatDesign.strokeGlass, lineWidth: 1))
+
+            VStack(spacing: 1) {
+                Text(member.name)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                if let role = member.role, !role.isEmpty {
+                    Text(role)
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(CatDesign.textMuted)
+                        .lineLimit(1)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .frame(width: 72)
+        }
+    }
+
+    private func initial(for name: String) -> String {
+        String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased()
+    }
+}
+
+// MARK: - Collections Section
+
+private struct MediaDetailCollectionsSection: View {
+    let collections: [ServerMediaItem]
+    let makeItem: (ServerMediaItem) -> MediaItem
+
+    var body: some View {
+        if !collections.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L10n.tr("合集"))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(CatDesign.textIvory)
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(collections, id: \.serverId) { collection in
+                            NavigationLink {
+                                EmbyFolderBrowseView(container: makeItem(collection))
+                            } label: {
+                                MediaDetailCollectionCard(collection: collection)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                }
+            }
+        }
+    }
+}
+
+private struct MediaDetailCollectionCard: View {
+    let collection: ServerMediaItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(CatDesign.mediaPlaceholder)
+
+                if let posterURL = collection.posterURL {
+                    KFImage(posterURL)
+                        .fade(duration: 0.2)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "rectangle.stack.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundStyle(CatDesign.accentAmber)
+                }
+            }
+            .frame(width: 124, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+            )
+
+            Text(collection.title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CatDesign.textIvory)
+                .lineLimit(2)
+                .frame(width: 124, alignment: .leading)
+        }
+    }
+}
+
+// MARK: - Technical Media Specifications Footer
+
+private struct MediaDetailSpecsFooter: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let chips: [String]
+
+    var body: some View {
+        if !chips.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L10n.tr("媒体规格"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(CatDesign.textDim)
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                            Text(chip)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundStyle(CatDesign.textMuted)
+                                .detailChipSurface(
+                                    colorScheme: colorScheme,
+                                    height: 26,
+                                    horizontalPadding: 10,
+                                    cornerRadius: 13
+                                )
+                        }
+                    }
+                    .padding(.horizontal, CatDesign.horizontalMargin)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Shared Helpers & Pickers
+
+private func mediaDetailDisplayedTask(
+    in tasks: [DownloadTaskSnapshot],
+    matching isRelated: (DownloadRequest) -> Bool
+) -> DownloadTaskSnapshot? {
+    let related = tasks.filter { isRelated($0.request) }
+    if let downloading = related.first(where: { $0.status == .downloading }) {
+        return downloading
+    }
+    if let queued = related
+        .filter({ $0.status == .queued })
+        .min(by: { $0.createdAt < $1.createdAt }) {
+        return queued
+    }
+    if let paused = related
+        .filter({ $0.status == .paused })
+        .min(by: { $0.createdAt < $1.createdAt }) {
+        return paused
+    }
+    if let failed = related
+        .filter({ $0.status == .failed })
+        .max(by: { $0.updatedAt < $1.updatedAt }) {
+        return failed
+    }
+    guard !related.isEmpty, related.allSatisfy({ $0.status == .completed }) else {
+        return nil
+    }
+    return related.max(by: { $0.updatedAt < $1.updatedAt })
 }
 
 private struct MediaDetailDownloadProgressRing: View {
@@ -2147,428 +1980,866 @@ private struct EpisodeDownloadPicker: View {
     }
 }
 
-private struct MediaDetailCastSection: View {
-    let members: [CastMemberDisplay]
+private struct DetailNavigationButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .opacity(configuration.isPressed ? 0.78 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
 
-    var body: some View {
+private struct MediaDetailRefreshErrorPresenter: ViewModifier {
+    @ObservedObject var state: MediaDetailActionState
+
+    private var refreshErrorBinding: Binding<Bool> {
+        Binding {
+            state.refreshErrorMessage != nil
+        } set: { isPresented in
+            if !isPresented { state.refreshErrorMessage = nil }
+        }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .alert(L10n.tr("刷新失败"), isPresented: refreshErrorBinding) {
+                Button(L10n.tr("确定")) {}
+            } message: {
+                Text(state.refreshErrorMessage ?? "")
+            }
+    }
+}
+
+// MARK: - Detail Content & Progressive Store
+
+struct MediaDetailContent {
+    var posterURL: URL?
+    var backdropURLs: [URL]
+    var year: Int?
+    var rating: Double?
+    var contentRating: String?
+    var logoURL: URL?
+    var overview: String?
+    var genres: [String]
+    var director: String?
+    var castMembers: [CastMemberDisplay]
+    var seasons: [SeasonInfo]
+    var collections: [ServerMediaItem]
+}
+
+@MainActor
+final class MediaDetailSummaryState: ObservableObject {
+    @Published var content: MediaDetailContent?
+    @Published var isLoading = false
+}
+
+@MainActor
+final class MediaDetailCastState: ObservableObject {
+    @Published var members: [CastMemberDisplay] = []
+}
+
+@MainActor
+final class MediaDetailCollectionState: ObservableObject {
+    @Published var items: [ServerMediaItem] = []
+}
+
+@MainActor
+final class MediaDetailEpisodeState: ObservableObject {
+    @Published var seasons: [SeasonInfo] = []
+    @Published var selectedSeason: Int?
+    @Published var episodes: [EpisodeInfo] = []
+    @Published var isLoading = false
+    @Published var isLoadingMore = false
+    @Published var hasMore = false
+}
+
+@MainActor
+final class MediaDetailTechnicalState: ObservableObject {
+    @Published var videoWidth: Int?
+    @Published var videoHeight: Int?
+    @Published var videoCodec: String?
+    @Published var videoBitDepth: Int?
+    @Published var bitRate: Int?
+    @Published var dynamicRange: String?
+    @Published var audioTracks: [AudioTrackInfo] = []
+    @Published var episodeFileNameHint: String?
+}
+
+@MainActor
+final class MediaDetailActionState: ObservableObject {
+    @Published var isRefreshingMetadata = false
+    @Published var refreshErrorMessage: String?
+}
+
+@MainActor
+final class MediaDetailStore: ObservableObject {
+    let summaryState = MediaDetailSummaryState()
+    let castState = MediaDetailCastState()
+    let collectionState = MediaDetailCollectionState()
+    let episodeState = MediaDetailEpisodeState()
+    let technicalState = MediaDetailTechnicalState()
+    let actionState = MediaDetailActionState()
+
+    var content: MediaDetailContent? {
+        get {
+            guard var value = summaryState.content else { return nil }
+            value.castMembers = castState.members
+            value.seasons = episodeState.seasons
+            value.collections = collectionState.items
+            return value
+        }
+        set {
+            summaryState.content = newValue.map {
+                MediaDetailContent(
+                    posterURL: $0.posterURL,
+                    backdropURLs: $0.backdropURLs,
+                    year: $0.year,
+                    rating: $0.rating,
+                    contentRating: $0.contentRating,
+                    logoURL: $0.logoURL,
+                    overview: $0.overview,
+                    genres: $0.genres,
+                    director: $0.director,
+                    castMembers: [],
+                    seasons: [],
+                    collections: []
+                )
+            }
+            castState.members = newValue?.castMembers ?? []
+            episodeState.seasons = newValue?.seasons ?? []
+            collectionState.items = newValue?.collections ?? []
+        }
+    }
+
+    var isLoading: Bool {
+        get { summaryState.isLoading }
+        set { summaryState.isLoading = newValue }
+    }
+
+    var selectedSeason: Int? {
+        get { episodeState.selectedSeason }
+        set { episodeState.selectedSeason = newValue }
+    }
+
+    var seasonEpisodes: [EpisodeInfo] {
+        get { episodeState.episodes }
+        set { episodeState.episodes = newValue }
+    }
+
+    var isLoadingEpisodes: Bool {
+        get { episodeState.isLoading }
+        set { episodeState.isLoading = newValue }
+    }
+
+    var isLoadingMoreEpisodes: Bool {
+        get { episodeState.isLoadingMore }
+        set { episodeState.isLoadingMore = newValue }
+    }
+
+    var hasMoreEpisodes: Bool {
+        get { episodeState.hasMore }
+        set { episodeState.hasMore = newValue }
+    }
+
+    var isRefreshingMetadata: Bool {
+        get { actionState.isRefreshingMetadata }
+        set { actionState.isRefreshingMetadata = newValue }
+    }
+
+    var videoWidth: Int? {
+        get { technicalState.videoWidth }
+        set { technicalState.videoWidth = newValue }
+    }
+
+    var videoHeight: Int? {
+        get { technicalState.videoHeight }
+        set { technicalState.videoHeight = newValue }
+    }
+
+    var dynamicRange: String? {
+        get { technicalState.dynamicRange }
+        set { technicalState.dynamicRange = newValue }
+    }
+
+    var refreshErrorMessage: String? {
+        get { actionState.refreshErrorMessage }
+        set { actionState.refreshErrorMessage = newValue }
+    }
+
+    private var loadedKey: String?
+    private var loadGeneration = 0
+    private var episodeStartIndex = 0
+    private var episodeLoadGeneration = 0
+    private var metadataCacheRecord: MetadataCacheRecord?
+    private var metadataRootDirectory: URL?
+    private var initialEpisodeTask: Task<Void, Never>?
+    private let metadataLoader = MediaDetailProgressiveLoader()
+
+    private let episodePageSize = 20
+
+    var nextEpisodeToPlay: EpisodeInfo? {
+        let sorted = seasonEpisodes.sorted { ($0.seasonNumber, $0.episodeNumber) < ($1.seasonNumber, $1.episodeNumber) }
+        if let inProgress = sorted.first(where: { !$0.isWatched && $0.lastPlaybackPosition > 0 }) {
+            return inProgress
+        }
+        if let firstUnwatched = sorted.first(where: { !$0.isWatched }) {
+            return firstUnwatched
+        }
+        return sorted.first
+    }
+
+    func supportsMetadataRefresh(for item: MediaItem, in modelContext: ModelContext) -> Bool {
+        if (try? connectionSnapshot(for: item, in: modelContext)) != nil {
+            return true
+        }
+        return MetadataRefreshCoordinator.supportsRefresh(for: item)
+    }
+
+    func load(item: MediaItem, modelContext: ModelContext, autoDownloadMetadata: Bool) async {
+        let key = detailKey(for: item)
+        guard loadedKey != key else { return }
+        loadedKey = key
+        loadGeneration += 1
+        let generation = loadGeneration
+        defer {
+            if generation == loadGeneration {
+                isLoading = false
+                if Task.isCancelled {
+                    loadedKey = nil
+                }
+            }
+        }
+
+        isLoading = true
+        resetEpisodePagingState()
+        content = baseContent(for: item)
+        #if DEBUG
+        VanmoLogger.library.info("[Debug][Detail] load type=\(item.mediaType.rawValue, privacy: .public) title=\(item.title, privacy: .private)")
+        #endif
+        technicalState.videoWidth = item.videoWidth
+        technicalState.videoHeight = item.videoHeight
+        technicalState.videoCodec = item.videoCodec
+        technicalState.videoBitDepth = nil
+        technicalState.bitRate = nil
+        technicalState.dynamicRange = item.dynamicRange
+        technicalState.audioTracks = item.audioTracks
+        technicalState.episodeFileNameHint = nil
+
+        await performAggregate(
+            item: item,
+            modelContext: modelContext,
+            autoDownloadMetadata: autoDownloadMetadata,
+            force: false,
+            generation: generation
+        )
+    }
+
+    func refreshMetadata(for item: MediaItem, modelContext: ModelContext, force: Bool) async {
+        guard !isRefreshingMetadata else { return }
+        isRefreshingMetadata = true
+        defer { isRefreshingMetadata = false }
+        loadGeneration += 1
+        let generation = loadGeneration
+        initialEpisodeTask?.cancel()
+        episodeLoadGeneration += 1
+
+        await performAggregate(
+            item: item,
+            modelContext: modelContext,
+            autoDownloadMetadata: true,
+            force: force,
+            generation: generation
+        )
+    }
+
+    func selectSeason(_ season: Int, item: MediaItem, modelContext: ModelContext) async {
+        guard selectedSeason != season else { return }
+        selectedSeason = season
+        await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
+    }
+
+    /// 退出播放器或刚打开详情时，用 SwiftData 中的已看和进度记录更新主条目与剧集状态。
+    func syncLocalPlaybackStates(for item: MediaItem, in modelContext: ModelContext) {
+        let sourceConnectionId = item.sourceConnectionId
+        if let serverId = item.serverId {
+            let descriptor = FetchDescriptor<MediaItem>(
+                predicate: #Predicate<MediaItem> { mediaItem in
+                    mediaItem.serverId == serverId &&
+                        mediaItem.sourceConnectionId == sourceConnectionId
+                }
+            )
+            if let stored = try? modelContext.fetch(descriptor).first {
+                item.isWatched = stored.isWatched
+                item.lastPlaybackPosition = stored.lastPlaybackPosition
+                item.lastPlayedAt = stored.lastPlayedAt
+                item.isFavorite = stored.isFavorite
+            }
+        }
+
+        guard item.mediaType == .tvShow, !seasonEpisodes.isEmpty else { return }
+        let localEpisodes = fetchLocalEpisodes(for: item, in: modelContext)
+        guard !localEpisodes.isEmpty else { return }
+        seasonEpisodes = mergeLocalProgress(into: seasonEpisodes, localItems: localEpisodes)
+    }
+
+    func applySeriesWatchedState(_ isWatched: Bool, for item: MediaItem, in modelContext: ModelContext) {
+        let localEpisodes = fetchLocalEpisodes(for: item, in: modelContext)
+        let episodeIDs = Set(seasonEpisodes.map(\.id))
+        let now = Date()
+        for local in localEpisodes {
+            let matchesLoaded = local.serverId.map { episodeIDs.contains($0) } ?? false
+            let matchesSeries = (item.serverId != nil && local.seriesId == item.serverId) || matchesLoaded
+            guard matchesSeries else { continue }
+            local.isWatched = isWatched
+            if isWatched {
+                if local.duration > 0 { local.lastPlaybackPosition = local.duration }
+                local.lastPlayedAt = now
+            } else {
+                local.lastPlaybackPosition = 0
+            }
+        }
+        try? modelContext.save()
+
+        guard !seasonEpisodes.isEmpty else { return }
+        seasonEpisodes = seasonEpisodes.map { episode in
+            EpisodeInfo(
+                id: episode.id,
+                title: episode.title,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                duration: episode.duration,
+                overview: episode.overview,
+                streamURL: episode.streamURL,
+                backdropURL: episode.backdropURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath,
+                videoWidth: episode.videoWidth,
+                videoHeight: episode.videoHeight,
+                videoCodec: episode.videoCodec,
+                videoBitDepth: episode.videoBitDepth,
+                bitRate: episode.bitRate,
+                dynamicRange: episode.dynamicRange,
+                audioTracks: episode.audioTracks,
+                lastPlaybackPosition: isWatched ? (episode.duration > 0 ? episode.duration : episode.lastPlaybackPosition) : 0,
+                isWatched: isWatched
+            )
+        }
+    }
+
+#if DEBUG
+    func installDebugHeroWalkEpisodesIfNeeded(for item: MediaItem) {
+        guard DownloadHeroWalkFixtures.requestedKind == .series, item.mediaType == .tvShow else { return }
+        guard let episodes = try? DownloadHeroWalkFixtures.seriesEpisodes() else { return }
+        if content == nil {
+            content = MediaDetailContent(
+                posterURL: item.posterURL,
+                backdropURLs: item.backdropURL.map { [$0] } ?? [],
+                year: item.year,
+                rating: nil,
+                contentRating: nil,
+                logoURL: nil,
+                overview: item.overview,
+                genres: [],
+                director: nil,
+                castMembers: [],
+                seasons: [SeasonInfo(seasonNumber: 1)],
+                collections: []
+            )
+        } else {
+            content?.seasons = [SeasonInfo(seasonNumber: 1)]
+        }
+        selectedSeason = 1
+        seasonEpisodes = episodes
+        hasMoreEpisodes = false
+        isLoadingEpisodes = false
+        isLoadingMoreEpisodes = false
+    }
+#endif
+
+    func loadMoreEpisodes(item: MediaItem, modelContext: ModelContext) async {
+        guard hasMoreEpisodes, !isLoadingMoreEpisodes, !isLoadingEpisodes else { return }
+        await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: false)
+    }
+
+    private func performAggregate(
+        item: MediaItem,
+        modelContext: ModelContext,
+        autoDownloadMetadata: Bool,
+        force: Bool,
+        generation: Int
+    ) async {
+        let root = (try? await MetadataCache.shared.rootDirectoryURL())
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        metadataRootDirectory = root
+        let connection = try? connectionSnapshot(for: item, in: modelContext)
+        let canRefresh = supportsMetadataRefresh(for: item, in: modelContext)
+        let updates = metadataLoader.updates(
+            for: item,
+            connection: connection,
+            autoDownloadMetadata: autoDownloadMetadata && canRefresh,
+            force: force
+        )
+
+        for await event in updates {
+            guard generation == loadGeneration, !Task.isCancelled, !item.isDeleted else { return }
+            switch event {
+            case .cached(let record), .metadata(let record):
+                applyMetadataRecord(record, root: root, item: item)
+                if episodeState.seasons.isEmpty, item.mediaType == .tvShow {
+                    applySeasons(seasonInfos(from: record), item: item, modelContext: modelContext)
+                }
+            case .seasons(let seasons):
+                applySeasons(seasons, item: item, modelContext: modelContext)
+            case .collections(let collections):
+                collectionState.items = collections
+            case .failed(let component, let message):
+                if component == .metadata {
+                    refreshErrorMessage = message
+                }
+            case .finished:
+                isLoading = false
+            }
+        }
+
+        guard generation == loadGeneration, !Task.isCancelled else { return }
+        isLoading = false
+    }
+
+    private func baseContent(for item: MediaItem) -> MediaDetailContent {
+        let members = item.cast.enumerated().map { index, name in
+            CastMemberDisplay(id: "\(index)-\(name)", name: name, role: nil, profileURL: nil)
+        }
+        return MediaDetailContent(
+            posterURL: item.posterURL,
+            backdropURLs: item.backdropURL.map { [$0] } ?? [],
+            year: item.year,
+            rating: item.rating,
+            contentRating: item.contentRating,
+            logoURL: item.logoURL,
+            overview: item.overview,
+            genres: item.genres,
+            director: item.director,
+            castMembers: members,
+            seasons: [],
+            collections: []
+        )
+    }
+
+    private func applyMetadataRecord(
+        _ record: MetadataCacheRecord,
+        root: URL,
+        item: MediaItem
+    ) {
+        metadataCacheRecord = record
+        var snapshot = summaryState.content ?? baseContent(for: item)
+        snapshot.posterURL = record.posterRemoteURL ?? snapshot.posterURL
+        let resolvedBackdrops = record.resolvedBackdropURLs(rootDirectory: root)
+        if !resolvedBackdrops.isEmpty {
+            snapshot.backdropURLs = resolvedBackdrops
+        }
+        snapshot.year = record.year ?? snapshot.year
+        snapshot.rating = record.rating ?? snapshot.rating
+        snapshot.contentRating = MediaCapabilityTags.normalizedContentRating(record.contentRating)
+            ?? snapshot.contentRating
+        snapshot.logoURL = record.resolvedLogoURL(rootDirectory: root) ?? snapshot.logoURL
+        snapshot.overview = record.overview?.isEmpty == false ? record.overview : snapshot.overview
+        snapshot.genres = record.genres.isEmpty ? snapshot.genres : record.genres
+        snapshot.director = record.director?.isEmpty == false ? record.director : snapshot.director
+        summaryState.content = snapshot
+
+        let members = record.makeCastDisplays(rootDirectory: root)
         if !members.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(L10n.tr("主演"))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(CatDesign.textIvory)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(members) { member in
-                            MediaDetailCastAvatar(member: member)
-                        }
-                    }
-                    .padding(.horizontal, CatDesign.horizontalMargin)
-                }
-                .padding(.horizontal, -CatDesign.horizontalMargin)
-            }
+            castState.members = members
         }
-    }
-}
 
-private struct MediaDetailCastAvatar: View {
-    let member: CastMemberDisplay
-
-    var body: some View {
-        VStack(spacing: 7) {
-            ZStack {
-                Circle()
-                    .fill(CatDesign.surfacePill)
-
-                if let profileURL = member.profileURL {
-                    KFImage(profileURL)
-                        .placeholder {
-                            Text(initial(for: member.name))
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundStyle(CatDesign.textMuted)
-                        }
-                        .fade(duration: 0.2)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 72, height: 72)
-                        .clipShape(Circle())
-                } else {
-                    Text(initial(for: member.name))
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundStyle(CatDesign.textMuted)
-                }
-            }
-            .frame(width: 72, height: 72)
-            .overlay(Circle().strokeBorder(CatDesign.strokeGlass, lineWidth: 1))
-
-            Text(member.name)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(CatDesign.textIvory)
-                .lineLimit(1)
-                .frame(width: 72)
+        technicalState.videoWidth = record.videoWidth ?? technicalState.videoWidth
+        technicalState.videoHeight = record.videoHeight ?? technicalState.videoHeight
+        technicalState.videoCodec = record.videoCodec ?? technicalState.videoCodec
+        technicalState.videoBitDepth = record.videoBitDepth ?? technicalState.videoBitDepth
+        technicalState.bitRate = record.bitRate ?? technicalState.bitRate
+        technicalState.dynamicRange = record.dynamicRange ?? technicalState.dynamicRange
+        if !record.audioTracks.isEmpty {
+            technicalState.audioTracks = record.audioTracks
         }
     }
 
-    private func initial(for name: String) -> String {
-        String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased()
-    }
-}
+    private func applySeasons(
+        _ seasons: [SeasonInfo],
+        item: MediaItem,
+        modelContext: ModelContext
+    ) {
+        guard !seasons.isEmpty else { return }
+        episodeState.seasons = seasons
+        let previousSeason = selectedSeason
+        if let previousSeason, seasons.contains(where: { $0.seasonNumber == previousSeason }) {
+            selectedSeason = previousSeason
+        } else {
+            selectedSeason = seasons.first?.seasonNumber
+        }
 
-private struct MediaDetailCollectionsSection: View {
-    let collections: [ServerMediaItem]
-    let makeItem: (ServerMediaItem) -> MediaItem
-
-    var body: some View {
-        if !collections.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(L10n.tr("合集"))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(CatDesign.textIvory)
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(collections, id: \.serverId) { collection in
-                            NavigationLink {
-                                EmbyFolderBrowseView(container: makeItem(collection))
-                            } label: {
-                                MediaDetailCollectionCard(collection: collection)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, CatDesign.horizontalMargin)
-                }
-                .padding(.horizontal, -CatDesign.horizontalMargin)
-            }
+        initialEpisodeTask?.cancel()
+        initialEpisodeTask = Task { [weak self] in
+            guard let self else { return }
+            await loadSeasonEpisodes(item: item, modelContext: modelContext, reset: true)
         }
     }
-}
 
-private struct MediaDetailCollectionCard: View {
-    let collection: ServerMediaItem
+    private func applyTechnicalFields(from episodes: [EpisodeInfo]) {
+        let names = episodes.compactMap(\.originalFileName).joined(separator: " ")
+        technicalState.episodeFileNameHint = names.isEmpty ? nil : names
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(CatDesign.mediaPlaceholder)
+        let match = episodes.first {
+            ($0.videoWidth ?? 0) > 0 || ($0.videoHeight ?? 0) > 0 || $0.videoCodec != nil
+        }
+        #if DEBUG
+        VanmoLogger.library.info("[Debug][Detail] tvTags episodes=\(episodes.count, privacy: .public) width=\(match?.videoWidth ?? 0, privacy: .public) height=\(match?.videoHeight ?? 0, privacy: .public) codec=\(match?.videoCodec ?? "nil", privacy: .public) files=\(names.isEmpty ? "none" : "yes", privacy: .public)")
+        #endif
+        guard let match else { return }
 
-                if let posterURL = collection.posterURL {
-                    KFImage(posterURL)
-                        .fade(duration: 0.2)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Image(systemName: "rectangle.stack.fill")
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(CatDesign.accentAmber)
-                }
+        technicalState.videoWidth = technicalState.videoWidth ?? match.videoWidth
+        technicalState.videoHeight = technicalState.videoHeight ?? match.videoHeight
+        technicalState.videoCodec = technicalState.videoCodec ?? match.videoCodec
+        technicalState.videoBitDepth = technicalState.videoBitDepth ?? match.videoBitDepth
+        technicalState.bitRate = technicalState.bitRate ?? match.bitRate
+        technicalState.dynamicRange = technicalState.dynamicRange ?? match.dynamicRange
+        if technicalState.audioTracks.isEmpty && !match.audioTracks.isEmpty {
+            technicalState.audioTracks = match.audioTracks
+        }
+    }
+
+    private func resetEpisodePagingState() {
+        initialEpisodeTask?.cancel()
+        episodeLoadGeneration += 1
+        selectedSeason = nil
+        seasonEpisodes = []
+        isLoadingEpisodes = false
+        isLoadingMoreEpisodes = false
+        hasMoreEpisodes = false
+        episodeStartIndex = 0
+        metadataCacheRecord = nil
+        metadataRootDirectory = nil
+    }
+
+    private func loadSeasonEpisodes(item: MediaItem, modelContext: ModelContext, reset: Bool) async {
+        guard !Task.isCancelled,
+              loadedKey == detailKey(for: item),
+              item.mediaType == .tvShow else {
+            return
+        }
+        guard let season = selectedSeason else { return }
+
+        if reset {
+            episodeLoadGeneration += 1
+            seasonEpisodes = []
+            episodeStartIndex = 0
+            hasMoreEpisodes = false
+            isLoadingEpisodes = true
+            isLoadingMoreEpisodes = false
+        } else {
+            guard hasMoreEpisodes, !isLoadingMoreEpisodes, !isLoadingEpisodes else { return }
+            isLoadingMoreEpisodes = true
+        }
+
+        let generation = episodeLoadGeneration
+        let startIndex = reset ? 0 : episodeStartIndex
+
+        defer {
+            if generation == episodeLoadGeneration {
+                isLoadingEpisodes = false
+                isLoadingMoreEpisodes = false
             }
-            .frame(width: 124, height: 72)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+        }
+
+        do {
+            let page = try await fetchEpisodesPage(
+                item: item,
+                modelContext: modelContext,
+                season: season,
+                startIndex: startIndex,
+                pageSize: episodePageSize
             )
 
-            Text(collection.title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(CatDesign.textIvory)
-                .lineLimit(2)
-                .frame(width: 124, alignment: .leading)
-        }
-    }
-}
+            guard generation == episodeLoadGeneration, !item.isDeleted else { return }
 
-private struct MediaDetailMetaRow: View {
-    enum Style { case collapsed, header }
+            let mergedBackdrops = mergeEpisodeBackdrops(page.items, for: item)
+            let localEpisodes = fetchLocalEpisodes(for: item, in: modelContext)
+            let merged = mergeLocalProgress(into: mergedBackdrops, localItems: localEpisodes)
 
-    let values: [String]
-    let style: Style
-
-    var body: some View {
-        if !values.isEmpty {
-            HStack(spacing: style == .collapsed ? 8 : 6) {
-                ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                    if index > 0 {
-                        Circle()
-                            .fill(style == .collapsed ? Color.white.opacity(0.5) : CatDesign.textMuted.opacity(0.5))
-                            .frame(width: 4, height: 4)
-                    }
-                    Text(value)
-                        .font(.system(size: style == .collapsed ? 14 : 12,
-                                      weight: style == .collapsed ? .medium : .semibold))
-                        .foregroundStyle(style == .collapsed
-                            ? CatDesign.Cinema.textIvory.opacity(0.85)
-                            : CatDesign.textMuted)
-                }
-            }
-        }
-    }
-}
-
-private struct MediaDetailSynopsisSection: View {
-    let overview: String?
-    let onTap: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(L10n.tr("简介"))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(CatDesign.textIvory)
-
-                Spacer()
-
-                Button(action: onTap) {
-                    Text(L10n.tr("更多 ›"))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(CatDesign.accentAmber)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Text(overview ?? L10n.tr("暂无简介"))
-                .font(.system(size: 12.5))
-                .lineSpacing(4)
-                .foregroundStyle(CatDesign.textMuted)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-                .onTapGesture { onTap() }
-        }
-    }
-}
-
-private struct MediaDetailDetailsSection: View {
-    let director: String?
-    let genres: [String]
-    let directorLabel: String
-
-    var body: some View {
-        if director != nil || !genres.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(L10n.tr("详情"))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(CatDesign.textIvory)
-
-                VStack(spacing: 10) {
-                    if let director {
-                        detailRow(title: directorLabel, value: director)
-                    }
-                    if director != nil && !genres.isEmpty {
-                        Rectangle()
-                            .fill(CatDesign.hairSeparator)
-                            .frame(height: 0.75)
-                    }
-                    if !genres.isEmpty {
-                        detailRow(title: L10n.tr("类型"), value: genres.joined(separator: " / "))
-                    }
-                }
-                .padding(14)
-                .catGlassCard(cornerRadius: CatDesign.radiusSquircleMd)
-            }
-        }
-    }
-
-    private func detailRow(title: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .font(.system(size: 12.5))
-                .foregroundStyle(CatDesign.textMuted)
-                .frame(width: 72, alignment: .leading)
-            Text(value)
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(CatDesign.textIvory)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .multilineTextAlignment(.trailing)
-        }
-    }
-}
-
-private struct MediaDetailEpisodesSection: View {
-    let episodes: [EpisodeInfo]
-    let seasonNumbers: [Int]
-    @Binding var selectedSeason: Int?
-    let accentColor: Color
-    var isLoadingEpisodes: Bool = false
-    var isLoadingMore: Bool = false
-    var hasMoreEpisodes: Bool = false
-    let onPlay: (EpisodeInfo) -> Void
-    var onLoadMore: (() -> Void)?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            headerRow
-
-            if isLoadingEpisodes && episodes.isEmpty {
-                ProgressView()
-                    .tint(CatDesign.accentAmber)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-            } else if episodes.isEmpty {
-                Text(L10n.tr("暂无剧集"))
-                    .font(.system(size: 13))
-                    .foregroundStyle(CatDesign.textMuted)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+            if reset {
+                seasonEpisodes = merged
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(episodes) { episode in
-                            episodeHorizontalCard(episode)
-                                .id(episode.id)
-                        }
-
-                        if hasMoreEpisodes || isLoadingMore {
-                            Group {
-                                if isLoadingMore {
-                                    ProgressView()
-                                        .tint(CatDesign.accentAmber)
-                                        .frame(width: 48, height: 98)
-                                } else {
-                                    Color.clear
-                                        .frame(width: 1, height: 98)
-                                }
-                            }
-                            .onAppear { onLoadMore?() }
-                        }
-                    }
-                    .padding(.horizontal, CatDesign.horizontalMargin)
-                }
-                .padding(.horizontal, -CatDesign.horizontalMargin)
-                .scrollClipDisabled()
+                let existingIDs = Set(seasonEpisodes.map(\.id))
+                seasonEpisodes.append(contentsOf: merged.filter { !existingIDs.contains($0.id) })
             }
+
+            episodeStartIndex = startIndex + page.items.count
+            hasMoreEpisodes = page.items.count >= episodePageSize
+                && episodeStartIndex < page.totalRecordCount
+            let cacheKey = MetadataCacheKey.from(item)
+            Task(priority: .utility) {
+                try? await MetadataCache.shared.cacheEpisodes(page.items, for: cacheKey)
+            }
+        } catch {
+            VanmoLogger.library.error("[MediaServer] Failed to load season episodes: \(error.localizedDescription)")
+            guard generation == episodeLoadGeneration else { return }
+
+            if reset, let fallback = cachedEpisodes(for: season, item: item), !fallback.isEmpty {
+                let localEpisodes = fetchLocalEpisodes(for: item, in: modelContext)
+                seasonEpisodes = mergeLocalProgress(into: fallback, localItems: localEpisodes)
+                episodeStartIndex = fallback.count
+                hasMoreEpisodes = false
+            } else if reset {
+                seasonEpisodes = []
+                hasMoreEpisodes = false
+            }
+        }
+
+        applyTechnicalFields(from: seasonEpisodes)
+    }
+
+    private func fetchLocalEpisodes(for item: MediaItem, in modelContext: ModelContext) -> [MediaItem] {
+        let sourceConnectionId = item.sourceConnectionId
+        let descriptor = FetchDescriptor<MediaItem>(
+            predicate: #Predicate<MediaItem> { mediaItem in
+                mediaItem.sourceConnectionId == sourceConnectionId
+            }
+        )
+        return ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.mediaType == .tvEpisode }
+    }
+
+    private func mergeLocalProgress(into episodes: [EpisodeInfo], localItems: [MediaItem]) -> [EpisodeInfo] {
+        guard !localItems.isEmpty else { return episodes }
+        var byServerId: [String: MediaItem] = [:]
+        var byURL: [String: MediaItem] = [:]
+        for local in localItems {
+            if let serverId = local.serverId {
+                byServerId[serverId] = local
+            }
+            byURL[local.fileURL.standardizedFileURL.absoluteString] = local
+        }
+
+        return episodes.map { episode in
+            let local = byServerId[episode.id] ?? byURL[episode.streamURL.standardizedFileURL.absoluteString]
+            guard let local else { return episode }
+
+            let mergedWatched = episode.isWatched || local.isWatched
+            let mergedPosition = max(episode.lastPlaybackPosition, local.lastPlaybackPosition)
+            guard mergedWatched != episode.isWatched || mergedPosition != episode.lastPlaybackPosition else {
+                return episode
+            }
+            return EpisodeInfo(
+                id: episode.id,
+                title: episode.title,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                duration: episode.duration,
+                overview: episode.overview,
+                streamURL: episode.streamURL,
+                backdropURL: episode.backdropURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath,
+                videoWidth: episode.videoWidth,
+                videoHeight: episode.videoHeight,
+                videoCodec: episode.videoCodec,
+                videoBitDepth: episode.videoBitDepth,
+                bitRate: episode.bitRate,
+                dynamicRange: episode.dynamicRange,
+                audioTracks: episode.audioTracks,
+                lastPlaybackPosition: mergedPosition,
+                isWatched: mergedWatched
+            )
         }
     }
 
-    private var headerRow: some View {
-        HStack(spacing: 8) {
-            Text(L10n.tr("剧集"))
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(CatDesign.textIvory)
-
-            CatStretchingDivider()
-
-            Spacer(minLength: 8)
-
-            if !seasonNumbers.isEmpty {
-                Menu {
-                    ForEach(seasonNumbers, id: \.self) { season in
-                        Button(LocalizedFormat.seasonLabel(season)) { selectedSeason = season }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(LocalizedFormat.seasonLabel(selectedSeason ?? seasonNumbers.first ?? 1))
-                            .font(.system(size: 11, weight: .semibold))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
-                    }
-                    .foregroundStyle(CatDesign.textIvory)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 5)
-                    .background(CatDesign.surfacePill, in: Capsule())
-                    .overlay(Capsule().strokeBorder(CatDesign.strokeGlass, lineWidth: 0.75))
-                }
-                .disabled(seasonNumbers.count <= 1)
-            }
+    private func fetchEpisodesPage(
+        item: MediaItem,
+        modelContext: ModelContext,
+        season: Int,
+        startIndex: Int,
+        pageSize: Int
+    ) async throws -> EpisodePage {
+        guard let seriesServerId = item.serverId else {
+            throw NetworkError.notConnected
         }
-    }
 
-    private func episodeHorizontalCard(_ episode: EpisodeInfo) -> some View {
-        Button {
-            onPlay(episode)
-        } label: {
-            VStack(alignment: .leading, spacing: 7) {
-                ZStack(alignment: .topLeading) {
-                    if let backdropURL = episode.backdropURL {
-                        KFImage(backdropURL)
-                            .placeholder { thumbnailPlaceholder }
-                            .fade(duration: 0.2)
-                            .resizable()
-                            .scaledToFill()
-                            .id(backdropURL)
-                    } else {
-                        thumbnailPlaceholder
-                    }
+        let snapshot = try? connectionSnapshot(for: item, in: modelContext)
 
-                    LinearGradient(
-                        colors: [.clear, CatDesign.catSilhouette.opacity(0.92)],
-                        startPoint: .top,
-                        endPoint: .bottom
+        switch item.fileURL.host {
+        case "plex-series":
+            if let seasonKey = content?.seasons.first(where: { $0.seasonNumber == season })?.serverId {
+                if let snapshot {
+                    return try await PlexEpisodeFetcher.fetchEpisodesPage(
+                        seasonRatingKey: seasonKey,
+                        seasonNumber: season,
+                        startIndex: startIndex,
+                        pageSize: pageSize,
+                        connection: snapshot
                     )
-                    .frame(height: 58)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-
-                    Text(String(format: "E%02d", episode.episodeNumber))
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(CatDesign.Cinema.textIvory)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(CatDesign.Cinema.surfaceGlass, in: Capsule())
-                        .overlay(Capsule().strokeBorder(CatDesign.Cinema.strokeGlass, lineWidth: 0.75))
-                        .padding(7)
                 }
-                .frame(width: 174, height: 98)
-                .clipShape(RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: CatDesign.radiusSquircleMd, style: .continuous)
-                        .strokeBorder(CatDesign.strokeGlass, lineWidth: 1)
+                return try await PlexEpisodeFetcher.fetchEpisodesPage(
+                    seasonRatingKey: seasonKey,
+                    seasonNumber: season,
+                    startIndex: startIndex,
+                    pageSize: pageSize
                 )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(episode.title.isEmpty ? LocalizedFormat.episodeLabel(episode.episodeNumber) : episode.title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(CatDesign.textIvory)
-                        .lineLimit(1)
-
-                    Text(episode.duration > 0 ? episode.duration.shortDuration : LocalizedFormat.unknownDuration())
-                        .font(.system(size: 11))
-                        .foregroundStyle(CatDesign.textMuted)
-                        .lineLimit(1)
-                }
-                .frame(width: 174, alignment: .leading)
             }
+
+            let all: [EpisodeInfo]
+            if let snapshot {
+                all = try await PlexEpisodeFetcher.fetchEpisodes(
+                    seriesRatingKey: seriesServerId,
+                    connection: snapshot
+                )
+            } else {
+                all = try await PlexEpisodeFetcher.fetchEpisodes(seriesRatingKey: seriesServerId)
+            }
+            let filtered = all
+                .filter { $0.seasonNumber == season }
+                .sorted { $0.episodeNumber < $1.episodeNumber }
+            let slice = Array(filtered.dropFirst(startIndex).prefix(pageSize))
+            return EpisodePage(items: slice, totalRecordCount: filtered.count)
+        default:
+            if let snapshot {
+                return try await EmbyEpisodeFetcher.fetchEpisodesPage(
+                    seriesId: seriesServerId,
+                    season: season,
+                    startIndex: startIndex,
+                    pageSize: pageSize,
+                    connection: snapshot
+                )
+            }
+            return try await EmbyEpisodeFetcher.fetchEpisodesPage(
+                seriesId: seriesServerId,
+                season: season,
+                startIndex: startIndex,
+                pageSize: pageSize
+            )
         }
-        .buttonStyle(.plain)
     }
 
-    private var thumbnailPlaceholder: some View {
-        ZStack {
-            CatDesign.mediaPlaceholder
-            Image(systemName: "play.rectangle")
-                .font(.title3)
-                .foregroundStyle(CatDesign.textMuted.opacity(0.45))
+    private func seasonInfos(from record: MetadataCacheRecord) -> [SeasonInfo] {
+        Array(Set(record.episodes.map(\.seasonNumber)))
+            .sorted()
+            .map { SeasonInfo(seasonNumber: $0) }
+    }
+
+    private func cachedEpisodes(for season: Int, item: MediaItem) -> [EpisodeInfo]? {
+        guard let record = metadataCacheRecord,
+              let root = metadataRootDirectory,
+              item.mediaType == .tvShow,
+              !record.episodes.isEmpty else {
+            return nil
         }
+        return record.episodes
+            .filter { $0.seasonNumber == season }
+            .map { $0.makeEpisodeInfo(rootDirectory: root) }
+            .sorted { $0.episodeNumber < $1.episodeNumber }
+    }
+
+    private func mergeEpisodeBackdrops(_ loaded: [EpisodeInfo], for item: MediaItem) -> [EpisodeInfo] {
+        guard let record = metadataCacheRecord,
+              let root = metadataRootDirectory,
+              item.mediaType == .tvShow,
+              !record.episodes.isEmpty else {
+            return loaded
+        }
+
+        let cachedByID = Dictionary(record.episodes.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+        return loaded.map { episode in
+            guard episode.backdropURL == nil, let cached = cachedByID[episode.id] else { return episode }
+            let cachedEpisode = cached.makeEpisodeInfo(rootDirectory: root)
+            guard let backdropURL = cachedEpisode.backdropURL else { return episode }
+            return EpisodeInfo(
+                id: episode.id,
+                title: episode.title,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+                duration: episode.duration,
+                overview: episode.overview,
+                streamURL: episode.streamURL,
+                backdropURL: backdropURL,
+                fileSize: episode.fileSize,
+                originalFileName: episode.originalFileName,
+                container: episode.container,
+                remotePath: episode.remotePath,
+                videoWidth: episode.videoWidth,
+                videoHeight: episode.videoHeight,
+                videoCodec: episode.videoCodec,
+                videoBitDepth: episode.videoBitDepth,
+                bitRate: episode.bitRate,
+                dynamicRange: episode.dynamicRange,
+                audioTracks: episode.audioTracks,
+                lastPlaybackPosition: episode.lastPlaybackPosition,
+                isWatched: episode.isWatched
+            )
+        }
+    }
+
+    private func detailKey(for item: MediaItem) -> String {
+        MetadataCacheKey.from(item).cacheKey
+    }
+
+    private func connectionSnapshot(for item: MediaItem, in modelContext: ModelContext) throws -> MediaServerConnectionSnapshot? {
+        try MediaServerConnectionResolver.snapshot(for: item, in: modelContext)
     }
 }
 
-#Preview {
-    NavigationStack {
-        MediaDetailView(item: MediaItem(
-            title: "DUNE: PART TWO",
-            fileURL: URL(fileURLWithPath: "/test.mkv"),
-            mediaType: .movie,
-            fileSize: 4_500_000_000,
-            duration: 8880
-        ))
+// MARK: - Previews
+
+#Preview("Movie Detail — Dark") {
+    let movie = MediaItem(
+        title: "DUNE: PROPHECY",
+        fileURL: URL(fileURLWithPath: "/dune.mkv"),
+        mediaType: .movie,
+        fileSize: 68_000_000_000,
+        duration: 8280
+    )
+    movie.year = 2024
+    movie.genres = ["Sci-Fi"]
+    movie.rating = 8.6
+    movie.videoWidth = 3840
+    movie.videoHeight = 2160
+    movie.videoCodec = "HEVC"
+    movie.dynamicRange = DynamicRange.dolbyVision.rawValue
+    movie.audioTracks = [AudioTrackInfo(id: 0, codec: "truehd", channels: 8)]
+    movie.overview = "Ten thousand years before the ascension of Paul Atreides, two Harkonnen sisters combat forces that threaten humanity and establish the Bene Gesserit."
+    movie.cast = ["Timothée Chalamet", "Zendaya Coleman", "Rebecca Ferguson", "Javier Bardem"]
+
+    return NavigationStack {
+        MediaDetailView(item: movie)
     }
     .environmentObject(AppState())
     .environmentObject(DownloadManager.shared)
     .preferredColorScheme(.dark)
 }
 
+#Preview("Movie Detail — Light") {
+    let movie = MediaItem(
+        title: "DUNE: PROPHECY",
+        fileURL: URL(fileURLWithPath: "/dune.mkv"),
+        mediaType: .movie,
+        fileSize: 68_000_000_000,
+        duration: 8280
+    )
+    movie.year = 2024
+    movie.genres = ["Sci-Fi"]
+    movie.rating = 8.6
+    movie.videoWidth = 3840
+    movie.videoHeight = 2160
+    movie.videoCodec = "HEVC"
+    movie.dynamicRange = DynamicRange.dolbyVision.rawValue
+    movie.audioTracks = [AudioTrackInfo(id: 0, codec: "truehd", channels: 8)]
+    movie.overview = "Ten thousand years before the ascension of Paul Atreides, two Harkonnen sisters combat forces that threaten humanity and establish the Bene Gesserit."
+    movie.cast = ["Timothée Chalamet", "Zendaya Coleman", "Rebecca Ferguson"]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return NavigationStack {
+        MediaDetailView(item: movie)
+    }
+    .environmentObject(AppState())
+    .environmentObject(DownloadManager.shared)
+    .preferredColorScheme(.light)
+}
