@@ -47,7 +47,7 @@ error affordance when appropriate.
 - Detail, season, and collection requests overlap for a supported TV item.
 - Text and list components become visible before deliberately delayed artwork completes.
 - A metadata event invalidates only its observing detail component, not the root detail view.
-- iOS MediaDetail uses the continuous parallax scroll layout (`19 · Movie Detail — Above the Fold` / `20 · Movie Detail — Full Parallax Scroll`) with backdrop-first hero artwork (carousel when multiple backdrops exist, poster fallback) and `MEDIA SPECIFICATIONS` chips; macOS preserves its split-hero desktop layout and interactions.
+- iOS MediaDetail uses the continuous parallax scroll layout (`19 · Movie Detail — Above the Fold` / `20 · Movie Detail — Full Parallax Scroll`) with backdrop-first hero artwork (carousel when multiple backdrops exist, poster fallback) and `MEDIA SPECIFICATIONS` chips; macOS uses the Black Cat Redesign split-hero desktop layout (`MacMediaDetailView`: `420px` backdrop hero, 4-action row with perching cat, mark-watched and metadata-refresh inside the `...` More menu, 16:9 episode cards, collections, and cast & crew).
 - Emby/Jellyfin and Plex issue one detail request per load generation.
 
 ## Evidence Boundary

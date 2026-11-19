@@ -55,11 +55,11 @@ Vanmo/
 │   └── Frameworks/FFmpeg/       # Ignored leftover local output; not a build input
 ├── VanmoMac/                    # macOS application
 │   ├── App/                     # App entry point, routing, window coordination
-│   ├── Player/                  # macOS AVPlayer/KSPlayer and player window
+│   ├── Player/                  # macOS AVPlayer/KSPlayer, cinema HUD, 3-tab track drawer, player window
 │   ├── Metadata/                # macOS KSPlayer media-probe bridge
-│   ├── UI/                      # Library / Browser / Search / Settings / Detail
+│   ├── UI/                      # DesignSystem (MacDesignTokens), Components (MacCatUIComponents), Library / Browser / Search / Settings / Detail
 │   ├── Shared/                  # AppKit OAuth bridge and platform extensions
-│   └── Resources/
+│   └── Resources/               # Info-Mac.plist, assets (incl. Black Cat SVG imagesets & 1024×1024 AppIcon), Lottie resources
 ├── Packages/VanmoCore/          # Cross-platform domain and infrastructure package
 │   ├── Sources/VanmoCore/
 │   └── Tests/VanmoCoreTests/
@@ -210,8 +210,8 @@ When the app enters the foreground, it resumes downloads, performs synchronizati
 The app declares:
 
 - A main `WindowGroup` containing `VanmoMacRootView`.
-- A dedicated downloads `WindowGroup`.
-- A native `Settings` scene.
+- A dedicated downloads `Window` (`id: "downloads"`), styled with the Black Cat glass theme and disk storage bar.
+- A native `Settings` scene hosting an immersive `720×540` borderless-titlebar window (`MacSettingsWindowAccessor` stripping the top toolbar chrome) with five top icon tabs (`General & Sync`, `Playback`, `Subtitles`, `Appearance`, `Cache`).
 - A `MenuBarExtra` for basic playback control.
 - A playback command menu with keyboard shortcuts.
 
@@ -219,13 +219,13 @@ The app declares:
 
 macOS does not use the iOS tab structure. `MacAppState` owns an explicit `MacContentRoute`:
 
-- Library Home, Favorites, and History
+- Library Home, Favorites, and History (`Continue Watching`)
 - Collection Folder, Scanned Library, Emby Folder, and Show Detail
 - Connection Browser
 - Direct Links (Open URL)
 - Search
 
-`VanmoMacRootView` combines a custom sidebar with a content area. Library root views remain mounted and switch through opacity and hit testing. This preserves scroll positions and Kingfisher's in-memory cache. Detail content is presented as an overlay.
+`VanmoMacRootView` combines a custom vibrancy sidebar (`MacSidebarView` with `⌘F` cat-ear search, `LIBRARY` navigation, protocol-badge `CONNECTIONS` rows with `MacCatEyeStatus` / standby indicators and `+ ▾` menu, and `Settings ⌘,`) with a dual-theme content area (Night `#121316` + `#FFB547` and Day `#FAF7F2` + `#E5DEC9`, synchronized via `preferredColorScheme`). `MacLibraryHomeView` leads with a `21:9` Featured Hero Banner, `Continue Watching`, and `Recently Added` sections above preserved folder bookmarks and server/scanned library rows; `MacConnectionsBrowseView` uses a 4-column grid, inline directory filter, and top scan progress pill (`MacScanSyncBanner`); `MacAddConnectionView` presents a `540×600` centered modal preserving all 22 protocols plus a Direct URL jump. Library root views remain mounted and switch through opacity and hit testing to preserve scroll positions and Kingfisher's in-memory cache. Detail content (`MacMediaDetailView`) is presented as an overlay with a split-hero backdrop, 4-action row (moving mark-watched into the `...` menu), 16:9 episode cards, collections, and cast.
 
 `MacAppState` coordinates:
 
@@ -471,7 +471,7 @@ macOS does not reuse the iOS `PlayerEngine` implementation:
 
 This supports AppKit window and keyboard-command integration, but creates two playback orchestration paths that must remain behaviorally aligned.
 
-macOS follows the same post-play, generation-guarded remote-subtitle discovery and KS source-error policy as iOS. Its KS seek bridge uses bounded one-shot completion so a missing callback cannot leak a continuation. The persistent AVPlayer time-control observer remains installed across item loads; per-item and KS subscriptions are still replaced during engine cleanup. The player window reapplies its aspect-fit frame after the autosaved frame is restored, so opening does not resize a second time. Scrubbing shows a preview card and, when a prefetch URL exists, reads frames from that same URL. Loading and buffering use a center indicator that is separate from the play button. The gray track span uses the same cache mapping as iOS.
+macOS follows the same post-play, generation-guarded remote-subtitle discovery and KS source-error policy as iOS. Its KS seek bridge uses bounded one-shot completion so a missing callback cannot leak a continuation. The persistent AVPlayer time-control observer remains installed across item loads; per-item and KS subscriptions are still replaced during engine cleanup. The player window reapplies its aspect-fit frame after the autosaved frame is restored, so opening does not resize a second time. `MacPlayerControlsOverlay` renders a cinema-dark HUD (top title/spec pill + `Episodes` / `Audio / Subtitles` drawer toggles, bottom `980×92` glass control deck with `15s` skip, and right-side `300px` 3-tab floating drawer `MacPlayerTrackDrawer`; unimplemented `PiP`, `AirPlay`, `Skip Intro`, and `Prev/Next Episode` buttons remain hidden). Scrubbing shows a `164×92` preview card with leaning cat artwork and, when a prefetch URL exists, reads frames from that same URL. Loading and buffering use a center indicator that is separate from the play button. The gray track span uses the same cache mapping as iOS.
 
 ## 8. Key Data Flows
 

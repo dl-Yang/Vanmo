@@ -48,7 +48,7 @@ The top bar includes a `40×40` circular system AirPlay route picker (`AVRoutePi
 
 ## Figma
 
-iOS Player chrome follows Vanmo iOS file `miM6YTQAnerz6SgkkYZMjo`, page `Black Cat Redesign` (`656:2`), frames `17 · Liquid Glass Player — Scrubbing Preview (852×393)` (`732:1536`), `18 · Liquid Glass Player — Popover & HUD (852×393)` (`732:1631`), and `Liquid Glass Player Icons` (`732:1511`) (superseding the earlier `07` / `08` layouts). macOS keeps its existing glass control layout inside the player window.
+iOS Player chrome follows Vanmo iOS file `miM6YTQAnerz6SgkkYZMjo`, page `Black Cat Redesign` (`656:2`), frames `17 · Liquid Glass Player — Scrubbing Preview (852×393)` (`732:1536`), `18 · Liquid Glass Player — Popover & HUD (852×393)` (`732:1631`), and `Liquid Glass Player Icons` (`732:1511`) (superseding the earlier `07` / `08` layouts). macOS Player (`MacPlayerView`, `MacPlayerControlsOverlay`, `MacPlayerTrackDrawer`) follows the `Vanmo-MacOS` `Black Cat Redesign` (`O75W1XT1Q0btSrepDwEx39`, `144:2`) cinema-dark HUD with a `980×92` floating glass control deck (`15s` skip, `164×92` hover-scrub preview card with leaning cat) and a right-side `300px` 3-tab floating drawer (`Audio | Subtitles | Episodes`), while keeping unimplemented `PiP`, `AirPlay`, `Skip Intro`, and `Prev/Next Episode` buttons hidden.
 
 ## Acceptance
 

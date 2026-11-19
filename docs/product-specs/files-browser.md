@@ -2,14 +2,14 @@
 
 **Status:** Completed  
 **Platforms:** iOS (`Vanmo`) and macOS (`Vanmo-macOS`)  
-**Design source:** iOS Figma `Black Cat Redesign` (`656:2`) frames `03 · Files Sources Hub`, `04 · Media Folder Browser`, and `16 · Favorites & Collections` (updating earlier `File` `630:2`/`630:56` with obsidian/cream glass styling, `CatEyeStatus` online indicators, and `4K` / `未观看` secondary list filters); macOS Figma `Files` page frames `Files-Grid-Light` (`116:407`), `Files-Grid-Dark` (`116:493`), and `Files-Grid-States` (`116:579`)  
-**Execution plan:** [`../exec-plans/completed/2026-10-28-files-browser-grid-and-transition.md`](../exec-plans/completed/2026-10-28-files-browser-grid-and-transition.md)
+**Design source:** iOS Figma `Black Cat Redesign` (`656:2`) frames `03 · Files Sources Hub`, `04 · Media Folder Browser`, and `16 · Favorites & Collections` (updating earlier `File` `630:2`/`630:56` with obsidian/cream glass styling, `CatEyeStatus` online indicators, and `4K` / `未观看` secondary list filters); macOS Figma `Vanmo-MacOS` (`O75W1XT1Q0btSrepDwEx39`, `144:2` `Black Cat Redesign`) `Server Files & Browser` (`166:431` / `166:765`, updating the earlier `Files-Grid-Light` / `Files-Grid-Dark` / `Files-Grid-States` layouts with 4-column grid, folder filter box, and top scan progress pill)
+**Execution plan:** [`../exec-plans/completed/2026-10-28-files-browser-grid-and-transition.md`](../exec-plans/completed/2026-10-28-files-browser-grid-and-transition.md) (with macOS 4-column grid, folder filter, and scan-banner updates recorded in [`../exec-plans/completed/2026-11-19-macos-black-cat-ui-redesign.md`](../exec-plans/completed/2026-11-19-macos-black-cat-ui-redesign.md))
 
 ## Behavior
 
 ### Layout
 
-- A connection's directory view defaults to a grid with three items per row. A header button switches between grid and list. The button shows the layout it switches to: `list.bullet` in grid mode and `square.grid.2x2` in list mode. The choice persists per device under `files.browserLayout`.
+- A connection's directory view defaults to a grid: three items per row on iOS and four items per row on macOS (`MacConnectionsBrowseView`, which also displays an inline `Filter in ...` search field and a top `MacScanSyncBanner` scan progress pill with pause/resume/cancel). A header button switches between grid and list. The button shows the layout it switches to: `list.bullet` in grid mode and `square.grid.2x2` in list mode. The choice persists per device under `files.browserLayout`.
 - The grid has two sections: Folders (`文件夹`), then files. The files section is titled `视频` when every item is a video, otherwise `文件`.
 - IPTV channel lists always stay a list.
 - List mode keeps the existing row design. The video icon box uses the same cover order as the grid.
